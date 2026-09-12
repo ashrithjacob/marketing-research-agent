@@ -651,3 +651,26 @@ The corpus audit was checked end to end on this run's real data:
 - **Where do themes live long-term?** In the packet for now. If stage 2 wants to
   re-cluster, they may want to be a separate mutable artifact keyed to immutable
   excerpts.
+
+
+Active ingredients:
+- extract all
+- customer reviews on cactive ingerdients
+- customer reviews on amazon  (more than 10) for product and the 
+
+- based on recent graph (hockey)
+- trustpilot score is high
+- 5-10 products with low saturation and high products
+- Big 5: USA, UK, AUSTRALIA, CANADA, NEW ZEALAND
+- Veloma
+
+- Long form statics: image (hook) followed by long texts in meta, its like a story format in meta
+marketing is highlighting their own desires, talk to them in their own language
+
+- sometimes these long form static videos start in product page
+Ads are eventually the most important thing form all the platforms
+Avatars from the real reviews --> we need to create the avatar for the product
+It has some kind of structure (has data from all the information we gathered)
+
+Sometimes the click goes into an information page not just directly to the page.
+

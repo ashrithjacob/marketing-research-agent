@@ -242,3 +242,4 @@ The agent is working when, on a product it has never seen:
 4. Entailment checker + sampled human verification
 5. Stage 4–5 and the angle map
 6. The two feedback loops as scheduled work
+

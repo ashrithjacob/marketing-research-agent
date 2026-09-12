@@ -63,6 +63,26 @@ CREATE TABLE IF NOT EXISTS research_judgements (
     applied_count INTEGER NOT NULL DEFAULT 0,
     created_at    TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS trendtrack_cache (
+    key        TEXT PRIMARY KEY,
+    kind       TEXT NOT NULL,
+    payload    TEXT NOT NULL,
+    credits    INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_trendtrack_cache_created
+    ON trendtrack_cache(created_at);
+CREATE TABLE IF NOT EXISTS discovery_runs (
+    id         TEXT PRIMARY KEY,
+    status     TEXT NOT NULL,
+    params     TEXT NOT NULL DEFAULT '{}',
+    result     TEXT NOT NULL DEFAULT '',
+    progress   TEXT NOT NULL DEFAULT '[]',
+    error      TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    ended_at   TEXT NOT NULL DEFAULT ''
+);
 `;
 
 /**
@@ -199,6 +219,9 @@ const RUN_FIELDS = new Set([
 
 const JSON_FIELDS = new Set(["brief", "reject_kinds", "judgement_ids", "packet", "usage"]);
 
+/** As `RUN_FIELDS`: anything else is a caller bug, not a silent no-op. */
+const DISCOVERY_FIELDS = new Set(["status", "result", "error", "ended_at"]);
+
 export interface RunUpdate {
   agent_run_id?: string;
   session_id?: string;
@@ -213,6 +236,59 @@ export interface RunUpdate {
   output?: string;
   usage?: unknown;
   ended_at?: string;
+}
+
+/**
+ * A stage-0 discovery run.
+ *
+ * A separate table from `research_runs` rather than a `stage = 0` row in it.
+ * Stage 0 has no brief, no packet and no agent transcript — it has parameters
+ * and a ranked list — so sharing the stage-1 row would mean six columns that are
+ * always empty and a `summary()` that has to branch on stage to mean anything.
+ */
+export interface DiscoveryRun {
+  id: string;
+  status: string;
+  params: Record<string, unknown>;
+  result: Record<string, unknown> | null;
+  /** Append-only step log. Cheap progress without a second event table. */
+  progress: Array<{ step: string; detail: Record<string, unknown>; at: string }>;
+  error: string;
+  created_at: string;
+  updated_at: string;
+  ended_at: string;
+}
+
+export interface DiscoveryUpdate {
+  status?: string;
+  result?: Record<string, unknown> | null;
+  error?: string;
+  ended_at?: string;
+}
+
+/**
+ * A cached TrendTrack response.
+ *
+ * `credits` is what the call cost when it was actually bought, so "credits this
+ * cache has saved" is a sum of real prices rather than an estimate.
+ */
+export interface CachedResponse {
+  key: string;
+  kind: string;
+  payload: unknown;
+  credits: number;
+  created_at: string;
+  /** Seconds since it was stored. The caller owns the TTL policy, not the store. */
+  ageSeconds: number;
+}
+
+export interface CacheStats {
+  entries: number;
+  queries: number;
+  shops: number;
+  creditsStored: number;
+  oldest: string;
+  newest: string;
 }
 
 /** Persistence contract. One implementation today; the seam is the point. */
@@ -232,6 +308,20 @@ export interface ResearchStore {
   addJudgement(input: { kind: string; text: string; rejects_kinds: SourceKind[] }): Judgement;
   deleteJudgement(judgementId: string): void;
   bumpJudgement(judgementId: string, by?: number): void;
+
+  createDiscoveryRun(params: Record<string, unknown>): DiscoveryRun;
+  getDiscoveryRun(runId: string): DiscoveryRun | null;
+  listDiscoveryRuns(limit?: number): DiscoveryRun[];
+  updateDiscoveryRun(runId: string, fields: DiscoveryUpdate): void;
+  addDiscoveryProgress(runId: string, step: string, detail: Record<string, unknown>): void;
+
+  getCached(key: string): CachedResponse | null;
+  putCached(input: { key: string; kind: string; payload: unknown; credits: number }): void;
+  /** Drop entries older than `maxAgeSeconds`. Returns how many went. */
+  pruneCache(maxAgeSeconds: number): number;
+  clearCache(): number;
+  cacheStats(): CacheStats;
+
   close(): void;
 }
 
@@ -427,6 +517,136 @@ export class SqliteResearchStore implements ResearchStore {
       .run(by, judgementId);
   }
 
+  // -- discovery (stage 0) ----------------------------------------------
+
+  createDiscoveryRun(params: Record<string, unknown>): DiscoveryRun {
+    const now = nowIso();
+    const runId = newId();
+    this.db
+      .prepare(
+        "INSERT INTO discovery_runs (id, status, params, created_at, updated_at)" +
+          " VALUES (?,?,?,?,?)",
+      )
+      .run(runId, "running", JSON.stringify(params), now, now);
+    const run = this.getDiscoveryRun(runId);
+    if (!run) throw new Error("discovery run vanished immediately after insert");
+    return run;
+  }
+
+  getDiscoveryRun(runId: string): DiscoveryRun | null {
+    const row = this.db.prepare("SELECT * FROM discovery_runs WHERE id = ?").get(runId);
+    return row ? discoveryFromRow(row as Record<string, any>) : null;
+  }
+
+  listDiscoveryRuns(limit = 50): DiscoveryRun[] {
+    const rows = this.db
+      .prepare("SELECT * FROM discovery_runs ORDER BY created_at DESC LIMIT ?")
+      .all(limit) as Array<Record<string, any>>;
+    return rows.map(discoveryFromRow);
+  }
+
+  updateDiscoveryRun(runId: string, fields: DiscoveryUpdate): void {
+    const keys = Object.keys(fields) as Array<keyof DiscoveryUpdate>;
+    if (keys.length === 0) return;
+    const unknown = keys.filter((k) => !DISCOVERY_FIELDS.has(k as string));
+    if (unknown.length > 0) {
+      throw new Error(`not discovery columns: ${unknown.sort().join(", ")}`);
+    }
+    const values = keys.map((key) => {
+      const value = fields[key];
+      if (key === "result" && typeof value !== "string") return JSON.stringify(value ?? null);
+      return value as string;
+    });
+    const assignments = keys.map((k) => `${k} = ?`).join(", ");
+    this.db
+      .prepare(`UPDATE discovery_runs SET ${assignments}, updated_at = ? WHERE id = ?`)
+      .run(...values, nowIso(), runId);
+  }
+
+  /**
+   * Append a step to the run's log.
+   *
+   * Read-modify-write inside a transaction: stage 0's steps are sequential
+   * within one run, but the pipeline fans out its detail calls and a lost-update
+   * race would drop exactly the progress line the operator is watching for.
+   */
+  addDiscoveryProgress(runId: string, step: string, detail: Record<string, unknown>): void {
+    const append = this.db.transaction(() => {
+      const row = this.db.prepare("SELECT progress FROM discovery_runs WHERE id = ?").get(runId) as
+        | { progress: string }
+        | undefined;
+      if (!row) return;
+      const log = (loads(row.progress, []) as unknown[]).slice(-200);
+      log.push({ step, detail, at: nowIso() });
+      this.db
+        .prepare("UPDATE discovery_runs SET progress = ?, updated_at = ? WHERE id = ?")
+        .run(JSON.stringify(log), nowIso(), runId);
+    });
+    append();
+  }
+
+  // -- the TrendTrack response cache ------------------------------------
+
+  getCached(key: string): CachedResponse | null {
+    const row = this.db.prepare("SELECT * FROM trendtrack_cache WHERE key = ?").get(key) as
+      | Record<string, any>
+      | undefined;
+    if (!row) return null;
+    const created = Date.parse(row.created_at);
+    return {
+      key: row.key,
+      kind: row.kind,
+      payload: loads(row.payload, null),
+      credits: row.credits as number,
+      created_at: row.created_at,
+      ageSeconds: Number.isFinite(created) ? Math.max(0, (Date.now() - created) / 1000) : Infinity,
+    };
+  }
+
+  putCached(input: { key: string; kind: string; payload: unknown; credits: number }): void {
+    // Upsert: a refetch after expiry replaces the stale row rather than
+    // failing on the primary key or leaving the old timestamp in place.
+    this.db
+      .prepare(
+        "INSERT INTO trendtrack_cache (key, kind, payload, credits, created_at)" +
+          " VALUES (?,?,?,?,?) ON CONFLICT(key) DO UPDATE SET" +
+          " payload = excluded.payload, credits = excluded.credits," +
+          " created_at = excluded.created_at",
+      )
+      .run(input.key, input.kind, JSON.stringify(input.payload), input.credits, nowIso());
+  }
+
+  pruneCache(maxAgeSeconds: number): number {
+    const cutoff = new Date(Date.now() - maxAgeSeconds * 1000).toISOString();
+    return this.db.prepare("DELETE FROM trendtrack_cache WHERE created_at < ?").run(cutoff).changes;
+  }
+
+  clearCache(): number {
+    return this.db.prepare("DELETE FROM trendtrack_cache").run().changes;
+  }
+
+  cacheStats(): CacheStats {
+    const row = this.db
+      .prepare(
+        "SELECT COUNT(*) AS entries," +
+          " SUM(kind = 'query') AS queries," +
+          " SUM(kind = 'shop') AS shops," +
+          " COALESCE(SUM(credits), 0) AS creditsStored," +
+          " COALESCE(MIN(created_at), '') AS oldest," +
+          " COALESCE(MAX(created_at), '') AS newest" +
+          " FROM trendtrack_cache",
+      )
+      .get() as Record<string, any>;
+    return {
+      entries: row.entries ?? 0,
+      queries: row.queries ?? 0,
+      shops: row.shops ?? 0,
+      creditsStored: row.creditsStored ?? 0,
+      oldest: row.oldest ?? "",
+      newest: row.newest ?? "",
+    };
+  }
+
   close(): void {
     this.db.close();
   }
@@ -450,6 +670,20 @@ function runFromRow(row: Record<string, any>): ResearchRun {
     created_at: row.created_at,
     updated_at: row.updated_at,
     ended_at: row.ended_at,
+  };
+}
+
+function discoveryFromRow(row: Record<string, any>): DiscoveryRun {
+  return {
+    id: row.id,
+    status: row.status,
+    params: loads(row.params, {}) as Record<string, unknown>,
+    result: row.result ? (loads(row.result, null) as Record<string, unknown> | null) : null,
+    progress: loads(row.progress, []) as DiscoveryRun["progress"],
+    error: row.error ?? "",
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+    ended_at: row.ended_at ?? "",
   };
 }
 

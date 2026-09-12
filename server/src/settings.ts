@@ -39,6 +39,24 @@ export interface Settings {
    *  The archived body on disk is never truncated — only what the model reads. */
   fetchCharLimit: number;
 
+  // --- stage 0 ----------------------------------------------------------
+  /**
+   * TrendTrack, for stage-0 discovery. Empty disables stage 0 rather than
+   * failing a run halfway: credits are billed per returned row, so a pipeline
+   * that discovers its key is missing after four pages has already spent 400.
+   */
+  trendtrackApiKey: string;
+  /**
+   * How long a TrendTrack response stays reusable, in days. 0 disables the
+   * cache.
+   *
+   * A week is the default because what stage 0 reads from these responses — a
+   * six-month traffic series, a Trustpilot rating — moves on a scale of months,
+   * while the rows cost a credit each. See `trendtrack-cache.ts` for the
+   * staleness this trades away.
+   */
+  trendtrackCacheDays: number;
+
   // --- the corpus -------------------------------------------------------
   /** Raw fetched bodies are written here by `web_fetch`, one directory per run.
    *  Absent is survivable — sources come back `archived: false` and each
@@ -89,6 +107,9 @@ export function loadSettings(): Settings {
     firecrawlBaseUrl: str("FIRECRAWL_BASE_URL", "https://api.firecrawl.dev"),
     webTimeoutSeconds: num("MRA_WEB_TIMEOUT_SECONDS", 90),
     fetchCharLimit: num("MRA_FETCH_CHAR_LIMIT", 60000),
+
+    trendtrackApiKey: str("TRENDTRACK_API_KEY", ""),
+    trendtrackCacheDays: num("MRA_TRENDTRACK_CACHE_DAYS", 7),
 
     corpusPath: str("MRA_CORPUS_PATH", "/corpus"),
 

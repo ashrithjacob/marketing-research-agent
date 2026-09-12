@@ -98,6 +98,15 @@ services:
       # nothing but search snippets.
       - SEARXNG_URL=http://searxng:8080
       - FIRECRAWL_API_KEY=${FIRECRAWL_API_KEY}
+      # Stage 0 only. Unset is fine and is the default: stage 0 then refuses to
+      # start and says so, rather than spending credits and failing partway.
+      # Billed per row returned, not per call — see .env.example.
+      - TRENDTRACK_API_KEY=${TRENDTRACK_API_KEY:-}
+      # Days a TrendTrack response stays reusable; 0 disables the cache.
+      # Passed through explicitly — an .env line for a variable the compose
+      # file does not forward is silently ignored, and the code default (7)
+      # would look like it had been honoured.
+      - MRA_TRENDTRACK_CACHE_DAYS=${MRA_TRENDTRACK_CACHE_DAYS:-7}
 
 volumes:
   # Runs, events and packets. Losing this loses your research history.

@@ -169,6 +169,159 @@ export interface Config {
   /** False means every source comes back unarchived and the run fills with
    *  gaps. Said before you pay for the run rather than after. */
   corpus_mounted: boolean;
+  stage0: {
+    /** False means TRENDTRACK_API_KEY is unset and stage 0 cannot run at all. */
+    configured: boolean;
+    defaults: StageZeroParams;
+    big_five: string[];
+    min_trustpilot_rating: number;
+    cache_days: number;
+    cache: CacheStats;
+  };
+}
+
+// -- stage 0 ----------------------------------------------------------------
+
+export interface StageZeroParams {
+  pages: number;
+  minMonthlyVisits: number;
+  minActiveAds: number;
+  minProductsCount: number;
+  minGrowth180d: number;
+  minGrowth90d: number;
+  minUps: number;
+  minBaseline: number;
+  minTrustpilotRating: number;
+  mrrBatchSize: number;
+  model: string;
+}
+
+/** A month in the reconstructed series. `t-6` is estimated from `growth180d`. */
+export interface Month {
+  offset: number;
+  label: string;
+  period: string;
+  visits: number | null;
+  estimated: boolean;
+  low?: number;
+  high?: number;
+}
+
+export interface ShopCandidate {
+  id: string;
+  domain: string;
+  name: string;
+  category: string;
+  monthlyVisits: number | null;
+  growth30d: number | null;
+  growth90d: number | null;
+  growth180d: number | null;
+  history: number[];
+  ups: number;
+  ratio: number;
+  activeAds: number | null;
+  productsCount: number | null;
+  topMarket: string | null;
+  topMarketShare: number | null;
+  bigFiveShare: number;
+  trustpilotRating: number | null;
+  trustpilotReviews: number | null;
+  months: Month[];
+  tMinus6Warning: string;
+  mrrScore: number | null;
+}
+
+export interface ScoredProduct {
+  shopId: string;
+  domain: string;
+  category: string;
+  title: string;
+  price: number | null;
+  currency: string;
+  /** Null means the model returned no verdict — not a zero, which means "durable". */
+  score: number | null;
+  reason: string;
+}
+
+/** Where the candidates went. Counts, not adjectives. */
+export interface Funnel {
+  returned: number;
+  afterDuplicates: number;
+  afterSeries: number;
+  afterUps: number;
+  afterBaseline: number;
+  afterMirrors: number;
+  afterBigFive: number;
+  afterTrustpilot: number;
+  productsConsidered: number;
+  productsScored: number;
+}
+
+/** What the response cache did. `creditsSaved` is a sum of prices actually
+ *  paid earlier, not an estimate. */
+export interface CacheLedger {
+  hits: number;
+  misses: number;
+  stale: number;
+  creditsSaved: number;
+  oldestUsedSeconds: number;
+  maxAgeDays: number;
+}
+
+export interface CacheStats {
+  entries: number;
+  queries: number;
+  shops: number;
+  creditsStored: number;
+  oldest: string;
+  newest: string;
+}
+
+export interface StageZeroResult {
+  params: StageZeroParams;
+  matchedTotal: number;
+  funnel: Funnel;
+  /** TrendTrack credits. Billed per returned row on search, flat per detail call. */
+  credits: { rows: number; details: number; free: number; total: number };
+  /** Null when the cache is switched off. */
+  cache: CacheLedger | null;
+  shops: ShopCandidate[];
+  products: ScoredProduct[];
+  problems: string[];
+  finishedAt: string;
+}
+
+export type DiscoveryStatus = 'running' | 'completed' | 'failed' | 'cancelled';
+
+export const DISCOVERY_TERMINAL: ReadonlySet<string> = new Set([
+  'completed',
+  'failed',
+  'cancelled',
+]);
+
+export interface DiscoverySummary {
+  id: string;
+  status: DiscoveryStatus;
+  error: string;
+  created_at: string;
+  updated_at: string;
+  ended_at: string;
+  credits: StageZeroResult['credits'] | null;
+  shops: number;
+  products: number;
+}
+
+export interface DiscoveryRun {
+  id: string;
+  status: DiscoveryStatus;
+  params: Partial<StageZeroParams>;
+  result: StageZeroResult | null;
+  progress: Array<{ step: string; detail: Record<string, unknown>; at: string }>;
+  error: string;
+  created_at: string;
+  updated_at: string;
+  ended_at: string;
+  live: boolean;
 }
 
 export interface RunEvent {
@@ -233,6 +386,27 @@ export const api = {
     request<{ ok: boolean }>(`/api/research/judgements/${id}`, { method: 'DELETE' }),
   sourceUrl: (runId: string, sourceId: string) =>
     `/api/research/runs/${runId}/sources/${sourceId.replace(/^sha256:/, '')}`,
+
+  discoveries: () =>
+    request<{ data: DiscoverySummary[] }>('/api/research/discovery'),
+  discovery: (id: string) =>
+    request<DiscoveryRun>(`/api/research/discovery/${id}`),
+  startDiscovery: (params: Partial<StageZeroParams>) =>
+    request<DiscoveryRun>('/api/research/discovery', {
+      method: 'POST',
+      body: JSON.stringify(params),
+    }),
+  stopDiscovery: (id: string) =>
+    request<{ ok: boolean }>(`/api/research/discovery/${id}/stop`, {
+      method: 'POST',
+    }),
+  cacheStats: () =>
+    request<CacheStats & { max_age_days: number }>('/api/research/discovery/cache'),
+  clearCache: () =>
+    request<{ dropped: number; credits_to_rebuy: number }>(
+      '/api/research/discovery/cache',
+      { method: 'DELETE' },
+    ),
 };
 
 /**

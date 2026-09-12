@@ -22,6 +22,7 @@ import { join } from "node:path";
 import type { AgentTool } from "@earendil-works/pi-agent-core";
 import { Type } from "@earendil-works/pi-ai";
 
+import { fetchWithTimeout } from "./http.js";
 import type { Settings } from "./settings.js";
 
 export interface SearchHit {
@@ -46,18 +47,6 @@ export const TOOL_LANES: Record<string, ToolLane> = {
   web_search: "search",
   web_fetch: "fetch",
 };
-
-/** Fetch with a deadline. `AbortSignal.timeout` alone loses the caller's own signal. */
-async function fetchWithTimeout(
-  url: string,
-  init: RequestInit,
-  timeoutSeconds: number,
-  signal?: AbortSignal,
-): Promise<Response> {
-  const timeout = AbortSignal.timeout(timeoutSeconds * 1000);
-  const combined = signal ? AbortSignal.any([signal, timeout]) : timeout;
-  return await fetch(url, { ...init, signal: combined });
-}
 
 /**
  * SearXNG search.

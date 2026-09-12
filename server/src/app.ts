@@ -13,8 +13,12 @@ import { join, resolve, sep } from "node:path";
 import { Hono } from "hono";
 import { deleteCookie, getCookie, setCookie } from "hono/cookie";
 
+import { createModels } from "@earendil-works/pi-ai";
+import { openrouterProvider } from "@earendil-works/pi-ai/providers/openrouter";
+
 import { TokenService, verifyPassword } from "./auth.js";
 import { buildRouter } from "./api.js";
+import { DiscoverySupervisor } from "./discovery.js";
 import { RunSupervisor } from "./runner.js";
 import { loadSettings, type Settings } from "./settings.js";
 import { SqliteResearchStore, type ResearchStore } from "./store.js";
@@ -24,6 +28,7 @@ export const SESSION_COOKIE = "mra_session";
 export interface App {
   fetch: Hono["fetch"];
   supervisor: RunSupervisor;
+  discovery: DiscoverySupervisor;
   store: ResearchStore;
   settings: Settings;
   close(): Promise<void>;
@@ -33,10 +38,22 @@ export function createApp(overrides?: {
   settings?: Settings;
   store?: ResearchStore;
   supervisor?: RunSupervisor;
+  discovery?: DiscoverySupervisor;
 }): App {
   const settings = overrides?.settings ?? loadSettings();
   const store = overrides?.store ?? new SqliteResearchStore(settings.databasePath);
   const supervisor = overrides?.supervisor ?? new RunSupervisor({ store, settings });
+  const discovery =
+    overrides?.discovery ??
+    new DiscoverySupervisor({
+      store,
+      settings,
+      models: (() => {
+        const models = createModels();
+        models.setProvider(openrouterProvider());
+        return models;
+      })(),
+    });
 
   const authRequired = Boolean(settings.appPasswordHash);
   if (!authRequired) {
@@ -99,17 +116,19 @@ export function createApp(overrides?: {
     if (!subject) return c.json({ detail: "not authenticated" }, 401);
     await next();
   });
-  app.route("/api/research", buildRouter({ store, supervisor, settings }));
+  app.route("/api/research", buildRouter({ store, supervisor, discovery, settings }));
 
   mountFrontend(app, settings.staticDir);
 
   return {
     fetch: app.fetch,
     supervisor,
+    discovery,
     store,
     settings,
     async close() {
       await supervisor.close();
+      await discovery.close();
       store.close();
     },
   };

@@ -27,7 +27,7 @@ export class PacketError extends Error {
  * so a reply that contains a ```python block before the packet yields one
  * garbage candidate and no packet. Line-at-a-time is longer and correct.
  */
-function fencedBlocks(text: string): string[] {
+export function fencedBlocks(text: string): string[] {
   const blocks: string[] = [];
   let body: string[] | null = null;
   for (const line of text.split("\n")) {
