@@ -217,6 +217,18 @@ describe("review tools", () => {
     expect(names).toEqual(["web_search", "web_fetch"]);
   });
 
+  it("offers Amazon product search alone to a competitors run", () => {
+    // Discovery, not reviews: the review tools stay withheld.
+    const names = createResearchTools({
+      settings,
+      runId: "run-x",
+      actorRunner: runner([]),
+      reviewTools: false,
+      productSearch: true,
+    }).map((t) => t.name);
+    expect(names).toEqual(["web_search", "web_fetch", "amazon_find_product"]);
+  });
+
   it("are present once a runner exists", () => {
     const names = reviewTools(runner([])).map((t) => t.name);
     expect(names).toContain("amazon_find_product");

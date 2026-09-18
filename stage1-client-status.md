@@ -14,7 +14,7 @@ Status: 18 September 2026. Effort in hours, rough.
 | Area | Status |
 |---|---|
 | Product data | Collecting. One change left. |
-| Competitors | Collecting. Cannot yet tell direct from indirect. |
+| Competitors | **Done: direct and indirect, tested on a real run.** Ad libraries not yet attempted. |
 | Review mining | **Built, not yet tried on a real run.** Amazon by star rating and Trustpilot are connected and tested piece by piece. |
 | Category data | Collecting. Measuring the wrong thing in places. |
 
@@ -28,12 +28,20 @@ Today the ingredient panel is stored as one block of text. Competitor matching a
 
 ## Competitors
 
+**Delivered 18 September.** Each competitor is now labelled **direct** (same active ingredient, same form — another mullein capsule against a mullein capsule) or **indirect** (same active, different form — mullein drops, a spray, a tea or a gummy). The label isn't the AI's opinion: the system checks it against the two products' forms and rejects a run that gets it wrong. A brand that treats the same problem with a *different* ingredient is listed as a gap, not as a competitor.
+
+The two groups are also searched separately, so a long list of direct competitors can't end the search before the indirect ones are found.
+
+**Tested on a real run** (Mullein, UK, competitors only): 5 direct and 8 indirect competitors, each with its price, dose and its own marketing line word for word. It cost about 9 cents (3 for the AI, and about 6 for one Amazon search at Apify's listed price) and took under 7 minutes. Both groups were still turning up new brands when it stopped, and the report says so rather than calling the list complete.
+
+**One thing that matters for you:** name a specific product in the brief, not just an ingredient. "Mullein" left the system to pick one mullein capsule to compare against, and every direct/indirect label follows from that choice. "Nutravita Mullein drops" would have made the capsules indirect and the drops direct.
+
 | To deliver | Hours |
 |---|---|
-| Label each competitor direct or indirect (same active + same form / different form) | 1 |
-| Stop searching each group separately, so a full direct list can't end the indirect search | 1 |
+| ~~Label each competitor direct or indirect~~ | done |
+| ~~Search each group separately~~ | done |
 
-Not included: testing whether I can read competitor ad libraries — the record of which ads a rival runs, and for how long. Roughly 2 hours, and it may return nothing, so it sits outside this estimate. Worth doing once the rest lands.
+Not included: testing whether I can read competitor ad libraries — the record of which ads a rival runs, and for how long. The first run found no ad-library entries for any mullein brand. Roughly 2 hours, and it may return nothing, so it sits outside this estimate.
 
 ## Review mining
 
@@ -56,7 +64,7 @@ Not included: testing whether I can read competitor ad libraries — the record 
 | To deliver | Hours | Cost |
 |---|---|---|
 | First full run with the review sources switched on, checked against what the spec asks for | 1 | Under $1 of Apify per product (see decision 1) |
-| Search the right Amazon for the market — today it always searches amazon.com, even for a UK brief | 1 | — |
+| Search the right Amazon for the market — today it always searches amazon.com, even for a UK brief. The competitors run hit this too: its Amazon results were US listings | 1 | — |
 
 ## Category data
 
@@ -79,9 +87,9 @@ Two checks the specification requires that aren't built yet. Until they are, the
 
 | | Hours |
 |---|---|
-| Total work | ~11 |
+| Total work | ~9 |
 
-The 16 September estimate was ~14. The review-mining items (8 hours) came out, because Apify replaced the browser experiment, Reddit and the Trustpilot reader. The two new review-mining items (2 hours) and the two checks above (3 hours) went in.
+The 16 September estimate was ~14. The review-mining items (8 hours) came out, because Apify replaced the browser experiment, Reddit and the Trustpilot reader. The two new review-mining items (2 hours) and the two checks above (3 hours) went in. The two competitor items (2 hours) are now done.
 
 ## Decisions
 

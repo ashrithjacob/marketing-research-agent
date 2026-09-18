@@ -512,6 +512,20 @@ describe("a run that covers part of the stage", () => {
     expect(run.error).toMatch(/outside this run's scope \(product_data\)/);
   });
 
+  it("offers a competitors run Amazon search for discovery, but not the review tools", async () => {
+    let tools: string[] = [];
+    faux.setResponses([
+      (context) => {
+        tools = (context.tools ?? []).map((t) => t.name);
+        return fauxAssistantMessage(fenced(minimalPacket()));
+      },
+    ]);
+    supervisor = new RunSupervisor({ store, settings: { ...settings, apifyToken: "t" }, models });
+    const runId = supervisor.start(request({ nodes: ["competitors"] }));
+    await supervisor.waitFor(runId);
+    expect(tools).toEqual(["web_search", "web_fetch", "amazon_find_product"]);
+  });
+
   it("offers the review tools when review mining is in scope", async () => {
     let tools: string[] = [];
     faux.setResponses([

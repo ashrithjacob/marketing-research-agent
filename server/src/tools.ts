@@ -316,15 +316,24 @@ export function createResearchTools(options: {
   /** Injected in tests. In production it is built from the settings. */
   actorRunner?: ActorRunner | null;
   /**
-   * False for a run that does not cover review mining. The review tools are
-   * the only ones that cost money per call, and a product-data run has no use
-   * for them — offering them anyway invites the agent to spend on the wrong node.
+   * False for a run that does not cover review mining. The Apify tools are the
+   * only ones that cost money per call, and a product-data run has no use for
+   * them — offering them anyway invites the agent to spend on the wrong node.
    */
   reviewTools?: boolean;
+  /**
+   * True offers `amazon_find_product` alone, even when `reviewTools` is false:
+   * Amazon's search is a competitor-discovery source ($0.012 a result), while
+   * the review tools are not.
+   */
+  productSearch?: boolean;
 }): AgentTool<any>[] {
   const { settings, runId, onFetch } = options;
+  const reviews = options.reviewTools !== false;
   const runner =
-    options.reviewTools === false ? null : (options.actorRunner ?? createActorRunner(settings));
+    reviews || options.productSearch
+      ? (options.actorRunner ?? createActorRunner(settings))
+      : null;
 
   const webSearch: AgentTool<typeof searchParameters> = {
     name: "web_search",
@@ -501,5 +510,7 @@ export function createResearchTools(options: {
     },
   };
 
-  return [webSearch, webFetch, findProduct, amazon, trustpilot];
+  return reviews
+    ? [webSearch, webFetch, findProduct, amazon, trustpilot]
+    : [webSearch, webFetch, findProduct];
 }

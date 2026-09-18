@@ -127,7 +127,9 @@ The three Apify tools exist **only when `APIFY_TOKEN` is set and the run covers
 `review_mining`**; otherwise they are not offered at all. Without the token the
 prompt tells the agent to gap `review_mining`; on a run that does not cover it they
 are simply not needed, and withholding them keeps a product-data run from spending
-on Apify.
+on Apify. The one exception is `amazon_find_product` on its own: a run that covers
+`competitors` gets it (still only with the token) as a discovery source — Amazon's
+search lists competitors with their review counts — without the two review tools.
 
 The `source_id` is `sha256:` + the hash of the exact bytes written to disk, so
 `GET /runs/:id/sources/:sha` can re-hash the file later and say whether it still
@@ -166,7 +168,7 @@ When the agent goes idle:
    No such block → `invalid`.
 4. **Validate:** `stagePacketSchema` — every object `.strict()`, so a field that
    is not in the contract (a `summary`, a `finding`) fails the packet. A run that
-   covers part of the stage then gets the scope rule (§2b). Then six cross-object
+   covers part of the stage then gets the scope rule (§2b). Then seven cross-object
    rules:
    - the packet's `brief.product` must echo the run's brief (containment,
      case-insensitive) — a packet about the worked example's product is
@@ -177,7 +179,13 @@ When the agent goes idle:
    - an admitted `ad_library` source with no `first_seen` needs a `competitors` gap;
    - `review_mining` marked complete needs at least one 3★ excerpt;
    - `gaps` must not be empty;
-   - every node marked complete, except `product_data`, needs a saturation curve.
+   - every node marked complete, except `product_data`, needs a saturation curve —
+     and `competitors` needs two, one with `class: "direct"` and one with
+     `class: "indirect"` (§2c);
+   - competitor rows obey the §2.2 test (§2c): `relation` is recomputed from the
+     forms, `shared_actives` must be in both the row's actives and the reference
+     product's, `competitor_reference` must exist once any competitor does, and
+     `ad_source_ids` must point at `ad_library` sources.
 5. **Invalid** → status `invalid` with the reason, event `packet.invalid`.
    **Valid** → status `completed`, packet stored, judgement `applied_count`s bumped,
    events `run.completed` then `packet.ready {sources, excerpts, gaps}`.
@@ -226,7 +234,9 @@ all keyed off the run's `nodes`:
   else, and the system prompt's "work through the four nodes" becomes "this run
   covers only …". Run-level gaps are attached to the first covered node, not
   `category_data`. A whole-stage run's prompt is unchanged, byte for byte.
-- **Tools.** The Apify review tools are offered only if `review_mining` is covered.
+- **Tools.** The Apify review tools are offered only if `review_mining` is covered;
+  `amazon_find_product` alone also if `competitors` is. The system prompt describes
+  exactly the tools offered.
 - **Validation** (`packet.ts`). Any source, excerpt, measurement, attribute,
   saturation curve, node or gap recorded against a node outside the scope fails the
   packet (`invalid`, naming the node and the count). So does a covered node with no
@@ -264,6 +274,60 @@ cost, tool calls), then one row per call: expand it for the prompt (what is new,
 token counts, cost). It follows the event stream and fetches only calls it has not
 got (`?after=<seq>`), then refetches everything once `run.billed` lands, because the
 billed costs arrive on calls it already has.
+
+### §2c — competitors: direct and indirect
+
+`spec-stage-1.md` §2.2: a **direct** competitor shares an active ingredient with the
+product and has the same form; an **indirect** one shares an active and has a
+different form. A brand that solves the same problem with a *different* active is
+neither — it becomes a gap ("same problem, different active"), because whether
+another molecule is a substitute is a stage-2 judgement.
+
+The packet carries this as two things (`schema.ts`):
+
+- `competitor_reference` — the product being compared against, read off its own
+  page: `name`, `form`, `form_as_printed`, `actives` (normalised names), `source_id`.
+  A competitors-only run has no product-data attributes to lean on, so the node
+  records the two facts the test needs itself.
+- `competitors[]` — one strict row each: `name`, `brand`, `url`, `relation`,
+  `form`, `form_as_printed`, `active_ingredients[]` (§2.1's shape: as printed,
+  normalised, dose, unit, per, standardisation), `shared_actives`,
+  `dose_per_serving`, `positioning_copy` (verbatim), `price`, `price_per_dose`,
+  `source_id` (the page the row was read from), `ad_source_ids`.
+
+`form` is one of a fixed vocabulary — `capsule`, `tablet`, `gummy`, `powder`,
+`liquid`, `spray`, `tea`, `topical`, `other` — because the test is only mechanical
+if "veg caps" and "capsules" are the same word; `form_as_printed` keeps the label's
+own wording. The validator then **recomputes** each row's relation from the two
+forms and rejects a label that disagrees, rejects a "shared" active that is not in
+both the row's and the reference's actives, and requires two saturation curves
+(`class: "direct"`, `class: "indirect"`) before the node may call itself complete —
+one combined count would let a long direct list end the indirect search.
+
+The agent finds competitors with `web_search` across forms ("<active> capsules",
+"… spray", "… gummies", "… tea"), `amazon_find_product` where offered, and then
+`web_fetch` of each competitor's own page — a search hit is not a competitor.
+
+**Measured, 2026-09-18, brief "Mullein", market UK, competitors only.** Reference:
+*Mullein Leaf, 120 capsules (New Leaf Products)*, capsule, `mullein leaf`.
+5 direct (capsules) and 8 indirect (3 liquid drops, 1 spray, 3 teas, 1 gummy),
+each with verbatim positioning copy and price; node honestly `incomplete` — both
+curves were still adding brands on their last source. 12 LLM calls, 835k tokens
+(486k of them cache reads), $0.028 billed by OpenRouter, 6.6 minutes, 28 tool calls
+— plus one `amazon_find_product` call returning 5 results, ~$0.06 at Apify's listed
+$0.012 a result (not read back: the call log covers OpenRouter only). Three
+things it showed:
+
+- **A category brief makes the reference arbitrary.** "Mullein" names an
+  ingredient, not a product, so the agent picked one capsule product to measure
+  against — and every direct/indirect label follows from that pick. Brief a
+  specific product (brand, form) when the split matters.
+- **`amazon_find_product` searches amazon.com**, so on a UK brief it surfaces US
+  listings; the agent gapped this rather than recording them as UK competitors.
+- **The system prompt used to list all five tools whatever the scope**, and the
+  run gapped "amazon_reviews and trustpilot_reviews were not available" — noise
+  from tools it was never meant to have. It now describes only the tools the run
+  is given (`systemPrompt(nodes)`).
 
 ### Step 7 — the screen fills in
 

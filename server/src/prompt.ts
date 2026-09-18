@@ -21,6 +21,7 @@
 
 import {
   DEFAULT_REJECTED_KINDS,
+  FORMS,
   NODES,
   PRODUCT_ATTRIBUTES,
   SOURCE_KIND_NOTES,
@@ -79,6 +80,59 @@ const EXAMPLE = {
       archived: false,
       node: "competitors",
     },
+    {
+      id: "sha256:1c9d…",
+      url: "https://magnacalm.example/products/glycinate-400",
+      title: "MagnaCalm Magnesium Glycinate 400mg — 90 capsules",
+      kind: "first_party",
+      publisher: "magnacalm.example",
+      fetched_at: "2026-09-10T09:11:40Z",
+      marketing: true,
+      admitted: true,
+      admission_reason: "first_party — the product's own page",
+      archived: true,
+      node: "competitors",
+    },
+    {
+      id: "sha256:5e21…",
+      url: "https://calmwell.example/magnesium-glycinate",
+      title: "CalmWell Magnesium Glycinate 400mg",
+      kind: "competitor_marketing",
+      publisher: "calmwell.example",
+      fetched_at: "2026-09-10T09:16:05Z",
+      marketing: true,
+      admitted: true,
+      admission_reason: "competitor_marketing — admitted by policy",
+      archived: true,
+      node: "competitors",
+    },
+    {
+      id: "sha256:a803…",
+      url: "https://sleepmist.example/magnesium-spray",
+      title: "SleepMist Magnesium Glycinate Oral Spray",
+      kind: "competitor_marketing",
+      publisher: "sleepmist.example",
+      fetched_at: "2026-09-10T09:17:30Z",
+      marketing: true,
+      admitted: true,
+      admission_reason: "competitor_marketing — admitted by policy",
+      archived: true,
+      node: "competitors",
+    },
+    {
+      id: "sha256:d4f7…",
+      url: "https://www.facebook.com/ads/library/?id=1234567890",
+      title: "CalmWell — 'Finally sleeping through' ad",
+      kind: "ad_library",
+      publisher: "facebook.com",
+      fetched_at: "2026-09-10T09:18:44Z",
+      first_seen: "2026-03-02",
+      marketing: true,
+      admitted: true,
+      admission_reason: "ad_library — admitted by policy",
+      archived: true,
+      node: "competitors",
+    },
   ],
   excerpts: [
     {
@@ -126,6 +180,67 @@ const EXAMPLE = {
       source_id: "sha256:2f1a…",
     },
   ],
+  competitor_reference: {
+    name: "MagnaCalm Magnesium Glycinate 400mg",
+    form: "capsule",
+    form_as_printed: "90 vegan capsules",
+    actives: ["magnesium glycinate"],
+    source_id: "sha256:1c9d…",
+  },
+  competitors: [
+    {
+      id: "c1",
+      name: "CalmWell Magnesium Glycinate 400mg",
+      brand: "CalmWell",
+      url: "https://calmwell.example/magnesium-glycinate",
+      relation: "direct",
+      form: "capsule",
+      form_as_printed: "120 capsules",
+      active_ingredients: [
+        {
+          name_as_printed: "Magnesium (as Magnesium Bisglycinate)",
+          name_normalised: "magnesium glycinate",
+          dose: "400",
+          unit: "mg",
+          per: "serving",
+          standardisation: "",
+        },
+      ],
+      shared_actives: ["magnesium glycinate"],
+      dose_per_serving: "400 mg (2 capsules)",
+      positioning_copy: "The gentle magnesium that lets you sleep through the night.",
+      price: "£19.99",
+      price_per_dose: "£0.33 per serving",
+      source_id: "sha256:5e21…",
+      ad_source_ids: ["sha256:d4f7…"],
+    },
+    {
+      id: "c2",
+      name: "SleepMist Magnesium Glycinate Oral Spray",
+      brand: "SleepMist",
+      url: "https://sleepmist.example/magnesium-spray",
+      relation: "indirect",
+      form: "spray",
+      form_as_printed: "oral spray, 50 ml",
+      active_ingredients: [
+        {
+          name_as_printed: "Magnesium Glycinate",
+          name_normalised: "magnesium glycinate",
+          dose: "100",
+          unit: "mg",
+          per: "serving",
+          standardisation: "",
+        },
+      ],
+      shared_actives: ["magnesium glycinate"],
+      dose_per_serving: "100 mg (4 sprays)",
+      positioning_copy: "Four sprays under the tongue. No pills to swallow.",
+      price: "£14.00",
+      price_per_dose: "",
+      source_id: "sha256:a803…",
+      ad_source_ids: [],
+    },
+  ],
   saturation: [
     {
       node: "review_mining",
@@ -135,6 +250,21 @@ const EXAMPLE = {
       ],
       stopped_because: "three consecutive sources added no new theme",
     },
+    {
+      node: "competitors",
+      class: "direct",
+      curve: [
+        { source_id: "sha256:5e21…", new_themes: 1, cumulative_themes: 1 },
+        { source_id: "sha256:9c04…", new_themes: 0, cumulative_themes: 1 },
+      ],
+      stopped_because: "still finding direct brands when the example ends",
+    },
+    {
+      node: "competitors",
+      class: "indirect",
+      curve: [{ source_id: "sha256:a803…", new_themes: 1, cumulative_themes: 1 }],
+      stopped_because: "still finding indirect brands when the example ends",
+    },
   ],
   nodes: [
     {
@@ -142,6 +272,12 @@ const EXAMPLE = {
       status: "complete",
       done_criterion_met: true,
       why: "saturated at 14 sources; 3-star coverage present",
+    },
+    {
+      node: "competitors",
+      status: "incomplete",
+      done_criterion_met: false,
+      why: "neither class had three consecutive sources with no new brand",
     },
   ],
   gaps: [
@@ -262,10 +398,46 @@ const NODE_RULES: Record<Node, string> = {
   product_data: `**product_data** — a finite checklist, not a search. Capture every one of:
    {attributes}. Anything you cannot find is a gap entry, not an omission and
    not a zero. A missing certificate of analysis is a gap.`,
-  competitors: `**competitors** — name, url, verbatim positioning copy, price, format, and
-   ad-library entries. **Every ad entry must carry \`first_seen\`**; ad longevity
-   is the only outside performance signal that exists. An ad with no date is
-   captured with \`first_seen: null\` AND recorded as a gap.`,
+  competitors: `**competitors** — every brand that sells the product's active ingredient,
+   found anywhere on the open web: brand sites, Amazon and other marketplaces,
+   retailers, comparison and "alternatives" threads. Two classes, and the split
+   is a mechanical test, not your opinion:
+   - **direct** — shares an active ingredient with the product **and** has the
+     same form;
+   - **indirect** — shares an active ingredient, **different** form (a spray, a
+     gummy or a tea where the product is a capsule). Research indirect
+     competitors to the same depth as direct ones: they compete for the same
+     buyer.
+
+   How to work this node, in order:
+   a. Fetch the product's own page and record \`competitor_reference\`: its name,
+      its \`form\`, and its actives (\`name_normalised\`: lowercase, trimmed, one
+      accepted synonym, e.g. "vitamin b3" → "niacin"), citing that page.
+   b. Find competitors: \`web_search\` for the active ingredient in every form
+      ("<active> capsules", "<active> spray", "<active> gummies", "<active> tea",
+      "best <active> <market>"), and \`amazon_find_product\` for the active if you
+      have it. Then \`web_fetch\` each competitor's own product page — a search
+      result is not a competitor, the page you read is.
+   c. For each one, read off *its* page: form, actives, dose, price, and its
+      positioning copy **verbatim** (the headline or tagline, character for
+      character). \`shared_actives\` names the actives it has in common with the
+      reference; \`relation\` follows from comparing its \`form\` with the
+      reference's, and the validator checks it.
+   d. A brand that solves the same problem with a **different** active is
+      neither class: do not list it — add a gap "same problem, different active:
+      <brand> (<its active>)". Whether another molecule is a substitute is a
+      later stage's judgement.
+   e. Ad-library entries are \`ad_library\` sources, linked from the competitor's
+      \`ad_source_ids\`. **Every ad entry must carry \`first_seen\`**; ad longevity
+      is the only outside performance signal that exists. An ad with no date is
+      captured with \`first_seen: null\` AND recorded as a gap.
+
+   Saturate each class **separately**: log two curves for this node, one with
+   \`"class": "direct"\` and one with \`"class": "indirect"\`. Each point is a
+   source that surfaced competitors, and \`new_themes\` is how many brands of
+   that class it added that you had not seen. A class is done after three
+   consecutive sources add no new brand of that class — one combined count lets
+   a long direct list end the indirect search, which is the failure to avoid.`,
   review_mining: `**review_mining** — verbatim customer language with star rating, date, and a
    three-axis code (\`why_bought\` / \`why_stayed\` / \`why_quit\`). **You must
    capture 3-star reviews specifically** — they are the most honest text in
@@ -364,6 +536,11 @@ Field notes:
 - \`nodes\` must contain an entry for {nodes_note}, \`complete\` or
   \`incomplete\`, with \`why\` naming the criterion that was or was not met.
 - \`gaps\` must not be empty.
+- \`competitor_reference\` and \`competitors\` belong to the competitors node; leave
+  them \`null\` and \`[]\` when it is not being researched. \`form\` is exactly one
+  of {forms}. \`relation\` is checked against the forms and must agree with them.
+- \`saturation\` for competitors has two entries, \`"class": "direct"\` and
+  \`"class": "indirect"\`; every other node's entry has no \`class\`.
 `;
 
 /**
@@ -372,12 +549,27 @@ Field notes:
  */
 export function systemPrompt(nodes: readonly Node[] = NODES): string {
   if (!isPartial(nodes)) return SYSTEM_PROMPT;
-  return SYSTEM_PROMPT.replace(
+  let text = SYSTEM_PROMPT.replace(
     "Work through the four nodes methodically.",
     `This run covers only ${code(nodes)} — work through ${
       nodes.length === 1 ? "it" : "them"
     } methodically and leave the rest of stage 1 alone.`,
   );
+  // Describe only the tools this run is offered (`createResearchTools`). A run
+  // told about review tools it does not have records their absence as a gap —
+  // measured on the first competitors-only run.
+  if (!nodes.includes("review_mining")) {
+    const [findStart, findEnd] = [text.indexOf("- `amazon_find_product`"), text.indexOf("\n\nWork through")];
+    const thisRun = text.indexOf("\n\nThis run covers only");
+    const end = findEnd === -1 ? thisRun : findEnd;
+    const tools = nodes.includes("competitors")
+      ? "- `amazon_find_product` — search Amazon (amazon.com) by product name for asin, " +
+        "title, stars and `reviewsCount`: a way to find competitors, and to see which " +
+        "sell. It may be absent."
+      : "";
+    text = text.slice(0, findStart).replace(/\n+$/, "") + (tools ? `\n${tools}` : "") + text.slice(end);
+  }
+  return text;
 }
 
 /**
@@ -407,10 +599,12 @@ export function buildInstructions(options: {
   if (isPartial(nodes)) parts.push(scopeBlock(nodes));
   if (judgements.length > 0) parts.push(judgementBlock(judgements));
   parts.push(briefBlock(brief));
-  let output = OUTPUT.replace("{example}", JSON.stringify(EXAMPLE, null, 2)).replace(
-    "{nodes_note}",
-    isPartial(nodes) ? `each node in scope (${code(nodes)})` : "each of the four nodes",
-  );
+  let output = OUTPUT.replace("{example}", JSON.stringify(EXAMPLE, null, 2))
+    .replace(
+      "{nodes_note}",
+      isPartial(nodes) ? `each node in scope (${code(nodes)})` : "each of the four nodes",
+    )
+    .replace("{forms}", code(FORMS));
   if (isPartial(nodes)) {
     output += `\nThe example shows every node, for shape only. Your packet records only ${code(nodes)}.\n`;
   }

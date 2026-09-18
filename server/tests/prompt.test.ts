@@ -11,7 +11,7 @@ import { describe, expect, it } from "vitest";
 
 import { parse, validate } from "../src/packet.js";
 import { buildInstructions, steerText, systemPrompt } from "../src/prompt.js";
-import { NODES, SOURCE_KINDS, briefSchema } from "../src/schema.js";
+import { FORMS, NODES, SOURCE_KINDS, briefSchema } from "../src/schema.js";
 import type { Judgement } from "../src/store.js";
 
 const brief = (overrides: Record<string, unknown> = {}) =>
@@ -177,5 +177,48 @@ describe("a run that covers part of the stage", () => {
   it("scopes the system prompt too", () => {
     expect(systemPrompt(["review_mining"])).toMatch(/This run covers only `review_mining`/);
     expect(systemPrompt()).toMatch(/Work through the four nodes methodically/);
+  });
+});
+
+describe("the competitors node", () => {
+  it("states the mechanical test and the per-class saturation", () => {
+    const text = build({ nodes: ["competitors"] });
+    expect(text).toMatch(/\*\*direct\*\* — shares an active ingredient with the product \*\*and\*\* has the\s+same form/);
+    expect(text).toMatch(/\*\*indirect\*\* — shares an active ingredient, \*\*different\*\* form/);
+    expect(text).toMatch(/Saturate each class \*\*separately\*\*/);
+    expect(text).toMatch(/same problem, different active/);
+  });
+
+  it("names every form the validator accepts", () => {
+    const text = build();
+    for (const form of FORMS) expect(text).toContain(`\`${form}\``);
+  });
+
+  it("shows a direct and an indirect competitor in the example", () => {
+    const parsed = parse(build());
+    expect(parsed.competitors.map((c) => c.relation).sort()).toEqual(["direct", "indirect"]);
+    expect(parsed.competitor_reference?.form).toBe("capsule");
+  });
+});
+
+describe("the system prompt names only the tools a run is given", () => {
+  // The first competitors-only run gapped "amazon_reviews was not available" —
+  // told about tools it did not have, it reported their absence as a finding.
+  it("gives a product-data run web search and fetch only", () => {
+    const text = systemPrompt(["product_data"]);
+    expect(text).toContain("web_fetch");
+    expect(text).not.toMatch(/amazon_|trustpilot_/);
+  });
+
+  it("gives a competitors run Amazon search as discovery, and no review tools", () => {
+    const text = systemPrompt(["competitors"]);
+    expect(text).toMatch(/`amazon_find_product` — .*a way to find competitors/);
+    expect(text).not.toMatch(/amazon_reviews|trustpilot_reviews|The last three may be absent/);
+  });
+
+  it("describes all five to a run that covers review mining", () => {
+    const text = systemPrompt(["review_mining"]);
+    expect(text).toContain("amazon_reviews");
+    expect(text).toContain("The last three may be absent");
   });
 });

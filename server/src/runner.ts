@@ -225,6 +225,7 @@ export class RunSupervisor {
           settings: this.settings,
           runId: run.id,
           reviewTools: nodes.includes("review_mining"),
+          productSearch: nodes.includes("competitors"),
         }),
       },
     });

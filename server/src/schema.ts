@@ -92,9 +92,33 @@ export const PRODUCT_ATTRIBUTES: readonly string[] = [
   "coa_present",
 ] as const;
 
+/**
+ * §2.2. A product's form, from a fixed vocabulary. The direct/indirect split is
+ * "same active, same form" against "same active, different form", and it only
+ * stays mechanical — two people classify a pair identically — if "veg caps" and
+ * "capsules" are the same word. `form_as_printed` keeps what the label said.
+ */
+export const FORMS = [
+  "capsule", // incl. softgel, veg cap
+  "tablet", // incl. chewable, effervescent
+  "gummy",
+  "powder",
+  "liquid", // drops, tincture, syrup, shot
+  "spray",
+  "tea",
+  "topical", // cream, balm, oil or patch on the skin
+  "other",
+] as const;
+export type Form = (typeof FORMS)[number];
+
+export const COMPETITOR_RELATIONS = ["direct", "indirect"] as const;
+export type CompetitorRelation = (typeof COMPETITOR_RELATIONS)[number];
+
 const nodeSchema = z.enum(NODES);
 const axisSchema = z.enum(AXES);
 const sourceKindSchema = z.enum(SOURCE_KINDS);
+const formSchema = z.enum(FORMS);
+const relationSchema = z.enum(COMPETITOR_RELATIONS);
 
 export const briefSchema = z
   .object({
@@ -203,6 +227,9 @@ export const saturationPointSchema = z
 export const saturationSchema = z
   .object({
     node: nodeSchema,
+    // competitors only: discovery saturates per class (§2.2), so that a long
+    // direct list cannot end the indirect search. Null for every other node.
+    class: relationSchema.nullable().default(null),
     curve: z.array(saturationPointSchema).default([]),
     stopped_because: z.string().default(""),
   })
@@ -228,6 +255,70 @@ export const gapSchema = z
   .strict();
 export type Gap = z.infer<typeof gapSchema>;
 
+/**
+ * §2.1's active-ingredient entry, as read off a label. `name_normalised` is
+ * lowercase, trimmed, one accepted synonym mapping — it is the join key the
+ * direct/indirect test compares on.
+ */
+export const activeIngredientSchema = z
+  .object({
+    name_as_printed: z.string(),
+    name_normalised: z.string(),
+    dose: z.string().default(""),
+    unit: z.string().default(""),
+    per: z.string().default(""), // serving | capsule | ml
+    standardisation: z.string().default(""), // "10:1", "95% curcuminoids"
+  })
+  .strict();
+
+/**
+ * The product competitors are measured against, as read off its own page.
+ *
+ * A competitors-only run has no product_data attributes to compare with, and
+ * the direct/indirect test needs the product's form and actives — so the node
+ * records them itself, with the page they came from.
+ */
+export const competitorReferenceSchema = z
+  .object({
+    name: z.string(),
+    form: formSchema,
+    form_as_printed: z.string().default(""),
+    actives: z.array(z.string()).min(1), // name_normalised values
+    source_id: z.string(),
+  })
+  .strict();
+export type CompetitorReference = z.infer<typeof competitorReferenceSchema>;
+
+/**
+ * §2.2 / §4.3 — one competitor, the only genuinely new row shape stage 1 has.
+ *
+ * `relation` is not the agent's opinion: the validator recomputes it from `form`
+ * against the reference's form, and `shared_actives` must appear both in this
+ * row's actives and the reference's. Everything else is transcription, and
+ * `positioning_copy` is verbatim.
+ */
+export const competitorSchema = z
+  .object({
+    id: z.string(),
+    name: z.string(),
+    brand: z.string().default(""),
+    url: z.string(),
+    relation: relationSchema,
+    form: formSchema,
+    form_as_printed: z.string().default(""),
+    active_ingredients: z.array(activeIngredientSchema).min(1),
+    shared_actives: z.array(z.string()).min(1),
+    dose_per_serving: z.string().default(""),
+    positioning_copy: z.string().default(""),
+    price: z.string().default(""),
+    // Only where the page states it, or it is price ÷ servings shown on the same page.
+    price_per_dose: z.string().default(""),
+    source_id: z.string(), // the page the row was read from
+    ad_source_ids: z.array(z.string()).default([]), // its `ad_library` sources
+  })
+  .strict();
+export type Competitor = z.infer<typeof competitorSchema>;
+
 /** What one stage-1 run emits. Nothing here may be a judgement. */
 export const stagePacketSchema = z
   .object({
@@ -239,6 +330,8 @@ export const stagePacketSchema = z
     excerpts: z.array(excerptSchema).default([]),
     measurements: z.array(measurementSchema).default([]),
     attributes: z.array(attributeSchema).default([]),
+    competitor_reference: competitorReferenceSchema.nullable().default(null),
+    competitors: z.array(competitorSchema).default([]),
     saturation: z.array(saturationSchema).default([]),
     nodes: z.array(nodeStatusSchema).default([]),
     gaps: z.array(gapSchema).default([]),

@@ -86,7 +86,9 @@ export default function StartRun({
         )}
         {partial && !reviewsInScope && (
           <p className="muted small">
-            The paid review tools (Amazon, Trustpilot) are not offered to this run.
+            {nodes.includes('competitors')
+              ? 'Amazon product search is offered for finding competitors (Apify, about $0.012 a result). The paid review tools are not.'
+              : 'The paid review tools (Amazon, Trustpilot) are not offered to this run.'}
           </p>
         )}
         {error && <p className="error small">{error}</p>}

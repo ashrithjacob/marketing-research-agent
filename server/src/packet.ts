@@ -12,7 +12,15 @@
 
 import { z } from "zod";
 
-import { NODES, isPartial, stagePacketSchema, type Node, type StagePacket } from "./schema.js";
+import {
+  COMPETITOR_RELATIONS,
+  NODES,
+  isPartial,
+  stagePacketSchema,
+  type CompetitorRelation,
+  type Node,
+  type StagePacket,
+} from "./schema.js";
 
 /** The output carried no packet, or one that violates the contract. */
 export class PacketError extends Error {
@@ -122,6 +130,11 @@ export function validate(
     ]) {
       tally(items);
     }
+    // Competitor rows carry no `node` field — they are the competitors node.
+    const competitorRows = packet.competitors.length + (packet.competitor_reference ? 1 : 0);
+    if (competitorRows > 0 && !allowed.has("competitors")) {
+      outside.set("competitors", (outside.get("competitors") ?? 0) + competitorRows);
+    }
     for (const [node, count] of outside) {
       problems.push(
         `${count} entr${count === 1 ? "y is" : "ies are"} recorded against ${node}, ` +
@@ -214,10 +227,25 @@ export function validate(
   }
 
   // 7. Saturation is the done-criterion for everything except the finite
-  //    product-data checklist.
+  //    product-data checklist. Competitor discovery saturates per class (§2.2):
+  //    one combined curve lets a long direct list end the indirect search.
   const curves = new Set(packet.saturation.filter((s) => s.curve.length > 0).map((s) => s.node));
   for (const node of complete) {
     if (node === "product_data") continue;
+    if (node === "competitors") {
+      for (const relation of COMPETITOR_RELATIONS) {
+        const has = packet.saturation.some(
+          (s) => s.node === "competitors" && s.class === relation && s.curve.length > 0,
+        );
+        if (!has) {
+          problems.push(
+            `competitors is complete with no ${relation} saturation curve — discovery ` +
+              "saturates per class, so each class needs its own",
+          );
+        }
+      }
+      continue;
+    }
     if (!curves.has(node)) {
       problems.push(
         `node ${node} is complete with no saturation curve — 'done' has to be a ` +
@@ -225,6 +253,13 @@ export function validate(
       );
     }
   }
+
+  // 8. Competitor rows (§2.2). Direct vs indirect is a mechanical test — same
+  //    active and same form, or same active and a different form — so it is
+  //    recomputed here rather than taken on trust. A label the forms contradict
+  //    is a judgement that slipped in, and "shared" actives the row does not
+  //    list are a competitor that shares nothing.
+  problems.push(...competitorProblems(packet, sourceIds));
 
   if (problems.length > 0) throw new PacketError(problems.join("; "));
   return packet;
@@ -241,6 +276,69 @@ export function parse(
 /** Lowercase, whitespace-collapsed — the echo need not be character-perfect. */
 function normaliseName(s: string): string {
   return s.toLowerCase().replace(/\s+/g, " ").trim();
+}
+
+/** The §2.2 test, and nothing else. */
+export function expectedRelation(competitorForm: string, referenceForm: string): CompetitorRelation {
+  return competitorForm === referenceForm ? "direct" : "indirect";
+}
+
+function competitorProblems(packet: StagePacket, sourceIds: ReadonlySet<string>): string[] {
+  const problems: string[] = [];
+  const reference = packet.competitor_reference;
+  if (packet.competitors.length > 0 && !reference) {
+    problems.push(
+      "competitors are listed but competitor_reference is missing — direct and " +
+        "indirect are measured against the product's own form and actives",
+    );
+  }
+  if (reference && !sourceIds.has(reference.source_id)) {
+    problems.push(
+      `competitor_reference cites source '${reference.source_id}', which is not in the packet`,
+    );
+  }
+  const referenceActives = new Set((reference?.actives ?? []).map(normaliseName));
+  const kinds = new Map(packet.sources.map((s) => [s.id, s.kind]));
+  const seen = new Set<string>();
+
+  for (const row of packet.competitors) {
+    const label = `competitor '${row.name}'`;
+    if (seen.has(row.id)) problems.push(`${label} repeats id '${row.id}'`);
+    seen.add(row.id);
+    if (!sourceIds.has(row.source_id)) {
+      problems.push(`${label} cites source '${row.source_id}', which is not in the packet`);
+    }
+    for (const adId of row.ad_source_ids) {
+      if (!sourceIds.has(adId)) {
+        problems.push(`${label} links ad source '${adId}', which is not in the packet`);
+      } else if (kinds.get(adId) !== "ad_library") {
+        problems.push(`${label} links '${adId}' as an ad, but that source is ${kinds.get(adId)}`);
+      }
+    }
+    const ownActives = new Set(row.active_ingredients.map((a) => normaliseName(a.name_normalised)));
+    for (const shared of row.shared_actives.map(normaliseName)) {
+      if (!ownActives.has(shared)) {
+        problems.push(`${label} lists '${shared}' as shared, but not among its own actives`);
+      } else if (reference && !referenceActives.has(shared)) {
+        problems.push(
+          `${label} lists '${shared}' as shared, but the reference product's actives are ` +
+            `${[...referenceActives].join(", ")} — a brand with a different active is neither ` +
+            "direct nor indirect; gap it as \"same problem, different active\"",
+        );
+      }
+    }
+    if (reference) {
+      const expected = expectedRelation(row.form, reference.form);
+      if (row.relation !== expected) {
+        problems.push(
+          `${label} is labelled ${row.relation}, but its form (${row.form}) ` +
+            `${expected === "direct" ? "matches" : "differs from"} the reference's ` +
+            `(${reference.form}), which makes it ${expected}`,
+        );
+      }
+    }
+  }
+  return problems;
 }
 
 /**

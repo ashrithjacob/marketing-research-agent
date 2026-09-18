@@ -4,6 +4,7 @@ import {
   streamRunEvents,
   TERMINAL_STATUSES,
   type Billed,
+  type Competitor,
   type Judgement,
   type Pricing,
   type ResearchNode,
@@ -11,6 +12,7 @@ import {
   type RunEvent,
   type RunSummary,
   type Source,
+  type StagePacket,
 } from './api';
 import StageRail, { NODE_LABELS, NODE_ORDER, scopeLabel } from './StageRail';
 import { ChatText } from './FileBox';
@@ -109,6 +111,13 @@ export default function RunView({
     [admitted],
   );
 
+  // Customers' words only. A competitors run also files brands' own taglines as
+  // verbatim excerpts, and under this heading they would read as customer voice.
+  const voice = useMemo(
+    () => (packet?.excerpts ?? []).filter((e) => e.node === 'review_mining'),
+    [packet],
+  );
+
   const lastTool = useMemo(
     () => [...events].reverse().find((e) => e.kind === 'tool.started'),
     [events],
@@ -200,6 +209,9 @@ export default function RunView({
                 {r.nodes && r.nodes.length < NODE_ORDER.length && (
                   <span className="runrow-scope">{scopeLabel(r.nodes)} · </span>
                 )}
+                {r.counts.competitors &&
+                  r.counts.competitors.direct + r.counts.competitors.indirect > 0 &&
+                  `${r.counts.competitors.direct} direct · ${r.counts.competitors.indirect} indirect · `}
                 {r.counts.sources} sources · {r.counts.excerpts} excerpts ·{' '}
                 {r.counts.gaps} gaps
               </div>
@@ -296,6 +308,10 @@ export default function RunView({
             )}
           </div>
         </section>
+
+        {packet && (packet.competitor_reference || (packet.competitors ?? []).length > 0) && (
+          <CompetitorsView packet={packet} />
+        )}
 
         {packet && (
           <section>
@@ -417,8 +433,8 @@ export default function RunView({
           <h3>
             Voice of customer <span className="n">verbatim, never paraphrased</span>
           </h3>
-          {(packet?.excerpts ?? []).length === 0 && <p className="muted">Nothing yet.</p>}
-          {(packet?.excerpts ?? []).slice(0, 25).map((excerpt) => (
+          {voice.length === 0 && <p className="muted">Nothing yet.</p>}
+          {voice.slice(0, 25).map((excerpt) => (
             <div key={excerpt.id} className="item">
               <div className="q">
                 “{excerpt.text}”
@@ -522,6 +538,79 @@ function Card({ label, value, tone }: { label: string; value: number; tone?: str
     <div className={`card ${tone ?? ''}`}>
       <div className="v">{value}</div>
       <div className="l">{label}</div>
+    </div>
+  );
+}
+
+/**
+ * §2.2's two classes, side by side. The relation shown is the one the server's
+ * validator has already checked against the forms — this view only lays it out.
+ */
+function CompetitorsView({ packet }: { packet: StagePacket }) {
+  const reference = packet.competitor_reference ?? null;
+  const rows = packet.competitors ?? [];
+  const curves = packet.saturation.filter((s) => s.node === 'competitors');
+  return (
+    <section>
+      <h3>
+        Competitors{' '}
+        <span className="n">same active · direct = same form, indirect = different form</span>
+      </h3>
+      {reference && (
+        <p className="comp-ref">
+          Measured against <b>{reference.name}</b> — {reference.form}
+          {reference.form_as_printed ? ` (${reference.form_as_printed})` : ''} ·{' '}
+          {reference.actives.join(', ')}
+        </p>
+      )}
+      {(['direct', 'indirect'] as const).map((relation) => {
+        const group = rows.filter((c) => c.relation === relation);
+        const curve = curves.find((s) => s.class === relation);
+        return (
+          <div key={relation} className="comp-group">
+            <div className="comp-head">
+              <span className={`comp-tag ${relation}`}>{relation}</span>
+              <span>
+                {group.length} found
+                {curve?.stopped_because ? ` · ${curve.stopped_because}` : ''}
+              </span>
+            </div>
+            {group.length === 0 && <p className="muted">None recorded.</p>}
+            {group.map((c) => (
+              <CompetitorRow key={c.id} competitor={c} />
+            ))}
+          </div>
+        );
+      })}
+    </section>
+  );
+}
+
+function CompetitorRow({ competitor: c }: { competitor: Competitor }) {
+  const ads = c.ad_source_ids?.length ?? 0;
+  return (
+    <div className="comp">
+      <div className="comp-top">
+        <a href={c.url} target="_blank" rel="noreferrer" className="comp-name">
+          {c.name}
+        </a>
+        <span className="comp-form">
+          {c.form}
+          {c.form_as_printed ? ` · ${c.form_as_printed}` : ''}
+        </span>
+      </div>
+      <div className="comp-facts">
+        <span>shares {c.shared_actives.join(', ')}</span>
+        {c.dose_per_serving && <span>{c.dose_per_serving}</span>}
+        {c.price && (
+          <span>
+            {c.price}
+            {c.price_per_dose ? ` (${c.price_per_dose})` : ''}
+          </span>
+        )}
+        {ads > 0 && <span>{ads} ad{ads === 1 ? '' : 's'}</span>}
+      </div>
+      {c.positioning_copy && <div className="comp-copy">“{c.positioning_copy}”</div>}
     </div>
   );
 }

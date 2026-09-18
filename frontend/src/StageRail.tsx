@@ -75,7 +75,9 @@ export default function StageRail({
   onRunNode?: (node: ResearchNode) => void;
 }) {
   const byNode = new Map(nodes.map((n) => [n.node, n]));
-  const curves = new Map(saturation.map((s) => [s.node, s]));
+  // Competitors carry two curves, one per class; every other node has one.
+  const curves = new Map<ResearchNode, Saturation[]>();
+  for (const entry of saturation) curves.set(entry.node, [...(curves.get(entry.node) ?? []), entry]);
   const inScope = new Set(scope);
 
   return (
@@ -118,7 +120,11 @@ export default function StageRail({
                     >
                       <span className="node-dot" />
                       <span className="node-name">{NODE_LABELS[node]}</span>
-                      <Curve entry={covered ? curves.get(node) : undefined} />
+                      {covered && (curves.get(node) ?? []).length > 0 ? (
+                        (curves.get(node) ?? []).map((entry, i) => <Curve key={i} entry={entry} />)
+                      ) : (
+                        <Curve />
+                      )}
                       {onRunNode && (
                         <button
                           className="node-run"
@@ -152,7 +158,10 @@ function Curve({ entry }: { entry?: Saturation }) {
   if (!entry || entry.curve.length === 0) return <span className="node-why">—</span>;
   const peak = Math.max(1, ...entry.curve.map((p) => p.new_themes));
   return (
-    <span className="spark" title={entry.stopped_because}>
+    <span
+      className="spark"
+      title={`${entry.class ? `${entry.class}: ` : ''}${entry.stopped_because ?? ''}`}
+    >
       {entry.curve.map((point, index) => (
         <i
           key={index}

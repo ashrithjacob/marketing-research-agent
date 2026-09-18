@@ -1104,12 +1104,20 @@ These are small, need no new service, and every one of them was caused by a real
       `prompt.ts` instructing the split of actives from the verbatim panel.
       *Done when* a run on a multi-ingredient product yields one row per active with
       dose and unit, and the verbatim panel alongside.
-- [ ] **Competitor rows** — the one genuinely new shape (§4.3): `relation`, `form`,
+- [x] **Competitor rows** — the one genuinely new shape (§4.3): `relation`, `form`,
       `active_ingredients[]`, `price_per_dose`. Today competitors are loose attributes,
       so direct-versus-indirect cannot be expressed at all.
       *Done when* a packet distinguishes the two classes and the validator rejects a
       competitor with no `relation`.
-- [ ] **Per-class competitor saturation** (§2.2): two curves, not one.
+      **Done 2026-09-18**, and one step further than asked: the validator does not
+      only require `relation`, it recomputes it from `form` against a new
+      `competitor_reference` (the product's own form and actives — a
+      competitors-only run has no §2.1 attributes to compare with) and rejects a
+      label the forms contradict. `form` became a fixed vocabulary for the same
+      reason. Verified on a real run: 5 direct, 8 indirect. See `workings.md` §2c.
+- [x] **Per-class competitor saturation** (§2.2): two curves, not one.
+      **Done 2026-09-18**: `saturation[].class`, and `competitors` cannot be
+      `complete` without a curve for each class.
 - [ ] **Category metric vocabulary** (§2.4): `tam`, `category_size`, `search_volume`,
       `amazon_sales`, `units_sold`, `bsr`, with `period` mandatory, and the prompt
       telling the agent to measure volume on the *active ingredient*.

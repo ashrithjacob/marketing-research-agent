@@ -251,3 +251,96 @@ describe("runNodes", () => {
     expect(runNodes(undefined)).toEqual([...NODES]);
   });
 });
+
+describe("validation: competitors, direct and indirect", () => {
+  /** A capsule product with one direct (capsule) and one indirect (spray) competitor. */
+  const withCompetitors = (): Record<string, any> => {
+    const data = minimalPacket();
+    data.sources.push(
+      { id: "sha256:ref", url: "https://magnacalm.example/p", kind: "first_party", marketing: true, admitted: true, archived: true, node: "competitors" },
+      { id: "sha256:cw", url: "https://calmwell.example/p", kind: "competitor_marketing", marketing: true, admitted: true, archived: true, node: "competitors" },
+      { id: "sha256:sm", url: "https://sleepmist.example/p", kind: "competitor_marketing", marketing: true, admitted: true, archived: true, node: "competitors" },
+      { id: "sha256:ad", url: "https://facebook.com/ads/library/?id=1", kind: "ad_library", first_seen: "2026-03-02", marketing: true, admitted: true, archived: true, node: "competitors" },
+    );
+    const active = { name_as_printed: "Magnesium Bisglycinate", name_normalised: "magnesium glycinate", dose: "400", unit: "mg", per: "serving" };
+    data.competitor_reference = {
+      name: "MagnaCalm 400mg",
+      form: "capsule",
+      form_as_printed: "90 capsules",
+      actives: ["magnesium glycinate"],
+      source_id: "sha256:ref",
+    };
+    data.competitors = [
+      { id: "c1", name: "CalmWell 400", url: "https://calmwell.example/p", relation: "direct", form: "capsule", active_ingredients: [active], shared_actives: ["magnesium glycinate"], positioning_copy: "Sleep through.", source_id: "sha256:cw", ad_source_ids: ["sha256:ad"] },
+      { id: "c2", name: "SleepMist spray", url: "https://sleepmist.example/p", relation: "indirect", form: "spray", active_ingredients: [active], shared_actives: ["Magnesium Glycinate"], source_id: "sha256:sm" },
+    ];
+    return data;
+  };
+
+  it("accepts rows whose relation agrees with the forms", () => {
+    const packet = validate(withCompetitors());
+    expect(packet.competitors.map((c) => c.relation)).toEqual(["direct", "indirect"]);
+  });
+
+  it("rejects a label the forms contradict, and names the test", () => {
+    // A spray against a capsule is indirect by §2.2, whatever the agent thinks.
+    const data = withCompetitors();
+    data.competitors[1].relation = "direct";
+    expect(() => validate(data)).toThrow(
+      /'SleepMist spray' is labelled direct, but its form \(spray\) differs from the reference's \(capsule\), which makes it indirect/,
+    );
+  });
+
+  it("rejects a shared active the reference product does not have", () => {
+    // Same problem, different molecule: neither class, and a gap instead.
+    const data = withCompetitors();
+    const melatonin = { name_as_printed: "Melatonin", name_normalised: "melatonin" };
+    data.competitors[0].active_ingredients = [melatonin];
+    data.competitors[0].shared_actives = ["melatonin"];
+    expect(() => validate(data)).toThrow(/is neither direct nor indirect/);
+  });
+
+  it("rejects a shared active the competitor does not list itself", () => {
+    const data = withCompetitors();
+    data.competitors[0].shared_actives = ["magnesium citrate"];
+    expect(() => validate(data)).toThrow(/'magnesium citrate' as shared, but not among its own actives/);
+  });
+
+  it("needs the reference product before it can classify anything", () => {
+    const data = withCompetitors();
+    data.competitor_reference = null;
+    expect(() => validate(data)).toThrow(/competitor_reference is missing/);
+  });
+
+  it("only links ad-library sources as ads", () => {
+    const data = withCompetitors();
+    data.competitors[0].ad_source_ids = ["sha256:sm"];
+    expect(() => validate(data)).toThrow(/links 'sha256:sm' as an ad, but that source is competitor_marketing/);
+  });
+
+  it("rejects a form outside the vocabulary", () => {
+    // "veg caps" and "capsule" must be one word or the test stops being mechanical.
+    const data = withCompetitors();
+    data.competitors[0].form = "veg caps";
+    expect(() => validate(data)).toThrow(/competitors\.0\.form/);
+  });
+
+  it("needs a saturation curve per class before competitors can be complete", () => {
+    const data = withCompetitors();
+    data.nodes.push({ node: "competitors", status: "complete", done_criterion_met: true, why: "saturated" });
+    data.saturation.push({ node: "competitors", class: "direct", curve: [{ source_id: "sha256:cw", new_themes: 1, cumulative_themes: 1 }] });
+    expect(() => validate(data)).toThrow(/competitors is complete with no indirect saturation curve/);
+
+    data.saturation.push({ node: "competitors", class: "indirect", curve: [{ source_id: "sha256:sm", new_themes: 1, cumulative_themes: 1 }] });
+    expect(() => validate(data)).not.toThrow();
+  });
+
+  it("counts competitor rows as out of scope on a run that does not cover competitors", () => {
+    const data = withCompetitors();
+    data.sources = data.sources.filter((s: any) => s.node === "review_mining");
+    data.gaps = [{ node: "review_mining", missing: "no 3-star text" }];
+    expect(() => validate(data, ["review_mining"])).toThrow(
+      /3 entries are recorded against competitors, which is outside this run's scope/,
+    );
+  });
+});

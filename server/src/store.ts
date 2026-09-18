@@ -160,6 +160,7 @@ export interface RunSummary {
     measurements: number;
     attributes: number;
     gaps: number;
+    competitors: { direct: number; indirect: number };
   };
 }
 
@@ -186,6 +187,10 @@ export function summary(run: ResearchRun): RunSummary {
       measurements: (packet.measurements ?? []).length,
       attributes: (packet.attributes ?? []).length,
       gaps: (packet.gaps ?? []).length,
+      competitors: {
+        direct: (packet.competitors ?? []).filter((c: any) => c.relation === "direct").length,
+        indirect: (packet.competitors ?? []).filter((c: any) => c.relation === "indirect").length,
+      },
     },
   };
 }
