@@ -89,7 +89,11 @@ export function extract(output: string): Record<string, unknown> {
  * "stage 1 contains no judgements" structural rather than advisory. Everything
  * below is a cross-object rule.
  */
-export function validate(data: unknown, scope: readonly Node[] = NODES): StagePacket {
+export function validate(
+  data: unknown,
+  scope: readonly Node[] = NODES,
+  brief?: { product?: unknown },
+): StagePacket {
   const parsed = stagePacketSchema.safeParse(data);
   if (!parsed.success) throw new PacketError(readable(parsed.error));
   const packet = parsed.data;
@@ -131,7 +135,22 @@ export function validate(data: unknown, scope: readonly Node[] = NODES): StagePa
   }
   const sourceIds = new Set(packet.sources.map((s) => s.id));
 
-  // 2. Every reference resolves. A dangling source_id is an excerpt from nowhere.
+  // 2. The packet answers the brief the run was given, not the worked example.
+  //    The example names a product, and a model that anchors on it researches
+  //    the example instead — a "completed" run about the wrong product is the
+  //    most expensive failure here, and the quietest. Containment, not
+  //    equality: "mullein" researched as "Mullein leaf 500mg capsules" is the
+  //    agent doing its job.
+  const wanted = typeof brief?.product === "string" ? normaliseName(brief.product) : "";
+  const got = normaliseName(packet.brief.product);
+  if (wanted && got && !got.includes(wanted) && !wanted.includes(got)) {
+    problems.push(
+      `packet brief is about '${packet.brief.product}', but this run's brief is ` +
+        `'${String(brief?.product)}' — the worked example is not the assignment`,
+    );
+  }
+
+  // 3. Every reference resolves. A dangling source_id is an excerpt from nowhere.
   for (const excerpt of packet.excerpts) {
     if (!sourceIds.has(excerpt.source_id)) {
       problems.push(
@@ -164,7 +183,7 @@ export function validate(data: unknown, scope: readonly Node[] = NODES): StagePa
 
   const gappedNodes = new Set(packet.gaps.map((g) => g.node));
 
-  // 3. An ad with no first-seen date is a hole in the sophistication read that
+  // 4. An ad with no first-seen date is a hole in the sophistication read that
   //    stage 3 depends on. Capture it, but say so.
   for (const source of packet.sources) {
     if (source.kind === "ad_library" && source.admitted && !source.first_seen) {
@@ -179,7 +198,7 @@ export function validate(data: unknown, scope: readonly Node[] = NODES): StagePa
 
   const complete = new Set(packet.nodes.filter((n) => n.status === "complete").map((n) => n.node));
 
-  // 4. 3★ is mandatory coverage, not a preference — it is where the honest
+  // 5. 3★ is mandatory coverage, not a preference — it is where the honest
   //    text lives, so a review node without it has not mined reviews.
   if (complete.has("review_mining")) {
     if (!packet.excerpts.some((e) => e.star_rating === 3)) {
@@ -187,14 +206,14 @@ export function validate(data: unknown, scope: readonly Node[] = NODES): StagePa
     }
   }
 
-  // 5. spec.md §4.3 — an empty gap list means the run stopped looking.
+  // 6. spec.md §4.3 — an empty gap list means the run stopped looking.
   if (packet.gaps.length === 0) {
     problems.push(
       "gap list is empty; real research always has holes, so the run is treated as failed",
     );
   }
 
-  // 6. Saturation is the done-criterion for everything except the finite
+  // 7. Saturation is the done-criterion for everything except the finite
   //    product-data checklist.
   const curves = new Set(packet.saturation.filter((s) => s.curve.length > 0).map((s) => s.node));
   for (const node of complete) {
@@ -211,8 +230,17 @@ export function validate(data: unknown, scope: readonly Node[] = NODES): StagePa
   return packet;
 }
 
-export function parse(output: string, scope: readonly Node[] = NODES): StagePacket {
-  return validate(extract(output), scope);
+export function parse(
+  output: string,
+  scope: readonly Node[] = NODES,
+  brief?: { product?: unknown },
+): StagePacket {
+  return validate(extract(output), scope, brief);
+}
+
+/** Lowercase, whitespace-collapsed — the echo need not be character-perfect. */
+function normaliseName(s: string): string {
+  return s.toLowerCase().replace(/\s+/g, " ").trim();
 }
 
 /**

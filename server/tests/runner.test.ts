@@ -51,9 +51,9 @@ function request(overrides: Partial<RunRequest> = {}): RunRequest {
 }
 
 /** Start a run whose single assistant turn is `text`, and wait for it to settle. */
-async function runWith(text: string): Promise<string> {
+async function runWith(text: string, req: RunRequest = request()): Promise<string> {
   faux.setResponses([fauxAssistantMessage(text)]);
-  const runId = supervisor.start(request());
+  const runId = supervisor.start(req);
   await supervisor.waitFor(runId);
   return runId;
 }
@@ -83,6 +83,18 @@ describe("settling a run", () => {
   it("marks a prose-only run invalid", async () => {
     const runId = await runWith("I looked into it and I think the market is crowded.");
     expect(store.getRun(runId)!.status).toBe("invalid");
+  });
+
+  it("marks a run about the wrong product invalid, not completed", async () => {
+    // The worked example names a product; a model that anchors on it hands back
+    // a packet about the example rather than the brief it was given.
+    const runId = await runWith(
+      fenced(minimalPacket()),
+      request({ brief: { product: "mullein", url: "", market: "", notes: "" } }),
+    );
+    const run = store.getRun(runId)!;
+    expect(run.status).toBe("invalid");
+    expect(run.error).toMatch(/worked example is not the assignment/);
   });
 
   it("records the output it read the packet from", async () => {

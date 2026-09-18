@@ -93,7 +93,8 @@ All of this happens **before the HTTP response is sent**:
      nodes; done = saturation; admission; how source ids work; the gap list is
      required) → standing judgements → the brief (with a line telling the agent no
      URL was supplied and finding one is its job) → the output contract and a worked
-     example packet.
+     example packet, framed as shape only — its product is invented, and a packet
+     about it is rejected (step 4).
 6. **Agent** — a `pi-agent-core` `Agent` is created in this process with that
    system prompt, the model, session id `research-<runId>` and the tools from
    `createResearchTools()`. Its `streamFn` — the one function that sends a request
@@ -165,8 +166,12 @@ When the agent goes idle:
    No such block → `invalid`.
 4. **Validate:** `stagePacketSchema` — every object `.strict()`, so a field that
    is not in the contract (a `summary`, a `finding`) fails the packet. A run that
-   covers part of the stage then gets the scope rule (§2b). Then five cross-object
+   covers part of the stage then gets the scope rule (§2b). Then six cross-object
    rules:
+   - the packet's `brief.product` must echo the run's brief (containment,
+     case-insensitive) — a packet about the worked example's product is
+     rejected, because anchoring on the example is the quiet way a run
+     "completes" having researched the wrong thing;
    - every `source_id` cited by an excerpt, measurement, attribute or saturation
      point exists in `sources`;
    - an admitted `ad_library` source with no `first_seen` needs a `competitors` gap;

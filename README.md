@@ -175,46 +175,6 @@ docker compose down      # volumes keep your runs and the corpus
 `docker compose down -v` also deletes the volumes — your run history and every
 archived page. Rarely what you want.
 
-### Without Docker, for iterating on the code
-
-The container rebuild compiles `better-sqlite3`, so it is the wrong loop to sit
-in while changing a file. Run the process directly instead — the paths have to be
-overridden because the defaults (`/data`, `/corpus`, `/app/static`) are the
-container's:
-
-```bash
-# build the SPA once; re-run after a frontend change, or use vite dev below
-cd frontend && npm install && npm run build && cd ..
-
-cd server && npm install
-set -a; . ../.env; set +a          # your keys
-MRA_DATABASE_PATH=./.local/research.db \
-MRA_CORPUS_PATH=./.local/corpus \
-MRA_STATIC_DIR=../frontend/dist \
-MRA_APP_PASSWORD_HASH= \
-MRA_COOKIE_SECURE=false \
-SEARXNG_URL=http://127.0.0.1:8081 \
-npm run dev                        # tsx watch, so a save restarts it
-```
-
-Then `http://localhost:8000`. Two things to know:
-
-- **`web_search` needs SearXNG**, which is only in the compose stack. Either run
-  `docker compose up -d searxng` alongside (it publishes nothing by default —
-  add `ports: ["127.0.0.1:8081:8080"]` or point `SEARXNG_URL` at the container
-  IP), or accept that stage-1 runs fail on their first search. **Review mining
-  does not touch SearXNG at all** — it only needs `APIFY_TOKEN`, so it works in
-  this mode as-is.
-- `corpus_mounted` will read `false` until that directory exists. For a stage-1
-  run it means every source comes back unarchived.
-- **Review mining needs only `APIFY_TOKEN`** — no container, no SearXNG. It is
-  the one part of stage 1 that works fully in this mode. `GET
-  /api/research/config` reports `review_mining.configured`, so check that before
-  blaming a run. Every call costs money; see the budget note below.
-
-For frontend work, `cd frontend && npm run dev` gives HMR on :5173 and proxies
-`/api` to :8000, so leave the server running in the other terminal.
-
 ### Review mining, locally
 
 The three review tools need one key and nothing else — no container, no SearXNG,
@@ -233,8 +193,8 @@ node scripts/apify-spike.mjs amazon
 node scripts/apify-spike.mjs trustpilot
 
 # 3. Through the real tools, which also writes to the corpus.
-MRA_CORPUS_PATH=./.local/corpus npm run dev
-curl -s localhost:8000/api/research/config | python3 -m json.tool | grep -A2 review_mining
+docker compose up -d --build
+curl -s localhost:8080/api/research/config | python3 -m json.tool | grep -A2 review_mining
 ```
 
 `review_mining.configured: false` means the tools are not on the agent's
@@ -355,18 +315,6 @@ to-do list, and a model that skipped it produced a packet claiming
 exact bytes on disk, which is what makes
 `GET /api/research/runs/:id/sources/:sha` able to re-hash the file and tell you
 whether it still matches.
-
-### Without Docker
-
-```bash
-cd server && npm install && npm test      # 88 tests
-npm run dev                               # :8000, tsx watch
-cd ../frontend && npm install && npm run dev   # :5173, proxies /api to :8000
-```
-
-You need `OPENROUTER_API_KEY` and `FIRECRAWL_API_KEY` in the environment, and a
-SearXNG to point `SEARXNG_URL` at — `docker compose up -d searxng` is enough,
-with `SEARXNG_URL=http://127.0.0.1:8080` once you publish its port.
 
 Every behavioural fix here has a regression test; keep that true. Most of them
 are about what the validator **refuses**, which is where the value is.

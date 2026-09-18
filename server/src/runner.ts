@@ -477,7 +477,7 @@ export class RunSupervisor {
 
     let parsed: StagePacket;
     try {
-      parsed = parsePacket(output, nodes);
+      parsed = parsePacket(output, nodes, run?.brief);
     } catch (error) {
       if (!(error instanceof PacketError)) throw error;
       this.store.updateRun(runId, { status: "invalid", error: error.message });

@@ -56,6 +56,15 @@ describe("what the instructions must state", () => {
     expect(build()).toMatch(/Never `null`/);
   });
 
+  it("says the worked example is not the brief", () => {
+    // A run once anchored on the example's product and researched it instead of
+    // the product it was given. The disclaimer is what stands between runs and
+    // that happening again at the model's initiative.
+    const text = build();
+    expect(text).toMatch(/shape only/);
+    expect(text).toMatch(/a packet about the example's product is rejected/);
+  });
+
   it("refuses a fifth gap node by naming the only four there are", () => {
     const text = build();
     expect(text).toMatch(/Never invent a fifth node name/);

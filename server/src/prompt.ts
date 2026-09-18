@@ -350,6 +350,10 @@ Everything outside the fence is ignored. The block must match this shape exactly
 {example}
 \`\`\`
 
+The example shows the **shape only** — its product, market and every value in
+it are invented. Your brief is the one in \`## The brief\` above: your packet's
+\`brief\` echoes it, and a packet about the example's product is rejected.
+
 Field notes:
 
 - \`star_rating\` and \`axis\` apply to review excerpts only; use \`null\` elsewhere.

@@ -164,6 +164,33 @@ describe("validation: the cross-object rules", () => {
   });
 });
 
+describe("validation: the packet answers the brief it was given", () => {
+  it("rejects a packet about the worked example's product", () => {
+    // The prompt's example names a product; a model that anchors on it
+    // researches the example instead of the brief — a "completed" run about
+    // the wrong product is the most expensive failure there is.
+    expect(() => validate(minimalPacket(), NODES, { product: "mullein" })).toThrow(
+      /packet brief is about 'MagnaCalm 400mg', but this run's brief is 'mullein'/,
+    );
+  });
+
+  it("accepts an echo of the brief, case and detail aside", () => {
+    expect(() => validate(minimalPacket(), NODES, { product: "magnacalm" })).not.toThrow();
+    expect(() => validate(minimalPacket(), NODES, { product: "MagnaCalm 400mg" })).not.toThrow();
+  });
+
+  it("lets the agent fill out a sparse product name", () => {
+    // "mullein" researched as "Mullein leaf 500mg capsules" is the job done well.
+    const data = minimalPacket();
+    data.brief.product = "Mullein leaf 500mg capsules";
+    expect(() => validate(data, NODES, { product: "mullein" })).not.toThrow();
+  });
+
+  it("checks nothing when no brief is handed over", () => {
+    expect(() => validate(minimalPacket())).not.toThrow();
+  });
+});
+
 describe("validation: a run that covers part of the stage", () => {
   /** A packet that only ever touched product_data. */
   const productOnly = (): Record<string, any> =>
