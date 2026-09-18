@@ -1,6 +1,7 @@
 # Spec — Stage 1: raw material collection
 
-**Status:** built (stage 1) · **Date:** 2026-09-11 · **Parents:** `spec.md` (what the
+**Status:** built (stage 1); node requirements extended 2026-09-16, §2.5 measures what
+is actually reachable · **Date:** 2026-09-11, revised 2026-09-16 · **Parents:** `spec.md` (what the
 researcher does), `cockpit-spec.md` (how you watch it) · **Engine:**
 `@earendil-works/pi-agent-core`, in-process (was: hermes runs API — see §6 and §8.2)
 
@@ -59,15 +60,59 @@ the logged saturation curve, not a finding. §9 says how we'll know if it's wron
 
 Mandatory attributes, each captured or gapped with a reason:
 
-`name · brand · form · dose_per_serving · servings_per_container · full_ingredient_panel ·
-price · subscription_terms · claims_made_on_own_site (verbatim) · coa_present`
+`name · brand · form · active_ingredients[] · full_ingredient_panel (verbatim, actives
+and inactives) · servings_per_container · price · subscription_terms ·
+claims_made_on_own_site (verbatim) · coa_present`
+
+Each entry in `active_ingredients[]` carries `name_as_printed · name_normalised ·
+dose · unit · per (serving | capsule | ml) · standardisation` — the last for extracts
+that state a concentration ("10:1", "95% curcuminoids"). `name_as_printed` is
+transcription; `name_normalised` is lowercase, trimmed, one accepted synonym mapping
+(`vitamin B3` → `niacin`). Anything requiring a judgement about equivalence is a gap,
+not a guess.
+
+**Why actives are split out from the panel, rather than living inside it.** They are
+the join key for two other nodes: §2.2 defines a competitor by shared active
+ingredient, and §2.4 measures search volume *for the active ingredient*, not for the
+brand. A panel captured only as one verbatim blob cannot be joined on, so both
+downstream nodes silently narrow to brand-name research. The verbatim panel is
+captured as well — it is the audit trail, and inactives matter for formulation
+claims.
+
+Where the panel lives, in descending order of trust: the product's own label image or
+supplement-facts panel, the brand's own page, the marketplace listing, a retailer
+listing. Below that it is a gap. A panel transcribed from a third-party article is
+**not** admissible as the panel; it may be captured as a `reference` source and must
+be gapped as unverified.
 
 Saturation does not apply — this node is a finite checklist. It completes when every
 attribute has a value or a gap. **A missing COA is a gap, not a zero.**
 
 ### 2.2 competitors
 
-Per competitor: `name · url · positioning_copy (verbatim) · price · format · ad_library_entries`.
+Two classes, and the distinction is mechanical rather than a judgement:
+
+| Class | Test |
+|---|---|
+| **Direct** | same active ingredient **and** same form |
+| **Indirect** | same active ingredient, **different** form — the same problem solved in another format |
+
+Both classes are researched to the same depth. Indirect competitors are not a
+footnote: a magnesium spray and a magnesium gummy compete for the same buyer as a
+capsule, and §2.4's search volume is measured over the ingredient, so the ingredient's
+market is the one being sized.
+
+The test is mechanical on purpose. It reads two attributes already captured in §2.1
+(`active_ingredients[].name_normalised`, `form`) and compares them, so a second person
+with the same two products classifies them identically — which is what keeps it inside
+stage 1's rule. **A brand that shares the problem but not the ingredient is neither**:
+capture it as a source if it is useful, and gap it as "same problem, different active"
+rather than inventing a third class here. Deciding whether a different molecule is a
+substitute is a stage-2 judgement.
+
+Per competitor: `name · url · relation ∈ {direct, indirect} · active_ingredients[] ·
+form · dose_per_serving · positioning_copy (verbatim) · price · price_per_dose ·
+ad_library_entries`.
 
 Each ad-library entry **must carry `first_seen`**. `spec.md` §7 is blunt about why:
 longevity is the only outside performance signal there is. An ad with no first-seen
@@ -75,8 +120,10 @@ date is captured, marked `first_seen: null`, and **counted as a gap** — not si
 dropped, because a competitor whose ad dates we couldn't get is a hole in the
 sophistication read that stage 3 depends on.
 
-Saturation applies to competitor *discovery*: three consecutive searches surfacing no
-new brand.
+Saturation applies to competitor *discovery*, **per class**: three consecutive
+searches surfacing no new direct brand, and three surfacing no new indirect one. One
+combined counter lets a rich direct set satisfy the criterion while the indirect
+search has barely started, which is the failure this splits to avoid.
 
 ### 2.3 review mining
 
@@ -85,8 +132,23 @@ The densest node and the one most likely to be faked, so it has the most structu
 Per excerpt: `text (verbatim) · star_rating · date · source_id · locator ·
 axis ∈ {why_bought, why_stayed, why_quit}`.
 
+**Volume and spread, per product researched:** at least **10 marketplace reviews**,
+covering 1★ through 5★ with 3★ mandatory (below), plus whatever forum material exists
+(Reddit and niche boards). Ten is a floor for *coverage*, not a done-criterion —
+saturation still decides when to stop, and a node that hits ten without saturating
+keeps going. A node that cannot reach ten is **incomplete with a gap naming the wall
+it hit**, never complete-with-fewer.
+
 Rules:
 
+- **A review is first-hand or it is not a review.** The excerpt must be the customer's
+  own words, taken from the page where that customer posted them. A reviewer's summary
+  of other reviews ("multiple customers have flagged…"), a YouTube description, and a
+  roundup article's paraphrase are all *somebody else's stage 3*. They may be captured
+  as `reference` or rejected as `review_roundup`, and they may never become a
+  `review_mining` excerpt. §2.5 records the run where exactly this happened.
+- **A wall is not a page.** A bot check, a cookie interstitial or a login page that
+  fetches successfully is an absence, not a source — see §2.5.
 - **Verbatim is immutable.** Stored exactly as it appears, including typos. `spec.md`
   §6.2-6 — the moment "I wake up at 3am and can't get back to sleep" becomes "sleep
   maintenance issues", it is gone and cannot be recovered. Enforced in §4: excerpt
@@ -99,10 +161,231 @@ Rules:
 
 ### 2.4 category data
 
-Measurements only: search volume with a trend line over **≥3 years** (not a point
-estimate — `spec.md` §7), category size figures, seasonality if published. Each
-carries `metric · value · unit · period · source_id`. A point estimate where a trend
-was needed is a gap.
+Measurements only, each carrying `metric · value · unit · period · source_id`. Three
+questions, in the order they are worth answering:
+
+| Question | Metric | Notes |
+|---|---|---|
+| How big is the market? | `tam` / `category_size` | currency and geography mandatory; a figure without a stated market is a gap |
+| How many people want this? | `search_volume` **for each active ingredient**, not the brand | trend over **≥3 years**, monthly. A point estimate where a trend was needed is a gap (`spec.md` §7) |
+| Is anyone actually buying? | `amazon_sales` / `units_sold` / `bsr` | traction, measured on the marketplace rather than claimed by a report |
+
+**Search volume is measured on the active ingredient** (§2.1) and, where they differ,
+on the problem phrase a buyer would type. Brand volume measures the brand's marketing
+spend to date, which is a different question and belongs to the competitor node.
+
+**Amazon sales are the traction reading.** A market-size report is somebody's model;
+units moving on a marketplace this month are an observation. Capture what the page
+states — best-seller rank, "N bought in past month", review counts as a lower bound on
+sales — and record the observation date, because all three move. An estimate produced
+by a third-party sales-estimation tool is admissible as a `reference` measurement with
+its tool named in the source, never as an Amazon figure.
+
+TAM built by multiplying two numbers from different sources is a **calculation, not a
+measurement**, and stage 1 does not do it. Capture both inputs, gap the product. Stage
+2 may multiply them where it can show its working.
+
+---
+
+## 2.5 What the two tools can actually reach — measured 2026-09-16
+
+§10 says stage 1 assumes "whatever SearXNG can find and Firecrawl can read". That
+sentence was never tested against the sources §2.3 and §2.4 need. It has been now,
+live, from the VPS container:
+
+| Target | Result | Consequence |
+|---|---|---|
+| SearXNG search | **works** — ~40 results/query from Google CSE and Brave | finding pages is not the problem |
+| DuckDuckGo, Wikidata engines | CAPTCHA / HTTP error on every query | harmless; the other two carry it |
+| Amazon product page (`/dp/…`), default fetch | 138k chars, star aggregates, **no review text** | the default fetch trims the reviews away — see §2.5.2 |
+| Amazon product page, `onlyMainContent: false` + `waitFor: 4000` | **10–17 real reviews** with star, title, date, "Verified Purchase" | the ten-review floor is reachable free, with caveats |
+| Amazon `/product-reviews/…` | **blocked**: 3.1k chars of page furniture, no reviews | the ≥10-review floor is currently unreachable |
+| Reddit, via Firecrawl | **refused by Firecrawl itself**: *"we do not support this site"* | no forum material at all |
+| Reddit JSON, direct from the container | **403** | the VPS IP is blocked too; it is not a Firecrawl-only limit |
+| Trustpilot, via Firecrawl | **bot wall**, 170 chars: *"Verifying your connection…"* | and it arrives as `success: true` — see below |
+| Trustpilot, direct from the container, full browser headers | **403 from CloudFront on every path, homepage included** (991 bytes) | an address-reputation block, not a scraping-difficulty one — see §2.5.3 |
+| YouTube watch page | title and description only, **not comments** | `video_comments` sources have contained no comments |
+
+**The failure mode this exposes is worse than the blocks themselves.** A wall fetches
+*successfully*: Firecrawl returns 200 with a short body, `web_fetch` archives it, and
+the agent receives a page. Nothing in the pipeline distinguishes 170 characters of
+"Verifying your connection" from a real page, so it became a cited
+`review_platform` source in run `yoracare` (2026-09-12). The agent, having no reviews,
+then filled `review_mining` from what it *could* read: YouTube descriptions and
+roundup prose. That run's 7 review excerpts contain 1 star rating and lines like
+*"Multiple customers have flagged that it's actually manufactured in China"* — a
+stranger's conclusion, stored as raw material, which is precisely the failure §1 exists
+to prevent.
+
+**So the honest current state of the four nodes:**
+
+| Node | Reachable today |
+|---|---|
+| product data | yes — brand site, marketplace listing, retailer pages |
+| competitors | partly — sites and listings yes; ad libraries untested here |
+| review mining | **thin** — Amazon's own sample of 10–17 reviews, once fetched properly (§2.5.2); no forums, no review platforms, no control over star spread |
+| category data | partly — published reports and keyword pages yes; Amazon traction figures come off pages that fetch, but BSR placement varies |
+
+### 2.5.2 Amazon reviews are reachable after all — measured 2026-09-16
+
+> **SUPERSEDED 2026-09-17 by `spec-review-mining.md` §3 — re-measured from the VPS
+> and the conclusion no longer holds.** Four corrections:
+>
+> (a) **"Amazon reviews are reachable" is no longer true from production.** Five
+> consecutive `curl --compressed` fetches from the VPS returned Amazon's bot page
+> — *at HTTP 200, 3,781 bytes* — and headless Chrome from the VPS got the same.
+> The block is keyed to the **address**, so no fetch tuning reaches it.
+> (b) **The Firecrawl path this section recommends has degraded.** Re-run one day
+> later with the exact settings below, `amazon.com/dp/B000BD0RT0` returned **0
+> reviews** across two `waitFor` values and both proxy modes, where this section
+> measured 17. The best result on any ASIN was 8 — below §2.3's floor of ten.
+> (c) **"Renders after first paint" was the wrong mechanism.** Reviews are
+> server-rendered and present in the first response body; a plain `curl` from a
+> residential address returns 13 complete reviews with no browser and no `waitFor`.
+> Firecrawl's `onlyMainContent: true` was trimming them. Point 4's `waitFor`
+> non-determinism is therefore a Firecrawl artifact, not an Amazon one.
+> (d) Point 3's login wall is **confirmed** from a second, unrelated address:
+> `/product-reviews/` 302s to `/ap/signin` regardless of origin.
+>
+> Also new and not recorded here: `?filterByStar=` on `/dp/` is silently broken in
+> **both** directions — `three_star` returns zero reviews, `one_star` returns the
+> *unfiltered* sample. See `spec-review-mining.md` §3.4 before ever using it.
+
+The first pass concluded Amazon carried no review text. That was an artifact of
+**how** it was fetched, not of the page. `web_fetch` sends
+`onlyMainContent: true` and no wait; Amazon renders its reviews after first
+paint, so the trimmed, un-waited fetch returns the listing without them.
+
+Fetched with `onlyMainContent: false` and `waitFor: 4000`:
+
+| Product | Reviews | Star spread |
+|---|---|---|
+| `amazon.com` B000BD0RT0 (magnesium glycinate) | 17 | 3★×2, 4★×1, 5★×14 |
+| `amazon.co.uk` B0GZVQMXX4 (yoracare bar) | 10 | 1★×2, 4★×2, 5★×6 |
+
+Each carries a title, a star rating, a posted date, a country and a "Verified
+Purchase" marker — first-hand customer text of the kind §2.3 requires.
+
+**Three limits, and they are the reason this is a floor rather than a solution:**
+
+1. **The sample is Amazon's, not ours.** These are the reviews the product page
+   chooses to show. Both samples skew to 5★ (14 of 17; 6 of 10).
+2. **Star coverage is luck.** §2.3 makes 3★ mandatory. One product had two 3★
+   reviews; the other had none. A run on the second product cannot complete its
+   review node honestly, and the correct behaviour is to say so.
+3. **The star-filtered pages want a login, not a better fetch.** Retested
+   2026-09-16 with the same untrimmed, waited settings that unlocked the product
+   page: `/product-reviews/…`, its page 2, and `?filterByStar=three_star` all return
+   **Amazon's "Sign in or create account" page**, identically (3,508 chars, zero
+   reviews). It is an authentication wall, so no amount of fetch tuning reaches it —
+   which retires the experiment as originally framed. What remains is a *signed-in
+   browser session*, and that is a terms-of-use decision rather than a technical one:
+   automated collection under an account risks that account. §13.2 timeboxes it.
+
+4. **The fetch is not deterministic.** The same URL with `waitFor: 10000` instead of
+   `4000` returned **0 reviews** and a 25% smaller body, minutes after returning 17.
+   A reader that does not assert "reviews > 0, else retry" will silently collect
+   nothing and the run will look merely disappointing.
+
+5. **Amazon captchas this server directly.** A plain fetch from the container gets
+   "Enter the characters you see" — so the working path today runs through Firecrawl's
+   addresses, not ours, the mirror image of §2.5.3's Trustpilot problem.
+
+So the honest position: the product page yields a usable ten-ish first-hand
+reviews per product for free, `review_mining` stops being empty, and a paid
+supplier buys *choice over the sample* — which is what 3★ coverage and star
+spread actually need.
+
+### 2.5.3 Trustpilot is an IP block, not a paywall — measured 2026-09-16
+
+> **SUPERSEDED 2026-09-17 by `spec-review-mining.md` §2. The measurements below are
+> correct; the diagnosis and the remedy are both wrong.** The same 403 with the same
+> 991-byte body was reproduced from a *residential* address, so address reputation
+> is not the cause. Those 991 bytes are an **AWS WAF JavaScript challenge**
+> (`awswaf.com/challenge.js`), served to any client that does not run JS, from any
+> network. The remedy proposed here — "a proxy or any non-data-centre network path"
+> — buys nothing.
+>
+> **Trustpilot is solved, from the VPS, for free.** One `docker run` of
+> `zenika/alpine-chrome --dump-dom` clears the challenge unattended and returns 20
+> reviews as structured JSON in `__NEXT_DATA__`, in ~9s. `?stars=3` returns 20 3★
+> reviews and composes with `?page=N`, so **§2.3's mandatory-3★ rule stops being a
+> matter of luck** — which was the constraint failing this node.
+>
+> The reasoning error worth keeping: this section varied headers and address — the
+> two things that do not matter here — and never varied *whether JavaScript ran*. A
+> domain-wide 403 is equally consistent with a domain-wide challenge.
+
+Prompted by a community Trustpilot scraper that works fine for its users, both
+paths were tested from the VPS:
+
+| Attempt | Result |
+|---|---|
+| Firecrawl scrape | 200, 170 chars, "Verifying your connection…" |
+| Direct fetch, minimal headers | 403, 991 bytes |
+| Direct fetch, full Chrome header set (UA, `sec-ch-ua`, `Sec-Fetch-*`, `Accept-Language`) | 403, 991 bytes |
+| Direct fetch of `trustpilot.com/` — the **homepage** | 403, 991 bytes, `server: CloudFront` |
+
+The homepage failing with a complete browser header set rules out fingerprinting
+as the cause: the block is on the requesting address, applied at CloudFront, and
+it covers the whole domain. Hetzner ranges are data-centre ranges, and Trustpilot
+refuses them wholesale.
+
+**So this is a routing problem, not a data problem.** Any path with a
+non-data-centre address reads Trustpilot normally: a proxy, a home connection, a
+laptop running the step. The parser itself is unremarkable — the review text is in
+the served HTML. Budget the work as *a reader plus a route*, and note the same
+question is likely to apply to Reddit, which also 403s the container directly.
+
+### 2.5.1 What would fix it, and what each costs
+
+> **PARTLY SUPERSEDED 2026-09-17 by `spec-review-mining.md` §4 and §7.** The Reddit
+> bullet below — "the obvious first build" — no longer holds. Reddit closed
+> self-service app registration in late 2025; every token now needs manual approval,
+> and the free tier is reportedly non-commercial only, which a marketing research
+> agent is not. Reddit also carries **no star ratings**, so it can never satisfy
+> §2.3's mandatory-3★ rule. It is now recommended **last**, not first.
+>
+> The Trustpilot bullet is also wrong, and in the costly direction: "a proxy or any
+> non-data-centre network path fixes it" would have bought proxies that change
+> nothing. Trustpilot is now **first**, and free — see §2.5.3's superseded note.
+> The Amazon bullet's conclusion ("no free, permitted route exists") has survived
+> and hardened: from the VPS there is no working route at all, paid or free, that
+> we currently possess.
+
+None of these is implemented; none has been tested beyond the table above.
+
+- **Reddit's official API.** Free tier, OAuth app credentials, 100 queries/minute,
+  and it returns comment trees as JSON. This is the only one of the four that is a
+  documented, permitted route rather than a workaround, and it is the obvious first
+  build. It needs a third tool (`reddit_search`/`reddit_thread`) or a fetch path that
+  recognises reddit URLs.
+- **Amazon reviews.** No free, permitted route exists. The options are a paid
+  scraping API that specialises in Amazon and handles the blocking itself, or a
+  residential-proxy/stealth mode on the fetch layer. Both cost money per page; the
+  first is likelier to keep working. Amazon's own Product Advertising API returns
+  listings, not review text, so it does not solve this.
+- **Trustpilot.** *Not* the same shape as Amazon — see §2.5.3. The page itself is
+  ordinary server-rendered HTML that community scrapers parse without difficulty; what
+  fails is our address. A proxy or any non-data-centre network path fixes it.
+  (Both halves of that diagnosis are wrong — see §2.5.3's superseded note. Stage 0,
+  which bought a Trustpilot *rating* per shop separately, was removed from the app
+  on 2026-09-18, so review text is now the only thing at stake.)
+- **YouTube comments.** The Data API v3 returns `commentThreads` on a free quota. A
+  genuine source of customer language, and the cheapest after Reddit.
+
+> **SUPERSEDED 2026-09-17.** `review_mining` *can* complete: Trustpilot runs from
+> the VPS, free, with deliberate 3★ coverage (`?stars=3`), which removes the
+> dependency on Amazon's sample happening to include 3★. See
+> `spec-review-mining.md` §2 and §7. The paragraph below describes the state before
+> that route existed; the gap-not-excerpts behaviour it prescribes is still right
+> and still unenforced.
+
+**Until the fetch fix in §2.5.2 lands, `review_mining` cannot complete at all**, and
+even after it the node completes only when Amazon's sample happens to include 3★. The
+correct behaviour in both cases is a node marked `incomplete` with a gap naming what
+was missing — not excerpts sourced from whatever happened to be fetchable. That behaviour is not yet enforced;
+§4.1's proposed rules 7–9 are what would enforce it.
 
 ---
 
@@ -243,6 +526,50 @@ The packet is rejected — the run marked `invalid`, not `completed` — when:
 Rule 1 is the load-bearing one and also the most likely to be annoying in practice.
 It stays strict until a real run shows it rejecting something legitimate, and if that
 happens the fix is to widen the schema deliberately — not to loosen the validator.
+
+### 4.2 Proposed rules 7–9 — not built, and each has a measured cause
+
+Rules 1–6 catch an agent that writes the wrong *shape*. The yoracare run (§2.5) was
+schema-valid and still produced paraphrase attributed to customers, so these three
+close what it walked through. They are mechanical checks over data the service already
+holds; none needs the model's cooperation.
+
+7. **An excerpt's text must occur verbatim in its source's archived body.** The
+   service has the bytes and the claimed span, so this is a substring check, not a
+   judgement. It is the single strongest guarantee available here: it makes quote drift
+   and invented quotes into hard failures instead of §9.3's manual spot-check of five.
+   Whitespace normalised on both sides before comparing, and nothing else.
+8. **A source whose archived body is below a floor, or matches a wall signature, is
+   not admissible.** Measured signatures: "Verifying your connection", "Enable
+   JavaScript and cookies to continue", a body under ~1,000 characters from a domain
+   known to paginate reviews. Such a fetch becomes a gap naming the domain and the
+   wall — the outcome "we could not read Trustpilot" is useful; a 170-character
+   Trustpilot "source" is not.
+9. **`review_mining` excerpts may only cite sources of kind `marketplace_review`,
+   `review_platform`, `forum` or `video_comments`.** In the measured run they cited
+   YouTube descriptions and roundup text. A `reference` source can inform the brief; it
+   cannot supply a customer's words.
+
+Rule 7 also changes what §9's hand-check is for: with it, the manual pass stops
+verifying transcription and starts verifying *selection* — whether the excerpts chosen
+are representative — which is the part a machine cannot do.
+
+### 4.3 Schema deltas these nodes need
+
+`schema.ts` today has no field for the things §2.1–§2.4 now require. Recording them
+here so the next implementation change is a list rather than an inference:
+
+| Where | Add |
+|---|---|
+| `attributes` | nothing structural — actives are attribute rows keyed `active_ingredient.<n>.name_as_printed` / `.name_normalised` / `.dose` / `.unit` / `.per` / `.standardisation` |
+| competitor rows | `relation ∈ {direct, indirect}`, `form`, `active_ingredients[]`, `price_per_dose` |
+| `measurements` | nothing structural; `metric` gains the vocabulary in §2.4 (`tam`, `category_size`, `search_volume`, `amazon_sales`, `units_sold`, `bsr`) and `period` becomes mandatory for all of them |
+| `nodes` | a `coverage` block for review mining: `{ reviews_captured, stars_covered[] }`, so "ten reviews across the star range" is checkable rather than asserted |
+
+Competitor rows are the only genuinely new shape. Everything else is vocabulary over
+the existing `attributes`/`measurements` tables, which is deliberate: a flat key-value
+row that a person can read is harder to smuggle a judgement into than a nested object
+with a free-text field.
 
 ---
 
@@ -534,6 +861,13 @@ they cannot becomes a gap entry. That is the design, not a shortfall: a stage 1 
 fails loudly on a source it cannot get is more useful than one that quietly returns
 less.
 
+> **Measured 2026-09-16 (§2.5), and it is worse than this paragraph assumed.** The
+> clause holds only where a blocked page *fails*. Amazon's review pages, Trustpilot and
+> Reddit do not fail — they return a wall with HTTP 200, or Firecrawl refuses the
+> domain outright — so the run does not gap them, it fills the node with whatever else
+> was readable. "Fails loudly" is a property that has to be built (§4.2, rules 7–9),
+> not one the fetch layer provides.
+
 > **Superseded (2026-09-11):** this read "whatever hermes's existing web tools can
 > reach". The clause was doing more work than it looked like — under hermes, "what
 > the tools can reach" depended on which backend the harness had auto-detected on
@@ -651,26 +985,149 @@ The corpus audit was checked end to end on this run's real data:
 - **Where do themes live long-term?** In the packet for now. If stage 2 wants to
   re-cluster, they may want to be a separate mutable artifact keyed to immutable
   excerpts.
+---
 
+## 12. Raw notes, and where each one went
 
-Active ingredients:
-- extract all
-- customer reviews on cactive ingerdients
-- customer reviews on amazon  (more than 10) for product and the 
+Working notes from the 2026-09-14 conversation. Folded into the spec above where they
+are stage-1 requirements; the rest are parked with the stage that owns them, because a
+note about ad formats is not a note about collection.
 
-- based on recent graph (hockey)
-- trustpilot score is high
-- 5-10 products with low saturation and high products
-- Big 5: USA, UK, AUSTRALIA, CANADA, NEW ZEALAND
-- Veloma
+**Now specified above:**
 
-- Long form statics: image (hook) followed by long texts in meta, its like a story format in meta
-marketing is highlighting their own desires, talk to them in their own language
+| Note | Where it landed |
+|---|---|
+| extract all active ingredients | §2.1 — `active_ingredients[]`, split out from the verbatim panel, with the reason |
+| direct = same active + same form; indirect = same active + different form | §2.2, with the mechanical test and per-class saturation |
+| Amazon reviews, more than 10, and a way around Amazon's limits | §2.3 volume floor; §2.5 measures the wall and §2.5.1 lists the routes |
+| Reddit and similar | §2.5 — blocked twice over today, and the fix is the Reddit API |
+| TAM, keyword volume for the active ingredient, Amazon sales as traction | §2.4 |
 
-- sometimes these long form static videos start in product page
-Ads are eventually the most important thing form all the platforms
-Avatars from the real reviews --> we need to create the avatar for the product
-It has some kind of structure (has data from all the information we gathered)
+**Parked, with the stage that owns them:**
 
-Sometimes the click goes into an information page not just directly to the page.
+- **Avatars built from real reviews** — a synthesis over excerpts, so stage 2 at the
+  earliest. It is the clearest example of why §2.3's first-hand rule matters: an avatar
+  built from a YouTuber's summary of reviews is a portrait of the YouTuber.
+- **Ads are the most important signal across platforms. Long-form statics: a hook
+  image over story-format body copy; some start on the product page. The click
+  sometimes lands on an advertorial rather than the product page.** Stage 3
+  (sophistication and angles). Stage 1's job here is narrower and already specified:
+  capture the creative and its `first_seen`, gap it when the date is missing (§2.2).
+- **"Marketing highlights their own desires, talk to them in their own language."**
+  The argument for verbatim capture, already load-bearing in §2.3, and a stage-4 copy
+  principle. Not a collection rule.
+- **Hockey-stick traffic, high Trustpilot, big five, 5–10 low-saturation products** —
+  these are stage 0's gates, specified in `spec-stage-0.md` §4 and built. Listed here
+  only so the note is not read as an unbuilt stage-1 requirement.
+- **"Veloma"** — an unexplained name in the notes; recorded verbatim rather than
+  guessed at. If it is a product or competitor to seed a run with, it belongs in a
+  brief, not in the spec.
 
+---
+
+## 13. To do
+
+Everything §2 now requires that the build does not yet do, ordered so each item
+unblocks the next. Nothing here is started. "Done when" is the check, not a feeling.
+
+### 13.1 First — stop the silent failures
+
+These are small, need no new service, and every one of them was caused by a real run
+(§2.5). Until they land, every other item produces confident nonsense faster.
+
+- [ ] **Rule 7 — an excerpt must occur verbatim in its source's archived body.**
+      `packet.ts` validates shape only and never opens the corpus; the run id and the
+      bodies are both to hand in `runner.ts`. Whitespace-normalise both sides, compare,
+      fail the run `invalid` naming the excerpt.
+      *Done when* a packet quoting text absent from its body is rejected, with a test
+      covering both a byte-identical pass and a paraphrase fail.
+- [ ] **Rule 8 — a wall is not a page.** In `tools.ts`, treat a body under ~1,000
+      characters, or one matching a wall signature ("Verifying your connection",
+      "Enable JavaScript and cookies"), as a failed fetch: no archive, no source_id, an
+      error telling the agent to gap the domain.
+      *Done when* the Trustpilot URL from §2.5 produces a gap rather than a source.
+- [ ] **Rule 9 — review excerpts may only cite review-bearing source kinds.**
+      `schema.ts` cross-object rule, alongside the existing 3★ check.
+      *Done when* an excerpt on a `reference` source fails validation.
+- [ ] **Fix the example leak in `prompt.ts`.** `spec-stage-0.md` §5.3 measured it on
+      stage 0 and fixed it there; stage 1 still puts a complete magnesium packet last,
+      which is why runs drift toward magnesium whatever the brief. Move the brief and
+      the task after the example, as stage 0 does.
+      *Done when* a test asserts the brief appears after the worked example.
+
+### 13.2 Then — make review mining possible at all
+
+§2.3 cannot complete today (§2.5). In cost order:
+
+- [ ] **Reddit API tool.** Free tier, OAuth client credentials, ~100 queries/min,
+      returns comment trees as JSON. New tool plus `MRA_REDDIT_*` settings; sources
+      land as `kind: forum`. The only permitted route of the four, so it goes first.
+      *Done when* a run captures ≥5 forum excerpts with post dates and permalinks, and
+      a missing credential degrades to a gap rather than an error.
+- [ ] ~~**YouTube comments.**~~ **Cut from scope 2026-09-16.** Data API v3
+      `commentThreads` would work on a free quota, but Reddit covers the same ground —
+      unpaid customer language — and one forum source is enough to prove the node.
+      Revisit only if Reddit yields thin material. The existing `video_comments`
+      sources, which contain descriptions rather than comments, should stop being
+      admitted regardless (§4.2 rule 9).
+      *Done when* `video_comments` excerpts carry comment text and posted dates.
+- [ ] **Amazon, step one: fetch the product page properly.** `onlyMainContent: false`
+      plus `waitFor: 4000` returns 10–17 first-hand reviews (§2.5.2). Needs per-domain
+      fetch options, a parse into excerpts with star, date and country, and a retry —
+      the same call returned 0 reviews at a 10s wait (§2.5.2, limit 4), so "reviews > 0
+      or try again" is part of the work, not a refinement of it.
+      *Done when* a run captures ≥10 Amazon reviews with star ratings on a live product.
+- [ ] **Amazon, step two: timebox 3 hours on a signed-in browser.** The plain-fetch
+      version of this experiment is already answered — those pages want a login
+      (§2.5.2, limit 3). What is untested is driving a real browser, signed into a
+      throwaway account, to `/product-reviews/…?filterByStar=three_star`. Success
+      fixes 3★ coverage; failure makes the paid question real. Note two constraints
+      before starting: automated collection under an account is against Amazon's terms
+      and the account is what gets closed, and this server is captcha'd by Amazon
+      directly, so the browser likely needs the same non-data-centre route as
+      Trustpilot (§2.5.3). Stop at 3 hours either way and record which.
+- [ ] **Then decide the paid supplier.** What it buys is *choice over the sample* —
+      star spread, volume, recency — not merely "reviews". Only worth pricing once
+      step two has answered.
+      *Done when* the decision is recorded here, including "not buying", in which case
+      §2.3's floor becomes "whatever the product page shows, typically 10–17" and 3★
+      coverage becomes best-effort with a gap when absent.
+- [ ] **Trustpilot: a reader plus a route (§2.5.3).** The parse is easy; the block is
+      on our server's address, so the work is a fetch path that is not the VPS — a
+      proxy, or running that step off a residential connection. Free either way, bar a
+      few pounds a month for a proxy.
+      *Done when* a run captures Trustpilot review text with star ratings and dates.
+
+### 13.3 Then — the schema and prompt for the new node requirements
+
+- [ ] **`active_ingredients[]` as attribute rows** (§2.1, §4.3 keying), and
+      `prompt.ts` instructing the split of actives from the verbatim panel.
+      *Done when* a run on a multi-ingredient product yields one row per active with
+      dose and unit, and the verbatim panel alongside.
+- [ ] **Competitor rows** — the one genuinely new shape (§4.3): `relation`, `form`,
+      `active_ingredients[]`, `price_per_dose`. Today competitors are loose attributes,
+      so direct-versus-indirect cannot be expressed at all.
+      *Done when* a packet distinguishes the two classes and the validator rejects a
+      competitor with no `relation`.
+- [ ] **Per-class competitor saturation** (§2.2): two curves, not one.
+- [ ] **Category metric vocabulary** (§2.4): `tam`, `category_size`, `search_volume`,
+      `amazon_sales`, `units_sold`, `bsr`, with `period` mandatory, and the prompt
+      telling the agent to measure volume on the *active ingredient*.
+- [ ] **`nodes[].coverage` for review mining** — `{ reviews_captured, stars_covered[] }`
+      so §2.3's floor is checkable rather than asserted.
+
+### 13.4 Then — verify, with numbers
+
+- [ ] **Re-run the yoracare brief** once 13.1 and 13.2 land, and check it against §9
+      point by point. The 2026-09-12 packet is the before; keep it for comparison.
+- [ ] **Answer §11's remaining cost question.** Every measured run so far was
+      cancelled, so the cost of a run that saturates all four nodes is still unknown.
+- [ ] **Cockpit: surface the wall gaps.** A run that gapped Amazon and Reddit should
+      say so where the operator looks, not only inside the packet JSON.
+
+### 13.5 Not doing yet, deliberately
+
+Ad-library capture beyond what a normal fetch reaches; anything in stages 2–5;
+avatars (§12). The ad libraries are the next hostile source after reviews, and worth
+attacking only once the review path works — the same wall problem, and less of the
+signal.

@@ -98,15 +98,17 @@ services:
       # nothing but search snippets.
       - SEARXNG_URL=http://searxng:8080
       - FIRECRAWL_API_KEY=${FIRECRAWL_API_KEY}
-      # Stage 0 only. Unset is fine and is the default: stage 0 then refuses to
-      # start and says so, rather than spending credits and failing partway.
-      # Billed per row returned, not per call — see .env.example.
-      - TRENDTRACK_API_KEY=${TRENDTRACK_API_KEY:-}
-      # Days a TrendTrack response stays reusable; 0 disables the cache.
-      # Passed through explicitly — an .env line for a variable the compose
-      # file does not forward is silently ignored, and the code default (7)
-      # would look like it had been honoured.
-      - MRA_TRENDTRACK_CACHE_DAYS=${MRA_TRENDTRACK_CACHE_DAYS:-7}
+      # Review mining. Unset is fine and is the default: the three review tools
+      # are then withheld from the agent entirely, rather than offered and
+      # failing on call — stage 1 gaps `review_mining` and says why. Amazon is
+      # unreachable from this host by any other route (it serves a bot page at
+      # HTTP 200), so without this there are no marketplace reviews at all.
+      # Billed per event against a real card, with no allowance. See
+      # .env.example and spec-review-mining.md §5.
+      - APIFY_TOKEN=${APIFY_TOKEN:-}
+      # Reviews requested per product per star band. The FREE plan's actor caps
+      # this at 10 per run regardless, and drops the extras without erroring.
+      - MRA_APIFY_MAX_REVIEWS=${MRA_APIFY_MAX_REVIEWS:-10}
 
 volumes:
   # Runs, events and packets. Losing this loses your research history.

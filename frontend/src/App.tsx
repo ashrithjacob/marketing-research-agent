@@ -5,15 +5,10 @@ import {
   type Config,
   type RunSummary,
 } from './api';
-import Discovery from './Discovery';
 import Login from './Login';
 import RunView from './RunView';
 import StartRun from './StartRun';
 import StepIn from './StepIn';
-
-/** Which stage the cockpit is showing. Stage 0 picks the product; stage 1
- *  researches it. They share nothing but the shell and the login. */
-type Stage = 0 | 1;
 
 /** The cockpit shell: a header bar over the three-column run view.
  *
@@ -23,7 +18,6 @@ type Stage = 0 | 1;
  *  agent's job, not the operator's.
  */
 export default function App() {
-  const [stage, setStage] = useState<Stage>(1);
   const [authed, setAuthed] = useState<boolean | null>(null);
   const [runs, setRuns] = useState<RunSummary[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -93,22 +87,8 @@ export default function App() {
     <div className="app">
       <header>
         <span className="brand">research cockpit</span>
-        <div className="stagetabs">
-          <button
-            className={stage === 0 ? 'tab now' : 'tab'}
-            onClick={() => setStage(0)}
-          >
-            stage 0 · product finder
-          </button>
-          <button
-            className={stage === 1 ? 'tab now' : 'tab'}
-            onClick={() => setStage(1)}
-          >
-            stage 1 · raw material
-          </button>
-        </div>
         <div className="subject">
-          {stage === 1 && activeRun && (
+          {activeRun && (
             <>
               <span className="chip">
                 {activeRun.brief.product}
@@ -120,25 +100,21 @@ export default function App() {
               </span>
             </>
           )}
-          {stage === 1 && (
-            <>
-              <button
-                className="ghost"
-                disabled={!activeRun}
-                onClick={() => setStepInOpen(true)}
-              >
-                Step in
-              </button>
-              {live && (
-                <button className="ghost" onClick={stopRun}>
-                  Stop
-                </button>
-              )}
-              <button className="primary" onClick={() => setStartOpen(true)}>
-                Start run
-              </button>
-            </>
+          <button
+            className="ghost"
+            disabled={!activeRun}
+            onClick={() => setStepInOpen(true)}
+          >
+            Step in
+          </button>
+          {live && (
+            <button className="ghost" onClick={stopRun}>
+              Stop
+            </button>
           )}
+          <button className="primary" onClick={() => setStartOpen(true)}>
+            Start run
+          </button>
           <button
             className="ghost"
             title="Sign out"
@@ -158,9 +134,7 @@ export default function App() {
         </div>
       )}
 
-      {stage === 0 ? (
-        <Discovery config={config} />
-      ) : activeId ? (
+      {activeId ? (
         <RunView
           runId={activeId}
           runs={runs}
@@ -184,10 +158,6 @@ export default function App() {
           <p className="muted">
             Press <b>Start run</b>. A product name and a market is the whole
             brief — finding the URLs is the agent's job.
-          </p>
-          <p className="muted">
-            Don't know which product yet? <b>Stage 0</b> ranks candidates by
-            whether they would carry a 28-day subscription.
           </p>
         </div>
       )}

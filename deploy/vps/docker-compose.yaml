@@ -54,16 +54,17 @@ services:
       - MRA_MODEL=${MRA_MODEL:-deepseek/deepseek-v4-flash-0731}
       - SEARXNG_URL=http://searxng:8080
       - FIRECRAWL_API_KEY=${FIRECRAWL_API_KEY:?FIRECRAWL_API_KEY is not set}
-      # Stage 0 only, and deliberately NOT `:?` like the two above. This key
-      # spends a metered per-row allowance rather than per-token inference, so
-      # an absent one disables stage 0 and leaves the rest of the cockpit
-      # working — which is better than refusing to boot. See setup.md §5b.
-      - TRENDTRACK_API_KEY=${TRENDTRACK_API_KEY:-}
-      # Days a TrendTrack response stays reusable; 0 disables the cache.
-      # Passed through explicitly — an .env line for a variable the compose
-      # file does not forward is silently ignored, and the code default (7)
-      # would look like it had been honoured.
-      - MRA_TRENDTRACK_CACHE_DAYS=${MRA_TRENDTRACK_CACHE_DAYS:-7}
+      # Review mining only, and deliberately NOT `:?` like the two above. This
+      # key spends against a card with no allowance rather than per-token
+      # inference, so an absent one withholds the three review tools from the
+      # agent and leaves the rest of the cockpit working — better than refusing
+      # to boot. See setup.md §5b.
+      - APIFY_TOKEN=${APIFY_TOKEN:-}
+      # Reviews requested per product per star band; the FREE plan's actor caps
+      # it at 10 per run anyway. Passed through explicitly — an .env line for a
+      # variable the compose file does not forward is silently ignored, and the
+      # code default would look like it had been honoured.
+      - MRA_APIFY_MAX_REVIEWS=${MRA_APIFY_MAX_REVIEWS:-10}
 
 networks:
   # Shared with Caddy and nothing else. Not `pa-compose_default`: that is the

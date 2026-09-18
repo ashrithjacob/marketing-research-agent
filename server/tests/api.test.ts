@@ -18,11 +18,9 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { createApp, type App } from "../src/app.js";
 import { hashPassword } from "../src/auth.js";
-import { DiscoverySupervisor } from "../src/discovery.js";
 import { RunSupervisor } from "../src/runner.js";
 import { loadSettings, type Settings } from "../src/settings.js";
 import { SqliteResearchStore } from "../src/store.js";
-import { emptyLedger, type TrendTrackClient } from "../src/trendtrack.js";
 import { fenced, minimalPacket } from "./fixtures.js";
 
 const MODEL_ID = "faux-model";
@@ -34,56 +32,6 @@ let settings: Settings;
 let faux: ReturnType<typeof fauxProvider>;
 let models: MutableModels;
 
-/** A TrendTrack that returns one page of one shop. Enough to exercise the routes. */
-function fakeTrendTrack(): TrendTrackClient {
-  const ledger = emptyLedger();
-  return {
-    ledger,
-    async queryShops(query) {
-      const data = [
-        {
-          id: "s1",
-          domain: "greens.com",
-          name: "Greens",
-          traffic: {
-            monthlyVisits: 90000,
-            growth30d: 0.2,
-            history: [30000, 40000, 50000, 60000, 70000, 90000].map((value, i) => ({
-              period: `2026-0${i + 3}-01`,
-              value,
-            })),
-            topCountries: [{ countryCode: "US", share: 0.8 }],
-          },
-          advertising: { activeAds: 30 },
-          catalog: {
-            productsCount: 40,
-            mainCategory: "Health",
-            bestSellers: [{ title: "Daily Greens Powder", price: 39, currency: "USD" }],
-          },
-          profile: { countryCode: "US", currency: "USD" },
-        },
-      ];
-      ledger.rows += data.length;
-      return { data, pagination: { limit: query.limit ?? 100, offset: 0, total: 1 } };
-    },
-    async getShop(shopId) {
-      ledger.details += 1;
-      return {
-        id: shopId,
-        domain: "greens.com",
-        traffic: { monthlyVisits: 90000, growth30d: 0.2, growth90d: 0.8, growth180d: 2, history: [], topCountries: [] },
-        advertising: null,
-        catalog: null,
-        profile: null,
-        trustpilot: { rating: 4.5, reviewCount: 200 },
-      };
-    },
-    async getUsage() {
-      return { remaining: 9000, limit: 10000, used: 1000 };
-    },
-  };
-}
-
 function build(settingsOverrides: Partial<Settings> = {}): App {
   settings = {
     ...loadSettings(),
@@ -91,7 +39,6 @@ function build(settingsOverrides: Partial<Settings> = {}): App {
     corpusPath: join(dir, "corpus"),
     staticDir: join(dir, "static"),
     appPasswordHash: "",
-    trendtrackApiKey: "test-key",
     ...settingsOverrides,
   };
   store = new SqliteResearchStore(join(dir, "research.db"));
@@ -99,13 +46,7 @@ function build(settingsOverrides: Partial<Settings> = {}): App {
   models = createModels();
   models.setProvider(faux.provider);
   const supervisor = new RunSupervisor({ store, settings, models });
-  const discovery = new DiscoverySupervisor({
-    store,
-    settings,
-    models,
-    makeClient: fakeTrendTrack,
-  });
-  return createApp({ settings, store, supervisor, discovery });
+  return createApp({ settings, store, supervisor });
 }
 
 beforeEach(() => {
@@ -173,103 +114,6 @@ describe("runs", () => {
     expect(body).toContain("run.started");
     expect(body).toContain("packet.ready");
     expect(body).toContain('"reason":"not live"');
-  });
-});
-
-describe("discovery (stage 0)", () => {
-  const verdicts = (refs: number[]) =>
-    fauxAssistantMessage(
-      "```json\n" +
-        JSON.stringify({
-          verdicts: refs.map((ref) => ({ ref, score: 9, reason: "depletes monthly" })),
-        }) +
-        "\n```",
-    );
-
-  it("runs a discovery and reads back the ranking and the bill", async () => {
-    faux.setResponses([verdicts([0])]);
-    const created = await post("/api/research/discovery", { pages: 1 });
-    expect(created.status).toBe(200);
-    const { id } = (await created.json()) as { id: string };
-
-    await app.discovery.waitFor(id);
-    const read = (await (await get(`/api/research/discovery/${id}`)).json()) as any;
-    expect(read.status).toBe("completed");
-    expect(read.live).toBe(false);
-    expect(read.result.products[0]).toMatchObject({
-      title: "Daily Greens Powder",
-      score: 9,
-    });
-    // One row plus one detail call, reported because the operator is charged.
-    expect(read.result.credits).toMatchObject({ rows: 1, details: 1, total: 2 });
-    expect(read.result.funnel).toMatchObject({ returned: 1, afterBigFive: 1 });
-    expect(read.progress.map((p: any) => p.step)).toContain("discover");
-  });
-
-  it("refuses a parameter the schema has no room for", async () => {
-    const response = await post("/api/research/discovery", { pages: 1, sortBy: "revenue" });
-    expect(response.status).toBe(400);
-  });
-
-  it("refuses a page count outside the allowed range", async () => {
-    expect((await post("/api/research/discovery", { pages: 0 })).status).toBe(400);
-    expect((await post("/api/research/discovery", { pages: 99 })).status).toBe(400);
-  });
-
-  it("refuses to start at all when no TrendTrack key is set", async () => {
-    // Failing here costs nothing. Failing after four pages has already spent
-    // four hundred credits.
-    await app.close();
-    app = build({ trendtrackApiKey: "" });
-    const response = await post("/api/research/discovery", { pages: 1 });
-    expect(response.status).toBe(400);
-    expect(((await response.json()) as { detail: string }).detail).toContain("TRENDTRACK_API_KEY");
-  });
-
-  it("says in config whether stage 0 can run", async () => {
-    const configured = (await (await get("/api/research/config")).json()) as any;
-    expect(configured.stage0.configured).toBe(true);
-    expect(configured.stage0.big_five).toEqual(["US", "GB", "CA", "NZ", "AU"]);
-    expect(configured.stage0.defaults.pages).toBe(5);
-
-    await app.close();
-    app = build({ trendtrackApiKey: "" });
-    const off = (await (await get("/api/research/config")).json()) as any;
-    expect(off.stage0.configured).toBe(false);
-  });
-
-  it("lists runs as headers rather than whole rankings", async () => {
-    faux.setResponses([verdicts([0])]);
-    const { id } = (await (
-      await post("/api/research/discovery", { pages: 1 })
-    ).json()) as { id: string };
-    await app.discovery.waitFor(id);
-
-    const listed = (await (await get("/api/research/discovery")).json()) as any;
-    expect(listed.data[0]).toMatchObject({ id, status: "completed", shops: 1, products: 1 });
-    expect(listed.data[0].result).toBeUndefined();
-  });
-
-  it("404s an unknown discovery run", async () => {
-    expect((await get("/api/research/discovery/nope")).status).toBe(404);
-    expect((await post("/api/research/discovery/nope/stop", {})).status).toBe(404);
-  });
-
-  it("409s a stop against a run that has already finished", async () => {
-    faux.setResponses([verdicts([0])]);
-    const { id } = (await (
-      await post("/api/research/discovery", { pages: 1 })
-    ).json()) as { id: string };
-    await app.discovery.waitFor(id);
-    expect((await post(`/api/research/discovery/${id}/stop`, {})).status).toBe(409);
-  });
-
-  it("marks a run that did not survive a restart as failed", async () => {
-    const run = store.createDiscoveryRun({ pages: 1 });
-    app.discovery.recover();
-    const read = store.getDiscoveryRun(run.id)!;
-    expect(read.status).toBe("failed");
-    expect(read.error).toContain("restarted");
   });
 });
 
@@ -418,5 +262,22 @@ describe("the SPA mount", () => {
     writeFileSync(join(dir, "secret.txt"), "nope");
     const response = await get("/../secret.txt");
     expect(response.status).toBe(404);
+  });
+});
+
+describe("review mining config", () => {
+  it("reports whether the review tools will exist", async () => {
+    // The cockpit needs this for the same reason it needs `corpus_mounted`:
+    // without a token, `review_mining` cannot complete and the run form should
+    // say so before the button rather than after the run.
+    await app.close();
+    app = build({ apifyToken: "apify_api_test", apifyMaxReviews: 10 });
+    const body = (await (await get("/api/research/config")).json()) as any;
+    expect(body.review_mining).toEqual({ configured: true, max_reviews: 10 });
+
+    await app.close();
+    app = build({ apifyToken: "" });
+    const offBody = (await (await get("/api/research/config")).json()) as any;
+    expect(offBody.review_mining.configured).toBe(false);
   });
 });

@@ -1,7 +1,7 @@
 /**
  * One fetch helper, shared by everything in this service that leaves the box.
  *
- * Extracted from `tools.ts` when `trendtrack.ts` needed the same thing. The
+ * Extracted from `tools.ts` when a second caller needed the same thing. The
  * detail that makes it worth sharing is the signal composition: a bare
  * `AbortSignal.timeout` replaces the caller's own signal rather than adding to
  * it, so an aborted run would keep its outbound requests alive until they timed
@@ -23,7 +23,7 @@ export async function fetchWithTimeout(
 /**
  * Run `work` over `items` with at most `limit` in flight.
  *
- * Results come back in input order. Stage 0 makes one detail call per surviving
+ * Results come back in input order. A caller may make one call per surviving
  * shop and they are independent, but firing eighty at once is how a rate limit
  * turns a working pipeline into a pile of 429s.
  */

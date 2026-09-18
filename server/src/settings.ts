@@ -5,9 +5,9 @@
  * `hermes_base_url` / `hermes_api_key` / `hermes_session_key` lived here. The
  * harness is now in-process (pi-agent-core), so there is no gateway to address
  * and no second container to isolate against. The isolation argument that
- * justified a separate hermes still holds and is now met differently: the agent
- * gets exactly two tools, both of which only read the web, and neither can
- * reach a shell, a file outside the corpus, or another agent's memory.
+ * justified a separate hermes still holds and is now met differently: every tool
+ * the agent has only reads the web, and none can reach a shell, a file outside
+ * the corpus, or another agent's memory.
  */
 
 export interface Settings {
@@ -39,23 +39,23 @@ export interface Settings {
    *  The archived body on disk is never truncated — only what the model reads. */
   fetchCharLimit: number;
 
-  // --- stage 0 ----------------------------------------------------------
+  // --- review mining ----------------------------------------------------
   /**
-   * TrendTrack, for stage-0 discovery. Empty disables stage 0 rather than
-   * failing a run halfway: credits are billed per returned row, so a pipeline
-   * that discovers its key is missing after four pages has already spent 400.
-   */
-  trendtrackApiKey: string;
-  /**
-   * How long a TrendTrack response stays reusable, in days. 0 disables the
-   * cache.
+   * Apify, for the review-mining node. Empty removes the three review tools
+   * from the agent's surface entirely rather than failing a run mid-way — an
+   * agent that discovers the key is missing on its fortieth tool call has
+   * already burned the turns.
    *
-   * A week is the default because what stage 0 reads from these responses — a
-   * six-month traffic series, a Trustpilot rating — moves on a scale of months,
-   * while the rows cost a credit each. See `trendtrack-cache.ts` for the
-   * staleness this trades away.
+   * Billed per event against a real card, with no allowance. On the FREE plan
+   * the ceiling is $5/month and the Amazon actor silently accepts one start URL
+   * and ten reviews per run. See `spec-review-mining.md` §5.7.
    */
-  trendtrackCacheDays: number;
+  apifyToken: string;
+  /** Reviews requested per product per star band. The FREE plan caps the actor
+   *  at 10 per run regardless, and extras are dropped without an error. */
+  apifyMaxReviews: number;
+  /** How long to wait for one actor run. Measured: Amazon ~10s, Trustpilot ~10s. */
+  apifyWaitSeconds: number;
 
   // --- the corpus -------------------------------------------------------
   /** Raw fetched bodies are written here by `web_fetch`, one directory per run.
@@ -108,8 +108,9 @@ export function loadSettings(): Settings {
     webTimeoutSeconds: num("MRA_WEB_TIMEOUT_SECONDS", 90),
     fetchCharLimit: num("MRA_FETCH_CHAR_LIMIT", 60000),
 
-    trendtrackApiKey: str("TRENDTRACK_API_KEY", ""),
-    trendtrackCacheDays: num("MRA_TRENDTRACK_CACHE_DAYS", 7),
+    apifyToken: str("APIFY_TOKEN", ""),
+    apifyMaxReviews: num("MRA_APIFY_MAX_REVIEWS", 10),
+    apifyWaitSeconds: num("MRA_APIFY_WAIT_SECONDS", 300),
 
     corpusPath: str("MRA_CORPUS_PATH", "/corpus"),
 

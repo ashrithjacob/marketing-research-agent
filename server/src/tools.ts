@@ -22,6 +22,14 @@ import { join } from "node:path";
 import type { AgentTool } from "@earendil-works/pi-agent-core";
 import { Type } from "@earendil-works/pi-ai";
 
+import {
+  amazonReviews,
+  createActorRunner,
+  findAmazonProducts,
+  trustpilotReviews,
+  type ActorRunner,
+  type ReviewResult,
+} from "./apify.js";
 import { fetchWithTimeout } from "./http.js";
 import type { Settings } from "./settings.js";
 
@@ -46,6 +54,9 @@ export type ToolLane = "search" | "fetch" | "other";
 export const TOOL_LANES: Record<string, ToolLane> = {
   web_search: "search",
   web_fetch: "fetch",
+  amazon_find_product: "search",
+  amazon_reviews: "fetch",
+  trustpilot_reviews: "fetch",
 };
 
 /**
@@ -161,6 +172,106 @@ const fetchParameters = Type.Object({
   url: Type.String({ description: "The absolute url to fetch." }),
 });
 
+const findProductParameters = Type.Object({
+  query: Type.String({ description: "Product name or phrase to search Amazon for." }),
+  max_results: Type.Optional(
+    Type.Number({ description: "How many products to return (default 5, max 20)." }),
+  ),
+});
+
+const starParameter = Type.Optional(
+  Type.Number({
+    description:
+      "Star band to fetch, 1-5. Omit for a mixed sample. Ask for 3 explicitly — " +
+      "3-star coverage is mandatory and is never reliably present in a mixed sample.",
+  }),
+);
+
+const amazonReviewParameters = Type.Object({
+  product_url: Type.String({ description: "An Amazon product url, e.g. https://www.amazon.com/dp/B0H2JVQ9GR" }),
+  star: starParameter,
+  max_reviews: Type.Optional(Type.Number({ description: "Reviews to request (default 10)." })),
+});
+
+const trustpilotReviewParameters = Type.Object({
+  domain: Type.String({
+    description: "Company domain, slug, or Trustpilot /review/ url — e.g. huel.com",
+  }),
+  star: starParameter,
+  max_reviews: Type.Optional(Type.Number({ description: "Reviews to request (default 10)." })),
+});
+
+/** 1-5, or null for a mixed sample. Anything else is a caller error, not a band. */
+function starBand(value: number | undefined): 1 | 2 | 3 | 4 | 5 | null {
+  if (value === undefined) return null;
+  const n = Math.trunc(value);
+  if (n < 1 || n > 5) throw new Error(`star must be between 1 and 5, got ${value}`);
+  return n as 1 | 2 | 3 | 4 | 5;
+}
+
+/**
+ * Render a review pull for the model, and archive the excerpts verbatim.
+ *
+ * Archiving matters as much here as in `web_fetch`: §2.3 requires every excerpt
+ * to cite a source that can be re-read, and the packet's `source_id` is
+ * re-hashed by `GET /runs/:id/sources/:sha`. What is archived is the exact JSON
+ * the model is shown, so the audit compares like with like.
+ */
+async function renderReviews(
+  settings: Settings,
+  runId: string,
+  label: string,
+  result: ReviewResult,
+  onFetch?: (record: FetchRecord) => void,
+): Promise<{ content: Array<{ type: "text"; text: string }>; details: unknown }> {
+  const body = JSON.stringify(result.excerpts, null, 2);
+  const { sourceId, archived } = await archive(settings.corpusPath, runId, body);
+
+  onFetch?.({
+    source_id: sourceId,
+    url: label,
+    title: `${result.excerpts.length} reviews — ${label}`,
+    archived,
+    chars: body.length,
+    truncated: false,
+  });
+
+  const header = [
+    `source_id: ${sourceId}`,
+    `source: ${label}`,
+    `archived: ${archived}`,
+    `excerpts: ${result.excerpts.length}`,
+    result.totalReviews !== null ? `written_reviews_total: ${result.totalReviews}` : "",
+    result.totalRatings !== null ? `ratings_total: ${result.totalRatings}` : "",
+    result.gap
+      ? `GAP: ${result.gap}\nRecord this as a gap entry. Do NOT substitute a ` +
+        "different star band and do not describe the node as complete."
+      : "",
+    archived
+      ? ""
+      : "NOTE: the corpus volume could not be written. Record these sources with " +
+        "archived: false and add a gap entry saying so.",
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  const rendered = result.excerpts.length
+    ? result.excerpts
+        .map(
+          (e, i) =>
+            `${i + 1}. [${e.star ?? "?"}*] ${e.date ?? "no date"}` +
+            `${e.verified ? " (verified purchase)" : ""}\n` +
+            `   title: ${e.title}\n   ${e.text}\n   locator: ${e.locator}`,
+        )
+        .join("\n\n")
+    : "(no excerpts)";
+
+  return {
+    content: [{ type: "text", text: `${header}\n\n---\n\n${rendered}` }],
+    details: { source_id: sourceId, archived, ...result },
+  };
+}
+
 /**
  * The tools for one run. Bound to a run id because the corpus is per-run — a
  * tool that could be pointed at another run's directory is a tool that can
@@ -170,8 +281,11 @@ export function createResearchTools(options: {
   settings: Settings;
   runId: string;
   onFetch?: (record: FetchRecord) => void;
+  /** Injected in tests. In production it is built from the settings. */
+  actorRunner?: ActorRunner | null;
 }): AgentTool<any>[] {
   const { settings, runId, onFetch } = options;
+  const runner = options.actorRunner ?? createActorRunner(settings);
 
   const webSearch: AgentTool<typeof searchParameters> = {
     name: "web_search",
@@ -249,5 +363,88 @@ export function createResearchTools(options: {
     },
   };
 
-  return [webSearch, webFetch];
+  // Without a token there is no review route at all. The tools are withheld
+  // rather than stubbed: an agent told it has a tool that always throws burns
+  // turns rediscovering that, and the prompt already knows how to gap a node.
+  if (!runner) return [webSearch, webFetch];
+
+  const findProduct: AgentTool<typeof findProductParameters> = {
+    name: "amazon_find_product",
+    label: "Find product on Amazon",
+    description:
+      "Search Amazon by product name and get back asin, title, stars and " +
+      "reviewsCount, most-reviewed first. Use this before amazon_reviews — it " +
+      "takes a url, not a name. Pick the product by reviewsCount: a listing " +
+      "with four reviews cannot support a review-mining node.",
+    parameters: findProductParameters,
+    async execute(_id, params, signal) {
+      const max = Math.min(Math.max(Math.trunc(params.max_results ?? 5), 1), 20);
+      const products = await findAmazonProducts(runner, {
+        query: params.query,
+        maxResults: max,
+        signal,
+      });
+      if (products.length === 0) {
+        return {
+          content: [{ type: "text", text: `No Amazon products found for ${JSON.stringify(params.query)}.` }],
+          details: { query: params.query, products: [] },
+        };
+      }
+      const rendered = products
+        .map(
+          (p) =>
+            `${p.asin}  ${p.stars ?? "?"}*  reviews=${p.reviewsCount ?? "?"}\n` +
+            `   ${p.title}\n   ${p.url}`,
+        )
+        .join("\n\n");
+      return {
+        content: [{ type: "text", text: rendered }],
+        details: { query: params.query, products },
+      };
+    },
+  };
+
+  const amazon: AgentTool<typeof amazonReviewParameters> = {
+    name: "amazon_reviews",
+    label: "Amazon reviews",
+    description:
+      "Fetch verbatim Amazon reviews for ONE product url, optionally at one " +
+      "star band. Returns text, star, date and a locator, archived and hashed " +
+      "like web_fetch. Call it once per star band to cover 1-5; 3 is " +
+      "mandatory. If it reports a GAP, record the gap — never substitute " +
+      "another band.",
+    parameters: amazonReviewParameters,
+    async execute(_id, params, signal) {
+      const result = await amazonReviews(runner, {
+        productUrl: params.product_url,
+        star: starBand(params.star),
+        maxReviews: Math.trunc(params.max_reviews ?? settings.apifyMaxReviews),
+        signal,
+      });
+      return renderReviews(settings, runId, params.product_url, result, onFetch);
+    },
+  };
+
+  const trustpilot: AgentTool<typeof trustpilotReviewParameters> = {
+    name: "trustpilot_reviews",
+    label: "Trustpilot reviews",
+    description:
+      "Fetch verbatim Trustpilot reviews for ONE company domain, optionally at " +
+      "one star band. These review the MERCHANT — delivery, support, ordering " +
+      "— not the product, so they are review_platform sources and answer " +
+      "why_quit far better than why_bought. Do not use them to fill the " +
+      "marketplace-review floor.",
+    parameters: trustpilotReviewParameters,
+    async execute(_id, params, signal) {
+      const result = await trustpilotReviews(runner, {
+        domainOrUrl: params.domain,
+        star: starBand(params.star),
+        maxItems: Math.trunc(params.max_reviews ?? settings.apifyMaxReviews),
+        signal,
+      });
+      return renderReviews(settings, runId, params.domain, result, onFetch);
+    },
+  };
+
+  return [webSearch, webFetch, findProduct, amazon, trustpilot];
 }

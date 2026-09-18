@@ -8,3 +8,7 @@ spec-product.md
 node_modules/
 server/dist/
 *.tsbuildinfo
+
+# Local non-Docker runs write here (MRA_DATABASE_PATH / MRA_CORPUS_PATH
+# overrides in the README). Never a deploy artefact.
+server/.local/

@@ -173,3 +173,114 @@ describe("archive", () => {
     expect(sourceId).toBe(`sha256:${expected}`);
   });
 });
+
+/**
+ * The three review tools.
+ *
+ * The Apify runner is injected, so nothing here touches the network. What these
+ * protect is the wiring rather than the mapping (`apify.test.ts` covers that):
+ * the tools must be absent without a token, and every excerpt must be archived
+ * under a re-hashable id, because §2.3 requires each one to cite a source that
+ * can be read back.
+ */
+describe("review tools", () => {
+  const runner = (items: Array<Record<string, unknown>>) => ({
+    async run() {
+      return { status: "SUCCEEDED", items };
+    },
+  });
+
+  const reviewTools = (actorRunner: any, runId = "run-r") =>
+    createResearchTools({ settings, runId, actorRunner });
+
+  it("are withheld entirely when no Apify token is configured", () => {
+    // Withheld rather than stubbed: an agent told it has a tool that always
+    // throws burns turns rediscovering that, and the prompt knows how to gap.
+    const names = createResearchTools({
+      settings: { ...settings, apifyToken: "" },
+      runId: "run-x",
+      actorRunner: null,
+    }).map((t) => t.name);
+
+    expect(names).toEqual(["web_search", "web_fetch"]);
+  });
+
+  it("are present once a runner exists", () => {
+    const names = reviewTools(runner([])).map((t) => t.name);
+    expect(names).toContain("amazon_find_product");
+    expect(names).toContain("amazon_reviews");
+    expect(names).toContain("trustpilot_reviews");
+  });
+
+  it("archives excerpts under an id that re-hashes to the stored bytes", async () => {
+    const list = reviewTools(
+      runner([
+        {
+          reviewDescription: "It works but you must reapply several times a day.",
+          ratingScore: 3,
+          date: "2026-09-06",
+          reviewUrl: "https://www.amazon.com/gp/customer-reviews/R1",
+          reviewTitle: "ok",
+          isVerified: true,
+        },
+      ]),
+    );
+    const tool = list.find((t) => t.name === "amazon_reviews")!;
+    const result = await tool.execute("1", {
+      product_url: "https://www.amazon.com/dp/B0H2JVQ9GR",
+      star: 3,
+    });
+
+    const sourceId: string = (result.details as any).source_id;
+    expect(sourceId).toMatch(/^sha256:[0-9a-f]{64}$/);
+    expect((result.details as any).archived).toBe(true);
+
+    const stored = readFileSync(
+      join(settings.corpusPath, "runs", "run-r", "sources", sourceId.slice(7)),
+    );
+    expect(`sha256:${createHash("sha256").update(stored).digest("hex")}`).toBe(sourceId);
+    expect(JSON.parse(stored.toString())[0].text).toBe(
+      "It works but you must reapply several times a day.",
+    );
+    expect((result.content[0] as any).text).toContain("[3*]");
+  });
+
+  it("surfaces a gap in the text the model reads, not just in details", async () => {
+    // A gap the model cannot see is a gap it will not record.
+    const list = reviewTools(
+      runner([{ error: "no_relevant_reviews_found", totalCategoryRatings: 61, totalCategoryReviews: 0 }]),
+    );
+    const tool = list.find((t) => t.name === "amazon_reviews")!;
+    const result = await tool.execute("1", {
+      product_url: "https://www.amazon.com/dp/B0H2JVQ9GR",
+      star: 3,
+    });
+
+    const text = (result.content[0] as any).text;
+    expect(text).toContain("GAP:");
+    expect(text).toContain("No 3-star reviews with text");
+    expect(text).toContain("do not describe the node as complete");
+  });
+
+  it("rejects a star band outside 1-5 rather than silently fetching a mixed sample", async () => {
+    const list = reviewTools(runner([]));
+    const tool = list.find((t) => t.name === "trustpilot_reviews")!;
+    await expect(tool.execute("1", { domain: "huel.com", star: 9 })).rejects.toThrow(
+      /star must be between 1 and 5/,
+    );
+  });
+
+  it("orders found products by reviewsCount so the agent spends on the right one", async () => {
+    const list = reviewTools(
+      runner([
+        { asin: "B0THIN", title: "four reviews", stars: 5, reviewsCount: 4 },
+        { asin: "B0GOOD", title: "sixty one reviews", stars: 3.9, reviewsCount: 61 },
+      ]),
+    );
+    const tool = list.find((t) => t.name === "amazon_find_product")!;
+    const result = await tool.execute("1", { query: "intertrigo cream" });
+
+    expect((result.details as any).products[0].asin).toBe("B0GOOD");
+    expect((result.content[0] as any).text).toContain("reviews=61");
+  });
+});

@@ -13,7 +13,6 @@ const app = createApp();
 // anything still marked `running` is a corpse. Say so before serving, or the
 // cockpit shows a run that will never move again.
 app.supervisor.recover();
-app.discovery.recover();
 
 const server = serve(
   { fetch: app.fetch, hostname: app.settings.host, port: app.settings.port },
@@ -21,7 +20,7 @@ const server = serve(
     console.log(
       `marketing-research-agent listening on ${app.settings.host}:${info.port} ` +
         `(model ${app.settings.model})` +
-        (app.discovery.configured ? "" : " — stage 0 disabled, TRENDTRACK_API_KEY is not set"),
+        (app.settings.apifyToken ? "" : " — review mining disabled, APIFY_TOKEN is not set"),
     );
   },
 );
