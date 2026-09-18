@@ -275,6 +275,23 @@ export const runRequestSchema = z
     model: z.string().default(""),
     // Overrides DEFAULT_REJECTED_KINDS when set (empty means "use the default").
     reject_kinds: z.array(sourceKindSchema).default([]),
+    // The nodes this run researches. Empty means the whole stage.
+    nodes: z.array(nodeSchema).default([]),
   })
   .strict();
 export type RunRequest = z.infer<typeof runRequestSchema>;
+
+/**
+ * The nodes a run covers, in stage order and without repeats. Empty — the
+ * default, and what every run before per-node runs stored — means all of them.
+ */
+export function runNodes(nodes: readonly string[] | undefined): Node[] {
+  const wanted = new Set(nodes ?? []);
+  const scoped = NODES.filter((n) => wanted.has(n));
+  return scoped.length > 0 ? scoped : [...NODES];
+}
+
+/** True when a run covers only part of the stage. */
+export function isPartial(nodes: readonly Node[]): boolean {
+  return nodes.length < NODES.length;
+}

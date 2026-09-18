@@ -25,7 +25,7 @@ export const NODE_LABELS: Record<ResearchNode, string> = {
   category_data: 'Category data',
 };
 
-const NODE_ORDER: ResearchNode[] = [
+export const NODE_ORDER: ResearchNode[] = [
   'product_data',
   'competitors',
   'review_mining',
@@ -53,17 +53,30 @@ function stageOneState(status: RunStatus): { cls: string; label: string } {
   }
 }
 
+/** "Product data" for one node, "Product data + Competitors" for two, "Whole stage" for four. */
+export function scopeLabel(nodes: readonly ResearchNode[]): string {
+  if (nodes.length === 0 || nodes.length === NODE_ORDER.length) return 'Whole stage';
+  return nodes.map((n) => NODE_LABELS[n]).join(' + ');
+}
+
 export default function StageRail({
   status,
   nodes,
   saturation,
+  scope,
+  onRunNode,
 }: {
   status: RunStatus | null;
   nodes: NodeStatus[];
   saturation: Saturation[];
+  /** The nodes the shown run covers; the others are marked as not in it. */
+  scope: readonly ResearchNode[];
+  /** Start a run on one node. Offered per node, stage 1 only for now. */
+  onRunNode?: (node: ResearchNode) => void;
 }) {
   const byNode = new Map(nodes.map((n) => [n.node, n]));
   const curves = new Map(saturation.map((s) => [s.node, s]));
+  const inScope = new Set(scope);
 
   return (
     <div className="rail">
@@ -89,16 +102,33 @@ export default function StageRail({
               <div className="node-list">
                 {NODE_ORDER.map((node) => {
                   const record = byNode.get(node);
-                  const cls = !record
-                    ? ''
-                    : record.status === 'complete' && record.done_criterion_met
-                      ? 'done'
-                      : 'partial';
+                  const covered = inScope.size === 0 || inScope.has(node);
+                  const cls = !covered
+                    ? 'out'
+                    : !record
+                      ? ''
+                      : record.status === 'complete' && record.done_criterion_met
+                        ? 'done'
+                        : 'partial';
                   return (
-                    <div key={node} className={`node ${cls}`} title={record?.why ?? ''}>
+                    <div
+                      key={node}
+                      className={`node ${cls}`}
+                      title={covered ? (record?.why ?? '') : 'not in this run'}
+                    >
                       <span className="node-dot" />
                       <span className="node-name">{NODE_LABELS[node]}</span>
-                      <Curve entry={curves.get(node)} />
+                      <Curve entry={covered ? curves.get(node) : undefined} />
+                      {onRunNode && (
+                        <button
+                          className="node-run"
+                          title={`Run ${NODE_LABELS[node]} on its own`}
+                          aria-label={`Run ${NODE_LABELS[node]}`}
+                          onClick={() => onRunNode(node)}
+                        >
+                          ▶
+                        </button>
+                      )}
                     </div>
                   );
                 })}

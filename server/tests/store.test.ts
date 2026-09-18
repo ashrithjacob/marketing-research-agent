@@ -114,14 +114,73 @@ describe("migration", () => {
         model: "m",
         rejectKinds: [],
         judgementIds: ["j1"],
+        nodes: ["product_data"],
       });
       migrated.updateRun(run.id, { output: "text", usage: { totalTokens: 1 }, agent_run_id: "a" });
       const back = migrated.getRun(run.id)!;
       expect(back.output).toBe("text");
       expect(back.judgement_ids).toEqual(["j1"]);
       expect(back.agent_run_id).toBe("a");
+      expect(back.nodes).toEqual(["product_data"]);
     } finally {
       migrated.close();
     }
+  });
+
+  it("reads a run from before per-node runs as covering the whole stage", () => {
+    // Its `nodes` column arrives as `[]`, and every such run did all four.
+    const run = newRun();
+    expect(store.getRun(run.id)!.nodes).toEqual([]);
+    expect(summary(store.getRun(run.id)!).nodes).toEqual([
+      "product_data",
+      "competitors",
+      "review_mining",
+      "category_data",
+    ]);
+  });
+});
+
+describe("llm calls", () => {
+  const call = (runId: string, seq: number, responseId: string) => ({
+    run_id: runId,
+    seq,
+    started_at: "2026-09-18T10:00:00.000Z",
+    ended_at: "2026-09-18T10:00:02.000Z",
+    duration_ms: 2000,
+    model: "m",
+    system_prompt: seq === 1 ? "you are the researcher" : null,
+    tools: seq === 1 ? [{ name: "web_search" }] : null,
+    context_reset: false,
+    context_messages: seq,
+    input: [{ role: "user", content: `turn ${seq}` }],
+    output: { content: [{ type: "text", text: "answer" }] },
+    stop_reason: "stop",
+    error: "",
+    usage: { input: 10, output: 5 },
+    response_id: responseId,
+  });
+
+  it("round-trips in order, keeping null where the prompt did not change", () => {
+    const run = newRun();
+    store.addLlmCall(call(run.id, 2, "gen-2"));
+    store.addLlmCall(call(run.id, 1, "gen-1"));
+    const calls = store.listLlmCalls(run.id);
+    expect(calls.map((c) => c.seq)).toEqual([1, 2]);
+    expect(calls[0]!.system_prompt).toBe("you are the researcher");
+    expect(calls[0]!.tools).toEqual([{ name: "web_search" }]);
+    expect(calls[1]!.system_prompt).toBeNull();
+    expect(calls[1]!.tools).toBeNull();
+    expect(calls[1]!.input).toEqual([{ role: "user", content: "turn 2" }]);
+    expect(calls[0]!.billed_cost).toBeNull();
+  });
+
+  it("attaches a billed cost to the call it was billed for", () => {
+    const run = newRun();
+    store.addLlmCall(call(run.id, 1, "gen-1"));
+    store.addLlmCall(call(run.id, 2, "gen-2"));
+    store.setLlmCallBilled(run.id, "gen-2", 0.0042);
+    const [first, second] = store.listLlmCalls(run.id);
+    expect(first!.billed_cost).toBeNull();
+    expect(second!.billed_cost).toBeCloseTo(0.0042, 10);
   });
 });

@@ -41,10 +41,34 @@ export interface RunCounts {
   gaps: number;
 }
 
+/** Mirrors `server/src/costs.ts`. Rates are dollars per million tokens. */
+export interface Pricing {
+  source: 'openrouter-live' | 'pi-ai-snapshot';
+  fetched_at: string;
+  rates: { input?: number; output?: number; cacheRead?: number; cacheWrite?: number };
+}
+
+export interface Billed {
+  total: number;
+  turns: number;
+  resolved: number;
+}
+
+/**
+ * pi-ai's Usage, summed over every turn by the server's runner. `cost` is
+ * calculated from token counts at the rates in `pricing`; `billed` is what
+ * OpenRouter actually charged, added once the run has settled.
+ */
 export interface Usage {
-  input_tokens?: number;
-  output_tokens?: number;
-  total_tokens?: number;
+  input?: number;
+  output?: number;
+  cacheRead?: number;
+  cacheWrite?: number;
+  reasoning?: number;
+  totalTokens?: number;
+  cost?: { input: number; output: number; cacheRead: number; cacheWrite: number; total: number };
+  pricing?: Pricing;
+  billed?: Billed;
 }
 
 export interface RunSummary {
@@ -53,6 +77,8 @@ export interface RunSummary {
   stage: number;
   model: string;
   brief: Brief;
+  /** The nodes this run covers. All four for a whole-stage run. */
+  nodes: ResearchNode[];
   error: string;
   created_at: string;
   updated_at: string;
@@ -185,6 +211,77 @@ export interface RunEvent {
   created_at: string;
 }
 
+/** One content block of a message, as pi-ai shapes it. */
+export interface ContentBlock {
+  type: 'text' | 'thinking' | 'toolCall' | 'image' | string;
+  text?: string;
+  thinking?: string;
+  id?: string;
+  name?: string;
+  arguments?: unknown;
+}
+
+/** A message as the model received it (a tool result's `details` removed). */
+export interface TraceMessage {
+  role: 'user' | 'assistant' | 'toolResult';
+  content: string | ContentBlock[];
+  toolName?: string;
+  toolCallId?: string;
+  isError?: boolean;
+  stopReason?: string;
+}
+
+/**
+ * One LLM call. Mirrors `LlmCall` in `server/src/store.ts`.
+ *
+ * `input` holds only what is new since the previous call: the full prompt of
+ * call N is the latest `system_prompt` and `tools` at or before N, then every
+ * call's `input` from the last `context_reset` up to N.
+ */
+export interface LlmCall {
+  id: number;
+  seq: number;
+  started_at: string;
+  ended_at: string;
+  duration_ms: number;
+  model: string;
+  system_prompt: string | null;
+  tools: Array<{ name: string; description: string; parameters: unknown }> | null;
+  context_reset: boolean;
+  context_messages: number;
+  input: TraceMessage[];
+  output: {
+    content?: ContentBlock[];
+    responseId?: string;
+    responseModel?: string;
+    stopReason?: string;
+    errorMessage?: string;
+  };
+  stop_reason: string;
+  error: string;
+  usage: Usage;
+  response_id: string;
+  billed_cost: number | null;
+}
+
+export interface CallStats {
+  llm_calls: number;
+  llm_errors: number;
+  tokens: { input: number; output: number; cache_read: number; cache_write: number; total: number };
+  cost: number;
+  billed: { total: number; resolved: number };
+  llm_time_ms: number;
+  wall_time_ms: number;
+  tool_calls: number;
+  tool_errors: number;
+}
+
+export interface CallsResponse {
+  run: RunSummary & { live: boolean };
+  stats: CallStats;
+  calls: LlmCall[];
+}
+
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, {
     credentials: 'same-origin',
@@ -218,11 +315,16 @@ export const api = {
   config: () => request<Config>('/api/research/config'),
   runs: () => request<{ data: RunSummary[] }>('/api/research/runs'),
   run: (id: string) => request<RunDetail>(`/api/research/runs/${id}`),
-  startRun: (brief: Brief, model = '') =>
+  /** `nodes` empty runs the whole stage. */
+  startRun: (brief: Brief, nodes: ResearchNode[] = [], model = '') =>
     request<RunSummary>('/api/research/runs', {
       method: 'POST',
-      body: JSON.stringify({ brief, model }),
+      body: JSON.stringify({ brief, model, nodes }),
     }),
+  /** Every LLM call, or only those after `after` (a seq), plus the run's totals. */
+  calls: (id: string, after = 0) =>
+    request<CallsResponse>(`/api/research/runs/${id}/calls${after > 0 ? `?after=${after}` : ''}`),
+  logsUrl: (id: string) => `/runs/${id}/logs`,
   stopRun: (id: string) =>
     request<{ ok: boolean }>(`/api/research/runs/${id}/stop`, { method: 'POST' }),
   steer: (id: string, judgement: { kind: string; text: string; rejects_kinds: string[] }) =>

@@ -11,7 +11,7 @@ import { describe, expect, it } from "vitest";
 
 import { parse, validate } from "../src/packet.js";
 import { buildInstructions, steerText, systemPrompt } from "../src/prompt.js";
-import { SOURCE_KINDS, briefSchema } from "../src/schema.js";
+import { NODES, SOURCE_KINDS, briefSchema } from "../src/schema.js";
 import type { Judgement } from "../src/store.js";
 
 const brief = (overrides: Record<string, unknown> = {}) =>
@@ -132,5 +132,41 @@ describe("the system prompt", () => {
 describe("the example survives the validator's cross-object rules", () => {
   it("passes validate() directly, not just extract()", () => {
     expect(() => validate(parse(build()))).not.toThrow();
+  });
+});
+
+describe("a run that covers part of the stage", () => {
+  const scoped = (nodes: string[]) => build({ nodes });
+
+  it("describes only the nodes it covers", () => {
+    const text = scoped(["product_data"]);
+    expect(text).toContain("### This run's node");
+    expect(text).toContain("**product_data** — a finite checklist");
+    expect(text).not.toContain("**review_mining** —");
+    expect(text).not.toContain("amazon_find_product");
+    expect(text).not.toContain("### The four nodes");
+  });
+
+  it("states the scope, and that the example's other nodes are shape only", () => {
+    const text = scoped(["competitors", "category_data"]);
+    expect(text).toContain("## Scope of this run");
+    expect(text).toMatch(/researches \*\*only\*\* `competitors`, `category_data`/);
+    expect(text).toMatch(/The example shows every node, for shape only/);
+  });
+
+  it("sends a run-level gap to a node in scope, not to category_data", () => {
+    const text = scoped(["product_data"]);
+    expect(text).toContain('attached to `node: "product_data"`');
+    expect(text).not.toContain('use\n`node: "category_data"`');
+  });
+
+  it("keeps a whole-stage run's instructions as they were", () => {
+    expect(build({ nodes: [...NODES] })).toBe(build());
+    expect(build()).not.toContain("## Scope of this run");
+  });
+
+  it("scopes the system prompt too", () => {
+    expect(systemPrompt(["review_mining"])).toMatch(/This run covers only `review_mining`/);
+    expect(systemPrompt()).toMatch(/Work through the four nodes methodically/);
   });
 });

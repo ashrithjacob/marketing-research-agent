@@ -1,6 +1,6 @@
 # Spec — Market research agent (the researcher)
 
-**Status:** design, not built · **Date:** 2026-09-09 · **Runs on:** hermes harness (`spec-hermes-agent.md`), reachable from `chat.vanis.ai`
+**Status:** design, not built · **Date:** 2026-09-09 · **Runs on:** hermes harness (`spec-hermes-agent.md`), ~~reachable from `chat.vanis.ai`~~ its own service at `marketing.vanis.ai` (see `cockpit-spec.md` §6, `../setup.md` §5a)
 
 ## 1. Scope
 

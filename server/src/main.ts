@@ -14,6 +14,11 @@ const app = createApp();
 // cockpit shows a run that will never move again.
 app.supervisor.recover();
 
+// OpenRouter's current prices, refreshed every six hours. Until the first fetch
+// lands (or if it fails), runs are priced from pi-ai's bundled snapshot and
+// their usage records say so.
+app.supervisor.costs.start();
+
 const server = serve(
   { fetch: app.fetch, hostname: app.settings.host, port: app.settings.port },
   (info) => {

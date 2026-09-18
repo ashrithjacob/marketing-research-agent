@@ -12,7 +12,7 @@
 
 import { z } from "zod";
 
-import { stagePacketSchema, type StagePacket } from "./schema.js";
+import { NODES, isPartial, stagePacketSchema, type Node, type StagePacket } from "./schema.js";
 
 /** The output carried no packet, or one that violates the contract. */
 export class PacketError extends Error {
@@ -89,12 +89,46 @@ export function extract(output: string): Record<string, unknown> {
  * "stage 1 contains no judgements" structural rather than advisory. Everything
  * below is a cross-object rule.
  */
-export function validate(data: unknown): StagePacket {
+export function validate(data: unknown, scope: readonly Node[] = NODES): StagePacket {
   const parsed = stagePacketSchema.safeParse(data);
   if (!parsed.success) throw new PacketError(readable(parsed.error));
   const packet = parsed.data;
 
   const problems: string[] = [];
+
+  // 1. A run that covers part of the stage records nothing outside it — the
+  //    worked example shows all four nodes, and copying it is the easy mistake.
+  //    It must also say how each node it did cover ended.
+  if (isPartial(scope)) {
+    const allowed = new Set<string>(scope);
+    const outside = new Map<string, number>();
+    const tally = (items: ReadonlyArray<{ node: string }>) => {
+      for (const { node } of items) {
+        if (!allowed.has(node)) outside.set(node, (outside.get(node) ?? 0) + 1);
+      }
+    };
+    for (const items of [
+      packet.sources,
+      packet.excerpts,
+      packet.measurements,
+      packet.attributes,
+      packet.saturation,
+      packet.nodes,
+      packet.gaps,
+    ]) {
+      tally(items);
+    }
+    for (const [node, count] of outside) {
+      problems.push(
+        `${count} entr${count === 1 ? "y is" : "ies are"} recorded against ${node}, ` +
+          `which is outside this run's scope (${scope.join(", ")})`,
+      );
+    }
+    const reported = new Set(packet.nodes.map((n) => n.node));
+    for (const node of scope) {
+      if (!reported.has(node)) problems.push(`nodes has no entry for ${node}, the node this run covers`);
+    }
+  }
   const sourceIds = new Set(packet.sources.map((s) => s.id));
 
   // 2. Every reference resolves. A dangling source_id is an excerpt from nowhere.
@@ -177,8 +211,8 @@ export function validate(data: unknown): StagePacket {
   return packet;
 }
 
-export function parse(output: string): StagePacket {
-  return validate(extract(output));
+export function parse(output: string, scope: readonly Node[] = NODES): StagePacket {
+  return validate(extract(output), scope);
 }
 
 /**

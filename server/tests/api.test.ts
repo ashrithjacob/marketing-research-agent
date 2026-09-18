@@ -13,7 +13,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { createModels, type MutableModels } from "@earendil-works/pi-ai";
-import { fauxAssistantMessage, fauxProvider } from "@earendil-works/pi-ai/providers/faux";
+import { fauxAssistantMessage, fauxProvider, fauxToolCall } from "@earendil-works/pi-ai/providers/faux";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { createApp, type App } from "../src/app.js";
@@ -279,5 +279,74 @@ describe("review mining config", () => {
     app = build({ apifyToken: "" });
     const offBody = (await (await get("/api/research/config")).json()) as any;
     expect(offBody.review_mining.configured).toBe(false);
+  });
+});
+
+describe("per-node runs and the LLM call log", () => {
+  async function finishedRun(body: Record<string, unknown> = {}) {
+    const created = await post("/api/research/runs", { brief: { product: "MagnaCalm" }, ...body });
+    expect(created.status).toBe(200);
+    const run = (await created.json()) as { id: string; nodes: string[] };
+    await app.supervisor.waitFor(run.id);
+    return run;
+  }
+
+  it("starts a run on one node and reports its scope", async () => {
+    faux.setResponses([fauxAssistantMessage(fenced(minimalPacket()))]);
+    const run = await finishedRun({ nodes: ["review_mining"] });
+    expect(run.nodes).toEqual(["review_mining"]);
+    const listed = (await (await get("/api/research/runs")).json()) as { data: any[] };
+    expect(listed.data[0].nodes).toEqual(["review_mining"]);
+  });
+
+  it("reports a whole-stage run as covering all four nodes", async () => {
+    faux.setResponses([fauxAssistantMessage(fenced(minimalPacket()))]);
+    const run = await finishedRun();
+    expect(run.nodes).toEqual(["product_data", "competitors", "review_mining", "category_data"]);
+  });
+
+  it("refuses a node that does not exist", async () => {
+    const response = await post("/api/research/runs", {
+      brief: { product: "MagnaCalm" },
+      nodes: ["everything"],
+    });
+    expect(response.status).toBe(400);
+  });
+
+  it("serves every call with its prompt, answer and the run's totals", async () => {
+    faux.setResponses([
+      fauxAssistantMessage(fauxToolCall("no_such_tool", {}), { stopReason: "toolUse" }),
+      fauxAssistantMessage(fenced(minimalPacket())),
+    ]);
+    const run = await finishedRun();
+    const response = await get(`/api/research/runs/${run.id}/calls`);
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as any;
+
+    expect(body.run.status).toBe("completed");
+    expect(body.calls.map((c: any) => c.seq)).toEqual([1, 2]);
+    expect(body.calls[0].system_prompt).toMatch(/stage-1 researcher/);
+    expect(body.calls[1].output.content[0].text).toContain("```json");
+    expect(body.stats.llm_calls).toBe(2);
+    expect(body.stats.tokens.total).toBeGreaterThan(0);
+    expect(body.stats.llm_time_ms).toBeGreaterThanOrEqual(0);
+    expect(body.stats.wall_time_ms).toBeGreaterThanOrEqual(0);
+    expect(body.stats.tool_calls).toBe(1);
+    expect(body.stats.tool_errors).toBe(1); // the unknown tool comes back as an error
+  });
+
+  it("returns only later calls after a given seq, with totals for the whole run", async () => {
+    faux.setResponses([
+      fauxAssistantMessage(fauxToolCall("no_such_tool", {}), { stopReason: "toolUse" }),
+      fauxAssistantMessage(fenced(minimalPacket())),
+    ]);
+    const run = await finishedRun();
+    const body = (await (await get(`/api/research/runs/${run.id}/calls?after=1`)).json()) as any;
+    expect(body.calls.map((c: any) => c.seq)).toEqual([2]);
+    expect(body.stats.llm_calls).toBe(2);
+  });
+
+  it("404s the log of a run that does not exist", async () => {
+    expect((await get("/api/research/runs/nope/calls")).status).toBe(404);
   });
 });

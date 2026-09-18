@@ -21,9 +21,12 @@
 
 import {
   DEFAULT_REJECTED_KINDS,
+  NODES,
   PRODUCT_ATTRIBUTES,
   SOURCE_KIND_NOTES,
+  isPartial,
   type Brief,
+  type Node,
   type SourceKind,
 } from "./schema.js";
 import type { Judgement } from "./store.js";
@@ -195,43 +198,7 @@ Three things are not conclusions and are what you are here for:
 The test: if a second person reading the same source would write down a
 different value, it is a judgement and does not belong in stage 1.
 
-### The four nodes
-
-1. **product_data** — a finite checklist, not a search. Capture every one of:
-   {attributes}. Anything you cannot find is a gap entry, not an omission and
-   not a zero. A missing certificate of analysis is a gap.
-2. **competitors** — name, url, verbatim positioning copy, price, format, and
-   ad-library entries. **Every ad entry must carry \`first_seen\`**; ad longevity
-   is the only outside performance signal that exists. An ad with no date is
-   captured with \`first_seen: null\` AND recorded as a gap.
-3. **review_mining** — verbatim customer language with star rating, date, and a
-   three-axis code (\`why_bought\` / \`why_stayed\` / \`why_quit\`). **You must
-   capture 3-star reviews specifically** — they are the most honest text in
-   commerce. Never clean up, summarise or paraphrase a quote: "I wake up at 3am
-   and can't get back to sleep" is usable and "sleep maintenance issues" is not,
-   and the degradation is irreversible.
-
-   How to work this node, in order:
-   a. \`amazon_find_product\` with the product name. **Choose by
-      \`reviewsCount\`**, not by position — a listing with four reviews cannot
-      support this node, and picking it wastes the whole budget below.
-   b. \`amazon_reviews\` on that url, **once per star band**, \`star: 3\` first.
-      One call per band is the only way the star spread can be trusted.
-   c. \`trustpilot_reviews\` on the brand's domain for merchant-side language.
-   Ratings vastly outnumber written reviews in most categories, so
-   \`no 3-star reviews with text\` is a common and *correct* answer. When a tool
-   reports a GAP, record it and move on. **Never fill a missing 3-star band with
-   4-star or 2-star reviews, and never let Trustpilot stand in for the
-   marketplace floor** — Trustpilot reviews a merchant's service, Amazon reviews
-   the product, and they are different evidence about different questions.
-
-   A review can be verbatim, first-hand and still be about a *different
-   product*: recycled Amazon listings keep their old reviews. If an excerpt's
-   subject matter does not match the product, reject it and say so — an
-   unverified purchase on a listing with very few reviews is the warning sign.
-4. **category_data** — search volume as a trend over at least three years (a
-   single point estimate is a gap), category size figures, seasonality. Numbers
-   with their source, never your reading of them.
+{nodes}
 
 ### Done is saturation, not a quota
 
@@ -284,13 +251,93 @@ What you could not find, per node, and what it would take to get it. A run that
 reports no gaps is treated as failed, because real research always has holes and
 an agent that cannot say "I could not find this" will invent it instead.
 
-A run-level problem that is not one of the four nodes — a tool failing, a fetch
+{gap_nodes}
+`;
+
+/**
+ * What each node asks for, in stage order. A run is given only the nodes it
+ * covers, so a single-node run is not also told how to do the other three.
+ */
+const NODE_RULES: Record<Node, string> = {
+  product_data: `**product_data** — a finite checklist, not a search. Capture every one of:
+   {attributes}. Anything you cannot find is a gap entry, not an omission and
+   not a zero. A missing certificate of analysis is a gap.`,
+  competitors: `**competitors** — name, url, verbatim positioning copy, price, format, and
+   ad-library entries. **Every ad entry must carry \`first_seen\`**; ad longevity
+   is the only outside performance signal that exists. An ad with no date is
+   captured with \`first_seen: null\` AND recorded as a gap.`,
+  review_mining: `**review_mining** — verbatim customer language with star rating, date, and a
+   three-axis code (\`why_bought\` / \`why_stayed\` / \`why_quit\`). **You must
+   capture 3-star reviews specifically** — they are the most honest text in
+   commerce. Never clean up, summarise or paraphrase a quote: "I wake up at 3am
+   and can't get back to sleep" is usable and "sleep maintenance issues" is not,
+   and the degradation is irreversible.
+
+   How to work this node, in order:
+   a. \`amazon_find_product\` with the product name. **Choose by
+      \`reviewsCount\`**, not by position — a listing with four reviews cannot
+      support this node, and picking it wastes the whole budget below.
+   b. \`amazon_reviews\` on that url, **once per star band**, \`star: 3\` first.
+      One call per band is the only way the star spread can be trusted.
+   c. \`trustpilot_reviews\` on the brand's domain for merchant-side language.
+   Ratings vastly outnumber written reviews in most categories, so
+   \`no 3-star reviews with text\` is a common and *correct* answer. When a tool
+   reports a GAP, record it and move on. **Never fill a missing 3-star band with
+   4-star or 2-star reviews, and never let Trustpilot stand in for the
+   marketplace floor** — Trustpilot reviews a merchant's service, Amazon reviews
+   the product, and they are different evidence about different questions.
+
+   A review can be verbatim, first-hand and still be about a *different
+   product*: recycled Amazon listings keep their old reviews. If an excerpt's
+   subject matter does not match the product, reject it and say so — an
+   unverified purchase on a listing with very few reviews is the warning sign.`,
+  category_data: `**category_data** — search volume as a trend over at least three years (a
+   single point estimate is a gap), category size figures, seasonality. Numbers
+   with their source, never your reading of them.`,
+};
+
+const code = (names: readonly string[]) => names.map((n) => `\`${n}\``).join(", ");
+
+function nodesBlock(nodes: readonly Node[]): string {
+  const heading = isPartial(nodes)
+    ? `### This run's ${nodes.length === 1 ? "node" : "nodes"}`
+    : "### The four nodes";
+  const items = nodes.map((node, i) => `${i + 1}. ${NODE_RULES[node]}`);
+  return [heading, "", ...items].join("\n");
+}
+
+/** Where a run-level problem goes, and which node names the packet may use. */
+function gapNodesBlock(nodes: readonly Node[]): string {
+  if (!isPartial(nodes)) {
+    return `A run-level problem that is not one of the four nodes — a tool failing, a fetch
 path blocked, a site refusing to serve — still goes in this list. Attach it to
 the node it blocked; if it blocked nothing in particular, use
 \`node: "category_data"\`. Never invent a fifth node name (\`all\`, \`general\`,
 \`run\`): only \`product_data\`, \`competitors\`, \`review_mining\`, \`category_data\`
-are accepted, and anything else fails the whole packet.
-`;
+are accepted, and anything else fails the whole packet.`;
+  }
+  return `A run-level problem — a tool failing, a fetch path blocked, a site refusing
+to serve — still goes in this list, attached to \`node: "${nodes[0]}"\`. Use no
+node name outside this run's scope, and never invent one (\`all\`, \`general\`,
+\`run\`): only ${code(nodes)} ${nodes.length === 1 ? "is" : "are"} accepted, and
+anything else fails the whole packet.`;
+}
+
+/**
+ * Said once, near the top, for a run that covers part of the stage. Without it
+ * the worked example — which shows every node — is an invitation to fill all four.
+ */
+function scopeBlock(nodes: readonly Node[]): string {
+  return [
+    "## Scope of this run",
+    "",
+    `This run researches **only** ${code(nodes)}. The rest of stage 1 is out of`,
+    "scope: do not search for it, and record nothing against it. Every `node` field",
+    "in the packet — on sources, excerpts, measurements, attributes, saturation,",
+    `nodes and gaps — must be one of ${code(nodes)}, and \`nodes\` has one entry for`,
+    `each of them. Anything recorded against another node fails the whole packet.`,
+  ].join("\n");
+}
 
 const OUTPUT = `\
 ## Output
@@ -310,14 +357,23 @@ Field notes:
   or "" when it does not. Never \`null\` — \`null\` fails validation.
 - \`locator\` is optional but strongly preferred: \`{"kind": "char_range",
   "start": N, "end": N}\` so a span can be checked against the archived body.
-- \`nodes\` must contain an entry for each of the four nodes, \`complete\` or
+- \`nodes\` must contain an entry for {nodes_note}, \`complete\` or
   \`incomplete\`, with \`why\` naming the criterion that was or was not met.
 - \`gaps\` must not be empty.
 `;
 
-/** The system prompt for a stage-1 run. Constant — the brief goes in the turn. */
-export function systemPrompt(): string {
-  return SYSTEM_PROMPT;
+/**
+ * The system prompt for a stage-1 run. The brief goes in the turn; only the
+ * scope sentence varies, so a single-node run is not told to work four.
+ */
+export function systemPrompt(nodes: readonly Node[] = NODES): string {
+  if (!isPartial(nodes)) return SYSTEM_PROMPT;
+  return SYSTEM_PROMPT.replace(
+    "Work through the four nodes methodically.",
+    `This run covers only ${code(nodes)} — work through ${
+      nodes.length === 1 ? "it" : "them"
+    } methodically and leave the rest of stage 1 alone.`,
+  );
 }
 
 /**
@@ -330,17 +386,31 @@ export function buildInstructions(options: {
   brief: Brief;
   rejectKinds: readonly string[];
   judgements: readonly Judgement[];
+  /** The nodes this run covers. Omitted means the whole stage. */
+  nodes?: readonly Node[];
 }): string {
   const { brief, rejectKinds, judgements } = options;
+  const nodes = options.nodes ?? NODES;
   const rejected = rejectKinds.length > 0 ? rejectKinds : DEFAULT_REJECTED_KINDS;
   const parts = [
-    RULES.replace("{attributes}", PRODUCT_ATTRIBUTES.map((a) => `\`${a}\``).join(", "))
+    // `{nodes}` first: the product_data rule carries its own `{attributes}`.
+    RULES.replace("{nodes}", nodesBlock(nodes))
+      .replace("{attributes}", PRODUCT_ATTRIBUTES.map((a) => `\`${a}\``).join(", "))
       .replace("{kinds}", SOURCE_KIND_NOTES.map(([kind, note]) => `- \`${kind}\` — ${note}`).join("\n"))
-      .replace("{rejected}", rejected.map((kind) => `- \`${kind}\``).join("\n") || "- (none)"),
+      .replace("{rejected}", rejected.map((kind) => `- \`${kind}\``).join("\n") || "- (none)")
+      .replace("{gap_nodes}", gapNodesBlock(nodes)),
   ];
+  if (isPartial(nodes)) parts.push(scopeBlock(nodes));
   if (judgements.length > 0) parts.push(judgementBlock(judgements));
   parts.push(briefBlock(brief));
-  parts.push(OUTPUT.replace("{example}", JSON.stringify(EXAMPLE, null, 2)));
+  let output = OUTPUT.replace("{example}", JSON.stringify(EXAMPLE, null, 2)).replace(
+    "{nodes_note}",
+    isPartial(nodes) ? `each node in scope (${code(nodes)})` : "each of the four nodes",
+  );
+  if (isPartial(nodes)) {
+    output += `\nThe example shows every node, for shape only. Your packet records only ${code(nodes)}.\n`;
+  }
+  parts.push(output);
   return parts.join("\n\n");
 }
 

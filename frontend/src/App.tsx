@@ -3,9 +3,11 @@ import {
   api,
   TERMINAL_STATUSES,
   type Config,
+  type ResearchNode,
   type RunSummary,
 } from './api';
 import Login from './Login';
+import LogsPage from './LogsPage';
 import RunView from './RunView';
 import StartRun from './StartRun';
 import StepIn from './StepIn';
@@ -17,12 +19,16 @@ import StepIn from './StepIn';
  *  run modal: a product and a market, nothing else. Finding the URLs is the
  *  agent's job, not the operator's.
  */
+/** `/runs/<id>/logs` — the LLM call log, opened in its own tab from a run. */
+const LOGS_PATH = /^\/runs\/([0-9a-f]+)\/logs\/?$/;
+
 export default function App() {
   const [authed, setAuthed] = useState<boolean | null>(null);
   const [runs, setRuns] = useState<RunSummary[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [config, setConfig] = useState<Config | null>(null);
-  const [startOpen, setStartOpen] = useState(false);
+  /** The Start run modal: null when closed, the nodes to run when open ([] = whole stage). */
+  const [startNodes, setStartNodes] = useState<ResearchNode[] | null>(null);
   const [stepInOpen, setStepInOpen] = useState(false);
   const [error, setError] = useState('');
   // Bumped when a judgement is saved at this level so RunView reloads them.
@@ -45,11 +51,13 @@ export default function App() {
     }
   }, []);
 
+  const logsFor = window.location.pathname.match(LOGS_PATH)?.[1] ?? null;
+
   useEffect(() => {
-    if (!authed) return;
+    if (!authed || logsFor) return;
     void loadRuns();
     api.config().then(setConfig).catch(() => undefined);
-  }, [authed, loadRuns]);
+  }, [authed, loadRuns, logsFor]);
 
   const activeRun = runs.find((r) => r.id === activeId) ?? null;
   const live = !!activeRun && !TERMINAL_STATUSES.has(activeRun.status);
@@ -82,6 +90,7 @@ export default function App() {
 
   if (authed === null) return <div className="boot">Loading…</div>;
   if (!authed) return <Login onSuccess={() => setAuthed(true)} />;
+  if (logsFor) return <LogsPage runId={logsFor} />;
 
   return (
     <div className="app">
@@ -112,7 +121,7 @@ export default function App() {
               Stop
             </button>
           )}
-          <button className="primary" onClick={() => setStartOpen(true)}>
+          <button className="primary" onClick={() => setStartNodes([])}>
             Start run
           </button>
           <button
@@ -141,6 +150,7 @@ export default function App() {
           judgementsRev={judgementsRev}
           onSelectRun={setActiveId}
           onChanged={loadRuns}
+          onRunNode={(node) => setStartNodes([node])}
         />
       ) : (
         <div className="empty intro">
@@ -162,12 +172,15 @@ export default function App() {
         </div>
       )}
 
-      {startOpen && (
+      {startNodes && (
         <StartRun
           config={config}
-          onClose={() => setStartOpen(false)}
+          nodes={startNodes}
+          // A per-node run is almost always "this product again, one node".
+          initial={startNodes.length > 0 ? activeRun?.brief : undefined}
+          onClose={() => setStartNodes(null)}
           onStarted={async (run) => {
-            setStartOpen(false);
+            setStartNodes(null);
             await loadRuns();
             setActiveId(run.id);
           }}

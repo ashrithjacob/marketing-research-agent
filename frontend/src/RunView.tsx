@@ -3,13 +3,16 @@ import {
   api,
   streamRunEvents,
   TERMINAL_STATUSES,
+  type Billed,
   type Judgement,
+  type Pricing,
+  type ResearchNode,
   type RunDetail,
   type RunEvent,
   type RunSummary,
   type Source,
 } from './api';
-import StageRail, { NODE_LABELS } from './StageRail';
+import StageRail, { NODE_LABELS, NODE_ORDER, scopeLabel } from './StageRail';
 import { ChatText } from './FileBox';
 
 /** Live fetch lanes, derived from tool events.
@@ -36,12 +39,14 @@ export default function RunView({
   judgementsRev,
   onSelectRun,
   onChanged,
+  onRunNode,
 }: {
   runId: string;
   runs: RunSummary[];
   judgementsRev: number;
   onSelectRun: (id: string) => void;
   onChanged: () => void;
+  onRunNode: (node: ResearchNode) => void;
 }) {
   const [run, setRun] = useState<RunDetail | null>(null);
   const [events, setEvents] = useState<RunEvent[]>([]);
@@ -124,10 +129,26 @@ export default function RunView({
           status={run.status}
           nodes={packet?.nodes ?? []}
           saturation={packet?.saturation ?? []}
+          scope={run.nodes ?? []}
+          onRunNode={onRunNode}
         />
 
-        <h3 style={{ marginTop: 18 }}>Run</h3>
+        <h3 style={{ marginTop: 18 }}>
+          Run{' '}
+          <a
+            className="logs-link"
+            href={api.logsUrl(run.id)}
+            target="_blank"
+            rel="noreferrer"
+            title="Every LLM call this run made — prompt, answer, tokens, cost and time — in a new tab"
+          >
+            Logs ↗
+          </a>
+        </h3>
         <div className="runmeta">
+          <div>
+            Scope <span>{scopeLabel(run.nodes ?? [])}</span>
+          </div>
           <div>
             Harness <span>pi-agent-core</span>
           </div>
@@ -145,10 +166,21 @@ export default function RunView({
           <div>
             Tokens{' '}
             <span>
-              {run.usage?.total_tokens
-                ? `${(run.usage.total_tokens / 1000).toFixed(0)}k`
+              {run.usage?.totalTokens
+                ? `${(run.usage.totalTokens / 1000).toFixed(0)}k`
                 : '—'}
             </span>
+          </div>
+          <div title={pricingNote(run.usage?.pricing)}>
+            Calc. cost{' '}
+            <span>
+              {run.usage?.cost?.total ? `$${run.usage.cost.total.toFixed(4)}` : '—'}
+              {run.usage?.pricing?.source === 'pi-ai-snapshot' ? ' (snapshot prices)' : ''}
+            </span>
+          </div>
+          <div title="What OpenRouter charged, read back per turn from /generation">
+            Billed{' '}
+            <span>{billedText(run.usage?.billed, live)}</span>
           </div>
         </div>
 
@@ -165,6 +197,9 @@ export default function RunView({
                 <span className={`status ${r.status}`}>{r.status}</span>
               </div>
               <div className="runrow-sub">
+                {r.nodes && r.nodes.length < NODE_ORDER.length && (
+                  <span className="runrow-scope">{scopeLabel(r.nodes)} · </span>
+                )}
                 {r.counts.sources} sources · {r.counts.excerpts} excerpts ·{' '}
                 {r.counts.gaps} gaps
               </div>
@@ -467,15 +502,17 @@ function nowPanel(
         return { title: run.status, sub: '' };
     }
   }
+  const where =
+    run.nodes && run.nodes.length < NODE_ORDER.length ? scopeLabel(run.nodes) : 'Raw material';
   if (lastTool) {
     const p = lastTool.payload as Record<string, string>;
     return {
-      title: `Stage 1 · ${p.tool ?? 'working'}`,
+      title: `Stage 1 · ${where} · ${p.tool ?? 'working'}`,
       sub: p.preview ?? '',
     };
   }
   return {
-    title: 'Stage 1 · Raw material',
+    title: `Stage 1 · ${where}`,
     sub: 'gathering only — no conclusions drawn here',
   };
 }
@@ -582,6 +619,26 @@ function groupEvents(events: RunEvent[]): TraceRow[] {
   return rows;
 }
 
+export function formatTokens(n: number): string {
+  return n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n);
+}
+
+function pricingNote(pricing: Pricing | undefined): string {
+  if (!pricing) return 'Priced before rates were recorded';
+  const r = pricing.rates;
+  const rates = `$${r.input ?? '?'}/$${r.output ?? '?'}/$${r.cacheRead ?? '?'} per M input/output/cache read`;
+  return pricing.source === 'openrouter-live'
+    ? `OpenRouter list prices fetched ${new Date(pricing.fetched_at).toLocaleString()}: ${rates}`
+    : `pi-ai's bundled price snapshot, which may be stale: ${rates}`;
+}
+
+/** Billing is read back after the run settles, so "pending" is a real state. */
+function billedText(billed: Billed | undefined, live: boolean): string {
+  if (!billed) return live ? 'after the run' : '—';
+  const partial = billed.resolved < billed.turns ? ` (${billed.resolved} of ${billed.turns} turns)` : '';
+  return `$${billed.total.toFixed(4)}${partial}`;
+}
+
 function traceText(event: RunEvent): string {
   const p = event.payload as Record<string, unknown>;
   switch (event.kind) {
@@ -603,6 +660,21 @@ function traceText(event: RunEvent): string {
       return `packet rejected — ${p.error ?? ''}`;
     case 'run.failed':
       return `run failed — ${p.error ?? ''}`;
+    case 'llm.call': {
+      const tokens = Number(p.input_tokens ?? 0) + Number(p.cache_read_tokens ?? 0);
+      const tools = Number(p.tool_calls ?? 0);
+      return (
+        `LLM call ${p.seq} — ${(Number(p.duration_ms ?? 0) / 1000).toFixed(1)}s, ` +
+        `${formatTokens(tokens)} in / ${formatTokens(Number(p.output_tokens ?? 0))} out, ` +
+        `$${Number(p.cost ?? 0).toFixed(4)}` +
+        (tools ? `, ${tools} tool call${tools === 1 ? '' : 's'}` : '') +
+        (p.error ? ` — ${p.error}` : '')
+      );
+    }
+    case 'run.billed': {
+      const b = p.billed as Billed;
+      return `OpenRouter billed $${b.total.toFixed(4)} — ${b.resolved} of ${b.turns} turns`;
+    }
     default:
       return event.kind;
   }

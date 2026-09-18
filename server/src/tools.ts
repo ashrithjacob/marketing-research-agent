@@ -190,7 +190,11 @@ const starParameter = Type.Optional(
 const amazonReviewParameters = Type.Object({
   product_url: Type.String({ description: "An Amazon product url, e.g. https://www.amazon.com/dp/B0H2JVQ9GR" }),
   star: starParameter,
-  max_reviews: Type.Optional(Type.Number({ description: "Reviews to request (default 10)." })),
+  max_reviews: Type.Optional(Type.Number({
+      description:
+        "Reviews to request. The server's default is also its maximum; a larger " +
+        "request is cut to it.",
+    })),
 });
 
 const trustpilotReviewParameters = Type.Object({
@@ -198,8 +202,34 @@ const trustpilotReviewParameters = Type.Object({
     description: "Company domain, slug, or Trustpilot /review/ url — e.g. huel.com",
   }),
   star: starParameter,
-  max_reviews: Type.Optional(Type.Number({ description: "Reviews to request (default 10)." })),
+  max_reviews: Type.Optional(Type.Number({
+      description:
+        "Reviews to request. The server's default is also its maximum; a larger " +
+        "request is cut to it.",
+    })),
 });
+
+/**
+ * Reviews to request: what the agent asked for, never more than
+ * `MRA_APIFY_MAX_REVIEWS`.
+ *
+ * The setting has to be the ceiling, not just the default. `capFor` sizes the
+ * Apify spend cap from this number, so an agent that asks for 500 would
+ * otherwise authorise $6 on one Amazon call — and on a paid plan, spend it.
+ */
+export function reviewLimit(requested: number | undefined, max: number): number {
+  if (requested === undefined || !Number.isFinite(requested)) return max;
+  return Math.min(Math.max(Math.trunc(requested), 1), max);
+}
+
+/** Told to the model when its request was cut, so a capped pull is not read as a thin product. */
+function cappedNote(requested: number | undefined, limit: number): string {
+  if (requested === undefined || Math.trunc(requested) <= limit) return "";
+  return (
+    `NOTE: asked for ${Math.trunc(requested)} reviews; this server caps each call at ${limit}. ` +
+    "Fewer excerpts here does not mean the product has fewer reviews."
+  );
+}
 
 /** 1-5, or null for a mixed sample. Anything else is a caller error, not a band. */
 function starBand(value: number | undefined): 1 | 2 | 3 | 4 | 5 | null {
@@ -223,6 +253,7 @@ async function renderReviews(
   label: string,
   result: ReviewResult,
   onFetch?: (record: FetchRecord) => void,
+  note = "",
 ): Promise<{ content: Array<{ type: "text"; text: string }>; details: unknown }> {
   const body = JSON.stringify(result.excerpts, null, 2);
   const { sourceId, archived } = await archive(settings.corpusPath, runId, body);
@@ -251,6 +282,7 @@ async function renderReviews(
       ? ""
       : "NOTE: the corpus volume could not be written. Record these sources with " +
         "archived: false and add a gap entry saying so.",
+    note,
   ]
     .filter(Boolean)
     .join("\n");
@@ -283,9 +315,16 @@ export function createResearchTools(options: {
   onFetch?: (record: FetchRecord) => void;
   /** Injected in tests. In production it is built from the settings. */
   actorRunner?: ActorRunner | null;
+  /**
+   * False for a run that does not cover review mining. The review tools are
+   * the only ones that cost money per call, and a product-data run has no use
+   * for them — offering them anyway invites the agent to spend on the wrong node.
+   */
+  reviewTools?: boolean;
 }): AgentTool<any>[] {
   const { settings, runId, onFetch } = options;
-  const runner = options.actorRunner ?? createActorRunner(settings);
+  const runner =
+    options.reviewTools === false ? null : (options.actorRunner ?? createActorRunner(settings));
 
   const webSearch: AgentTool<typeof searchParameters> = {
     name: "web_search",
@@ -415,13 +454,21 @@ export function createResearchTools(options: {
       "another band.",
     parameters: amazonReviewParameters,
     async execute(_id, params, signal) {
+      const limit = reviewLimit(params.max_reviews, settings.apifyMaxReviews);
       const result = await amazonReviews(runner, {
         productUrl: params.product_url,
         star: starBand(params.star),
-        maxReviews: Math.trunc(params.max_reviews ?? settings.apifyMaxReviews),
+        maxReviews: limit,
         signal,
       });
-      return renderReviews(settings, runId, params.product_url, result, onFetch);
+      return renderReviews(
+        settings,
+        runId,
+        params.product_url,
+        result,
+        onFetch,
+        cappedNote(params.max_reviews, limit),
+      );
     },
   };
 
@@ -436,13 +483,21 @@ export function createResearchTools(options: {
       "marketplace-review floor.",
     parameters: trustpilotReviewParameters,
     async execute(_id, params, signal) {
+      const limit = reviewLimit(params.max_reviews, settings.apifyMaxReviews);
       const result = await trustpilotReviews(runner, {
         domainOrUrl: params.domain,
         star: starBand(params.star),
-        maxItems: Math.trunc(params.max_reviews ?? settings.apifyMaxReviews),
+        maxItems: limit,
         signal,
       });
-      return renderReviews(settings, runId, params.domain, result, onFetch);
+      return renderReviews(
+        settings,
+        runId,
+        params.domain,
+        result,
+        onFetch,
+        cappedNote(params.max_reviews, limit),
+      );
     },
   };
 

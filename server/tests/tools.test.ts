@@ -15,8 +15,9 @@ import { join } from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { AMAZON_REVIEWS_ACTOR, TRUSTPILOT_ACTOR, capFor } from "../src/apify.js";
 import { loadSettings, type Settings } from "../src/settings.js";
-import { archive, createResearchTools } from "../src/tools.js";
+import { archive, createResearchTools, reviewLimit } from "../src/tools.js";
 
 let dir: string;
 let settings: Settings;
@@ -205,6 +206,17 @@ describe("review tools", () => {
     expect(names).toEqual(["web_search", "web_fetch"]);
   });
 
+  it("are withheld from a run that does not cover review mining, token or not", () => {
+    // The only tools that cost money per call; a product-data run has no use for them.
+    const names = createResearchTools({
+      settings,
+      runId: "run-x",
+      actorRunner: runner([]),
+      reviewTools: false,
+    }).map((t) => t.name);
+    expect(names).toEqual(["web_search", "web_fetch"]);
+  });
+
   it("are present once a runner exists", () => {
     const names = reviewTools(runner([])).map((t) => t.name);
     expect(names).toContain("amazon_find_product");
@@ -282,5 +294,72 @@ describe("review tools", () => {
 
     expect((result.details as any).products[0].asin).toBe("B0GOOD");
     expect((result.content[0] as any).text).toContain("reviews=61");
+  });
+});
+
+/**
+ * `MRA_APIFY_MAX_REVIEWS` is the ceiling, not just the default.
+ *
+ * It used to be only the default: `max_reviews` from the model went straight to
+ * the actor, and `capFor` sized the spend cap from it — so asking for 500
+ * authorised $6 on one Amazon call. The free plan's 10-per-call limit hid that;
+ * a paid plan would not have.
+ */
+describe("review volume is bounded by the server, not the agent", () => {
+  const recording = () => {
+    const calls: Array<{ actorId: string; input: Record<string, any>; cap: number }> = [];
+    const actorRunner = {
+      async run(actorId: string, input: Record<string, unknown>, cap: number) {
+        calls.push({ actorId, input, cap });
+        return { status: "SUCCEEDED", items: [{ text: "fine", rating: 3, reviewDescription: "fine", ratingScore: 3 }] };
+      },
+    };
+    return { calls, actorRunner };
+  };
+
+  const tool = (actorRunner: any, name: string) =>
+    createResearchTools({ settings: { ...settings, apifyMaxReviews: 10 }, runId: "run-cap", actorRunner })
+      .find((t) => t.name === name)!;
+
+  it("cuts an Amazon request to the setting, and sizes the spend cap from the cut number", async () => {
+    const { calls, actorRunner } = recording();
+    const result = await tool(actorRunner, "amazon_reviews").execute("1", {
+      product_url: "https://www.amazon.com/dp/B0H2JVQ9GR",
+      star: 3,
+      max_reviews: 500,
+    });
+
+    expect(calls[0]!.input.maxReviews).toBe(10);
+    expect(calls[0]!.cap).toBe(capFor(AMAZON_REVIEWS_ACTOR, 10));
+    expect(calls[0]!.cap).toBeLessThan(capFor(AMAZON_REVIEWS_ACTOR, 500));
+    // Told, so a capped pull is not mistaken for a product with few reviews.
+    expect((result.content[0] as any).text).toMatch(/asked for 500 reviews; this server caps each call at 10/);
+  });
+
+  it("cuts a Trustpilot request the same way", async () => {
+    const { calls, actorRunner } = recording();
+    await tool(actorRunner, "trustpilot_reviews").execute("1", { domain: "huel.com", max_reviews: 500 });
+
+    expect(calls[0]!.input.maxItems).toBe(10);
+    expect(calls[0]!.cap).toBe(capFor(TRUSTPILOT_ACTOR, 10));
+  });
+
+  it("leaves a request within the limit alone, with no note", async () => {
+    const { calls, actorRunner } = recording();
+    const result = await tool(actorRunner, "amazon_reviews").execute("1", {
+      product_url: "https://www.amazon.com/dp/B0H2JVQ9GR",
+      max_reviews: 4,
+    });
+
+    expect(calls[0]!.input.maxReviews).toBe(4);
+    expect((result.content[0] as any).text).not.toMatch(/caps each call/);
+  });
+
+  it("uses the setting when the agent asks for nothing, and never goes below one", () => {
+    expect(reviewLimit(undefined, 10)).toBe(10);
+    expect(reviewLimit(0, 10)).toBe(1);
+    expect(reviewLimit(-5, 10)).toBe(1);
+    expect(reviewLimit(7.9, 10)).toBe(7);
+    expect(reviewLimit(Number.NaN, 10)).toBe(10);
   });
 });

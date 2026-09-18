@@ -22,17 +22,27 @@ import { Agent, type AgentEvent } from "@earendil-works/pi-agent-core";
 import { createModels, type Models, type Usage } from "@earendil-works/pi-ai";
 import { openrouterProvider } from "@earendil-works/pi-ai/providers/openrouter";
 
+import { OpenRouterCosts, RunBilling, type Pricing } from "./costs.js";
 import { PacketError, parse as parsePacket } from "./packet.js";
 import { buildInstructions, steerText, systemPrompt } from "./prompt.js";
 import {
   DEFAULT_REJECTED_KINDS,
+  runNodes,
+  type Node,
   type RunRequest,
   type SourceKind,
   type StagePacket,
 } from "./schema.js";
 import type { Settings } from "./settings.js";
-import { TERMINAL_STATUSES, nowIso, type Judgement, type ResearchStore } from "./store.js";
+import {
+  TERMINAL_STATUSES,
+  nowIso,
+  type Judgement,
+  type LlmCall,
+  type ResearchStore,
+} from "./store.js";
 import { TOOL_LANES, createResearchTools } from "./tools.js";
+import { recordLlmCalls } from "./trace.js";
 
 /** Raised when a run cannot be started, steered or stopped. */
 export class RunError extends Error {
@@ -61,6 +71,27 @@ function preview(toolName: string, args: unknown): string {
   if (toolName === "web_search") return String(a.query ?? "");
   if (toolName === "web_fetch") return String(a.url ?? "");
   return "";
+}
+
+/**
+ * The `llm.call` event: enough for a trace line and a live counter. The prompt
+ * and answer stay in `research_llm_calls` — putting them on the event stream
+ * would replay megabytes to every tab that opens the run.
+ */
+function callSummary(call: LlmCall): Record<string, unknown> {
+  const usage = call.usage as Partial<Usage>;
+  const content = ((call.output as { content?: Array<{ type?: string }> }).content ?? []);
+  return {
+    seq: call.seq,
+    duration_ms: call.duration_ms,
+    input_tokens: usage.input ?? 0,
+    output_tokens: usage.output ?? 0,
+    cache_read_tokens: usage.cacheRead ?? 0,
+    cost: usage.cost?.total ?? 0,
+    stop_reason: call.stop_reason,
+    tool_calls: content.filter((c) => c?.type === "toolCall").length,
+    error: call.error,
+  };
 }
 
 function emptyUsage(): Usage {
@@ -106,11 +137,20 @@ export class RunSupervisor {
   private readonly store: ResearchStore;
   private readonly settings: Settings;
   private readonly models: Models;
+  /** Live prices and billed-cost lookups. `main.ts` starts the price refresh. */
+  readonly costs: OpenRouterCosts;
   private readonly live = new Map<string, Live>();
 
-  constructor(options: { store: ResearchStore; settings: Settings; models?: Models }) {
+  constructor(options: {
+    store: ResearchStore;
+    settings: Settings;
+    models?: Models;
+    costs?: OpenRouterCosts;
+  }) {
     this.store = options.store;
     this.settings = options.settings;
+    this.costs =
+      options.costs ?? new OpenRouterCosts({ apiKey: options.settings.openrouterApiKey });
     if (options.models) {
       this.models = options.models;
     } else {
@@ -127,37 +167,65 @@ export class RunSupervisor {
     const judgements = this.store.listJudgements(true);
     const rejectKinds = effectiveRejectKinds(request, judgements);
     const modelId = request.model || this.settings.model;
+    const nodes = runNodes(request.nodes);
 
     const run = this.store.createRun({
       brief: request.brief as unknown as Record<string, unknown>,
       model: modelId,
       rejectKinds,
       judgementIds: judgements.map((j) => j.id),
+      nodes,
     });
 
-    const model = this.models.getModel("openrouter", modelId);
-    if (!model) {
+    const listed = this.models.getModel("openrouter", modelId);
+    if (!listed) {
       const error = `unknown model ${JSON.stringify(modelId)} for provider openrouter`;
       this.store.updateRun(run.id, { status: "failed", error, ended_at: nowIso() });
       this.emit(run.id, "run.failed", { error });
       throw new RunError(error);
     }
+    // pi-ai prices each turn from `model.cost`; give it today's rates, not the
+    // ones frozen into the package.
+    const { model, pricing } = this.costs.price(listed);
 
     const instructions = buildInstructions({
       brief: request.brief,
       rejectKinds,
       judgements,
+      nodes,
+    });
+
+    // A call's billed cost and its log row arrive independently — the lookup
+    // starts at message_end, the row is written when the stream resolves — so
+    // whichever lands second attaches the cost.
+    const billed = new Map<string, number>();
+    const onBilled = (responseId: string, cost: number) => {
+      billed.set(responseId, cost);
+      this.store.setLlmCallBilled(run.id, responseId, cost);
+    };
+    const streamFn = recordLlmCalls((m, c, o) => this.models.streamSimple(m, c, o), {
+      runId: run.id,
+      store: this.store,
+      onCall: (call) => {
+        const cost = billed.get(call.response_id);
+        if (cost !== undefined) this.store.setLlmCallBilled(run.id, call.response_id, cost);
+        this.emit(run.id, "llm.call", callSummary(call));
+      },
     });
 
     const agent = new Agent({
-      streamFn: (m, c, o) => this.models.streamSimple(m, c, o),
+      streamFn,
       // One session id per run, so a cache-aware backend keeps the run's prefix
       // warm across its many turns rather than paying full price every time.
       sessionId: `research-${run.id}`,
       initialState: {
-        systemPrompt: systemPrompt(),
+        systemPrompt: systemPrompt(nodes),
         model,
-        tools: createResearchTools({ settings: this.settings, runId: run.id }),
+        tools: createResearchTools({
+          settings: this.settings,
+          runId: run.id,
+          reviewTools: nodes.includes("review_mining"),
+        }),
       },
     });
 
@@ -166,9 +234,9 @@ export class RunSupervisor {
       session_id: `research-${run.id}`,
       status: "running",
     });
-    this.emit(run.id, "run.started", { model: modelId });
+    this.emit(run.id, "run.started", { model: modelId, nodes });
 
-    const done = this.watch(run.id, agent, instructions);
+    const done = this.watch(run.id, agent, instructions, pricing, nodes, onBilled);
     this.live.set(run.id, { agent, subscribers: new Set(), done });
     return run.id;
   }
@@ -194,9 +262,27 @@ export class RunSupervisor {
     }
   }
 
-  steer(runId: string, judgement: Judgement): void {
+  /**
+   * The live agent for a run that can still be stopped or steered.
+   *
+   * Being in `this.live` is not enough. A run stays there after it settles, for
+   * as long as its billed-cost lookups take (up to ~30s), so the event stream
+   * can still carry `run.billed`. A Stop in that window used to overwrite
+   * `completed` with `stopping`, and nothing ever settled it again. The stored
+   * status is the truth: `settle()` writes it before billing starts.
+   */
+  private controllable(runId: string): Live {
     const live = this.live.get(runId);
     if (!live) throw new RunError(`run ${runId} is not running here`);
+    const status = this.store.getRun(runId)?.status;
+    if (status && TERMINAL_STATUSES.has(status)) {
+      throw new RunError(`run ${runId} has already finished (${status})`);
+    }
+    return live;
+  }
+
+  steer(runId: string, judgement: Judgement): void {
+    const live = this.controllable(runId);
     live.agent.steer({
       role: "user",
       content: [{ type: "text", text: steerText(judgement) }],
@@ -206,14 +292,15 @@ export class RunSupervisor {
   }
 
   stop(runId: string): void {
-    const live = this.live.get(runId);
-    if (!live) throw new RunError(`run ${runId} is not running here`);
+    const live = this.controllable(runId);
     this.store.updateRun(runId, { status: "stopping" });
     this.emit(runId, "run.stopping", {});
     live.agent.abort();
   }
 
   async close(): Promise<void> {
+    // Abandon billing lookups first, or shutdown waits out their retries.
+    this.costs.stop();
     for (const [, live] of this.live) live.agent.abort();
     await Promise.allSettled([...this.live.values()].map((l) => l.done));
     this.live.clear();
@@ -222,9 +309,20 @@ export class RunSupervisor {
   // -- watching ---------------------------------------------------------
 
   /** Run the agent to completion, recording everything it does on the way. */
-  private async watch(runId: string, agent: Agent, instructions: string): Promise<void> {
+  private async watch(
+    runId: string,
+    agent: Agent,
+    instructions: string,
+    pricing: Pricing,
+    nodes: readonly Node[],
+    onBilled: (responseId: string, cost: number) => void,
+  ): Promise<void> {
     const output: string[] = [];
     let usage = emptyUsage();
+    const billing = new RunBilling(this.costs);
+    // The rates travel with the usage they priced, so an old run's cost can be
+    // read against the prices it was actually calculated from.
+    const recorded = () => ({ ...usage, pricing });
     // Text is accumulated per assistant message rather than per delta: the
     // agent re-emits the whole message on each update, so appending deltas
     // would multiply the output by the number of updates.
@@ -232,8 +330,14 @@ export class RunSupervisor {
 
     const unsubscribe = agent.subscribe((event: AgentEvent) => {
       try {
-        this.onAgentEvent(runId, event, messageText, output, (u) => {
-          usage = addUsage(usage, u);
+        this.onAgentEvent(runId, event, messageText, output, (message) => {
+          usage = addUsage(usage, message.usage);
+          // Looked up now, while the run goes on, so only the last turn's lookup
+          // is still pending when the run ends.
+          const responseId = message.responseId;
+          billing.track(responseId)?.then((cost) => {
+            if (cost !== null && responseId) onBilled(responseId, cost);
+          });
         });
       } catch (error) {
         // A listener that throws would abort the run. Losing one cockpit frame
@@ -245,7 +349,7 @@ export class RunSupervisor {
     try {
       await agent.prompt(instructions);
       await agent.waitForIdle();
-      this.settle(runId, output.join(""), usage, agent.state.errorMessage);
+      this.settle(runId, output.join(""), recorded(), nodes, agent.state.errorMessage);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       console.error(`research run ${runId}: agent failed`, error);
@@ -253,14 +357,32 @@ export class RunSupervisor {
         status: "failed",
         error: `agent failed: ${message}`,
         output: output.join(""),
-        usage,
+        usage: recorded(),
         ended_at: nowIso(),
       });
       this.emit(runId, "run.failed", { error: message });
     } finally {
       unsubscribe();
+      // A failed or cancelled run was still billed for the turns it took.
+      await this.recordBilling(runId, billing);
       this.closeSubscribers(runId);
       this.live.delete(runId);
+    }
+  }
+
+  /**
+   * Add what OpenRouter charged to the run, once every lookup has answered or
+   * given up. The run has already settled: its status never waits on billing.
+   */
+  private async recordBilling(runId: string, billing: RunBilling): Promise<void> {
+    try {
+      const billed = await billing.settle();
+      if (!billed) return;
+      const usage = this.store.getRun(runId)?.usage ?? {};
+      this.store.updateRun(runId, { usage: { ...usage, billed } });
+      this.emit(runId, "run.billed", { billed });
+    } catch (error) {
+      console.error(`research run ${runId}: recording the billed cost failed`, error);
     }
   }
 
@@ -269,7 +391,7 @@ export class RunSupervisor {
     event: AgentEvent,
     messageText: Map<string, string>,
     output: string[],
-    addTurnUsage: (usage: Usage | undefined) => void,
+    onTurnEnd: (message: { usage?: Usage; responseId?: string }) => void,
   ): void {
     switch (event.type) {
       case "message_update":
@@ -292,7 +414,7 @@ export class RunSupervisor {
           // each finished message contributes once, in order.
           output.push(messageText.get(key) ?? text);
           messageText.delete(key);
-          addTurnUsage(message.usage);
+          onTurnEnd(message);
           const thinking: string = (message.content ?? [])
             .filter((c: any) => c?.type === "thinking")
             .map((c: any) => c.thinking ?? c.text ?? "")
@@ -328,7 +450,13 @@ export class RunSupervisor {
    * the most informative failure there is, and collapsing it into "failed" would
    * hide it.
    */
-  private settle(runId: string, output: string, usage: Usage, errorMessage?: string): void {
+  private settle(
+    runId: string,
+    output: string,
+    usage: Usage & { pricing: Pricing },
+    nodes: readonly Node[],
+    errorMessage?: string,
+  ): void {
     const run = this.store.getRun(runId);
     const stopping = run?.status === "stopping";
 
@@ -349,7 +477,7 @@ export class RunSupervisor {
 
     let parsed: StagePacket;
     try {
-      parsed = parsePacket(output);
+      parsed = parsePacket(output, nodes);
     } catch (error) {
       if (!(error instanceof PacketError)) throw error;
       this.store.updateRun(runId, { status: "invalid", error: error.message });

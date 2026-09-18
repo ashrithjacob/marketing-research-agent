@@ -10,6 +10,7 @@
 import { describe, expect, it } from "vitest";
 
 import { PacketError, extract, parse, validate } from "../src/packet.js";
+import { NODES, runNodes } from "../src/schema.js";
 import { fenced, minimalPacket } from "./fixtures.js";
 
 describe("extraction", () => {
@@ -160,5 +161,66 @@ describe("validation: the cross-object rules", () => {
     const parsed = parse(fenced(minimalPacket()));
     expect(parsed.excerpts[0]!.text.startsWith("I wake up at 3am")).toBe(true);
     expect(parsed.excerpts[0]!.star_rating).toBe(3);
+  });
+});
+
+describe("validation: a run that covers part of the stage", () => {
+  /** A packet that only ever touched product_data. */
+  const productOnly = (): Record<string, any> =>
+    minimalPacket({
+      sources: [
+        {
+          id: "sha256:ppp",
+          url: "https://magnacalm.example/product",
+          kind: "first_party",
+          admitted: true,
+          archived: true,
+          marketing: true,
+          node: "product_data",
+        },
+      ],
+      excerpts: [],
+      saturation: [],
+      attributes: [
+        { id: "a1", node: "product_data", key: "form", value: "capsule", source_id: "sha256:ppp" },
+      ],
+      nodes: [{ node: "product_data", status: "incomplete", done_criterion_met: false, why: "COA gapped" }],
+      gaps: [{ node: "product_data", missing: "no certificate of analysis", would_need: "ask the brand" }],
+    });
+
+  it("accepts a packet that stays inside its scope", () => {
+    expect(() => validate(productOnly(), ["product_data"])).not.toThrow();
+  });
+
+  it("rejects anything recorded against a node outside the scope, and says which", () => {
+    // Copying the worked example, which shows all four nodes, is the easy way here.
+    const data = productOnly();
+    data.gaps.push({ node: "competitors", missing: "CalmWell ad library empty" });
+    expect(() => validate(data, ["product_data"])).toThrow(
+      /1 entry is recorded against competitors, which is outside this run's scope \(product_data\)/,
+    );
+  });
+
+  it("requires the covered node to say how it ended", () => {
+    const data = productOnly();
+    data.nodes = [];
+    expect(() => validate(data, ["product_data"])).toThrow(/nodes has no entry for product_data/);
+  });
+
+  it("leaves a whole-stage run exactly as it was", () => {
+    // minimalPacket reports one node and gaps another — fine for a full run.
+    expect(() => validate(minimalPacket())).not.toThrow();
+    expect(() => validate(minimalPacket(), [...NODES])).not.toThrow();
+  });
+});
+
+describe("runNodes", () => {
+  it("orders by stage, drops repeats, and reads empty as the whole stage", () => {
+    expect(runNodes(["category_data", "product_data", "product_data"])).toEqual([
+      "product_data",
+      "category_data",
+    ]);
+    expect(runNodes([])).toEqual([...NODES]);
+    expect(runNodes(undefined)).toEqual([...NODES]);
   });
 });

@@ -1,6 +1,6 @@
 # Spec — Research cockpit
 
-**Status:** design; stage 1 built · **Date:** 2026-09-09, §6 revised 2026-09-10 · **Surface:** ~~a tab in agentchat~~ its own service at `research.vanis.ai` (see §6) · **Engine:** hermes runs API
+**Status:** design; stage 1 built · **Date:** 2026-09-09, §6 revised 2026-09-10 · **Surface:** ~~a tab in agentchat~~ its own service at ~~`research.vanis.ai`~~ `marketing.vanis.ai` (see §6; live under that name since 2026-09-11, `../setup.md` §5a) · **Engine:** hermes runs API
 
 Companion to `spec.md` (what the researcher does). This is how you watch it work and change how it works.
 

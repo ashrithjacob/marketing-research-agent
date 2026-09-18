@@ -24,7 +24,7 @@ import { randomUUID } from "node:crypto";
 
 import Database from "better-sqlite3";
 
-import type { SourceKind, StagePacket } from "./schema.js";
+import { runNodes, type SourceKind, type StagePacket } from "./schema.js";
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS research_runs (
@@ -37,6 +37,7 @@ CREATE TABLE IF NOT EXISTS research_runs (
     brief          TEXT NOT NULL DEFAULT '{}',
     reject_kinds   TEXT NOT NULL DEFAULT '[]',
     judgement_ids  TEXT NOT NULL DEFAULT '[]',
+    nodes          TEXT NOT NULL DEFAULT '[]',
     packet         TEXT NOT NULL DEFAULT '',
     error          TEXT NOT NULL DEFAULT '',
     output         TEXT NOT NULL DEFAULT '',
@@ -54,6 +55,28 @@ CREATE TABLE IF NOT EXISTS research_events (
 );
 CREATE INDEX IF NOT EXISTS idx_research_events_run
     ON research_events(run_id, id);
+CREATE TABLE IF NOT EXISTS research_llm_calls (
+    id               INTEGER PRIMARY KEY AUTOINCREMENT,
+    run_id           TEXT NOT NULL REFERENCES research_runs(id) ON DELETE CASCADE,
+    seq              INTEGER NOT NULL,
+    started_at       TEXT NOT NULL,
+    ended_at         TEXT NOT NULL,
+    duration_ms      INTEGER NOT NULL,
+    model            TEXT NOT NULL DEFAULT '',
+    system_prompt    TEXT,
+    tools            TEXT,
+    context_reset    INTEGER NOT NULL DEFAULT 0,
+    context_messages INTEGER NOT NULL DEFAULT 0,
+    input            TEXT NOT NULL DEFAULT '[]',
+    output           TEXT NOT NULL DEFAULT '{}',
+    stop_reason      TEXT NOT NULL DEFAULT '',
+    error            TEXT NOT NULL DEFAULT '',
+    usage            TEXT NOT NULL DEFAULT '{}',
+    response_id      TEXT NOT NULL DEFAULT '',
+    billed_cost      REAL
+);
+CREATE INDEX IF NOT EXISTS idx_research_llm_calls_run
+    ON research_llm_calls(run_id, seq);
 CREATE TABLE IF NOT EXISTS research_judgements (
     id            TEXT PRIMARY KEY,
     kind          TEXT NOT NULL,
@@ -106,6 +129,8 @@ export interface ResearchRun {
   brief: Record<string, unknown>;
   reject_kinds: string[];
   judgement_ids: string[];
+  /** The nodes this run covers. `[]` on a run from before per-node runs: all of them. */
+  nodes: string[];
   packet: Record<string, unknown> | null;
   error: string;
   output: string;
@@ -121,6 +146,8 @@ export interface RunSummary {
   stage: number;
   model: string;
   brief: Record<string, unknown>;
+  /** Always explicit here: an old run's `[]` is spelled out as the whole stage. */
+  nodes: string[];
   error: string;
   created_at: string;
   updated_at: string;
@@ -146,6 +173,7 @@ export function summary(run: ResearchRun): RunSummary {
     stage: run.stage,
     model: run.model,
     brief: run.brief,
+    nodes: runNodes(run.nodes),
     error: run.error,
     created_at: run.created_at,
     updated_at: run.updated_at,
@@ -215,6 +243,43 @@ export interface RunUpdate {
   ended_at?: string;
 }
 
+/**
+ * One request to the model and its answer, as `recordLlmCalls` in `trace.ts`
+ * captured it.
+ *
+ * `input` is what is new since the previous call — the full prompt of call N is
+ * the system prompt, the tools, and the `input` of calls 1..N, in order. The
+ * agent only ever appends to its context, so storing each call's whole context
+ * would store the transcript N times over. When a context is *not* an extension
+ * of the previous one, `context_reset` is true and `input` is all of it.
+ * `system_prompt` and `tools` are likewise stored only on a call where they
+ * changed, which in practice is the first.
+ */
+export interface LlmCallRecord {
+  run_id: string;
+  seq: number;
+  started_at: string;
+  ended_at: string;
+  duration_ms: number;
+  model: string;
+  system_prompt: string | null;
+  tools: unknown[] | null;
+  context_reset: boolean;
+  context_messages: number;
+  input: unknown[];
+  output: unknown;
+  stop_reason: string;
+  error: string;
+  usage: Record<string, unknown>;
+  response_id: string;
+}
+
+export interface LlmCall extends LlmCallRecord {
+  id: number;
+  /** What OpenRouter charged for this call; null until the lookup answers, or if it never does. */
+  billed_cost: number | null;
+}
+
 /** Persistence contract. One implementation today; the seam is the point. */
 export interface ResearchStore {
   createRun(input: {
@@ -222,6 +287,7 @@ export interface ResearchStore {
     model: string;
     rejectKinds: string[];
     judgementIds: string[];
+    nodes?: string[];
   }): ResearchRun;
   getRun(runId: string): ResearchRun | null;
   listRuns(limit?: number): ResearchRun[];
@@ -232,6 +298,9 @@ export interface ResearchStore {
   addJudgement(input: { kind: string; text: string; rejects_kinds: SourceKind[] }): Judgement;
   deleteJudgement(judgementId: string): void;
   bumpJudgement(judgementId: string, by?: number): void;
+  addLlmCall(call: LlmCallRecord): LlmCall;
+  setLlmCallBilled(runId: string, responseId: string, cost: number): void;
+  listLlmCalls(runId: string): LlmCall[];
 
 
   /** Drop entries older than `maxAgeSeconds`. Returns how many went. */
@@ -276,6 +345,9 @@ export class SqliteResearchStore implements ResearchStore {
       // database still carries the old column; adding the new one beside it is
       // the migration, and the old column is simply left alone.
       ["agent_run_id", "ALTER TABLE research_runs ADD COLUMN agent_run_id TEXT NOT NULL DEFAULT ''"],
+      // Per-node runs. An older row gets `[]`, which `runNodes` reads as the
+      // whole stage — what every run before this column actually was.
+      ["nodes", "ALTER TABLE research_runs ADD COLUMN nodes TEXT NOT NULL DEFAULT '[]'"],
     ];
     for (const [column, ddl] of columns) {
       if (!have.has(column)) this.db.exec(ddl);
@@ -289,13 +361,14 @@ export class SqliteResearchStore implements ResearchStore {
     model: string;
     rejectKinds: string[];
     judgementIds: string[];
+    nodes?: string[];
   }): ResearchRun {
     const now = nowIso();
     const runId = newId();
     this.db
       .prepare(
         "INSERT INTO research_runs (id, status, model, brief, reject_kinds," +
-          " judgement_ids, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?)",
+          " judgement_ids, nodes, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?)",
       )
       .run(
         runId,
@@ -304,6 +377,7 @@ export class SqliteResearchStore implements ResearchStore {
         JSON.stringify(input.brief),
         JSON.stringify(input.rejectKinds),
         JSON.stringify(input.judgementIds),
+        JSON.stringify(input.nodes ?? []),
         now,
         now,
       );
@@ -431,6 +505,68 @@ export class SqliteResearchStore implements ResearchStore {
       .run(by, judgementId);
   }
 
+  // -- llm calls --------------------------------------------------------
+
+  addLlmCall(call: LlmCallRecord): LlmCall {
+    const info = this.db
+      .prepare(
+        "INSERT INTO research_llm_calls (run_id, seq, started_at, ended_at, duration_ms," +
+          " model, system_prompt, tools, context_reset, context_messages, input, output," +
+          " stop_reason, error, usage, response_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+      )
+      .run(
+        call.run_id,
+        call.seq,
+        call.started_at,
+        call.ended_at,
+        call.duration_ms,
+        call.model,
+        call.system_prompt,
+        call.tools === null ? null : JSON.stringify(call.tools),
+        call.context_reset ? 1 : 0,
+        call.context_messages,
+        JSON.stringify(call.input),
+        JSON.stringify(call.output ?? {}),
+        call.stop_reason,
+        call.error,
+        JSON.stringify(call.usage ?? {}),
+        call.response_id,
+      );
+    return { ...call, id: Number(info.lastInsertRowid), billed_cost: null };
+  }
+
+  setLlmCallBilled(runId: string, responseId: string, cost: number): void {
+    this.db
+      .prepare("UPDATE research_llm_calls SET billed_cost = ? WHERE run_id = ? AND response_id = ?")
+      .run(cost, runId, responseId);
+  }
+
+  listLlmCalls(runId: string): LlmCall[] {
+    const rows = this.db
+      .prepare("SELECT * FROM research_llm_calls WHERE run_id = ? ORDER BY seq")
+      .all(runId) as Array<Record<string, any>>;
+    return rows.map((r) => ({
+      id: r.id as number,
+      run_id: r.run_id as string,
+      seq: r.seq as number,
+      started_at: r.started_at as string,
+      ended_at: r.ended_at as string,
+      duration_ms: r.duration_ms as number,
+      model: r.model as string,
+      system_prompt: (r.system_prompt as string | null) ?? null,
+      tools: r.tools === null ? null : (loads(r.tools, []) as unknown[]),
+      context_reset: Boolean(r.context_reset),
+      context_messages: r.context_messages as number,
+      input: loads(r.input, []) as unknown[],
+      output: loads(r.output, {}),
+      stop_reason: r.stop_reason as string,
+      error: r.error as string,
+      usage: loads(r.usage, {}) as Record<string, unknown>,
+      response_id: r.response_id as string,
+      billed_cost: (r.billed_cost as number | null) ?? null,
+    }));
+  }
+
 
   close(): void {
     this.db.close();
@@ -448,6 +584,7 @@ function runFromRow(row: Record<string, any>): ResearchRun {
     brief: loads(row.brief, {}) as Record<string, unknown>,
     reject_kinds: loads(row.reject_kinds, []) as string[],
     judgement_ids: loads(row.judgement_ids, []) as string[],
+    nodes: loads(row.nodes, []) as string[],
     packet: row.packet ? (loads(row.packet, null) as Record<string, unknown> | null) : null,
     error: row.error,
     output: row.output,
