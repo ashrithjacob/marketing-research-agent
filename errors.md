@@ -1,0 +1,3 @@
+- packet rejected — no fenced JSON block in the run output — the packet must be emitted as ```json … ```
+- packet rejected — packet brief is about 'Mayaverra Drenaje Linfático — Gotas Naturales (lymphatic drainage drops)', but this run's brief is 'https://mayaverra.com/' — the worked example is not the assignment
+- packet rejected — packet brief is about 'Mayaverra Drenaje Linfático — Gotas Naturales (lymphatic drainage liquid drops)', but this run's brief is 'https://mayaverra.com/' — the worked example is not the assignment

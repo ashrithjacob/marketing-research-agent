@@ -106,7 +106,9 @@ export function loadSettings(): Settings {
     firecrawlApiKey: str("FIRECRAWL_API_KEY", ""),
     firecrawlBaseUrl: str("FIRECRAWL_BASE_URL", "https://api.firecrawl.dev"),
     webTimeoutSeconds: num("MRA_WEB_TIMEOUT_SECONDS", 90),
-    fetchCharLimit: num("MRA_FETCH_CHAR_LIMIT", 60000),
+    // Per page, not per run. At 60 000 a batch of four Amazon listings added
+    // ~60k tokens, and a run reached 208k input and never wrote its packet.
+    fetchCharLimit: num("MRA_FETCH_CHAR_LIMIT", 25000),
 
     apifyToken: str("APIFY_TOKEN", ""),
     apifyMaxReviews: num("MRA_APIFY_MAX_REVIEWS", 10),

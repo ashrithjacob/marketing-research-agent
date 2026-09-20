@@ -133,14 +133,17 @@ export type Brief = z.infer<typeof briefSchema>;
 /**
  * Where in the source the span was taken from.
  *
- * `char_range` is the honest default for fetched text. `selector` and `note`
- * exist for material that has no stable offsets (a PDF, a screenshot of an ad).
+ * `char_range` is the honest default for fetched text. `url` is for a review
+ * the review tools returned: it has a permalink of its own and no offsets in a
+ * fetched page. `selector` and `note` exist for material that has no stable
+ * offsets (a PDF, a screenshot of an ad).
  */
 export const locatorSchema = z
   .object({
-    kind: z.enum(["char_range", "selector", "note"]),
+    kind: z.enum(["char_range", "url", "selector", "note"]),
     start: z.number().int().nullable().default(null),
     end: z.number().int().nullable().default(null),
+    url: z.string().default(""),
     selector: z.string().default(""),
     note: z.string().default(""),
   })

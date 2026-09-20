@@ -247,6 +247,20 @@ function starBand(value: number | undefined): 1 | 2 | 3 | 4 | 5 | null {
  * re-hashed by `GET /runs/:id/sources/:sha`. What is archived is the exact JSON
  * the model is shown, so the audit compares like with like.
  */
+/**
+ * A review's locator as the packet JSON it goes into, ready to copy.
+ *
+ * Printed as a bare url, it left the model to invent a shape the contract has
+ * no room for: a run wrote `{"kind": "url", "value": …}` on all 19 excerpts
+ * and was rejected for it. An actor with no url gives a review id instead,
+ * which is only a note.
+ */
+export function reviewLocator(locator: string): string {
+  return /^https?:\/\//.test(locator)
+    ? JSON.stringify({ kind: "url", url: locator })
+    : JSON.stringify({ kind: "note", note: `review id ${locator}` });
+}
+
 async function renderReviews(
   settings: Settings,
   runId: string,
@@ -293,7 +307,7 @@ async function renderReviews(
           (e, i) =>
             `${i + 1}. [${e.star ?? "?"}*] ${e.date ?? "no date"}` +
             `${e.verified ? " (verified purchase)" : ""}\n` +
-            `   title: ${e.title}\n   ${e.text}\n   locator: ${e.locator}`,
+            `   title: ${e.title}\n   ${e.text}\n   locator: ${reviewLocator(e.locator)}`,
         )
         .join("\n\n")
     : "(no excerpts)";

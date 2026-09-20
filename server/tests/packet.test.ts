@@ -9,7 +9,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { PacketError, extract, parse, validate } from "../src/packet.js";
+import { PacketError, brandLabels, extract, parse, validate } from "../src/packet.js";
 import { NODES, runNodes } from "../src/schema.js";
 import { fenced, minimalPacket } from "./fixtures.js";
 
@@ -157,6 +157,23 @@ describe("validation: the cross-object rules", () => {
     expect(validate(data).sources.map((s) => s.admitted)).toEqual([true, false]);
   });
 
+  it("accepts a review excerpt located by its permalink", () => {
+    // Reviews from the review tools have no offsets in a fetched page.
+    const data = minimalPacket();
+    data.excerpts[0].locator = {
+      kind: "url",
+      url: "https://www.amazon.com/gp/customer-reviews/R83A6B2PFC42",
+    };
+    expect(() => validate(data)).not.toThrow();
+  });
+
+  it("still rejects a locator shape the contract does not name", () => {
+    // What a run invented before the tools printed the locator ready to copy.
+    const data = minimalPacket();
+    data.excerpts[0].locator = { kind: "url", value: "https://www.amazon.com/gp/customer-reviews/R1" };
+    expect(() => validate(data)).toThrow(/locator\.value: field not in the stage-1 contract/);
+  });
+
   it("round-trips a valid packet", () => {
     const parsed = parse(fenced(minimalPacket()));
     expect(parsed.excerpts[0]!.text.startsWith("I wake up at 3am")).toBe(true);
@@ -184,6 +201,30 @@ describe("validation: the packet answers the brief it was given", () => {
     const data = minimalPacket();
     data.brief.product = "Mullein leaf 500mg capsules";
     expect(() => validate(data, NODES, { product: "mullein" })).not.toThrow();
+  });
+
+  it("takes the brand from a URL brief", () => {
+    // A store URL is a valid brief; no product name contains the URL itself.
+    const data = minimalPacket();
+    data.brief.product = "Surity urinary incontinence management — Female External Catheter";
+    expect(() => validate(data, NODES, { product: "https://www.surity.care/" })).not.toThrow();
+    expect(() => validate(data, NODES, { product: "surity.care" })).not.toThrow();
+    data.brief.product = "Mayaverse lash serum";
+    expect(() => validate(data, NODES, { product: "https://shop.mayaverse.co.uk/x" })).not.toThrow();
+  });
+
+  it("still rejects the worked example when the brief is a URL", () => {
+    expect(() => validate(minimalPacket(), NODES, { product: "https://www.surity.care/" })).toThrow(
+      /packet brief is about 'MagnaCalm 400mg', but this run's brief is 'https:\/\/www.surity.care\/'/,
+    );
+  });
+
+  it("reads brand labels from URLs and nothing else", () => {
+    expect(brandLabels("https://www.surity.care/")).toEqual(["surity"]);
+    expect(brandLabels("https://shop.mayaverse.co.uk/")).toEqual(["mayaverse"]);
+    expect(brandLabels("surity.care")).toEqual(["surity"]);
+    expect(brandLabels("mullein")).toBeNull();
+    expect(brandLabels("mullein leaf 500mg")).toBeNull();
   });
 
   it("checks nothing when no brief is handed over", () => {

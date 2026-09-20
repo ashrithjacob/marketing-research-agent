@@ -81,8 +81,43 @@ describe("settling a run", () => {
   });
 
   it("marks a prose-only run invalid", async () => {
-    const runId = await runWith("I looked into it and I think the market is crowded.");
+    // Prose twice: the run's own ending, then the answer to the one nudge.
+    faux.setResponses([
+      fauxAssistantMessage("I looked into it and I think the market is crowded."),
+      fauxAssistantMessage("Still no packet, just my view that it is crowded."),
+    ]);
+    const runId = supervisor.start(request());
+    await supervisor.waitFor(runId);
+    const run = store.getRun(runId)!;
+    expect(run.status).toBe("invalid");
+    expect(run.error).toMatch(/no fenced JSON/);
+  });
+
+  it("asks once for the packet when a run ends without one", async () => {
+    // A DeepSeek run at 208k input tokens wrote "let me write the JSON now" 56
+    // times and ended its turn without it. The research was all there.
+    faux.setResponses([
+      fauxAssistantMessage("I have enough. Let me finalize and write the JSON now."),
+      fauxAssistantMessage(fenced(minimalPacket())),
+    ]);
+    const runId = supervisor.start(request());
+    await supervisor.waitFor(runId);
+
+    expect(store.getRun(runId)!.status).toBe("completed");
+    expect(store.listEvents(runId).map((e) => e.kind)).toContain("run.nudged");
+    const [, nudged] = store.listLlmCalls(runId) as [any, any];
+    // Tools are off for the nudge, so it can only answer in text.
+    expect(nudged.tools).toEqual([]);
+    expect(JSON.stringify(nudged.input)).toContain("ended without the stage-1 packet");
+  });
+
+  it("does not nudge a run whose packet is there but breaks the contract", async () => {
+    const packet = minimalPacket();
+    packet.findings = ["buyers want sleep"];
+    const runId = await runWith(fenced(packet));
     expect(store.getRun(runId)!.status).toBe("invalid");
+    expect(store.listEvents(runId).map((e) => e.kind)).not.toContain("run.nudged");
+    expect(store.listLlmCalls(runId)).toHaveLength(1);
   });
 
   it("marks a run about the wrong product invalid, not completed", async () => {

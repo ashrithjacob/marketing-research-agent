@@ -533,6 +533,9 @@ Field notes:
   or "" when it does not. Never \`null\` — \`null\` fails validation.
 - \`locator\` is optional but strongly preferred: \`{"kind": "char_range",
   "start": N, "end": N}\` so a span can be checked against the archived body.
+  A review from \`amazon_reviews\` or \`trustpilot_reviews\` has no offsets: copy
+  the \`locator\` the tool printed under it, exactly as printed, e.g.
+  \`{"kind": "url", "url": "https://…"}\`.
 - \`nodes\` must contain an entry for {nodes_note}, \`complete\` or
   \`incomplete\`, with \`why\` naming the criterion that was or was not met.
 - \`gaps\` must not be empty.
@@ -668,5 +671,22 @@ export function steerText(judgement: Judgement): string {
   return (
     "Standing judgement from the human supervising this run — apply it for " +
     `the rest of the run: ${judgement.text}${rejects}`
+  );
+}
+
+/**
+ * The one follow-up a run gets when it ends without a packet.
+ *
+ * A model deep into a long context can announce "let me write the JSON now"
+ * dozens of times and then end its turn without writing it (a DeepSeek run at
+ * 208k input tokens did exactly that). The research is in the transcript
+ * already; one direct ask is far cheaper than rerunning it.
+ */
+export function packetNudgeText(): string {
+  return (
+    "Your last reply ended without the stage-1 packet, so this run has no " +
+    "result yet. Do not research further; tools are switched off. Write the " +
+    "packet now from what you have already gathered, as a single fenced " +
+    "```json block, and record what you did not reach as gaps."
   );
 }

@@ -17,7 +17,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AMAZON_REVIEWS_ACTOR, TRUSTPILOT_ACTOR, capFor } from "../src/apify.js";
 import { loadSettings, type Settings } from "../src/settings.js";
-import { archive, createResearchTools, reviewLimit } from "../src/tools.js";
+import { archive, createResearchTools, reviewLimit, reviewLocator } from "../src/tools.js";
+import { locatorSchema } from "../src/schema.js";
 
 let dir: string;
 let settings: Settings;
@@ -115,6 +116,18 @@ describe("web_fetch", () => {
       .content[0] as any;
     expect(text.text).toMatch(/^source_id: sha256:[0-9a-f]{64}$/m);
     expect(text.text).toMatch(/^archived: true$/m);
+  });
+
+  it("shows the model at most 25 000 characters of a page by default", () => {
+    // At 60 000, four Amazon listings a batch took a run to 208k input tokens,
+    // and it ended without ever writing its packet.
+    const saved = process.env.MRA_FETCH_CHAR_LIMIT;
+    delete process.env.MRA_FETCH_CHAR_LIMIT;
+    try {
+      expect(loadSettings().fetchCharLimit).toBe(25000);
+    } finally {
+      if (saved !== undefined) process.env.MRA_FETCH_CHAR_LIMIT = saved;
+    }
   });
 
   it("truncates what the model reads but never what is archived", async () => {
@@ -267,6 +280,39 @@ describe("review tools", () => {
       "It works but you must reapply several times a day.",
     );
     expect((result.content[0] as any).text).toContain("[3*]");
+  });
+
+  it("prints each review's locator as the packet JSON the contract accepts", async () => {
+    // Printed as a bare url, the model invented {"kind": "url", "value": …} for
+    // all 19 excerpts of a run, and the packet was rejected for it.
+    const list = reviewTools(
+      runner([
+        {
+          reviewDescription: "Less swelling after three weeks.",
+          ratingScore: 4,
+          reviewUrl: "https://www.amazon.com/gp/customer-reviews/R83A6B2PFC42",
+        },
+      ]),
+    );
+    const tool = list.find((t) => t.name === "amazon_reviews")!;
+    const result = await tool.execute("1", {
+      product_url: "https://www.amazon.com/dp/B0H2JVQ9GR",
+      star: 4,
+    });
+    const text: string = (result.content[0] as any).text;
+    const printed = text.match(/locator: (\{.*\})/)![1]!;
+    expect(JSON.parse(printed)).toEqual({
+      kind: "url",
+      url: "https://www.amazon.com/gp/customer-reviews/R83A6B2PFC42",
+    });
+    // Copied as printed, it validates.
+    expect(locatorSchema.safeParse(JSON.parse(printed)).success).toBe(true);
+  });
+
+  it("falls back to a note locator when the actor gives only a review id", () => {
+    const printed = JSON.parse(reviewLocator("R83A6B2PFC42"));
+    expect(printed).toEqual({ kind: "note", note: "review id R83A6B2PFC42" });
+    expect(locatorSchema.safeParse(printed).success).toBe(true);
   });
 
   it("surfaces a gap in the text the model reads, not just in details", async () => {

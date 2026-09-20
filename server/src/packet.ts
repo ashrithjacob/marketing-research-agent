@@ -154,9 +154,16 @@ export function validate(
   //    most expensive failure here, and the quietest. Containment, not
   //    equality: "mullein" researched as "Mullein leaf 500mg capsules" is the
   //    agent doing its job.
+  //    A brief can also be a store URL, which no product name ever contains.
+  //    Then the brand in the domain ("surity" from https://www.surity.care/)
+  //    stands in for the name.
   const wanted = typeof brief?.product === "string" ? normaliseName(brief.product) : "";
   const got = normaliseName(packet.brief.product);
-  if (wanted && got && !got.includes(wanted) && !wanted.includes(got)) {
+  const labels = wanted ? brandLabels(wanted) : null;
+  const matches = labels
+    ? labels.some((label) => got.includes(label))
+    : got.includes(wanted) || wanted.includes(got);
+  if (wanted && got && !matches) {
     problems.push(
       `packet brief is about '${packet.brief.product}', but this run's brief is ` +
         `'${String(brief?.product)}' — the worked example is not the assignment`,
@@ -277,6 +284,28 @@ export function parse(
 function normaliseName(s: string): string {
   return s.toLowerCase().replace(/\s+/g, " ").trim();
 }
+
+/**
+ * The brand-bearing labels of a URL brief: its host without `www`, the TLD,
+ * or short second-level labels like `co` in `.co.uk`. Null when the brief is
+ * not a URL. A bare domain ("surity.care") counts as one.
+ */
+export function brandLabels(brief: string): string[] | null {
+  if (/\s/.test(brief)) return null;
+  let host: string;
+  try {
+    host = new URL(/^[a-z][a-z0-9+.-]*:\/\//.test(brief) ? brief : `https://${brief}`).hostname;
+  } catch {
+    return null;
+  }
+  const parts = host.split(".");
+  if (parts.length < 2) return null;
+  const labels = parts.slice(0, -1).filter((label) => label.length > 1 && !NON_BRAND.has(label));
+  return labels.length > 0 ? labels : null;
+}
+
+/** Host labels that name no brand: `www`, second-level domains, shop subdomains. */
+const NON_BRAND = new Set(["www", "co", "com", "net", "org", "gov", "edu", "ac", "shop", "store"]);
 
 /** The §2.2 test, and nothing else. */
 export function expectedRelation(competitorForm: string, referenceForm: string): CompetitorRelation {

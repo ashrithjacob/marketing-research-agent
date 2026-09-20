@@ -674,7 +674,7 @@ function applyToLanes(
 }
 
 function traceClass(kind: string): string {
-  if (kind === 'run.steered') return 'rule';
+  if (kind === 'run.steered' || kind === 'run.nudged') return 'rule';
   if (kind === 'packet.invalid' || kind === 'run.failed') return 'bad';
   return '';
 }
@@ -743,6 +743,8 @@ function traceText(event: RunEvent): string {
       return String(p.text ?? '');
     case 'run.steered':
       return `judgement applied mid-run — ${p.text ?? ''}`;
+    case 'run.nudged':
+      return 'the run ended without a packet — asked once more, tools off';
     case 'packet.ready':
       return `packet accepted — ${p.sources} sources, ${p.excerpts} excerpts, ${p.gaps} gaps`;
     case 'packet.invalid':

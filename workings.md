@@ -118,9 +118,9 @@ which is how the status chip and counters change.
 | Tool | Backed by | What it returns to the model | Side effect |
 |---|---|---|---|
 | `web_search` | SearXNG `GET /search?format=json` | numbered titles, urls, snippets (default 10, max 25) | none |
-| `web_fetch` | Firecrawl `POST /v2/scrape` (markdown, main content) | header (`source_id`, url, title, `archived`) + the page text, cut at `MRA_FETCH_CHAR_LIMIT` (60 000) | body written to `/corpus/runs/<runId>/sources/<sha256>` |
+| `web_fetch` | Firecrawl `POST /v2/scrape` (markdown, main content) | header (`source_id`, url, title, `archived`) + the page text, cut at `MRA_FETCH_CHAR_LIMIT` (25 000; was 60 000 until a run's context reached 208k tokens) | body written to `/corpus/runs/<runId>/sources/<sha256>` |
 | `amazon_find_product` | Apify `junglee/free-amazon-product-scraper` | asin, stars, `reviewsCount`, title, url — most-reviewed first | none |
-| `amazon_reviews` | Apify `junglee/amazon-reviews-scraper`, one star band per call | header (`source_id`, totals, any `GAP:`) + numbered verbatim reviews with star, date, verified flag, locator | the review JSON archived like a fetch |
+| `amazon_reviews` | Apify `junglee/amazon-reviews-scraper`, one star band per call | header (`source_id`, totals, any `GAP:`) + numbered verbatim reviews with star, date, verified flag, and a locator printed as packet JSON (`{"kind": "url", "url": …}`, or a `note` when there is only a review id) | the review JSON archived like a fetch |
 | `trustpilot_reviews` | Apify `memo23/trustpilot-scraper-ppe` | same shape as above | archived like a fetch |
 
 The three Apify tools exist **only when `APIFY_TOKEN` is set and the run covers
@@ -160,6 +160,13 @@ lookup in the background, so by the end of the run only the last turn's is pendi
 
 When the agent goes idle:
 
+0. **One nudge** (`watch()`): if the run ended cleanly (no error, no Stop) but its
+   output holds no packet object at all, it gets one more turn, with tools
+   switched off, asking for the packet from what it already gathered. Event
+   `run.nudged`. A DeepSeek run at 208k input tokens wrote "let me write the JSON
+   now" 56 times and then ended its turn without writing it. A packet that exists
+   but breaks the contract is *not* nudged. That is an `invalid` run, and asking
+   again would hide the mistake.
 1. `output` (all assistant text, in order), `usage` and `ended_at` are saved.
 2. **Error or Stop:** if the agent reported an error → `failed`, or `cancelled` if
    you had pressed Stop. A stop with no error → `cancelled`.
@@ -173,7 +180,9 @@ When the agent goes idle:
    - the packet's `brief.product` must echo the run's brief (containment,
      case-insensitive) — a packet about the worked example's product is
      rejected, because anchoring on the example is the quiet way a run
-     "completes" having researched the wrong thing;
+     "completes" having researched the wrong thing. A URL brief is matched by
+     the brand in its domain (`https://www.surity.care/` → `surity`), since no
+     product name contains the URL itself;
    - every `source_id` cited by an excerpt, measurement, attribute or saturation
      point exists in `sources`;
    - an admitted `ad_library` source with no `first_seen` needs a `competitors` gap;
@@ -499,6 +508,7 @@ What the start modal needs to warn you before you pay for a run.
   | `tool.completed` | `{tool, error, lane}` |
   | `run.steered` | `{judgement_id, text}` |
   | `run.stopping` | `{}` |
+  | `run.nudged` | `{reason}` — the run ended without a packet and was asked once more |
   | `run.completed` | `{usage}` |
   | `run.billed` | `{billed: {total, turns, resolved}}` — after the terminal event |
   | `packet.ready` | `{sources, excerpts, gaps}` |

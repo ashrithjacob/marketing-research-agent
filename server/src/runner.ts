@@ -23,8 +23,8 @@ import { createModels, type Models, type Usage } from "@earendil-works/pi-ai";
 import { openrouterProvider } from "@earendil-works/pi-ai/providers/openrouter";
 
 import { OpenRouterCosts, RunBilling, type Pricing } from "./costs.js";
-import { PacketError, parse as parsePacket } from "./packet.js";
-import { buildInstructions, steerText, systemPrompt } from "./prompt.js";
+import { PacketError, extract, parse as parsePacket } from "./packet.js";
+import { buildInstructions, packetNudgeText, steerText, systemPrompt } from "./prompt.js";
 import {
   DEFAULT_REJECTED_KINDS,
   runNodes,
@@ -350,6 +350,13 @@ export class RunSupervisor {
     try {
       await agent.prompt(instructions);
       await agent.waitForIdle();
+      if (this.lacksPacket(runId, output.join(""), agent)) {
+        // Once, with tools off, so the only thing the turn can produce is text.
+        agent.state.tools = [];
+        this.emit(runId, "run.nudged", { reason: "the run ended without a packet" });
+        await agent.prompt(packetNudgeText());
+        await agent.waitForIdle();
+      }
       this.settle(runId, output.join(""), recorded(), nodes, agent.state.errorMessage);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -368,6 +375,22 @@ export class RunSupervisor {
       await this.recordBilling(runId, billing);
       this.closeSubscribers(runId);
       this.live.delete(runId);
+    }
+  }
+
+  /**
+   * Whether a run that ended cleanly left no packet object to read at all.
+   * A packet that is there but breaks the contract is not this case: that is
+   * an `invalid` run, and asking again would hide what the model got wrong.
+   */
+  private lacksPacket(runId: string, output: string, agent: Agent): boolean {
+    if (agent.state.errorMessage) return false;
+    if (this.store.getRun(runId)?.status === "stopping") return false;
+    try {
+      extract(output);
+      return false;
+    } catch {
+      return true;
     }
   }
 

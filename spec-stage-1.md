@@ -132,6 +132,16 @@ The densest node and the one most likely to be faked, so it has the most structu
 Per excerpt: `text (verbatim) · star_rating · date · source_id · locator ·
 axis ∈ {why_bought, why_stayed, why_quit}`.
 
+**Locator for a review from the review tools: `{"kind": "url", "url": "<permalink>"}`.**
+A review pulled through Apify has no character offsets in a fetched page, and its
+permalink points at exactly that review, which makes it a better locator than a
+range. `url` was added to the locator kinds (`char_range`, `url`, `selector`,
+`note`) on 2026-09-20. Before that, the tools printed the permalink as a bare
+`locator: https://…` and the contract had no kind to hold it. A Mayaverra
+review-mining run invented `{"kind": "url", "value": …}` on all 19 excerpts and
+was rejected on those alone. The tools now print the locator as the JSON to copy.
+When the actor gives only a review id, it is `{"kind": "note", "note": "review id …"}`.
+
 **Volume and spread, per product researched:** at least **10 marketplace reviews**,
 covering 1★ through 5★ with 3★ mandatory (below), plus whatever forum material exists
 (Reddit and niche boards). Ten is a floor for *coverage*, not a done-criterion —
@@ -1139,3 +1149,7 @@ Ad-library capture beyond what a normal fetch reaches; anything in stages 2–5;
 avatars (§12). The ad libraries are the next hostile source after reviews, and worth
 attacking only once the review path works — the same wall problem, and less of the
 signal.
+
+
+Add a check (product truth):
+-> every scientific fact of the product should be reinforced by customer reviews
