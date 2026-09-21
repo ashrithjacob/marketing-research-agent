@@ -8,6 +8,13 @@ Read against the code on 2026-09-18. Response shapes were checked by calling the
 running stack (`docker compose up`, `http://localhost:8080`); where a shape is
 quoted, it came back from the live server.
 
+**The same material as a browsable guide:**
+<https://claude.ai/artifact/ASqgXr5hN7cjgBeqwZdbif> — the build and boot sequence,
+one run end to end, the three per-node flows side by side, a collaborator diagram
+and an endpoint explorer, each layer opening into the next. Built 2026-09-20 from
+this file plus the code. This file stays the source of truth; when they disagree,
+this one is right and the page needs rebuilding.
+
 ---
 
 ## 1. The shape of the thing
@@ -43,9 +50,23 @@ Host port `127.0.0.1:8080` maps to the container's `8000`.
 
 ### Step 1 — the modal
 
-`App.tsx` opens `StartRun.tsx`. It asks for two things, **product** and **market**,
+`App.tsx` opens `StartRun.tsx`. It asks for two things, **product** and **markets**,
 and deliberately has no URL field: finding the product's site, reviews, competitors
 and ad-library entries is the agent's job.
+
+Markets are five checkboxes — **US, UK, Australia, New Zealand, Canada**
+(`DEFAULT_MARKETS`) — all ticked when the modal opens, plus a free-text box for
+anything else. The brief's `market` is the joined list, ticks first: a run started
+with the defaults sends `"US, UK, Australia, New Zealand, Canada"`. Re-running one
+node from the stage rail splits the shown run's market string back into ticks and
+free text, so the re-run carries the same scope. Untick everything and leave the box
+empty and `market` is `""`, which is the old unscoped behaviour.
+
+From 2026-09-21 a named market is a **scope, not a hint**: `briefBlock()` follows it
+with "research only these markets… a source from outside them is out of scope: do not
+record it, and do not count it toward saturation", and tells the agent to gap a market
+that yields nothing rather than substitute another. The cockpit shows the list in the
+run-detail panel as **Markets**, beside Scope.
 
 If `GET /api/research/config` reported `corpus_mounted: false`, the modal warns that
 nothing will be archived. The button is disabled until the product is non-empty.
@@ -160,13 +181,54 @@ lookup in the background, so by the end of the run only the last turn's is pendi
 
 When the agent goes idle:
 
-0. **One nudge** (`watch()`): if the run ended cleanly (no error, no Stop) but its
-   output holds no packet object at all, it gets one more turn, with tools
-   switched off, asking for the packet from what it already gathered. Event
-   `run.nudged`. A DeepSeek run at 208k input tokens wrote "let me write the JSON
-   now" 56 times and then ended its turn without writing it. A packet that exists
-   but breaks the contract is *not* nudged. That is an `invalid` run, and asking
-   again would hide the mistake.
+0a. **Retry, up to three times** (`watch()`, `shouldRetry()`, `backoffMs()`): if the
+   agent ended with an `errorMessage`, you did not press Stop, and pi-ai's
+   `isRetryableAssistantError` calls it transient, the run waits and is prompted to
+   carry on — the message says the last turn's connection dropped and that the tool
+   results above still stand. Event `run.resumed` with `attempt` and `delay_ms`.
+   `prompt()` clears `errorMessage` and keeps the transcript, so this continues
+   rather than restarts.
+
+   **Backoff is 2s, 4s, 8s with equal jitter** (half fixed, half random, capped at
+   30s): full jitter can pick a few milliseconds and hammer a provider that just
+   dropped the connection, and no jitter makes concurrent runs retry in lockstep.
+
+   **Why bounded at three.** A retry re-sends the whole transcript, so on a long run
+   it costs a full context of input tokens — the run below was carrying 93k. Three
+   attempts ride out an upstream restart without turning an outage into a bill.
+
+   **Why a deny-list, not a recognise-list.** The first cut asked pi-ai's
+   `isRetryableAssistantError` what to retry, and it only retries wordings it
+   knows. Two live runs died on two different strings: `terminated`, which it
+   knows, and `Upstream error from Relace: The model stopped before completing the
+   response`, which it does not — the second lost 140k tokens of research without a
+   single retry. Providers and gateways word stream failures however they like, so
+   `retryableError()` now retries **anything** except `TERMINAL_ERROR`: quota,
+   billing, 401/403, context-length, invalid request, unknown model, content
+   policy. The attempt budget caps what an unknown wording can cost; a lost run
+   cannot be recovered. pi-agent-core has no retry of its own, which is why this
+   lives here at all.
+
+   Measured 2026-09-21: a HappyWags run lost five completed turns and 15 tool calls
+   when the OpenRouter stream closed 98s into turn 6 — `stop_reason: "error"`,
+   `error: "terminated"` (undici's word for a socket that went away), zero tokens
+   recorded for that call, and OpenRouter still billed the run.
+
+0b. **One nudge** (`watch()`, `lacksPacket()`): if the run holds no packet object
+   at all, it gets one more turn with tools switched off, asking for the packet
+   from what it already gathered. Event `run.nudged`. Two cases reach it:
+
+   - it **ended cleanly** with no packet — a DeepSeek run at 208k input tokens
+     wrote "let me write the JSON now" 56 times and then ended its turn without
+     writing it;
+   - it **died with the retry budget spent**, but had at least one tool result in
+     the transcript. A run that fetched 30 pages is worth one tools-off ask before
+     it is written off; a run whose provider never answered has nothing to salvage,
+     so the tool result is the bar. If the ask fails too, the run settles `failed`
+     with that error.
+
+   A packet that exists but breaks the contract is *not* nudged. That is an
+   `invalid` run, and asking again would hide the mistake. Never for a Stop.
 1. `output` (all assistant text, in order), `usage` and `ended_at` are saved.
 2. **Error or Stop:** if the agent reported an error → `failed`, or `cancelled` if
    you had pressed Stop. A stop with no error → `cancelled`.
@@ -178,11 +240,14 @@ When the agent goes idle:
    covers part of the stage then gets the scope rule (§2b). Then seven cross-object
    rules:
    - the packet's `brief.product` must echo the run's brief (containment,
-     case-insensitive) — a packet about the worked example's product is
-     rejected, because anchoring on the example is the quiet way a run
-     "completes" having researched the wrong thing. A URL brief is matched by
-     the brand in its domain (`https://www.surity.care/` → `surity`), since no
-     product name contains the URL itself;
+     case-insensitive, on letters and digits only) — a packet about the worked
+     example's product is rejected, because anchoring on the example is the quiet
+     way a run "completes" having researched the wrong thing. A **site brief**
+     (`brief.url`, no product) passes when the packet echoes the same host, or
+     when the brand in the domain survives in the name it wrote —
+     `thedropletco` against "Droplet (**The Droplet Co**) — …", which only matches
+     once both sides are squashed to letters and digits. And `brief.product` in
+     the packet may not itself be a url: the name is what the run was for;
    - every `source_id` cited by an excerpt, measurement, attribute or saturation
      point exists in `sources`;
    - an admitted `ad_library` source with no `first_seen` needs a `competitors` gap;
@@ -359,6 +424,10 @@ Worth knowing, because the prompt or a spec can suggest otherwise:
   page is archived and cited like any other page (§13.1, rule 8). The Apify tools do
   detect their equivalent — an empty dataset or an error record becomes a `GAP:`.
 - **`amazon_find_product` always searches amazon.com**, whatever the brief's market.
+  With the five default markets this is right for the US and roughly right elsewhere,
+  but a UK-only or AU-only run still gets amazon.com listings and prices. The brief
+  tells the agent to use each market's own listing where a site serves several, so
+  the honest record of the difference is a gap entry.
 - **A restart kills a live run.** The agent lives in this process; `recover()` marks
   anything left `running`/`queued`/`stopping` as `failed` on startup.
 - **Billing is lost for a run killed by a restart.** The lookups live in the
@@ -455,8 +524,13 @@ What the start modal needs to warn you before you pay for a run.
    "reject_kinds": [],
    "nodes": []}
   ```
-  Only `brief.product` is required. `url` and `notes` are accepted and reach the
-  prompt, but the cockpit never sends them. Empty `model` means `MRA_MODEL`. Empty
+  **A url typed as the product is moved to `url`.** `normaliseBrief()`
+  (`schema.ts`) runs on every POST: if `brief.product` looks like a url — a bare
+  `example.com` or a full `https://…`, no spaces — it is moved into `brief.url`
+  (adding `https://` if missing) and `product` is left **empty**. `product` is a
+  name; a url never belongs in it. Either field satisfies the request, so
+  `{"brief": {"url": "https://…"}}` is valid, and only a brief with neither is a
+  `400`. `notes` is accepted and reaches the prompt. Empty `model` means `MRA_MODEL`. Empty
   `reject_kinds` means the defaults; a non-empty list **replaces** the defaults, and
   judgements then add to it. `nodes` picks what the run researches — any of
   `product_data`, `competitors`, `review_mining`, `category_data`; empty is the
@@ -464,7 +538,7 @@ What the start modal needs to warn you before you pay for a run.
 - **Out:** `200` + `RunSummary` (status `running`), returned as soon as the agent
   is started, not when it finishes.
 - **Errors:** `400` on a bad body (`"Unrecognized key(s) in object: 'colour'"`) or
-  blank product (`"brief.product is required"`); `502` when the model id is unknown
+  an empty brief (`"brief.product or brief.url is required"`); `502` when the model id is unknown
   — the run row exists and is `failed`.
 
 #### `GET /api/research/runs/:runId`
@@ -509,6 +583,7 @@ What the start modal needs to warn you before you pay for a run.
   | `run.steered` | `{judgement_id, text}` |
   | `run.stopping` | `{}` |
   | `run.nudged` | `{reason}` — the run ended without a packet and was asked once more |
+  | `run.resumed` | `{error, attempt, delay_ms}` — the model stream dropped and the run was continued after a backoff |
   | `run.completed` | `{usage}` |
   | `run.billed` | `{billed: {total, turns, resolved}}` — after the terminal event |
   | `packet.ready` | `{sources, excerpts, gaps}` |

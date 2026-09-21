@@ -213,6 +213,45 @@ describe("validation: the packet answers the brief it was given", () => {
     expect(() => validate(data, NODES, { product: "https://shop.mayaverse.co.uk/x" })).not.toThrow();
   });
 
+  it("matches a multi-word brand against its squashed domain", () => {
+    // The real rejection: `thedropletco` is not a substring of "the droplet co"
+    // — a domain cannot hold a space, so any brand of two or more words fails a
+    // plain containment test.
+    const data = minimalPacket();
+    data.brief.product = "Droplet (The Droplet Co) — luxury reed diffuser home fragrance";
+    data.brief.url = "";
+    expect(() =>
+      validate(data, NODES, { product: "", url: "https://thedropletco.co.uk/" }),
+    ).not.toThrow();
+  });
+
+  it("accepts a site brief when the packet echoes the same host", () => {
+    // What the Droplet run actually wrote: the name is the agent's own, but the
+    // url it echoed is exact, and that is the stronger signal.
+    const data = minimalPacket();
+    data.brief.product = "Rose Reed Diffuser";
+    data.brief.url = "https://thedropletco.co.uk/products/rose-reed-diffuser";
+    expect(() =>
+      validate(data, NODES, { product: "", url: "https://www.thedropletco.co.uk/" }),
+    ).not.toThrow();
+  });
+
+  it("rejects a packet about the example when the brief is a site", () => {
+    expect(() =>
+      validate(minimalPacket(), NODES, { product: "", url: "https://thedropletco.co.uk/" }),
+    ).toThrow(/this run's brief is the site 'https:\/\/thedropletco.co.uk\/'/);
+  });
+
+  it("refuses a packet that puts a url where the product's name belongs", () => {
+    // The brief carries the url. `product` is the name the agent read off the
+    // page, and a url there means it never did that job.
+    const data = minimalPacket();
+    data.brief.product = "https://thedropletco.co.uk/";
+    expect(() =>
+      validate(data, NODES, { product: "", url: "https://thedropletco.co.uk/" }),
+    ).toThrow(/which is a url — it must be the product's name/);
+  });
+
   it("still rejects the worked example when the brief is a URL", () => {
     expect(() => validate(minimalPacket(), NODES, { product: "https://www.surity.care/" })).toThrow(
       /packet brief is about 'MagnaCalm 400mg', but this run's brief is 'https:\/\/www.surity.care\/'/,

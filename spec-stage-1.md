@@ -512,11 +512,30 @@ schema, as JSON, not markdown" made concrete for stage 1.
 }
 ```
 
-`brief.url` stays in the contract but the UI never collects it: the operator's
-brief is a product and a market, and finding the URLs — own site, reviews,
-competitors, ad libraries — is the agent's job, via SearXNG (find) and
-Firecrawl (fetch). When it is empty the prompt says so explicitly, or a careful
-agent stalls asking for one.
+`brief.url` stays in the contract but the UI never collects it *as a separate
+field*: the operator's brief is a product and a market, and finding the URLs —
+own site, reviews, competitors, ad libraries — is the agent's job, via SearXNG
+(find) and Firecrawl (fetch). When it is empty the prompt says so explicitly, or
+a careful agent stalls asking for one.
+
+**Revised 2026-09-21: a url is a brief in its own right, and it lives in
+`brief.url`.** Operators paste a store URL into the product box, so
+`normaliseBrief()` moves it: `product` keeps names only, `url` keeps the site,
+and `product` may now be empty on the way in. The prompt for a site brief drops
+the `**Product:**` line entirely and says the first job is to fetch the site and
+set `brief.product` to *the product's own name as the site writes it*.
+
+The failure that forced this: brief `https://thedropletco.co.uk/` printed as
+"**Product:** https://thedropletco.co.uk/" directly above "No product URL was
+supplied — finding it is part of the job". The agent spent a turn reconciling the
+two, wondered whether the example's MagnaCalm was the real brief, and finally
+wrote `brief.product` as "Droplet (The Droplet Co) — luxury reed diffuser home
+fragrance". The §4.1 brief check then rejected the packet, because a domain holds
+no spaces and `thedropletco` is not a substring of "the droplet co". Three
+changes came out of it: the brief is normalised, the prompt for a site brief asks
+for the name, and the check compares on letters and digits only — plus it accepts
+outright when the packet's `brief.url` names the same host, which is the exact
+signal and was present all along.
 
 ### 4.1 Validation, which is where the rule is enforced
 

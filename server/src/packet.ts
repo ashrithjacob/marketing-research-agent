@@ -16,6 +16,7 @@ import {
   COMPETITOR_RELATIONS,
   NODES,
   isPartial,
+  looksLikeUrl,
   stagePacketSchema,
   type CompetitorRelation,
   type Node,
@@ -100,7 +101,7 @@ export function extract(output: string): Record<string, unknown> {
 export function validate(
   data: unknown,
   scope: readonly Node[] = NODES,
-  brief?: { product?: unknown },
+  brief?: { product?: unknown; url?: unknown },
 ): StagePacket {
   const parsed = stagePacketSchema.safeParse(data);
   if (!parsed.success) throw new PacketError(readable(parsed.error));
@@ -158,16 +159,40 @@ export function validate(
   //    Then the brand in the domain ("surity" from https://www.surity.care/)
   //    stands in for the name.
   const wanted = typeof brief?.product === "string" ? normaliseName(brief.product) : "";
+  const site = typeof brief?.url === "string" ? brief.url.trim() : "";
   const got = normaliseName(packet.brief.product);
-  const labels = wanted ? brandLabels(wanted) : null;
-  const matches = labels
-    ? labels.some((label) => got.includes(label))
-    : got.includes(wanted) || wanted.includes(got);
-  if (wanted && got && !matches) {
+  if (got && looksLikeUrl(got)) {
+    // The brief carries the url; `product` is the name the agent read off the
+    // site. A url here means it never did that job.
     problems.push(
-      `packet brief is about '${packet.brief.product}', but this run's brief is ` +
-        `'${String(brief?.product)}' — the worked example is not the assignment`,
+      `packet brief.product is '${packet.brief.product}', which is a url — it must be ` +
+        `the product's name as the site writes it, with the url in brief.url`,
     );
+  } else if (site && !wanted) {
+    // A site brief: the packet is about the right thing when it echoes the same
+    // host, or when the brand in the domain survives in the name it wrote.
+    // Letters and digits only on both sides — a domain has no spaces, so
+    // "thedropletco" has to be matched against "The Droplet Co" squashed flat.
+    const matches =
+      sameHost(site, packet.brief.url) ||
+      (brandLabels(site) ?? []).some((label) => squash(got).includes(squash(label)));
+    if (got && !matches) {
+      problems.push(
+        `packet brief is about '${packet.brief.product}', but this run's brief is the ` +
+          `site '${site}' — the worked example is not the assignment`,
+      );
+    }
+  } else if (wanted && got) {
+    const labels = brandLabels(wanted);
+    const matches = labels
+      ? labels.some((label) => squash(got).includes(squash(label)))
+      : got.includes(wanted) || wanted.includes(got);
+    if (!matches) {
+      problems.push(
+        `packet brief is about '${packet.brief.product}', but this run's brief is ` +
+          `'${String(brief?.product)}' — the worked example is not the assignment`,
+      );
+    }
   }
 
   // 3. Every reference resolves. A dangling source_id is an excerpt from nowhere.
@@ -275,7 +300,7 @@ export function validate(
 export function parse(
   output: string,
   scope: readonly Node[] = NODES,
-  brief?: { product?: unknown },
+  brief?: { product?: unknown; url?: unknown },
 ): StagePacket {
   return validate(extract(output), scope, brief);
 }
@@ -283,6 +308,34 @@ export function parse(
 /** Lowercase, whitespace-collapsed — the echo need not be character-perfect. */
 function normaliseName(s: string): string {
   return s.toLowerCase().replace(/\s+/g, " ").trim();
+}
+
+/**
+ * Letters and digits only.
+ *
+ * A domain cannot hold a space, so a brand of more than one word never appears
+ * in it verbatim: `thedropletco.co.uk` against "Droplet (The Droplet Co) —
+ * luxury reed diffuser home fragrance" failed a plain substring test and threw
+ * away a whole run. Squashed, both sides read the same.
+ */
+function squash(s: string): string {
+  return s.toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+/** Same site, ignoring scheme, `www.` and trailing slashes. */
+function sameHost(a: string, b: string): boolean {
+  const host = (value: string): string => {
+    try {
+      const raw = value.trim();
+      if (!raw) return "";
+      const url = new URL(/^[a-z][a-z0-9+.-]*:\/\//i.test(raw) ? raw : `https://${raw}`);
+      return url.hostname.replace(/^www\./, "").toLowerCase();
+    } catch {
+      return "";
+    }
+  };
+  const left = host(a);
+  return left !== "" && left === host(b);
 }
 
 /**

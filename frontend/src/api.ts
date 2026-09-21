@@ -32,6 +32,14 @@ export interface Brief {
   notes?: string;
 }
 
+/** What to call a run on screen.
+ *
+ *  A site brief has no product name until the agent reads one off the page, so
+ *  the url stands in until the packet arrives with the real name. */
+export function briefLabel(brief: Brief | undefined): string {
+  return brief?.product || brief?.url || 'untitled run';
+}
+
 export interface RunCounts {
   sources: number;
   rejected: number;

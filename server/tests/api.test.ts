@@ -45,7 +45,14 @@ function build(settingsOverrides: Partial<Settings> = {}): App {
   faux = fauxProvider({ provider: "openrouter", models: [{ id: MODEL_ID }] });
   models = createModels();
   models.setProvider(faux.provider);
-  const supervisor = new RunSupervisor({ store, settings, models });
+  // Instant retries: the real policy waits 2s, 4s, 8s, and a test that starts a
+  // run without queueing a reply would sit through the whole budget.
+  const supervisor = new RunSupervisor({
+    store,
+    settings,
+    models,
+    retry: { attempts: 3, baseMs: 0, capMs: 0 },
+  });
   return createApp({ settings, store, supervisor });
 }
 
@@ -85,9 +92,31 @@ describe("runs", () => {
     expect(read.live).toBe(false);
   });
 
-  it("refuses a run without a product", async () => {
+  it("refuses a run with neither a product nor a site", async () => {
     const response = await post("/api/research/runs", { brief: { product: "  " } });
     expect(response.status).toBe(400);
+  });
+
+  it("moves a url typed as the product into brief.url", async () => {
+    // A url in `product` had the prompt print "**Product:** <url>" above "no
+    // product URL was supplied"; the agent argued with it for a turn and then
+    // invented a name that failed the brief check.
+    const created = await post("/api/research/runs", {
+      brief: { product: "https://thedropletco.co.uk/" },
+    });
+    expect(created.status).toBe(200);
+    const brief = ((await created.json()) as any).brief;
+    expect(brief.product).toBe("");
+    expect(brief.url).toBe("https://thedropletco.co.uk/");
+  });
+
+  it("accepts a bare domain, and a run that names only a site", async () => {
+    const bare = await post("/api/research/runs", { brief: { product: "thedropletco.co.uk" } });
+    expect(((await bare.json()) as any).brief.url).toBe("https://thedropletco.co.uk");
+    const urlOnly = await post("/api/research/runs", {
+      brief: { product: "", url: "https://thedropletco.co.uk/" },
+    });
+    expect(urlOnly.status).toBe(200);
   });
 
   it("refuses a request carrying a field the contract has no room for", async () => {

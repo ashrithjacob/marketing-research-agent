@@ -13,7 +13,12 @@ import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
 
 import { RunError, RunSupervisor, type EventFrame } from "./runner.js";
-import { DEFAULT_REJECTED_KINDS, judgementInSchema, runRequestSchema } from "./schema.js";
+import {
+  DEFAULT_REJECTED_KINDS,
+  judgementInSchema,
+  normaliseBrief,
+  runRequestSchema,
+} from "./schema.js";
 import type { Settings } from "./settings.js";
 import {
   summary,
@@ -57,12 +62,15 @@ export function buildRouter(options: {
     if (!parsed.success) {
       return c.json({ detail: parsed.error.issues.map((i) => i.message).join("; ") }, 400);
     }
-    if (!parsed.data.brief.product.trim()) {
-      return c.json({ detail: "brief.product is required" }, 400);
+    // A url typed into the product box moves to `url`; `product` then stays
+    // empty until the agent names what the site sells.
+    const brief = normaliseBrief(parsed.data.brief);
+    if (!brief.product && !brief.url) {
+      return c.json({ detail: "brief.product or brief.url is required" }, 400);
     }
     let runId: string;
     try {
-      runId = supervisor.start(parsed.data);
+      runId = supervisor.start({ ...parsed.data, brief });
     } catch (error) {
       if (!(error instanceof RunError)) throw error;
       // 502: the run record exists and is marked failed, so the UI can show

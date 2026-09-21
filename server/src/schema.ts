@@ -122,13 +122,39 @@ const relationSchema = z.enum(COMPETITOR_RELATIONS);
 
 export const briefSchema = z
   .object({
-    product: z.string(),
+    // Empty when the brief is a store URL: naming the product is then the
+    // agent's first job, and `normaliseBrief` keeps a url out of this field.
+    product: z.string().default(""),
     url: z.string().default(""),
     market: z.string().default(""),
     notes: z.string().default(""),
   })
   .strict();
 export type Brief = z.infer<typeof briefSchema>;
+
+/** A bare `example.com` or a full `https://…`, with no spaces in it. */
+const URL_LIKE = /^(https?:\/\/\S+|(?!.*\s)[a-z0-9-]+(\.[a-z0-9-]+)+(\/\S*)?)$/i;
+
+export function looksLikeUrl(value: string): boolean {
+  return URL_LIKE.test(value.trim());
+}
+
+/**
+ * A url typed into the product box belongs in `url`, never in `product`.
+ *
+ * `product` is a name a human or the agent wrote; `url` is where to start. Left
+ * mixed, the prompt printed "**Product:** https://thedropletco.co.uk/" directly
+ * above "No product URL was supplied", which a real run spent a turn arguing
+ * with before inventing a name — "Droplet (The Droplet Co) — luxury reed
+ * diffuser home fragrance" — that then failed the brief check. Normalising here
+ * means every later step (prompt, cockpit, validator) sees the two apart.
+ */
+export function normaliseBrief(brief: Brief): Brief {
+  const product = brief.product.trim();
+  if (!looksLikeUrl(product)) return { ...brief, product, url: brief.url.trim() };
+  const url = brief.url.trim() || (/^https?:\/\//i.test(product) ? product : `https://${product}`);
+  return { ...brief, product: "", url };
+}
 
 /**
  * Where in the source the span was taken from.

@@ -1,6 +1,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   api,
+  briefLabel,
   streamRunEvents,
   TERMINAL_STATUSES,
   type Billed,
@@ -159,6 +160,11 @@ export default function RunView({
             Scope <span>{scopeLabel(run.nodes ?? [])}</span>
           </div>
           <div>
+            {/* Markets are a scope the agent is held to, like nodes, so they
+                belong next to Scope rather than only in the header chip. */}
+            Markets <span>{run.brief?.market || 'anywhere'}</span>
+          </div>
+          <div>
             Harness <span>pi-agent-core</span>
           </div>
           <div>
@@ -202,7 +208,7 @@ export default function RunView({
               onClick={() => onSelectRun(r.id)}
             >
               <div className="runrow-top">
-                <span className="runrow-title">{r.brief.product}</span>
+                <span className="runrow-title">{briefLabel(r.brief)}</span>
                 <span className={`status ${r.status}`}>{r.status}</span>
               </div>
               <div className="runrow-sub">
@@ -674,7 +680,7 @@ function applyToLanes(
 }
 
 function traceClass(kind: string): string {
-  if (kind === 'run.steered' || kind === 'run.nudged') return 'rule';
+  if (kind === 'run.steered' || kind === 'run.nudged' || kind === 'run.resumed') return 'rule';
   if (kind === 'packet.invalid' || kind === 'run.failed') return 'bad';
   return '';
 }
@@ -745,6 +751,11 @@ function traceText(event: RunEvent): string {
       return `judgement applied mid-run — ${p.text ?? ''}`;
     case 'run.nudged':
       return 'the run ended without a packet — asked once more, tools off';
+    case 'run.resumed':
+      return (
+        `the model stream dropped (${p.error || 'no detail'}) — retry ${p.attempt ?? 1} of 3` +
+        `${p.delay_ms ? ` after ${(Number(p.delay_ms) / 1000).toFixed(1)}s` : ''}`
+      );
     case 'packet.ready':
       return `packet accepted — ${p.sources} sources, ${p.excerpts} excerpts, ${p.gaps} gaps`;
     case 'packet.invalid':

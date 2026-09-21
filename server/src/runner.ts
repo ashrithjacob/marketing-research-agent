@@ -24,7 +24,7 @@ import { openrouterProvider } from "@earendil-works/pi-ai/providers/openrouter";
 
 import { OpenRouterCosts, RunBilling, type Pricing } from "./costs.js";
 import { PacketError, extract, parse as parsePacket } from "./packet.js";
-import { buildInstructions, packetNudgeText, steerText, systemPrompt } from "./prompt.js";
+import { buildInstructions, packetNudgeText, resumeText, steerText, systemPrompt } from "./prompt.js";
 import {
   DEFAULT_REJECTED_KINDS,
   runNodes,
@@ -132,6 +132,65 @@ function addUsage(total: Usage, next: Usage | undefined): Usage {
   };
 }
 
+/**
+ * How hard to try again when the model's stream drops.
+ *
+ * Bounded, because a retry here is not free: the whole transcript is re-sent, so
+ * a retry on a long run costs a full context of input tokens — the HappyWags run
+ * was carrying 93k by the time it broke. Three attempts at 2s, 4s, 8s covers the
+ * restart of an upstream without turning a genuine outage into a bill.
+ */
+export interface RetryPolicy {
+  /** Continuations after the first failure. 0 disables retrying. */
+  attempts: number;
+  baseMs: number;
+  /** Ceiling per wait, before jitter. */
+  capMs: number;
+}
+
+export const DEFAULT_RETRY: RetryPolicy = { attempts: 3, baseMs: 2000, capMs: 30000 };
+
+/**
+ * Errors no amount of waiting fixes. Everything else is retried.
+ *
+ * The first cut delegated the whole judgement to pi-ai's
+ * `isRetryableAssistantError`, which retries what it recognises and refuses
+ * what it does not. That is the wrong default here. Two runs died on two
+ * different wordings — `terminated`, which it knows, and "Upstream error from
+ * Relace: The model stopped before completing the response", which it does not
+ * — and the second threw away 140k tokens of research without one retry.
+ * Providers and gateways word stream failures however they like, so an unknown
+ * message is now assumed transient: the attempt budget caps what that can cost,
+ * while a lost run cannot be recovered.
+ *
+ * The list is pi-ai's own non-retryable vocabulary (quota, billing) plus the
+ * deterministic failures: bad key, bad request, a context that will not fit,
+ * and a refusal. Retrying any of those buys the same answer at the same price.
+ */
+const TERMINAL_ERROR =
+  /insufficient_quota|quota exceeded|out of budget|billing|payment required|\b402\b|usage limit|credits? (exhausted|required)|unauthorized|unauthenticated|invalid api key|invalid_api_key|forbidden|\b401\b|\b403\b|context (length|window)|maximum context|too many tokens|prompt is too long|invalid_request|invalid request|unknown model|model not found|content[ _-]?(policy|filter)|safety/i;
+
+/** Whether a failed turn is worth trying again. */
+export function retryableError(errorMessage: string): boolean {
+  return errorMessage.trim() !== "" && !TERMINAL_ERROR.test(errorMessage);
+}
+
+/**
+ * Exponential backoff with equal jitter: half the delay fixed, half random.
+ *
+ * Full jitter (random across the whole window) can pick a few milliseconds and
+ * hammer a provider that has just dropped the connection; no jitter at all makes
+ * concurrent runs retry in lockstep. Half and half keeps the floor and breaks
+ * the sync.
+ */
+export function backoffMs(attempt: number, policy: RetryPolicy = DEFAULT_RETRY): number {
+  const window = Math.min(policy.capMs, policy.baseMs * 2 ** (attempt - 1));
+  return Math.round(window / 2 + Math.random() * (window / 2));
+}
+
+const sleep = (ms: number): Promise<void> =>
+  ms > 0 ? new Promise((resolve) => setTimeout(resolve, ms)) : Promise.resolve();
+
 /** Starts runs and keeps them alive independently of any HTTP connection. */
 export class RunSupervisor {
   private readonly store: ResearchStore;
@@ -139,6 +198,8 @@ export class RunSupervisor {
   private readonly models: Models;
   /** Live prices and billed-cost lookups. `main.ts` starts the price refresh. */
   readonly costs: OpenRouterCosts;
+  /** Injected in tests, so a retry test does not wait out a real backoff. */
+  private readonly retry: RetryPolicy;
   private readonly live = new Map<string, Live>();
 
   constructor(options: {
@@ -146,9 +207,11 @@ export class RunSupervisor {
     settings: Settings;
     models?: Models;
     costs?: OpenRouterCosts;
+    retry?: RetryPolicy;
   }) {
     this.store = options.store;
     this.settings = options.settings;
+    this.retry = options.retry ?? DEFAULT_RETRY;
     this.costs =
       options.costs ?? new OpenRouterCosts({ apiKey: options.settings.openrouterApiKey });
     if (options.models) {
@@ -350,6 +413,19 @@ export class RunSupervisor {
     try {
       await agent.prompt(instructions);
       await agent.waitForIdle();
+      for (let attempt = 1; attempt <= this.retry.attempts; attempt++) {
+        const dropped = agent.state.errorMessage ?? "";
+        if (!this.shouldRetry(runId, dropped)) break;
+        const delayMs = backoffMs(attempt, this.retry);
+        this.emit(runId, "run.resumed", { error: dropped, attempt, delay_ms: delayMs });
+        await sleep(delayMs);
+        // The operator may have pressed Stop while we were waiting.
+        if (this.store.getRun(runId)?.status === "stopping") break;
+        // `prompt()` clears `errorMessage` and keeps the transcript, so this is
+        // a continuation rather than a restart: the turns already paid for stay.
+        await agent.prompt(resumeText(dropped));
+        await agent.waitForIdle();
+      }
       if (this.lacksPacket(runId, output.join(""), agent)) {
         // Once, with tools off, so the only thing the turn can produce is text.
         agent.state.tools = [];
@@ -379,12 +455,38 @@ export class RunSupervisor {
   }
 
   /**
+   * Whether a run that died on the provider gets another continuation.
+   *
+   * A stream can drop mid-turn — undici reports `terminated`, the turn records
+   * zero tokens, and the run used to end there. Measured: a HappyWags run lost
+   * five completed turns and 15 tool calls to a socket that closed 98s into
+   * turn 6. The transcript is intact in the agent, so asking it to carry on is
+   * one call against a run that has already cost dozens.
+   *
+   * Anything but a `TERMINAL_ERROR` is retried — see there for why the default
+   * is "try again" rather than "recognise it first". pi-agent-core has no retry
+   * of its own, so this is where it goes.
+   */
+  private shouldRetry(runId: string, errorMessage: string): boolean {
+    if (!retryableError(errorMessage)) return false;
+    return this.store.getRun(runId)?.status !== "stopping";
+  }
+
+  /**
    * Whether a run that ended cleanly left no packet object to read at all.
    * A packet that is there but breaks the contract is not this case: that is
    * an `invalid` run, and asking again would hide what the model got wrong.
    */
   private lacksPacket(runId: string, output: string, agent: Agent): boolean {
-    if (agent.state.errorMessage) return false;
+    // After the retry budget is spent the agent still holds the whole
+    // transcript, and a run that fetched 30 pages is worth one more ask before
+    // it is written off. If that ask fails too, `errorMessage` is set again and
+    // the run settles as `failed` with it. A run whose provider never answered
+    // at all has nothing to salvage, so a tool result is the bar: it means the
+    // run actually gathered something.
+    if (agent.state.errorMessage && !agent.state.messages.some((m) => m.role === "toolResult")) {
+      return false;
+    }
     if (this.store.getRun(runId)?.status === "stopping") return false;
     try {
       extract(output);

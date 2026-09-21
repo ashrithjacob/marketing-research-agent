@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
   api,
+  briefLabel,
   TERMINAL_STATUSES,
   type Config,
   type ResearchNode,
@@ -100,7 +101,7 @@ export default function App() {
           {activeRun && (
             <>
               <span className="chip">
-                {activeRun.brief.product}
+                {briefLabel(activeRun.brief)}
                 {activeRun.brief.market ? ` — ${activeRun.brief.market}` : ''}
               </span>
               <span className="chip">{clock}</span>

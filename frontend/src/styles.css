@@ -322,6 +322,27 @@ form.modal .row { margin-top: 4px; }
 }
 .modal .row { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
 
+/* The five default markets. Ticked is the resting state, so the ticked chip is
+   the quiet one and unticking is what looks like a deliberate change. */
+fieldset.markets {
+  border: 1px solid var(--line); border-radius: 10px;
+  margin: 0; padding: 8px 12px 10px; display: flex; flex-wrap: wrap; gap: 6px 14px;
+}
+fieldset.markets legend {
+  color: var(--faint); font-size: 11px; text-transform: uppercase;
+  letter-spacing: .08em; padding: 0 4px;
+}
+label.market {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 13px; color: var(--dim); cursor: pointer; user-select: none;
+}
+label.market:has(input:checked) { color: var(--ink); }
+/* Beats `.modal input:not([type=radio])`, which stretches text inputs to 100%. */
+.modal label.market input[type=checkbox] {
+  width: auto; padding: 0; background: none; border: 0;
+  accent-color: var(--accent); cursor: pointer;
+}
+
 @media (max-width: 980px) {
   .app > header { flex-wrap: wrap; }
   .subject { margin-left: 0; flex-wrap: wrap; }

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   api,
+  briefLabel,
   streamRunEvents,
   type CallStats,
   type ContentBlock,
@@ -98,7 +99,7 @@ export default function LogsPage({ runId }: { runId: string }) {
   }, [run?.live]);
 
   useEffect(() => {
-    if (run) document.title = `Logs · ${run.brief.product}`;
+    if (run) document.title = `Logs · ${briefLabel(run.brief)}`;
   }, [run]);
 
   const wallMs = run
@@ -116,7 +117,7 @@ export default function LogsPage({ runId }: { runId: string }) {
           {run && (
             <>
               <span className="chip">
-                {run.brief.product}
+                {briefLabel(run.brief)}
                 {run.brief.market ? ` — ${run.brief.market}` : ''}
               </span>
               <span className="chip">Stage {run.stage} · {scopeLabel(run.nodes ?? [])}</span>

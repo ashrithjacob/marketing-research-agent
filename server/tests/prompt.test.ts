@@ -87,6 +87,18 @@ describe("the brief block", () => {
     expect(build()).toMatch(/No product URL was supplied/);
   });
 
+  it("asks for the name when the brief is a site and nothing else", () => {
+    // The old shape printed "**Product:** <url>" above "No product URL was
+    // supplied — finding it is part of the job", and a run spent a turn on the
+    // contradiction before inventing a name that failed validation.
+    const text = build({ brief: brief({ product: "", url: "https://thedropletco.co.uk/" }) });
+    expect(text).toContain("**Site:** https://thedropletco.co.uk/");
+    expect(text).not.toMatch(/\*\*Product:\*\*/);
+    expect(text).not.toMatch(/No product URL was supplied/);
+    expect(text).toMatch(/as the site writes it/);
+    expect(text).toMatch(/no domain and no url appended/);
+  });
+
   it("skips the search instruction when a url was supplied", () => {
     const text = build({ brief: brief({ url: "https://magnacalm.example" }) });
     expect(text).toContain("https://magnacalm.example");
@@ -97,6 +109,28 @@ describe("the brief block", () => {
     const text = build({ brief: brief({ market: "UK", notes: "focus on sleep" }) });
     expect(text).toContain("**Market:** UK");
     expect(text).toContain("focus on sleep");
+  });
+
+  it("makes a single market a scope, not a hint", () => {
+    // The cockpit ticks five markets by default, so "market" has to mean
+    // "only here" — a run that wanders spends its budget on unusable sources.
+    const text = build({ brief: brief({ market: "UK" }) });
+    expect(text).toContain("Research only this market");
+    expect(text).toMatch(/outside it is out of scope/);
+  });
+
+  it("pluralises and still restricts a list of markets", () => {
+    const text = build({
+      brief: brief({ market: "US, UK, Australia, New Zealand, Canada" }),
+    });
+    expect(text).toContain("**Markets:** US, UK, Australia, New Zealand, Canada");
+    expect(text).toContain("Research only these markets");
+    expect(text).toMatch(/gap entry naming the market/);
+  });
+
+  it("says nothing about markets when the brief names none", () => {
+    const text = build({ brief: brief({ market: "" }) });
+    expect(text).not.toMatch(/Research only th/);
   });
 });
 

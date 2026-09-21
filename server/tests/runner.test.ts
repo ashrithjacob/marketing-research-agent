@@ -15,13 +15,19 @@ import { fauxAssistantMessage, fauxProvider, fauxToolCall } from "@earendil-work
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { OpenRouterCosts } from "../src/costs.js";
-import { RunSupervisor, effectiveRejectKinds } from "../src/runner.js";
+import {
+  RunSupervisor,
+  backoffMs,
+  effectiveRejectKinds,
+  retryableError,
+} from "../src/runner.js";
 import { runRequestSchema, type RunRequest } from "../src/schema.js";
 import { loadSettings, type Settings } from "../src/settings.js";
 import { SqliteResearchStore, type Judgement } from "../src/store.js";
 import { fenced, minimalPacket } from "./fixtures.js";
 
 const MODEL_ID = "faux-model";
+const FAST_RETRY = { attempts: 3, baseMs: 0, capMs: 0 };
 
 let dir: string;
 let store: SqliteResearchStore;
@@ -37,7 +43,9 @@ beforeEach(() => {
   faux = fauxProvider({ provider: "openrouter", models: [{ id: MODEL_ID }] });
   models = createModels();
   models.setProvider(faux.provider);
-  supervisor = new RunSupervisor({ store, settings, models });
+  // Fast retries: the real policy waits 2s, 4s, 8s, and a test that drives a
+  // provider error would sit through it.
+  supervisor = new RunSupervisor({ store, settings, models, retry: FAST_RETRY });
 });
 
 afterEach(async () => {
@@ -500,14 +508,176 @@ describe("the LLM call trace", () => {
   });
 
   it("records a call the provider failed, with its error", async () => {
-    faux.setResponses([
-      fauxAssistantMessage("", { stopReason: "error", errorMessage: "upstream 502" }),
-    ]);
+    // 502 is retryable, so the run spends its budget before settling.
+    faux.setResponses(
+      Array.from({ length: 4 }, () =>
+        fauxAssistantMessage("", { stopReason: "error", errorMessage: "upstream 502" }),
+      ),
+    );
     const runId = supervisor.start(request());
     await supervisor.waitFor(runId);
     const [call] = store.listLlmCalls(runId);
     expect(call!.stop_reason).toBe("error");
     expect(call!.error).toBe("upstream 502");
+  });
+});
+
+describe("a stream that drops mid-run", () => {
+  it("spaces its attempts with exponential backoff and jitter", () => {
+    const policy = { attempts: 3, baseMs: 2000, capMs: 30000 };
+    for (const [attempt, low, high] of [
+      [1, 1000, 2000],
+      [2, 2000, 4000],
+      [3, 4000, 8000],
+    ] as const) {
+      const waits = Array.from({ length: 40 }, () => backoffMs(attempt, policy));
+      expect(Math.min(...waits)).toBeGreaterThanOrEqual(low);
+      expect(Math.max(...waits)).toBeLessThanOrEqual(high);
+      // Jitter, not a constant: two runs that drop together must not retry in step.
+      expect(new Set(waits).size).toBeGreaterThan(1);
+    }
+    // The cap binds before the exponent runs away.
+    expect(backoffMs(20, policy)).toBeLessThanOrEqual(30000);
+  });
+
+  it("carries on from the transcript rather than losing the run", async () => {
+    // Measured: a HappyWags run lost five completed turns and 15 tool calls to
+    // a socket that closed 98s into turn 6 (undici reports `terminated`).
+    faux.setResponses([
+      fauxAssistantMessage("", { stopReason: "error", errorMessage: "terminated" }),
+      fauxAssistantMessage(fenced(minimalPacket())),
+    ]);
+    const runId = supervisor.start(request());
+    await supervisor.waitFor(runId);
+
+    const run = store.getRun(runId)!;
+    expect(run.status).toBe("completed");
+    expect(run.error).toBe("");
+    const resumed = store.listEvents(runId).find((e) => e.kind === "run.resumed");
+    expect(resumed?.payload.error).toBe("terminated");
+    // The continuation says the turn was lost, so tools are not re-run.
+    expect(JSON.stringify(store.listLlmCalls(runId)[1]!.input)).toContain("dropped part-way");
+  });
+
+  it("keeps trying to the end of its budget, then fails", async () => {
+    faux.setResponses([
+      fauxAssistantMessage("", { stopReason: "error", errorMessage: "terminated" }),
+      fauxAssistantMessage("", { stopReason: "error", errorMessage: "socket hang up" }),
+      fauxAssistantMessage("", { stopReason: "error", errorMessage: "502 bad gateway" }),
+      fauxAssistantMessage("", { stopReason: "error", errorMessage: "terminated, again" }),
+      fauxAssistantMessage(fenced(minimalPacket())), // never reached: budget is 3
+    ]);
+    const runId = supervisor.start(request());
+    await supervisor.waitFor(runId);
+
+    const run = store.getRun(runId)!;
+    expect(run.status).toBe("failed");
+    expect(run.error).toBe("terminated, again");
+    const resumed = store.listEvents(runId).filter((e) => e.kind === "run.resumed");
+    expect(resumed).toHaveLength(3);
+    expect(resumed.map((e) => e.payload.attempt)).toEqual([1, 2, 3]);
+  });
+
+  it("recovers on a later attempt when the provider comes back", async () => {
+    faux.setResponses([
+      fauxAssistantMessage("", { stopReason: "error", errorMessage: "terminated" }),
+      fauxAssistantMessage("", { stopReason: "error", errorMessage: "503 service unavailable" }),
+      fauxAssistantMessage(fenced(minimalPacket())),
+    ]);
+    const runId = supervisor.start(request());
+    await supervisor.waitFor(runId);
+
+    expect(store.getRun(runId)!.status).toBe("completed");
+    expect(store.listEvents(runId).filter((e) => e.kind === "run.resumed")).toHaveLength(2);
+  });
+
+  it("retries a wording it has never seen", () => {
+    // The second live failure, and the reason the policy is a deny-list: pi-ai's
+    // classifier does not recognise this one, and refusing it threw away 140k
+    // tokens of research without a single retry.
+    expect(
+      retryableError("Upstream error from Relace: The model stopped before completing the response."),
+    ).toBe(true);
+    for (const transient of [
+      "terminated",
+      "socket hang up",
+      "502 bad gateway",
+      "Provider returned error",
+      "stream ended before message_stop",
+      "something nobody has written down yet",
+    ]) {
+      expect(retryableError(transient)).toBe(true);
+    }
+  });
+
+  it("knows the errors that waiting cannot fix", () => {
+    for (const terminal of [
+      "402 insufficient_quota: your account is out of credit",
+      "Quota exceeded for this month",
+      "401 Unauthorized: invalid api key",
+      "403 Forbidden",
+      "This model's maximum context length is 128000 tokens",
+      "invalid_request_error: unknown model",
+      "flagged by the content policy",
+    ]) {
+      expect(retryableError(terminal)).toBe(false);
+    }
+    expect(retryableError("")).toBe(false);
+  });
+
+  it("asks for a packet from what it gathered when the retries run out", async () => {
+    // A run that fetched 30 pages and then lost the provider still holds the
+    // whole transcript; one tools-off ask is cheaper than losing all of it.
+    faux.setResponses([
+      // A turn that did some work, so the transcript is worth salvaging.
+      fauxAssistantMessage(fauxToolCall("no_such_tool", { q: "x" }), { stopReason: "toolUse" }),
+      // Then the provider goes away for the whole retry budget.
+      ...Array.from({ length: 4 }, () =>
+        fauxAssistantMessage("", { stopReason: "error", errorMessage: "Upstream error from Relace" }),
+      ),
+      // The tools-off ask that follows still lands.
+      fauxAssistantMessage(fenced(minimalPacket())),
+    ]);
+    const runId = supervisor.start(request());
+    await supervisor.waitFor(runId);
+
+    const kinds = store.listEvents(runId).map((e) => e.kind);
+    expect(kinds.filter((k) => k === "run.resumed")).toHaveLength(3);
+    expect(kinds).toContain("run.nudged");
+    expect(store.getRun(runId)!.status).toBe("completed");
+  });
+
+  it("does not retry an error that waiting cannot fix", async () => {
+    // pi-ai's classifier: quota and billing exhaustion are terminal, and a
+    // retry on a 93k-token transcript is a real charge for a certain failure.
+    faux.setResponses([
+      fauxAssistantMessage("", {
+        stopReason: "error",
+        errorMessage: "402 insufficient_quota: your account is out of credit",
+      }),
+      fauxAssistantMessage(fenced(minimalPacket())),
+    ]);
+    const runId = supervisor.start(request());
+    await supervisor.waitFor(runId);
+
+    expect(store.getRun(runId)!.status).toBe("failed");
+    expect(store.listEvents(runId).some((e) => e.kind === "run.resumed")).toBe(false);
+  });
+
+  it("does not resume a run the operator stopped", async () => {
+    faux.setResponses([
+      () => {
+        // Stop lands while the turn is in flight, which is the real shape of it.
+        supervisor.stop(runId);
+        return fauxAssistantMessage("", { stopReason: "error", errorMessage: "aborted" });
+      },
+      fauxAssistantMessage(fenced(minimalPacket())),
+    ]);
+    const runId = supervisor.start(request());
+    await supervisor.waitFor(runId);
+
+    expect(store.getRun(runId)!.status).toBe("cancelled");
+    expect(store.listEvents(runId).some((e) => e.kind === "run.resumed")).toBe(false);
   });
 });
 

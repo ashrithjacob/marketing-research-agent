@@ -635,21 +635,56 @@ function judgementBlock(judgements: readonly Judgement[]): string {
 }
 
 function briefBlock(brief: Brief): string {
-  const lines = ["## The brief", "", `**Product:** ${brief.product}`];
-  if (brief.url) {
-    lines.push(`**Product URL:** ${brief.url}`);
-  } else {
-    // The normal case: the operator names a product and a market, and the
-    // agent finds everything. Saying so matters — without the line, a
-    // careful agent stalls asking for a URL it was never going to get.
+  const lines = ["## The brief", ""];
+  if (!brief.product && brief.url) {
+    // A store URL and nothing else. Naming the product is the first task, and
+    // saying so plainly is what stops the agent inventing a name to fill the
+    // field: one run spent a turn reconciling "**Product:** <url>" with "no
+    // product URL was supplied", then wrote "Droplet (The Droplet Co) — luxury
+    // reed diffuser home fragrance" and failed the brief check on it.
     lines.push(
-      "No product URL was supplied — finding it is part of the job. Use " +
-        "web search to locate the product's own site first, then the " +
-        "reviews, competitors, ad-library entries and category data the " +
-        "four nodes need.",
+      `**Site:** ${brief.url}`,
+      "",
+      "The brief is this site, not a product name. Your first step is to fetch " +
+        "it and read what it sells. Then set `brief.product` in your packet to " +
+        "the product's own name **as the site writes it** — the name on the " +
+        "product page or in the site's title, with no description, no domain " +
+        "and no url appended. If the site sells a range, name the line the site " +
+        "leads with and say in a gap which others you left.",
+    );
+  } else {
+    lines.push(`**Product:** ${brief.product}`);
+    if (brief.url) {
+      lines.push(`**Product URL:** ${brief.url}`);
+    } else {
+      // The normal case: the operator names a product and a market, and the
+      // agent finds everything. Saying so matters — without the line, a
+      // careful agent stalls asking for a URL it was never going to get.
+      lines.push(
+        "No product URL was supplied — finding it is part of the job. Use " +
+          "web search to locate the product's own site first, then the " +
+          "reviews, competitors, ad-library entries and category data the " +
+          "four nodes need.",
+      );
+    }
+  }
+  if (brief.market) {
+    // Named markets are a scope, not a hint. A run that wanders outside them
+    // spends its budget on sources nobody can act on, and the cockpit ticks
+    // five by default — so the brief says what "only" means here.
+    const plural = brief.market.includes(",");
+    lines.push(
+      `**Market${plural ? "s" : ""}:** ${brief.market}`,
+      "",
+      `Research only ${plural ? "these markets" : "this market"}. A source from ` +
+        `outside ${plural ? "them" : "it"} is out of scope: do not record it, and do ` +
+        `not count it toward saturation. Where a site serves several regions, use ` +
+        `the ${plural ? "listings" : "listing"} for ${brief.market} — prices, ` +
+        `availability and reviews differ by region. If a named market yields ` +
+        `nothing, that is a gap entry naming the market, never a reason to ` +
+        `substitute another.`,
     );
   }
-  if (brief.market) lines.push(`**Market:** ${brief.market}`);
   if (brief.notes) lines.push(`**Notes:** ${brief.notes}`);
   return lines.join("\n");
 }
@@ -688,5 +723,21 @@ export function packetNudgeText(): string {
     "result yet. Do not research further; tools are switched off. Write the " +
     "packet now from what you have already gathered, as a single fenced " +
     "```json block, and record what you did not reach as gaps."
+  );
+}
+
+/**
+ * The one continuation a run gets when the provider's stream drops.
+ *
+ * The transcript survives in the agent, so the work already done is still
+ * there — the agent only needs telling that the last turn was cut off rather
+ * than answered, or it re-runs tools it has already paid for.
+ */
+export function resumeText(error: string): string {
+  return (
+    `The connection to the model dropped part-way through your last turn (${error || "no detail"}), ` +
+    "so that turn was lost. Everything before it stands: the tool results above " +
+    "are yours and do not need fetching again. Carry on from where you were, and " +
+    "finish with the stage-1 packet as a single fenced ```json block."
   );
 }
