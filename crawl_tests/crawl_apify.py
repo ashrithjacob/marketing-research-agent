@@ -74,7 +74,8 @@ def call(actor: str, payload: dict, cap: float, timeout: int = 300):
 
 def _finish(result: Result, status: int, items, cap: float, want_star: int | None) -> Result:
     result.status = status
-    result.cost_usd = cap  # the ceiling, not the charge — see the note below
+    result.cost_usd = cap
+    result.cost_is_cap = True  # a ceiling; the Apify console is the authority
 
     if status == 402:
         result.note = (

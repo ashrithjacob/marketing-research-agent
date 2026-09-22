@@ -239,8 +239,18 @@ class Result:
     wall: bool | None = None
     filter_honoured: bool | None = None  # asked for N stars, got N stars?
     cost_usd: float | None = None
+    # True when cost_usd is a spend CEILING rather than what was charged.
+    # Apify caps a run server-side; the console is the authority on the bill.
+    cost_is_cap: bool = False
     note: str = ""
     raw_path: str = ""
+
+    def cost_label(self) -> str:
+        if self.cost_usd == 0:
+            return "free"
+        if self.cost_usd is None:
+            return "—"
+        return f"${self.cost_usd} CAP (not the charge)" if self.cost_is_cap else f"~${self.cost_usd}"
 
     def print(self) -> None:
         mark = "ok " if self.ok else "FAIL"
@@ -256,7 +266,7 @@ class Result:
             ("star spread", self.star_spread or "—"),
             ("filter honoured", "n/a" if self.filter_honoured is None else self.filter_honoured),
             ("WALL", "n/a" if self.wall is None else ("YES — " + self.note if self.wall else "no")),
-            ("cost", "free" if self.cost_usd == 0 else (f"~${self.cost_usd}" if self.cost_usd else "—")),
+            ("cost", self.cost_label()),
             ("raw", self.raw_path or "—"),
         ]
         for label, value in rows:
@@ -336,7 +346,7 @@ def table(results: list[Result]) -> str:
                 "n/a" if r.records is None else str(r.records),
                 "n/a" if r.wall is None else ("YES" if r.wall else "no"),
                 "n/a" if r.filter_honoured is None else ("yes" if r.filter_honoured else "NO"),
-                "free" if r.cost_usd == 0 else (f"${r.cost_usd}" if r.cost_usd else "—"),
+                r.cost_label(),
             )
         )
     widths = [max(len(row[i]) for row in rows) for i in range(len(head))]

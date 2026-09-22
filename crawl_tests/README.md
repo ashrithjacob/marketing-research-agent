@@ -119,10 +119,18 @@ The browser handler reports itself unhealthy and is skipped, which is fine for
 everything except a `--browser` run.
 
 **Apify.** Prints the spend cap before every call and refuses a cap above
-`--budget` (default $1.00) without `--yes`. **The cap is a ceiling, not a
-prediction** — the Apify console is the authority on the real charge. `--stars N`
-asks for one band; the script checks the spread that came back against the band
-requested and tells you when they differ.
+`--budget` (default $1.00) without `--yes`. The `cost` line says
+`$0.50 CAP (not the charge)` for a reason: it is a server-side ceiling, floored
+at what the actor will accept, and the Apify console is the only authority on
+what you were actually billed. At `--max 5` the arithmetic is 5 × $0.006 = $0.03.
+
+`--stars N` asks for one band, and this is the capability the money buys — the
+script checks the spread that came back against the band requested and discards
+the rows when they differ. It is also slow: ~22s against ~3s for a page fetch,
+because an actor run has to start.
+
+Rows come back with `totalCategoryReviews`, which is worth reading — on the
+example ASIN it is 845, against the 13 a `/dp/` fetch can see.
 
 **Trustpilot** (not part of the comparison):
 
@@ -175,22 +183,31 @@ Raw bodies land in `out/`, one per run, path printed. Diff them by hand.
 you read a results table. Measured 2026-09-22 from a residential laptop, same
 ASIN, same minute:
 
-| Crawler | Fetched from | Result |
-|---|---|---|
-| Firecrawl (`--full --html`) | Firecrawl's cloud | 1,455,348 chars, **0 reviews**, sign-in prompt in the review slot |
-| Firecrawl (`--as-production`) | Firecrawl's cloud | 150,574 chars markdown, **0 reviews** |
-| anakin, **plain HTTP handler**, no browser, no proxy | this laptop's residential IP | 2,773,447 chars, **13 complete reviews**, spread `{3: 1, 4: 1, 5: 11}`, 13/13 verified |
+| Crawler | Fetched from | Reviews | Star control | Time |
+|---|---|---|---|---|
+| Firecrawl `--full --html` | Firecrawl's cloud | **0** of 1,455,348 chars — sign-in prompt in the review slot | none | 3.4s |
+| Firecrawl `--as-production` | Firecrawl's cloud | **0** of 150,574 chars markdown | none | 2.6s |
+| anakin, **plain HTTP handler**, no browser, no proxy | this laptop's residential IP | **13**, spread `{3:1, 4:1, 5:11}`, 13/13 verified | none — you get what Amazon chose | 2.6s |
+| Apify `--stars 3 --max 5` | Apify's addresses | **5**, spread `{3: 5}`, all verified, dated within 3 weeks | **asked for 3★, got 3★** | 21.6s |
 
-Anakin did not win on technique. It used a residential address and Firecrawl
-used a datacentre one, and Amazon serves those two addresses different pages.
-Note anakin got the reviews *without* Camoufox even running — a plain GET with a
-browser user-agent was enough. That 13/`{3:1, 4:1, 5:11}` is byte-for-byte the
-laptop control recorded in `../spec-review-mining.md` §3.4.
+Two separate things are going on, and it is easy to read only the first.
 
-**On the VPS this result does not hold.** §3.2 measured plain Chrome from the
-Hetzner address getting the bot page, so anakin's HTTP handler there would get
-the bot page too. Run the same three from the VPS before drawing any conclusion
-about production — a laptop win is not a deployment.
+**The address decides whether you get reviews at all.** Anakin did not win on
+technique — it used a residential address and Firecrawl used a datacentre one,
+and Amazon serves those two different pages. Anakin got its 13 *without Camoufox
+running at all*; a plain GET with a browser user-agent was enough. That
+13/`{3:1, 4:1, 5:11}` is byte-for-byte the laptop control in
+`../spec-review-mining.md` §3.4. **On the VPS it does not hold** — §3.2 measured
+plain Chrome from the Hetzner address getting the bot page, so anakin's HTTP
+handler there gets the bot page too. A laptop win is not a deployment.
+
+**The star band decides whether the reviews are usable**, and only Apify has it.
+The free route's 13 reviews contain exactly **one** 3-star, because Amazon picks
+what goes on the page. The contract wants 3-star specifically and at least ten
+of them, and the 845 written reviews on this ASIN are unreachable from `/dp/`:
+pagination lives at `/product-reviews/`, which 302s to a sign-in from every
+address tested. So even where the free route works, it tops out at one usable
+review; Apify asked for five 3-star and got five, out of that pool of 845.
 
 **1. The `/dp/` page does not always carry its reviews.** From Firecrawl's
 addresses, `amazon.com/dp/B000BD0RT0` returns 1.46 MB at HTTP 200 — a real
