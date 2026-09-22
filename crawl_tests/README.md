@@ -319,10 +319,25 @@ This is worse than Amazon's own behaviour, not better: Amazon's `three_star`
 at least returns nothing, which is obviously broken. Ten rows that look like
 1-star reviews and are really eight 5-star reviews look like evidence.
 
-It also does not page. Asked for 50 with no filter, it returned **13**, spread
-`{3:1, 4:1, 5:11}` — and 11 of those 13 are byte-identical to what anakin
-scraped free from a residential IP. **Outscraper is scraping the `/dp/` page**:
-same page, same reviews, same ceiling, with a bill attached. At $2/1,000 it is
+It is not just the star filter. `--check-filter` also asks whether any other
+parameter does anything, and none of them do:
+
+| Parameter | Behaviour |
+|---|---|
+| `filterByStar` | inert — five bands, one identical sample |
+| `sort` | inert — `recent` and `helpful` return the same rows in the same order |
+| `query` | a bare ASIN is treated as the `/dp/` url; a `/product-reviews/` url returns 0 |
+| `limit` | truncates only — ask for 50, get the page's own 13 |
+
+So it is one `/dp/` fetch with parameters that are accepted and ignored.
+**11 of those 13 reviews are byte-identical to what anakin scraped free** from a
+residential IP: same page, same reviews, same ceiling, with a bill attached.
+
+One more behaviour to design around if you use it anyway: **an empty result
+arrives as `status: Success`.** The same query returned 13 rows, then 0, then 13
+on each of five straight retries — roughly one call in ten. Recording that as
+"this product has no reviews" writes a gap the next call disproves, so
+`crawl_outscraper.py` retries an empty Success once before believing it. At $2/1,000 it is
 nominally 3x cheaper than Apify's $6/1,000, but it cannot deliver the one thing
 the money is for. Apify's actor was verified to honour the band on the same
 ASIN the same day.
