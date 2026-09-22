@@ -1,2 +1,0 @@
-# Only crawl_trustpilot.py needs anything. The other three use urllib.
-selenium==4.41.0

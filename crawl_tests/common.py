@@ -20,7 +20,7 @@ import time
 import urllib.error
 import urllib.request
 from collections import Counter
-from dataclasses import dataclass, field, asdict
+from dataclasses import dataclass, field
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -223,10 +223,6 @@ def timed(fn):
 
 def spread_of(values) -> dict:
     return dict(sorted(Counter(v for v in values if v is not None).items(), key=lambda kv: str(kv[0])))
-
-
-def as_json(results: list[Result]) -> str:
-    return json.dumps([asdict(r) for r in results], indent=2)
 
 
 # --- the comparison table --------------------------------------------------

@@ -20,19 +20,28 @@ should change with it, or they stop measuring production.
 | `crawl_anakin.py` | AnakinScraper, self-hosted (`../../anakin`) | any URL | free (your compute) |
 | `crawl_apify.py` | Apify actors — junglee Amazon reviews + search, memo23 Trustpilot | Amazon product URL / search term / company | **real money** |
 | `crawl_trustpilot.py` | Trustpilot direct, via real Chrome | company domain or `/review/` URL | free |
-| `compare.py` | runs several of the above on one target and tables the result | any URL | free unless `--paid` |
+
+Plus `common.py`, which holds the three things the four have to share to be
+comparable at all — the bot-wall check, the printed record shape and the table —
+and `test_wall_check.py`, which pins the first of those.
 
 ## Setup
 
 ```bash
 cd marketing-research-agent/crawl_tests
-pip install -r requirements.txt        # selenium, for the Trustpilot script only
+pip install selenium        # ONLY for crawl_trustpilot.py; the other three use urllib
 ```
 
-**You probably do not need a `.env`.** `common.py` falls back to this repo's own
-`../.env`, which already holds `FIRECRAWL_API_KEY` and `APIFY_TOKEN`. Copy
-`.env.example` to `.env` only if you want different keys here. Anything exported
-in your shell wins over both.
+**You do not need a `.env`.** `common.py` reads this repo's own `../.env`, which
+already holds `FIRECRAWL_API_KEY` and `APIFY_TOKEN`; it also checks
+`./.env` and `../deploy/vps/.env`, in that order. Anything exported in your shell
+wins over all of them. The three keys that matter:
+
+| Variable | Used by | Get it from |
+|---|---|---|
+| `FIRECRAWL_API_KEY` | `crawl_firecrawl.py` | https://www.firecrawl.dev/app/api-keys |
+| `APIFY_TOKEN` | `crawl_apify.py` — **spends real money** | the Apify console |
+| `ANAKIN_BASE_URL` | `crawl_anakin.py`, defaults to `http://localhost:8080` | your own instance |
 
 For `crawl_anakin.py`, start anakin first:
 
@@ -103,17 +112,29 @@ python3 crawl_trustpilot.py huel.com --all-bands              # 1..5, one browse
 Needs a system `google-chrome`. Roughly 9s for the first page (the WAF challenge
 has to solve itself) and ~4s for each page after, since the token is held.
 
-### Compare
+### Comparing two of them
+
+There is no runner script — run the ones that can take your target, and read the
+two blocks against each other. Not every crawler takes every target: Firecrawl
+and anakin take any URL, the Apify Amazon actor takes a product URL only, and
+the Trustpilot script takes a company.
 
 ```bash
-python3 compare.py                                            # example page
-python3 compare.py https://www.trustpilot.com/review/huel.com
-python3 compare.py https://www.amazon.com/dp/B000BD0RT0 --paid
+# same page, two page crawlers — the like-for-like pair
+python3 crawl_firecrawl.py https://www.trustpilot.com/review/huel.com
+python3 crawl_anakin.py    https://www.trustpilot.com/review/huel.com --browser
+
+# same company's 3-star reviews, free route vs paid route
+python3 crawl_trustpilot.py huel.com --stars 3
+python3 crawl_apify.py trustpilot huel.com --stars 3 --max 5 --yes
 ```
 
-It picks crawlers by host — both page crawlers always, plus Trustpilot or Apify
-where they apply — and prints a table. Free crawlers run by default; `--paid` is
-required before anything bills.
+Then diff the raw bodies by hand — every run prints its own path under `out/`:
+
+```bash
+ls -t out/ | head -4
+diff <(jq -S . out/trustpilot-*.json) <(jq -S . out/apify-trustpilot-*.json) | head -40
+```
 
 ## Reading the output
 
