@@ -6,13 +6,14 @@ Not "does it fetch the page" — every crawler here fetches the page. Whether th
 reviews are *on* the page it returns is a different question, and it is the one
 that decides whether review mining has to be bought.
 
-Three crawlers are compared, all against `amazon.com` (US) product URLs:
+Four crawlers are compared, all against `amazon.com` (US) product URLs:
 
 | Script | Crawler | Cost |
 |---|---|---|
 | `crawl_firecrawl.py` | Firecrawl cloud — what `web_fetch` uses in production today | a credit per scrape |
 | `crawl_anakin.py` | AnakinScraper, self-hosted (`../../anakin`), incl. its Camoufox browser | free (your compute) |
 | `crawl_apify.py` | Apify — junglee reviews actor, junglee search actor | **real money** |
+| `crawl_outscraper.py` | Outscraper `/amazon/reviews` — cheaper on paper, see finding 2 | free to 500, then $2/1k |
 
 Each prints the same fields, counts reviews out of whatever came back using the
 same extractor, and writes its raw body to `out/` so you can check by hand.
@@ -39,7 +40,7 @@ When `server/src/tools.ts` or `server/src/apify.ts` changes, these should too.
 cd marketing-research-agent/crawl_tests
 ```
 
-Nothing to install for the three Amazon crawlers — they use `urllib`. Only
+Nothing to install for the four Amazon crawlers — they use `urllib`. Only
 `crawl_trustpilot.py` needs anything: `pip install selenium`, plus a system
 `google-chrome`.
 
@@ -53,6 +54,7 @@ all of them.
 | `FIRECRAWL_API_KEY` | `crawl_firecrawl.py` | https://www.firecrawl.dev/app/api-keys |
 | `APIFY_TOKEN` | `crawl_apify.py` — **spends real money** | the Apify console |
 | `ANAKIN_BASE_URL` | `crawl_anakin.py`, defaults to `http://localhost:8080` | your own instance |
+| `OUTSCRAPER_API_KEY` | `crawl_outscraper.py` — free to 500 reviews | app.outscraper.cloud profile |
 
 For `crawl_anakin.py`, start anakin first:
 
@@ -64,11 +66,12 @@ cd ../../anakin/server && go run cmd/server/main.go
 
 ## The comparison
 
-All three default to the same ASIN, so this is the whole thing:
+All four default to the same ASIN, so this is the whole thing:
 
 ```bash
 python3 crawl_firecrawl.py                      # 1 credit
 python3 crawl_anakin.py --fresh                 # free (add --browser if it comes back empty)
+python3 crawl_outscraper.py --check-filter      # free inside the first 500
 python3 crawl_apify.py amazon --yes             # ~$0.03 at the default cap
 ```
 
@@ -134,7 +137,10 @@ example ASIN it is 845, against the 13 a `/dp/` fetch can see.
 
 ## Getting hundreds of reviews
 
-Only one of the three scales, and not by spending alone. Check before you run:
+Only one of the four scales, and not by spending alone. Outscraper is the one
+that looks like it should — it is 3x cheaper per review — but it cannot page
+past the `/dp/` page's 13 and its star filter is inert, so there is nothing to
+scale (finding 2). Check before you run:
 
 ```bash
 python3 crawl_apify.py amazon --count 100 --all-stars --plan   # costs nothing
@@ -196,6 +202,13 @@ those is not a budget question; there is nothing to scale.
 Where hundreds *are* free: **Trustpilot**, 20 per page, paginated, honest star
 filters, no vendor. But those are reviews of a merchant, not of a SKU.
 
+**Outscraper.** `--check-filter` is the run that matters and costs nothing
+inside the free 500: it asks for each band in turn and prints whether the band
+is what came back. `--limit N` is a request, not a promise — ask for 50 on a
+`/dp/` URL and you get 13. The script separates a transport failure from an
+empty result, which it did not do on first write: a five-band run printed five
+honest-looking empties that were all DNS errors.
+
 **Trustpilot** (not part of the comparison):
 
 ```bash
@@ -252,6 +265,7 @@ ASIN, same minute:
 | Firecrawl `--full --html` | Firecrawl's cloud | **0** of 1,455,348 chars — sign-in prompt in the review slot | none | 3.4s |
 | Firecrawl `--as-production` | Firecrawl's cloud | **0** of 150,574 chars markdown | none | 2.6s |
 | anakin, **plain HTTP handler**, no browser, no proxy | this laptop's residential IP | **13**, spread `{3:1, 4:1, 5:11}`, 13/13 verified | none — you get what Amazon chose | 2.6s |
+| Outscraper `--all-stars --limit 50` | Outscraper's addresses | **13** (asked 50), spread `{3:1, 4:1, 5:11}` — 11 of them the same reviews anakin got free | **none, and it claims otherwise** — see finding 2 | 1.0s |
 | Apify `--stars 3 --max 5` | Apify's addresses | **5**, spread `{3: 5}`, all verified, dated within 3 weeks | **asked for 3★, got 3★** | 21.6s |
 
 Two separate things are going on, and it is easy to read only the first.
@@ -282,13 +296,39 @@ is `cm-cr-dp-reviews-loading-wrapper`, an unloaded placeholder, with
 reviews, server-rendered, first response body, no JS needed. The page Amazon
 serves depends on who is asking.
 
-**2. Amazon's star filter lies, in two directions.** Measured from a residential
-address where Amazon does serve reviews: `?filterByStar=three_star` returns
-**zero** containers, which reads as "no 3-star reviews exist".
-`?filterByStar=one_star` returns the **unfiltered** sample — thirteen reviews
-presented as 1-star, eleven really 5-star. Fabricated star data, undetectable
-from the page alone. That is what `filter honoured` is for, and why the Apify
-script discards rows whose spread does not match the band it asked for.
+**2. Amazon's star filter lies, and a vendor can inherit the lie.** Measured
+from a residential address where Amazon does serve reviews:
+`?filterByStar=three_star` returns **zero** containers, which reads as "no
+3-star reviews exist". `?filterByStar=one_star` returns the **unfiltered**
+sample — thirteen reviews presented as 1-star, eleven really 5-star.
+
+**Outscraper forwards that parameter and inherits both failures.** Its API takes
+`filterByStar` with Amazon's own value names, and all five bands come back
+identical — `python3 crawl_outscraper.py --check-filter`, 2026-09-22:
+
+```
+  asked      got    spread                      verdict
+  1-star     10     {3.0: 1, 4.0: 1, 5.0: 8}    LIES — discard
+  2-star     10     {3.0: 1, 4.0: 1, 5.0: 8}    LIES — discard
+  3-star     10     {3.0: 1, 4.0: 1, 5.0: 8}    LIES — discard
+  4-star     10     {3.0: 1, 4.0: 1, 5.0: 8}    LIES — discard
+  5-star     10     {3.0: 1, 4.0: 1, 5.0: 8}    LIES — discard
+```
+
+This is worse than Amazon's own behaviour, not better: Amazon's `three_star`
+at least returns nothing, which is obviously broken. Ten rows that look like
+1-star reviews and are really eight 5-star reviews look like evidence.
+
+It also does not page. Asked for 50 with no filter, it returned **13**, spread
+`{3:1, 4:1, 5:11}` — and 11 of those 13 are byte-identical to what anakin
+scraped free from a residential IP. **Outscraper is scraping the `/dp/` page**:
+same page, same reviews, same ceiling, with a bill attached. At $2/1,000 it is
+nominally 3x cheaper than Apify's $6/1,000, but it cannot deliver the one thing
+the money is for. Apify's actor was verified to honour the band on the same
+ASIN the same day.
+
+`filter honoured` exists for exactly this, and both the Apify and Outscraper
+scripts discard rows whose spread does not match the band requested.
 
 **3. Amazon blocks by address; Trustpilot blocks by JavaScript.** From the
 Hetzner VPS, Amazon serves a 3.7 KB bot page **at HTTP 200** to curl, to headless
