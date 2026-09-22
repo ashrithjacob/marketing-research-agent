@@ -2,6 +2,13 @@
 """
 Trustpilot, direct — real Chrome, no vendor, no cost.
 
+**Not part of the Amazon comparison, and kept anyway.** Trustpilot is not a hard
+page: one browser clears the challenge, `?stars=N` is honest, and there is
+nothing to choose between crawlers on it. This script stays because it is the
+working free route and the documented fallback if the paid Trustpilot actor ever
+degrades the way Firecrawl did on Amazon. Run it when you want Trustpilot data;
+do not run it expecting a comparison.
+
 Trustpilot's 403 is an AWS WAF *JavaScript challenge* being served, not access
 being refused: a residential address and a datacentre address get byte-identical
 991-byte refusals, and any client that runs JS gets through from either. So the

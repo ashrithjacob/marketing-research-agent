@@ -2,15 +2,19 @@
 """
 Firecrawl — what marketing-research-agent's `web_fetch` uses today.
 
-The defaults here mirror `../server/src/tools.ts:firecrawlScrape` exactly
-(`formats: ["markdown"], onlyMainContent: true`), so what this prints is what a
-stage-1 run would actually have seen. Change the flags to explore; change the
-defaults and you are no longer measuring production.
+    python3 crawl_firecrawl.py                              # the example ASIN
+    python3 crawl_firecrawl.py https://www.amazon.com/dp/B0C1234567
+    python3 crawl_firecrawl.py <amazon url> --as-production  # markdown + main-content
+    python3 crawl_firecrawl.py <amazon url> --stealth --wait 6000
+    python3 crawl_firecrawl.py https://huel.com/products/x   # any non-Amazon page
 
-    python3 crawl_firecrawl.py                                   # example url
-    python3 crawl_firecrawl.py https://huel.com/products/daily-greens
-    python3 crawl_firecrawl.py <url> --stealth --wait 6000
-    python3 crawl_firecrawl.py <url> --full --html
+**On an amazon.com url this does NOT use production's settings by default**, and
+that is deliberate. Production sends `formats: ["markdown"], onlyMainContent:
+true`; `onlyMainContent` was measured trimming Amazon's reviews off the page
+(spec-stage-1.md §2.5.2 correction (c)), and the data-hooks the extractor needs
+only survive in html. So an Amazon target defaults to `--full --html` and the
+run says so. `--as-production` reproduces what a stage-1 run really sees, which
+is the other half of the comparison and usually worse.
 
 Needs FIRECRAWL_API_KEY (picked up from ../.env).
 Cost: a Firecrawl credit per scrape; stealth proxy costs more credits per call.
@@ -21,12 +25,24 @@ from __future__ import annotations
 import argparse
 import sys
 
-from common import Result, env, load_env, need, post_json, save, timed, wall_check
+from common import (
+    Result,
+    amazon_reviews,
+    env,
+    is_amazon,
+    load_env,
+    need,
+    post_json,
+    save,
+    spread_of,
+    timed,
+    wall_check,
+)
 
 # --- CHANGE ME -------------------------------------------------------------
-# A brand's own product page: the bread-and-butter stage-1 fetch, and a page
-# nobody blocks. Swap in a Trustpilot or Amazon url to watch it hit a wall.
-EXAMPLE_URL = "https://huel.com/products/huel-daily-greens"
+# A US listing with 500+ written reviews — enough that "zero reviews returned"
+# can only ever be the crawler's fault, never the product's.
+EXAMPLE_URL = "https://www.amazon.com/dp/B000BD0RT0"
 # ---------------------------------------------------------------------------
 
 
@@ -75,10 +91,20 @@ def fetch(
     result.chars = len(text)
     result.ok = bool(text.strip())
     result.wall, why = wall_check(text)
-    result.note = why or f"onlyMainContent={main_content} format={fmt}" + (" proxy=stealth" if stealth else "")
+    settings = f"onlyMainContent={main_content} format={fmt}" + (" proxy=stealth" if stealth else "")
+    result.note = why or settings
     result.raw_path = save("firecrawl", url, "md" if fmt == "markdown" else "html", text)
+
     if not result.ok:
         result.note = "empty body — web_fetch throws here rather than archiving nothing"
+    elif is_amazon(url):
+        rows, diagnosis = amazon_reviews(text)
+        result.records = len(rows)
+        result.star_spread = spread_of(r["star"] for r in rows)
+        # A page full of product copy with no reviews on it is not a success
+        # for this comparison, whatever the char count says.
+        result.ok = bool(rows)
+        result.note = f"{settings} — {diagnosis}"
     return result
 
 
@@ -88,19 +114,29 @@ def main() -> int:
     parser.add_argument("url", nargs="?", default=EXAMPLE_URL)
     parser.add_argument("--full", action="store_true", help="onlyMainContent: false")
     parser.add_argument("--html", action="store_true", help="ask for html instead of markdown")
+    parser.add_argument(
+        "--as-production",
+        action="store_true",
+        help="markdown + onlyMainContent, exactly what web_fetch sends",
+    )
     parser.add_argument("--wait", type=int, default=0, metavar="MS", help="waitFor, milliseconds")
     parser.add_argument("--stealth", action="store_true", help="proxy: stealth (more credits)")
     parser.add_argument("--timeout", type=int, default=90)
     args = parser.parse_args()
 
+    # Amazon needs html for the data-hooks and the full page for the review
+    # block; anything else defaults to what production sends.
+    amazon_defaults = is_amazon(args.url) and not args.as_production
     result = fetch(
         args.url,
-        main_content=not args.full,
-        fmt="html" if args.html else "markdown",
+        main_content=not (args.full or amazon_defaults),
+        fmt="html" if (args.html or amazon_defaults) else "markdown",
         wait_ms=args.wait,
         stealth=args.stealth,
         timeout=args.timeout,
     )
+    if amazon_defaults:
+        print("amazon url: defaulting to --full --html. Use --as-production for web_fetch's own settings.")
     result.print()
     print(f"\nRead it:  less {result.raw_path}" if result.raw_path else "")
     return 0 if result.ok and not result.wall else 1

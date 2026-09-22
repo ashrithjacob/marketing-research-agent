@@ -2,19 +2,22 @@
 """
 AnakinScraper (self-hosted) — the Firecrawl-shaped alternative.
 
-Same job as `crawl_firecrawl.py`: url in, page text out. The interesting
-differences are that the handler chain falls back HTTP -> Camoufox browser ->
-paid API, and that a domain config can declare failure patterns so a bot wall
-retries instead of being returned as content.
+Same job as `crawl_firecrawl.py`: url in, page text out, Amazon reviews counted
+out of it. The differences that might matter on Amazon are that the handler
+chain falls back HTTP -> Camoufox browser -> paid API, that the browser is
+anti-detect Firefox rather than headless Chrome, and that it waits for
+`networkidle` — which is the only thing in this folder with a chance of picking
+up a review block that loads after first paint.
 
     make up                       # in ../../anakin — starts server, browser, postgres
-    python3 crawl_anakin.py                                  # example url
-    python3 crawl_anakin.py https://www.trustpilot.com/review/huel.com --browser
-    python3 crawl_anakin.py <url> --json                     # Gemini extraction
-    python3 crawl_anakin.py --which-handler <url>            # + proxy scores
+    python3 crawl_anakin.py                                  # the example ASIN
+    python3 crawl_anakin.py https://www.amazon.com/dp/B0C1234567 --browser
+    python3 crawl_anakin.py <url> --browser --fresh          # no cache, real fetch
+    python3 crawl_anakin.py <url> --which-handler            # + proxy scores
 
-`--browser` is the flag that matters for a JS wall: without it the chain starts
-on the plain HTTP handler and may return the challenge page as "content".
+**Use `--browser` on Amazon.** Without it the chain starts on the plain HTTP
+handler, which cannot run the JavaScript the review block needs, and you are
+measuring the same single-shot fetch Firecrawl already did.
 
 Cost: free (your own compute), unless ANAKIN_API_KEY routes the tail of the
 chain to anakin.io.
@@ -28,10 +31,23 @@ import sys
 import urllib.error
 import urllib.request
 
-from common import Result, env, load_env, post_json, save, timed, wall_check
+from common import (
+    Result,
+    amazon_reviews,
+    env,
+    is_amazon,
+    load_env,
+    post_json,
+    save,
+    spread_of,
+    timed,
+    wall_check,
+)
 
 # --- CHANGE ME -------------------------------------------------------------
-EXAMPLE_URL = "https://huel.com/products/huel-daily-greens"
+# The same ASIN crawl_firecrawl.py and crawl_apify.py default to, so the three
+# are comparable without you having to remember to change three files.
+EXAMPLE_URL = "https://www.amazon.com/dp/B000BD0RT0"
 # ---------------------------------------------------------------------------
 
 DEFAULT_BASE = "http://localhost:8080"
@@ -98,7 +114,12 @@ def fetch(
         result.note = f"job {decoded.get('status')}: {decoded['error']}"
         return result
 
-    text = decoded.get("markdown") or decoded.get("cleanedHtml") or decoded.get("html") or ""
+    # For Amazon the raw html is what carries the data-hooks; markdown has
+    # already thrown them away, so prefer html and fall back the other way.
+    if is_amazon(url):
+        text = decoded.get("html") or decoded.get("cleanedHtml") or decoded.get("markdown") or ""
+    else:
+        text = decoded.get("markdown") or decoded.get("cleanedHtml") or decoded.get("html") or ""
     result.chars = len(text)
     result.ok = bool(text.strip())
     result.wall, wall_why = wall_check(text)
@@ -113,9 +134,17 @@ def fetch(
         notes.append(f"generateJson: {generated.get('status')}")
         if generated.get("data"):
             result.raw_path = save("anakin-json", url, "json", str(generated["data"]))
+    if is_amazon(url) and result.ok:
+        rows, diagnosis = amazon_reviews(text)
+        result.records = len(rows)
+        result.star_spread = spread_of(r["star"] for r in rows)
+        result.ok = bool(rows)
+        notes.append(diagnosis)
+        if not rows and not use_browser:
+            notes.append("try --browser: the HTTP handler cannot run the review block's JS")
     result.note = wall_why or "; ".join(notes)
 
-    suffix = "md" if decoded.get("markdown") else "html"
+    suffix = "html" if is_amazon(url) or not decoded.get("markdown") else "md"
     result.raw_path = save("anakin", url, suffix, text) or result.raw_path
     return result
 

@@ -12,6 +12,7 @@ Zero third-party dependencies on purpose (urllib, not requests) — except
 
 from __future__ import annotations
 
+import html
 import json
 import os
 import re
@@ -124,6 +125,99 @@ def wall_check(text: str) -> tuple[bool, str]:
         if hit:
             return True, f"matched {hit!r} in a short body ({size} chars)"
     return False, ""
+
+
+# --- Amazon reviews, out of whatever a crawler returned --------------------
+#
+# The selectors are the ones measured against live markup in 2026-09 and
+# recorded in spec-review-mining.md §9. Every guide online is stale, and the
+# stale ones fail SILENTLY: `data-hook="review-body"` and
+# `data-hook="reviewTextContent"` both return zero matches on a page that has
+# thirteen reviews. That is why this reports a diagnosis and not just a count.
+
+def is_amazon(url: str) -> bool:
+    """Any Amazon marketplace. The comparison targets amazon.com (US)."""
+    from urllib.parse import urlparse
+
+    host = (urlparse(url).hostname or "").lower()
+    return "amazon." in host
+
+
+AMZ_CONTAINER = r'(?=<div id="R[A-Z0-9]+"[^>]*data-hook="review")'
+AMZ_STAR = r'data-hook="review-star-rating"[^>]*>\s*<span class="a-icon-alt">([\d.]+) out of 5'
+AMZ_TITLE = r'data-hook="reviewTitle"[^>]*>(.*?)</h5>'
+AMZ_DATE = r'data-hook="review-date"[^>]*>(.*?)</span>'
+AMZ_BODY = r'data-hook="reviewRichContentContainer"[^>]*>(.*?)</div>\s*</div>'
+
+# Markers that say WHY a page has no reviews on it. Measured 2026-09-22 against
+# amazon.com/dp/B000BD0RT0 through Firecrawl: 1.46 MB of real product page,
+# HTTP 200, no bot page — and zero review containers, because the review block
+# is a placeholder that loads separately and prompts a sign-in in the slot.
+AMZ_PLACEHOLDER = ["cm-cr-dp-reviews-loading-wrapper", "cr-reviews-loading"]
+AMZ_SIGNIN = ["cm-cr-dp-sign-in-prompt"]
+
+
+def group1(pattern: str, text: str) -> str:
+    """First capture group with tags stripped and entities decoded, or ""."""
+    match = re.search(pattern, text, re.S)
+    if not match:
+        return ""
+    return html.unescape(re.sub(r"<[^>]+>", " ", match.group(1))).strip()
+
+
+def amazon_reviews(body: str) -> tuple[list[dict], str]:
+    """(rows, diagnosis) for any Amazon body — html or markdown.
+
+    A count alone cannot be read: zero reviews means one of four very different
+    things, and only one of them is "this product has no reviews". The
+    diagnosis says which.
+    """
+    if not body:
+        return [], "empty body"
+
+    rows = []
+    for part in re.split(AMZ_CONTAINER, body)[1:]:
+        star = group1(AMZ_STAR, part)
+        rows.append(
+            {
+                "id": group1(r'<div id="(R[A-Z0-9]+)"', part),
+                "star": float(star) if star else None,
+                "title": group1(AMZ_TITLE, part),
+                "date": group1(AMZ_DATE, part),
+                "verified": "avp-badge" in part,
+                "text": group1(AMZ_BODY, part),
+            }
+        )
+    complete = [r for r in rows if r["text"] and r["star"]]
+    if complete:
+        return complete, f"{len(complete)} complete of {len(rows)} containers"
+
+    # Markdown fallback: Firecrawl's default format has no data-hooks left, so
+    # count the one string Amazon puts on every review and nowhere else.
+    md = re.findall(r"Reviewed in .{1,40} on \w+ \d{1,2}, \d{4}", body)
+    if md:
+        return (
+            [{"star": None, "text": "", "date": d, "verified": None, "title": ""} for d in md],
+            f"{len(md)} review datelines in markdown — text not separable without html",
+        )
+
+    if any(marker in body for marker in AMZ_SIGNIN):
+        return [], (
+            "review slot holds a SIGN-IN PROMPT — the page wants an account "
+            "before it shows reviews. Not an absence of reviews."
+        )
+    if any(marker in body for marker in AMZ_PLACEHOLDER):
+        return [], (
+            "review section is an UNLOADED PLACEHOLDER — /dp/ defers reviews to a "
+            "later request, so a single-shot fetch can never contain them. "
+            "Not an absence of reviews."
+        )
+    if "out of 5 stars" in body:
+        return [], (
+            "star aggregate present but no review containers — either the "
+            "selectors have gone stale (§9) or the reviews were never in this body"
+        )
+    return [], "no review markup of any kind on this page"
 
 
 # --- the shared record -----------------------------------------------------
