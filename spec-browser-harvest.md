@@ -28,9 +28,12 @@ Three consequences, in increasing order of importance:
 1. **The corpus stops depending on what a datacentre IP can see.** Harvested
    reviews are archived and content-hashed exactly like a `web_fetch` body, so
    nothing downstream changes.
-2. **Star bands become real.** §2.3's floor of ten 3-star reviews per product
-   stops being something we buy and start being something we can reach — *if*
-   §11's measurement passes.
+2. **Volume becomes reachable, not just the floor.** The target is **hundreds of
+   reviews per product across the bands, and 3-star in particular** — not
+   §2.3's minimum of ten, which is a floor for the contract, not an ambition.
+   At the documented ceiling that is up to 100 per band and 500 per product.
+   Apify can sell that for $3.00/product; this route would be free — *if* §11
+   passes.
 3. **The human stays in the loop, and that is the design, not a limitation.**
    The consent is what makes this defensible. An architecture that engineers the
    human out is a different product with a different risk profile, and §6 says so
@@ -356,8 +359,14 @@ Collected so they are seen before the mistake, not after.
 
 ## 11. The gate — measure this before writing anything else
 
-**One question: does `filterByStar` tell the truth on `/product-reviews/` when
-signed in?**
+**Two questions, and the second is now as load-bearing as the first:**
+
+1. **Does `filterByStar` tell the truth on `/product-reviews/` when signed in?**
+2. **How deep does `pageNumber` go before it stops returning new reviews?**
+
+The target is hundreds per product with 3-star well represented, so page 1 of a
+band proves nothing on its own. An honest filter that only ever serves ten
+reviews is not a route to 100 three-star reviews; it is a slower Outscraper.
 
 Everything in §2 rests on inference from the Apify actor's URLs. If the parameter
 lies on that page the way it lies on `/dp/`, this whole route produces fabricated
@@ -376,7 +385,8 @@ Five page loads, signed in, by hand if necessary. Also record, while there:
 - whether the totals match the 845 the actor reports for this ASIN
 - how long a session survives before the 302 returns
 
-**If the spread does not match the band requested, stop.** Write it up, mark this
+**If the spread does not match the band requested, or the 3-star band cannot
+pass ~10 reviews, stop.** Write it up, mark this
 spec superseded, and keep buying from Apify — where the band was verified honest
 on 2026-09-22.
 
