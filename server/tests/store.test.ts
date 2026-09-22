@@ -134,7 +134,6 @@ describe("migration", () => {
     expect(summary(store.getRun(run.id)!).nodes).toEqual([
       "product_data",
       "competitors",
-      "review_mining",
       "category_data",
     ]);
   });

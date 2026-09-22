@@ -5,6 +5,7 @@ import {
   streamRunEvents,
   TERMINAL_STATUSES,
   type Billed,
+  type Brief,
   type Competitor,
   type Judgement,
   type Pricing,
@@ -141,6 +142,14 @@ export default function RunView({
           saturation={packet?.saturation ?? []}
           scope={run.nodes ?? []}
           onRunNode={onRunNode}
+          // Stage 2 mines what stage 1 found. The server enforces this with a
+          // 409; the rail greys the button so it is visible before the click.
+          stageTwoReady={runs.some(
+            (r) =>
+              r.status === 'completed' &&
+              (r.stage ?? 1) === 1 &&
+              sameSubject(r.brief, run.brief),
+          )}
         />
 
         <h3 style={{ marginTop: 18 }}>
@@ -679,8 +688,26 @@ function applyToLanes(
   }
 }
 
+/** Two briefs name the same subject. Mirrors `briefKey` in server/src/schema.ts. */
+function sameSubject(a: Brief | undefined, b: Brief | undefined): boolean {
+  const key = (brief: Brief | undefined): string => {
+    const url = brief?.url?.trim();
+    if (url) return `site:${url.replace(/^https?:\/\//i, '').replace(/^www\./, '').split('/')[0].toLowerCase()}`;
+    return `product:${(brief?.product ?? '').toLowerCase().replace(/[^a-z0-9]/g, '')}`;
+  };
+  return key(a) === key(b);
+}
+
 function traceClass(kind: string): string {
-  if (kind === 'run.steered' || kind === 'run.nudged' || kind === 'run.resumed') return 'rule';
+  if (
+    kind === 'run.steered' ||
+    kind === 'run.nudged' ||
+    kind === 'run.resumed' ||
+    kind === 'packet.checked' ||
+    kind === 'run.ended_early'
+  ) {
+    return 'rule';
+  }
   if (kind === 'packet.invalid' || kind === 'run.failed') return 'bad';
   return '';
 }
@@ -757,7 +784,21 @@ function traceText(event: RunEvent): string {
         `${p.delay_ms ? ` after ${(Number(p.delay_ms) / 1000).toFixed(1)}s` : ''}`
       );
     case 'packet.ready':
-      return `packet accepted — ${p.sources} sources, ${p.excerpts} excerpts, ${p.gaps} gaps`;
+      return (
+        `packet accepted${p.via === 'tool' ? ' (checked during the run)' : ''} — ` +
+        `${p.sources} sources, ${p.excerpts} excerpts, ${p.gaps} gaps`
+      );
+    case 'packet.checked': {
+      // A failed check is the loop working, not an error state.
+      const problems = (p.problems as string[] | undefined) ?? [];
+      return p.valid
+        ? 'packet checked — valid, this is the run\'s result'
+        : `packet checked — ${problems.length} problem${problems.length === 1 ? '' : 's'}: ${
+            problems[0] ?? ''
+          }${problems.length > 1 ? ` (+${problems.length - 1} more)` : ''}`;
+    }
+    case 'run.ended_early':
+      return `the run ended early (${p.error || 'no detail'}) — the packet was already validated`;
     case 'packet.invalid':
       return `packet rejected — ${p.error ?? ''}`;
     case 'run.failed':

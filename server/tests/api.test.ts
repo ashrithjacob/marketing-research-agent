@@ -21,7 +21,7 @@ import { hashPassword } from "../src/auth.js";
 import { RunSupervisor } from "../src/runner.js";
 import { loadSettings, type Settings } from "../src/settings.js";
 import { SqliteResearchStore } from "../src/store.js";
-import { fenced, minimalPacket } from "./fixtures.js";
+import { fenced, minimalPacket, reviewPacket } from "./fixtures.js";
 
 const MODEL_ID = "faux-model";
 
@@ -88,7 +88,7 @@ describe("runs", () => {
     await app.supervisor.waitFor(id);
     const read = (await (await get(`/api/research/runs/${id}`)).json()) as any;
     expect(read.status).toBe("completed");
-    expect(read.packet.excerpts).toHaveLength(1);
+    expect(read.packet.attributes).toHaveLength(1);
     expect(read.live).toBe(false);
   });
 
@@ -322,16 +322,47 @@ describe("per-node runs and the LLM call log", () => {
 
   it("starts a run on one node and reports its scope", async () => {
     faux.setResponses([fauxAssistantMessage(fenced(minimalPacket()))]);
-    const run = await finishedRun({ nodes: ["review_mining"] });
-    expect(run.nodes).toEqual(["review_mining"]);
+    const run = await finishedRun({ nodes: ["competitors"] });
+    expect(run.nodes).toEqual(["competitors"]);
     const listed = (await (await get("/api/research/runs")).json()) as { data: any[] };
-    expect(listed.data[0].nodes).toEqual(["review_mining"]);
+    expect(listed.data[0].nodes).toEqual(["competitors"]);
   });
 
-  it("reports a whole-stage run as covering all four nodes", async () => {
+  it("gates review mining behind a completed stage-1 run for the same brief", async () => {
+    // Stage 2 mines the listings stage 1 found. Without stage 1 there is no
+    // product name, no site and no competitor set to mine against.
+    const blocked = await post("/api/research/runs", {
+      brief: { product: "MagnaCalm" },
+      nodes: ["review_mining"],
+    });
+    expect(blocked.status).toBe(409);
+    expect(((await blocked.json()) as any).detail).toMatch(/run stage 1 for this brief first/);
+
+    // A stage-1 run for a *different* brief does not unlock it.
+    faux.setResponses([fauxAssistantMessage(fenced(minimalPacket()))]);
+    await finishedRun({ brief: { product: "Something else" } });
+    const still = await post("/api/research/runs", {
+      brief: { product: "MagnaCalm" },
+      nodes: ["review_mining"],
+    });
+    expect(still.status).toBe(409);
+
+    // Its own completed stage 1 does, and the match survives spelling drift.
+    faux.setResponses([fauxAssistantMessage(fenced(minimalPacket()))]);
+    await finishedRun({ brief: { product: "MagnaCalm" } });
+    faux.setResponses([fauxAssistantMessage(fenced(reviewPacket()))]);
+    const allowed = await post("/api/research/runs", {
+      brief: { product: "magna calm" },
+      nodes: ["review_mining"],
+    });
+    expect(allowed.status).toBe(200);
+    expect(((await allowed.json()) as any).stage).toBe(2);
+  });
+
+  it("reports a whole-stage run as covering stage 1's three nodes", async () => {
     faux.setResponses([fauxAssistantMessage(fenced(minimalPacket()))]);
     const run = await finishedRun();
-    expect(run.nodes).toEqual(["product_data", "competitors", "review_mining", "category_data"]);
+    expect(run.nodes).toEqual(["product_data", "competitors", "category_data"]);
   });
 
   it("refuses a node that does not exist", async () => {

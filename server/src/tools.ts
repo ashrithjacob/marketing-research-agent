@@ -31,6 +31,8 @@ import {
   type ReviewResult,
 } from "./apify.js";
 import { fetchWithTimeout } from "./http.js";
+import { PacketError, validate } from "./packet.js";
+import type { Node, StagePacket } from "./schema.js";
 import type { Settings } from "./settings.js";
 
 export interface SearchHit {
@@ -57,7 +59,23 @@ export const TOOL_LANES: Record<string, ToolLane> = {
   amazon_find_product: "search",
   amazon_reviews: "fetch",
   trustpilot_reviews: "fetch",
+  validate_packet: "other",
 };
+
+/** How many contract checks one run gets. */
+export const PACKET_CHECK_BUDGET = 5;
+
+/** What the runner needs to hand `validate_packet` so it can check a draft. */
+export interface PacketCheckOptions {
+  /** The nodes this run covers, for the scope rule. */
+  nodes: readonly Node[];
+  /** The run's brief, for the "answers the brief it was given" rule. */
+  brief: { product?: unknown; url?: unknown };
+  /** Called with the first draft that passes. The runner persists it. */
+  onValid: (packet: StagePacket) => void;
+  /** Called for every check, valid or not, for the per-run record. */
+  onChecked?: (valid: boolean, problems: readonly string[]) => void;
+}
 
 /**
  * SearXNG search.
@@ -170,6 +188,10 @@ const searchParameters = Type.Object({
 
 const fetchParameters = Type.Object({
   url: Type.String({ description: "The absolute url to fetch." }),
+});
+
+const packetParameters = Type.Object({
+  packet: Type.Unknown({ description: "The full stage-1 packet object, as JSON." }),
 });
 
 const findProductParameters = Type.Object({
@@ -323,9 +345,137 @@ async function renderReviews(
  * tool that could be pointed at another run's directory is a tool that can
  * forge another run's audit trail.
  */
+/**
+ * The contract, as something the agent can call.
+ *
+ * Stage 1's rules used to be enforced once, at the exit, after every token had
+ * been paid for — so a packet that was 95% right died whole, and five runs did in
+ * one week: an invented `kind`, a locator shape the schema had no room for, a
+ * float star rating, a form vocabulary that could not describe a toothbrush.
+ * Each was a tool call's worth of correction, discovered too late to make it.
+ *
+ * `validate()` here is the same function `settle()` runs. A second, kinder
+ * implementation would be the worst of both: the agent told its packet is fine,
+ * then rejected for it.
+ */
+function packetCheckTool(check: PacketCheckOptions): AgentTool<typeof packetParameters> {
+  // The high-water mark, so a draft cannot pass by dropping what it could not
+  // fix. Counted across calls, never reset.
+  const most = { sources: 0, excerpts: 0, measurements: 0, competitors: 0 };
+  let spent = 0;
+  let passed = false;
+
+  return {
+    name: "validate_packet",
+    label: "Check the packet",
+    description:
+      "Check a draft stage-1 packet against the contract. Returns VALID, or the " +
+      "exact problems to fix. Call it as soon as you have a few sources, and " +
+      "again after each fix — a problem costs one call here and the whole run at " +
+      "the end. The first packet that passes is this run's result; emit that same " +
+      `packet as your final answer. ${PACKET_CHECK_BUDGET} checks per run.`,
+    parameters: packetParameters,
+    async execute(_id, params) {
+      const draft = (params.packet ?? {}) as Record<string, unknown>;
+      const count = (key: string) => (Array.isArray(draft[key]) ? (draft[key] as unknown[]).length : 0);
+      const now = {
+        sources: count("sources"),
+        excerpts: count("excerpts"),
+        measurements: count("measurements"),
+        competitors: count("competitors"),
+      };
+      // Not a contract failure, so it does not cost a check.
+      const shrunk = (Object.keys(most) as Array<keyof typeof most>).find(
+        (key) => now[key] < most[key],
+      );
+      if (shrunk) {
+        return {
+          content: [
+            {
+              type: "text",
+              text:
+                `NOT CHECKED — this draft has ${now[shrunk]} ${shrunk}; an earlier draft had ` +
+                `${most[shrunk]}. Fix the problem, do not drop the evidence. ` +
+                `Restore what is missing and call again.`,
+            },
+          ],
+          details: { checked: false, reason: "evidence_shrank", field: shrunk },
+        };
+      }
+      for (const key of Object.keys(most) as Array<keyof typeof most>) {
+        most[key] = Math.max(most[key], now[key]);
+      }
+
+      if (spent >= PACKET_CHECK_BUDGET) {
+        return {
+          content: [
+            {
+              type: "text",
+              text:
+                `NOT CHECKED — the ${PACKET_CHECK_BUDGET} checks for this run are spent. ` +
+                "Emit your best packet as your final answer now.",
+            },
+          ],
+          details: { checked: false, reason: "budget_spent" },
+        };
+      }
+      spent++;
+
+      let packet: StagePacket | null = null;
+      let problems: string[] = [];
+      try {
+        packet = validate(draft, check.nodes, check.brief);
+      } catch (error) {
+        problems =
+          error instanceof PacketError
+            ? error.message.split("; ")
+            : [error instanceof Error ? error.message : String(error)];
+      }
+      check.onChecked?.(packet !== null, problems);
+
+      if (packet) {
+        // First pass wins: a later, thinner packet must not replace it.
+        if (!passed) {
+          passed = true;
+          check.onValid(packet);
+        }
+        return {
+          content: [
+            {
+              type: "text",
+              text:
+                "VALID — this packet is the run's result. Emit it as your final answer, " +
+                `unchanged, in one fenced json block.\nsources ${packet.sources.length} · ` +
+                `excerpts ${packet.excerpts.length} · measurements ${packet.measurements.length} · ` +
+                `gaps ${packet.gaps.length}`,
+            },
+          ],
+          details: { checked: true, valid: true, checks_used: spent },
+        };
+      }
+
+      const numbered = problems.map((problem, i) => `${i + 1}. ${problem}`).join("\n");
+      return {
+        content: [
+          {
+            type: "text",
+            text:
+              `NOT VALID — ${problems.length} problem${problems.length === 1 ? "" : "s"}. ` +
+              `Fix exactly these and call again:\n${numbered}\n` +
+              `Checks used: ${spent} of ${PACKET_CHECK_BUDGET}.`,
+          },
+        ],
+        details: { checked: true, valid: false, problems, checks_used: spent },
+      };
+    },
+  };
+}
+
 export function createResearchTools(options: {
   settings: Settings;
   runId: string;
+  /** Omitted for a run with no contract to check against (tests, mostly). */
+  packetCheck?: PacketCheckOptions;
   onFetch?: (record: FetchRecord) => void;
   /** Injected in tests. In production it is built from the settings. */
   actorRunner?: ActorRunner | null;
@@ -428,7 +578,9 @@ export function createResearchTools(options: {
   // Without a token there is no review route at all. The tools are withheld
   // rather than stubbed: an agent told it has a tool that always throws burns
   // turns rediscovering that, and the prompt already knows how to gap a node.
-  if (!runner) return [webSearch, webFetch];
+  const checkTool = options.packetCheck ? [packetCheckTool(options.packetCheck)] : [];
+
+  if (!runner) return [webSearch, webFetch, ...checkTool];
 
   const findProduct: AgentTool<typeof findProductParameters> = {
     name: "amazon_find_product",
@@ -525,6 +677,6 @@ export function createResearchTools(options: {
   };
 
   return reviews
-    ? [webSearch, webFetch, findProduct, amazon, trustpilot]
-    : [webSearch, webFetch, findProduct];
+    ? [webSearch, webFetch, findProduct, amazon, trustpilot, ...checkTool]
+    : [webSearch, webFetch, findProduct, ...checkTool];
 }

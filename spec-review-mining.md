@@ -1,5 +1,14 @@
 # Review mining — the access spec
 
+> **Stage 2 as of 2026-09-21.** Review mining was stage 1's fourth node; it is now a
+> stage of its own, gated on a completed stage-1 run for the same brief. Its packet
+> carries `stage: 2` and may record nothing but `review_mining`. Nothing about the
+> mining itself changed — the 3★ rule, the axes, the verbatim rule, the Apify route
+> and the gap discipline below are unaltered. What changed is that a dead review node
+> can no longer take a good product/competitor/category packet down with it, and a
+> product with no marketplace presence can still complete stage 1. See
+> `spec-stage-1.md` §1.
+
 `spec-stage-1.md` §2.3 defines *what a review excerpt must be*: verbatim customer
 text, with a star rating, a date, a source and an axis, at least ten per product,
 1★–5★ with 3★ mandatory. That definition has never been the problem. **Reaching the

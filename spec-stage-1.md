@@ -12,8 +12,26 @@ stage 1 is the only stage whose output is allowed to contain no thinking at all.
 
 ## 1. What stage 1 is
 
-Four nodes: **product data**, **competitors**, **review mining**, **category data**.
-Their job is to put material in a box. Not to read it, not to weigh it, not to notice
+**Revised 2026-09-21: three nodes, not four.** Stage 1 is **product data**,
+**competitors** and **category data**. **Review mining moved to its own stage, stage
+2** (`spec-review-mining.md`), and the compartment is now six stages: 1 raw material ·
+2 review mining · 3 product truth · 4 market truth · viability gate · 5 customer truth
+· 6 synthesis.
+
+Why it moved. Review mining is the only node with paid tools, the only one a product
+can be structurally unable to satisfy — no marketplace listing, no Trustpilot profile
+— and its failures say nothing about whether the other three succeeded. As stage 1's
+fourth node it could sink a packet that had already described the product, its
+competitors and its category, and a product with no reviews could not produce a
+stage-1 packet at all. Split, the two fail independently, and the order reads the way
+the work happens: describe the thing and its market, then go and listen to customers.
+Stage 2 is gated on a completed stage 1 for the same brief, because it mines the
+listings stage 1 found.
+
+Everything below about *how to collect* still holds for both stages; §2.3 now
+describes stage 2's only node.
+
+The nodes' job is to put material in a box. Not to read it, not to weigh it, not to notice
 patterns in it.
 
 `spec.md` §3 names the failure directly: *"Concluding while collecting is the single
@@ -105,7 +123,38 @@ market is the one being sized.
 The test is mechanical on purpose. It reads two attributes already captured in §2.1
 (`active_ingredients[].name_normalised`, `form`) and compares them, so a second person
 with the same two products classifies them identically — which is what keeps it inside
-stage 1's rule. **A brand that shares the problem but not the ingredient is neither**:
+stage 1's rule.
+
+**Revised 2026-09-21: the mechanical test is scoped to the form vocabulary, and
+`other` is outside it.** `FORMS` — capsule, tablet, gummy, powder, liquid, spray, tea,
+topical, other — was written for supplements. Stage 1 now runs on toothbrushes,
+catheters, reed diffusers and dog treats, and every one of those lands on `other`. With
+both sides `other`, "same form" is true by default and the test declares every
+competitor direct.
+
+Measured on one Toxin Rebellion packet, which contained both errors at once:
+
+- a manual boar-bristle bamboo toothbrush (`other`) against Sonicare-compatible
+  electric brush heads (`other`) is genuinely **indirect**. The agent labelled it so
+  and the packet was rejected — 926k tokens, $0.028, for being right;
+- four other boar-bristle bamboo toothbrushes in the same packet are genuinely
+  **direct**, and the obvious repair — comparing `form_as_printed` as text — would
+  have rejected *those* instead: "4-pack, pure boar bristles & bamboo handle" is not
+  the string "manual bamboo toothbrush, 100% natural boar bristles (firm)", though
+  both are manual toothbrushes.
+
+So `expectedRelation()` now returns `null` for `other` against `other`, and the
+validator accepts the agent's `relation` in that case while **requiring
+`form_as_printed` on both sides** — the evidence a human checks the call against. A
+free-text comparison would be a judgement wearing a mechanical hat, which is worse
+than admitting the vocabulary ran out.
+
+**The open question this leaves.** A single global form vocabulary cannot serve every
+category this runs on. The options, none chosen yet: per-category vocabularies chosen
+from the brief; `form` as free text with a normalisation step; or keeping `other` as
+the honest escape hatch it now is and accepting that outside supplements the
+direct/indirect split is the agent's call, audited rather than enforced. Revisit when
+a third category needs it. **A brand that shares the problem but not the ingredient is neither**:
 capture it as a source if it is useful, and gap it as "same problem, different active"
 rather than inventing a third class here. Deciding whether a different molecule is a
 substitute is a stage-2 judgement.
@@ -538,6 +587,17 @@ outright when the packet's `brief.url` names the same host, which is the exact
 signal and was present all along.
 
 ### 4.1 Validation, which is where the rule is enforced
+
+**Revised 2026-09-21: the same validation also runs *during* the run.** `validate_packet`
+is a tool (`spec-validate-tool.md`): the agent hands it a draft, gets either VALID or
+the numbered problems, and fixes them while the evidence is still in front of it. Five
+checks per run. The first draft that passes is written to the run row immediately and
+is the run's result, so a contract mismatch costs a tool call rather than the whole
+run — five runs died at this gate in the week to 2026-09-21, each 95% right.
+
+Nothing below is relaxed by that. The rules are identical in both places, because both
+call the same function; what changed is that the agent can now read them before it is
+judged by them. `invalid` now means *the agent never got a packet past the validator*.
 
 The packet is rejected — the run marked `invalid`, not `completed` — when:
 
@@ -1172,3 +1232,10 @@ signal.
 
 Add a check (product truth):
 -> every scientific fact of the product should be reinforced by customer reviews
+
+-> consistently find 100+ reviews of the customer
+-> also find reviews for the alternate products with slightly different names
+-> after confirm of stage 1 lets go to stage 2 which is review mining
+-> USA only
+-> COGS how much is generated profit from cost and then determine break even return on add spend (1.3 break even roas, 1 for first month vs 2nd month)
+manual input: price of product, price of shipping, customer retention

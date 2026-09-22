@@ -77,6 +77,16 @@ CREATE TABLE IF NOT EXISTS research_llm_calls (
 );
 CREATE INDEX IF NOT EXISTS idx_research_llm_calls_run
     ON research_llm_calls(run_id, seq);
+CREATE TABLE IF NOT EXISTS research_packet_checks (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    run_id     TEXT NOT NULL REFERENCES research_runs(id) ON DELETE CASCADE,
+    seq        INTEGER NOT NULL,
+    valid      INTEGER NOT NULL,
+    problems   TEXT NOT NULL DEFAULT '[]',
+    created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_research_packet_checks_run
+    ON research_packet_checks(run_id, seq);
 CREATE TABLE IF NOT EXISTS research_judgements (
     id            TEXT PRIMARY KEY,
     kind          TEXT NOT NULL,
@@ -132,6 +142,9 @@ export interface ResearchRun {
   /** The nodes this run covers. `[]` on a run from before per-node runs: all of them. */
   nodes: string[];
   packet: Record<string, unknown> | null;
+  /** "tool" when the agent validated it mid-run, "output" when it was read from
+   *  the final message, "" on a run from before the check tool existed. */
+  packet_source: string;
   error: string;
   output: string;
   usage: Record<string, unknown>;
@@ -228,9 +241,20 @@ const RUN_FIELDS = new Set([
   "output",
   "usage",
   "ended_at",
+  "packet_source",
 ]);
 
 const JSON_FIELDS = new Set(["brief", "reject_kinds", "judgement_ids", "packet", "usage"]);
+
+/** One `validate_packet` call: what the agent sent, and what came back. */
+export interface PacketCheck {
+  id: number;
+  run_id: string;
+  seq: number;
+  valid: boolean;
+  problems: string[];
+  created_at: string;
+}
 
 export interface RunUpdate {
   agent_run_id?: string;
@@ -246,6 +270,8 @@ export interface RunUpdate {
   output?: string;
   usage?: unknown;
   ended_at?: string;
+  /** Where the stored packet came from: the `validate_packet` tool, or the output. */
+  packet_source?: "tool" | "output" | "";
 }
 
 /**
@@ -293,6 +319,8 @@ export interface ResearchStore {
     rejectKinds: string[];
     judgementIds: string[];
     nodes?: string[];
+    /** 1 for product/competitors/category, 2 for review mining. */
+    stage?: number;
   }): ResearchRun;
   getRun(runId: string): ResearchRun | null;
   listRuns(limit?: number): ResearchRun[];
@@ -303,6 +331,8 @@ export interface ResearchStore {
   addJudgement(input: { kind: string; text: string; rejects_kinds: SourceKind[] }): Judgement;
   deleteJudgement(judgementId: string): void;
   bumpJudgement(judgementId: string, by?: number): void;
+  addPacketCheck(runId: string, valid: boolean, problems: readonly string[]): PacketCheck;
+  listPacketChecks(runId: string): PacketCheck[];
   addLlmCall(call: LlmCallRecord): LlmCall;
   setLlmCallBilled(runId: string, responseId: string, cost: number): void;
   listLlmCalls(runId: string): LlmCall[];
@@ -353,6 +383,12 @@ export class SqliteResearchStore implements ResearchStore {
       // Per-node runs. An older row gets `[]`, which `runNodes` reads as the
       // whole stage — what every run before this column actually was.
       ["nodes", "ALTER TABLE research_runs ADD COLUMN nodes TEXT NOT NULL DEFAULT '[]'"],
+      // Where the packet came from. An older row gets "", which reads as
+      // "before the check tool existed" rather than as a failure to use it.
+      [
+        "packet_source",
+        "ALTER TABLE research_runs ADD COLUMN packet_source TEXT NOT NULL DEFAULT ''",
+      ],
     ];
     for (const [column, ddl] of columns) {
       if (!have.has(column)) this.db.exec(ddl);
@@ -367,17 +403,19 @@ export class SqliteResearchStore implements ResearchStore {
     rejectKinds: string[];
     judgementIds: string[];
     nodes?: string[];
+    stage?: number;
   }): ResearchRun {
     const now = nowIso();
     const runId = newId();
     this.db
       .prepare(
-        "INSERT INTO research_runs (id, status, model, brief, reject_kinds," +
-          " judgement_ids, nodes, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?)",
+        "INSERT INTO research_runs (id, status, stage, model, brief, reject_kinds," +
+          " judgement_ids, nodes, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?)",
       )
       .run(
         runId,
         "queued",
+        input.stage ?? 1,
         input.model,
         JSON.stringify(input.brief),
         JSON.stringify(input.rejectKinds),
@@ -512,6 +550,50 @@ export class SqliteResearchStore implements ResearchStore {
 
   // -- llm calls --------------------------------------------------------
 
+  /**
+   * Record a contract check. Kept per run so the problems that actually fire can
+   * be counted across runs — that is how a too-narrow enum is told apart from
+   * one model's quirk, with evidence rather than argument.
+   */
+  addPacketCheck(runId: string, valid: boolean, problems: readonly string[]): PacketCheck {
+    const created = nowIso();
+    const seq =
+      ((
+        this.db
+          .prepare("SELECT MAX(seq) AS seq FROM research_packet_checks WHERE run_id = ?")
+          .get(runId) as { seq: number | null }
+      ).seq ?? 0) + 1;
+    const info = this.db
+      .prepare(
+        "INSERT INTO research_packet_checks (run_id, seq, valid, problems, created_at)" +
+          " VALUES (?,?,?,?,?)",
+      )
+      .run(runId, seq, valid ? 1 : 0, JSON.stringify(problems), created);
+    return {
+      id: Number(info.lastInsertRowid),
+      run_id: runId,
+      seq,
+      valid,
+      problems: [...problems],
+      created_at: created,
+    };
+  }
+
+  listPacketChecks(runId: string): PacketCheck[] {
+    return (
+      this.db
+        .prepare("SELECT * FROM research_packet_checks WHERE run_id = ? ORDER BY seq")
+        .all(runId) as Array<Record<string, any>>
+    ).map((row) => ({
+      id: row.id,
+      run_id: row.run_id,
+      seq: row.seq,
+      valid: row.valid === 1,
+      problems: loads(row.problems, []) as string[],
+      created_at: row.created_at,
+    }));
+  }
+
   addLlmCall(call: LlmCallRecord): LlmCall {
     const info = this.db
       .prepare(
@@ -591,6 +673,7 @@ function runFromRow(row: Record<string, any>): ResearchRun {
     judgement_ids: loads(row.judgement_ids, []) as string[],
     nodes: loads(row.nodes, []) as string[],
     packet: row.packet ? (loads(row.packet, null) as Record<string, unknown> | null) : null,
+    packet_source: row.packet_source ?? "",
     error: row.error,
     output: row.output,
     usage: loads(row.usage, {}) as Record<string, unknown>,

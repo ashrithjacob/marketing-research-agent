@@ -11,7 +11,7 @@ import { describe, expect, it } from "vitest";
 
 import { parse, validate } from "../src/packet.js";
 import { buildInstructions, steerText, systemPrompt } from "../src/prompt.js";
-import { FORMS, NODES, SOURCE_KINDS, briefSchema } from "../src/schema.js";
+import { FORMS, SOURCE_KINDS, STAGE_NODES, briefSchema } from "../src/schema.js";
 import type { Judgement } from "../src/store.js";
 
 const brief = (overrides: Record<string, unknown> = {}) =>
@@ -33,8 +33,19 @@ describe("the worked example", () => {
     expect(parsed.gaps.length).toBeGreaterThan(0);
   });
 
-  it("shows a 3-star excerpt, which is the coverage the validator demands", () => {
-    expect(parse(build()).excerpts.some((e) => e.star_rating === 3)).toBe(true);
+  it("is cut to the stage it is shown in", () => {
+    // Review mining is stage 2, so a stage-1 example that shows review excerpts
+    // teaches every run to break the boundary it is about to be validated against.
+    const stage1 = parse(build(), STAGE_NODES[1]);
+    expect(stage1.stage).toBe(1);
+    expect(stage1.excerpts).toHaveLength(0);
+    expect(stage1.competitors.length).toBeGreaterThan(0);
+
+    const stage2 = parse(build({ nodes: ["review_mining"] }), STAGE_NODES[2]);
+    expect(stage2.stage).toBe(2);
+    expect(stage2.competitors).toHaveLength(0);
+    // The 3★ coverage the validator demands, shown where it belongs.
+    expect(stage2.excerpts.some((e) => e.star_rating === 3)).toBe(true);
   });
 });
 
@@ -65,10 +76,13 @@ describe("what the instructions must state", () => {
     expect(text).toMatch(/a packet about the example's product is rejected/);
   });
 
-  it("refuses a fifth gap node by naming the only four there are", () => {
+  it("refuses an invented gap node, and a node from the other stage", () => {
     const text = build();
-    expect(text).toMatch(/Never invent a fifth node name/);
-    expect(text).toMatch(/`all`, `general`,\s*\n?`run`/);
+    expect(text).toMatch(/Never invent a node name/);
+    expect(text).toMatch(/`all`, `general`, `run`/);
+    expect(text).toMatch(/never use a node from another stage/);
+    // Stage 1's packet may not file a gap against review mining.
+    expect(text).not.toMatch(/accepted in a stage-1 packet[\s\S]{0,80}review_mining/);
   });
 
   it("states that the gap list may not be empty", () => {
@@ -204,13 +218,21 @@ describe("a run that covers part of the stage", () => {
   });
 
   it("keeps a whole-stage run's instructions as they were", () => {
-    expect(build({ nodes: [...NODES] })).toBe(build());
+    expect(build({ nodes: [...STAGE_NODES[1]] })).toBe(build());
     expect(build()).not.toContain("## Scope of this run");
   });
 
   it("scopes the system prompt too", () => {
-    expect(systemPrompt(["review_mining"])).toMatch(/This run covers only `review_mining`/);
-    expect(systemPrompt()).toMatch(/Work through the four nodes methodically/);
+    expect(systemPrompt(["competitors"])).toMatch(/This run covers only `competitors`/);
+    expect(systemPrompt()).toMatch(/Work through this stage's nodes methodically/);
+  });
+
+  it("tells each stage which stage it is", () => {
+    expect(systemPrompt()).toMatch(/You are the stage-1 researcher of a six-stage/);
+    expect(systemPrompt(["review_mining"])).toMatch(/You are the stage-2 researcher of a six-stage/);
+    // A whole stage is not a partial run, whichever stage it is.
+    expect(systemPrompt(["review_mining"])).not.toMatch(/This run covers only/);
+    expect(build({ nodes: ["review_mining"] })).toMatch(/## Stage 2 — what customers said/);
   });
 });
 

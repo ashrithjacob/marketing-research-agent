@@ -28,6 +28,7 @@ import { buildInstructions, packetNudgeText, resumeText, steerText, systemPrompt
 import {
   DEFAULT_REJECTED_KINDS,
   runNodes,
+  stageForNodes,
   type Node,
   type RunRequest,
   type SourceKind,
@@ -198,6 +199,8 @@ export class RunSupervisor {
   private readonly models: Models;
   /** Live prices and billed-cost lookups. `main.ts` starts the price refresh. */
   readonly costs: OpenRouterCosts;
+  /** Packets that passed `validate_packet` mid-run, by run id. */
+  private readonly validated = new Map<string, StagePacket>();
   /** Injected in tests, so a retry test does not wait out a real backoff. */
   private readonly retry: RetryPolicy;
   private readonly live = new Map<string, Live>();
@@ -238,6 +241,8 @@ export class RunSupervisor {
       rejectKinds,
       judgementIds: judgements.map((j) => j.id),
       nodes,
+      // Review mining is stage 2; the other three nodes are stage 1.
+      stage: stageForNodes(nodes) ?? 1,
     });
 
     const listed = this.models.getModel("openrouter", modelId);
@@ -289,6 +294,18 @@ export class RunSupervisor {
           runId: run.id,
           reviewTools: nodes.includes("review_mining"),
           productSearch: nodes.includes("competitors"),
+          packetCheck: {
+            nodes,
+            brief: request.brief,
+            // First pass wins. A later draft that validates cannot replace it,
+            // so a model that validates early and then trims its evidence
+            // cannot overwrite the fuller packet it already had.
+            onValid: (packet) => this.storeValidated(run.id, packet),
+            onChecked: (valid, problems) => {
+              this.store.addPacketCheck(run.id, valid, problems);
+              this.emit(run.id, "packet.checked", { valid, problems: [...problems] });
+            },
+          },
         }),
       },
     });
@@ -451,6 +468,7 @@ export class RunSupervisor {
       await this.recordBilling(runId, billing);
       this.closeSubscribers(runId);
       this.live.delete(runId);
+      this.validated.delete(runId);
     }
   }
 
@@ -478,6 +496,8 @@ export class RunSupervisor {
    * an `invalid` run, and asking again would hide what the model got wrong.
    */
   private lacksPacket(runId: string, output: string, agent: Agent): boolean {
+    // Already validated mid-run: there is nothing to ask for.
+    if (this.validated.has(runId)) return false;
     // After the retry budget is spent the agent still holds the whole
     // transcript, and a run that fetched 30 pages is worth one more ask before
     // it is written off. If that ask fails too, `errorMessage` is set again and
@@ -588,6 +608,21 @@ export class RunSupervisor {
 
     this.store.updateRun(runId, { output, usage, ended_at: nowIso() });
 
+    // The agent validated a packet mid-run, so the run has its deliverable
+    // whatever happened afterwards. Do not extract, do not re-validate.
+    const validated = this.validated.get(runId);
+    if (validated && !stopping) {
+      this.store.updateRun(runId, { status: "completed", error: "" });
+      this.countJudgementApplications(runId, validated);
+      this.emit(runId, "run.completed", { usage });
+      if (errorMessage) {
+        // Honest about both halves: the artefact is valid, the run did not end
+        // cleanly. Calling this `failed` would be a lie about the packet.
+        this.emit(runId, "run.ended_early", { error: errorMessage });
+      }
+      return;
+    }
+
     if (errorMessage) {
       // An abort the operator asked for is a cancellation, not a failure.
       const status = stopping ? "cancelled" : "failed";
@@ -610,13 +645,40 @@ export class RunSupervisor {
       this.emit(runId, "packet.invalid", { error: error.message });
       return;
     }
-    this.store.updateRun(runId, { status: "completed", packet: parsed, error: "" });
+    this.store.updateRun(runId, {
+      status: "completed",
+      packet: parsed,
+      error: "",
+      // Read out of the final message rather than checked during the run. When
+      // this stops appearing, `extract()` and its scanners can go.
+      packet_source: "output",
+    });
     this.countJudgementApplications(runId, parsed);
     this.emit(runId, "run.completed", { usage });
     this.emit(runId, "packet.ready", {
       sources: parsed.sources.length,
       excerpts: parsed.excerpts.length,
       gaps: parsed.gaps.length,
+    });
+  }
+
+  /**
+   * Keep the first packet that passed the contract mid-run.
+   *
+   * Written the moment it validates, not at the end: three of the five runs lost
+   * in the week to 2026-09-21 had a good packet in hand when they died — to a
+   * dropped stream, to a final turn that rambled instead of emitting, to fences
+   * that did not pair. After this point none of those can take it away.
+   */
+  private storeValidated(runId: string, packet: StagePacket): void {
+    if (this.validated.has(runId)) return;
+    this.validated.set(runId, packet);
+    this.store.updateRun(runId, { packet, packet_source: "tool", error: "" });
+    this.emit(runId, "packet.ready", {
+      sources: packet.sources.length,
+      excerpts: packet.excerpts.length,
+      gaps: packet.gaps.length,
+      via: "tool",
     });
   }
 

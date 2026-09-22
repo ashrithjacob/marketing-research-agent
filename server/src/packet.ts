@@ -15,7 +15,10 @@ import { z } from "zod";
 import {
   COMPETITOR_RELATIONS,
   NODES,
+  STAGE_NODES,
   isPartial,
+  stageForNodes,
+  stageOf,
   looksLikeUrl,
   stagePacketSchema,
   type CompetitorRelation,
@@ -56,6 +59,51 @@ export function fencedBlocks(text: string): string[] {
 }
 
 /**
+ * Every balanced `{ … }` in the text, ignoring fences entirely.
+ *
+ * The fence scanner above assumes fences come in pairs. A real run broke that:
+ * the model wrote a placeholder block (```` ```json {...} ```` ````), then a
+ * stray ```` ``` ```` after "Now, finally, emitting.", then two abandoned
+ * attempts — eight fence lines, unbalanced. One stray fence inverts the pairing
+ * for everything after it, so the prose became block content and the real
+ * packet, all 47k characters of it, ended up outside every block. It was in the
+ * output the whole time.
+ *
+ * Braces cannot drift like that. Strings and escapes are tracked so a `}` inside
+ * a review quote does not close the object.
+ */
+export function balancedObjects(text: string): string[] {
+  const found: string[] = [];
+  let depth = 0;
+  let start = -1;
+  let inString = false;
+  let escaped = false;
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i]!;
+    if (inString) {
+      if (escaped) escaped = false;
+      else if (char === "\\") escaped = true;
+      else if (char === '"') inString = false;
+      continue;
+    }
+    if (char === '"') {
+      inString = true;
+    } else if (char === "{") {
+      if (depth === 0) start = i;
+      depth++;
+    } else if (char === "}") {
+      if (depth === 0) continue; // a stray brace in prose
+      depth--;
+      if (depth === 0 && start !== -1) {
+        found.push(text.slice(start, i + 1));
+        start = -1;
+      }
+    }
+  }
+  return found;
+}
+
+/**
  * Pull the packet object out of a run's final output.
  *
  * The *last* decodable block wins: an agent that shows its working writes an
@@ -70,6 +118,12 @@ export function extract(output: string): Record<string, unknown> {
   // An output that is nothing but JSON is fine too — some models skip fences.
   const stripped = output.trim();
   if (stripped.startsWith("{")) candidates.push(stripped);
+  // The fence-proof candidates. The loop below runs from the end, so these are
+  // tried first: the last balanced object in the output is the last JSON the
+  // model wrote, whatever it did with fences, while a fenced block whose pairing
+  // drifted can be prose. A fenced packet appears in both lists and decodes the
+  // same either way.
+  candidates.push(...balancedObjects(output));
 
   for (let i = candidates.length - 1; i >= 0; i--) {
     let decoded: unknown;
@@ -100,7 +154,7 @@ export function extract(output: string): Record<string, unknown> {
  */
 export function validate(
   data: unknown,
-  scope: readonly Node[] = NODES,
+  scope: readonly Node[] = STAGE_NODES[1],
   brief?: { product?: unknown; url?: unknown },
 ): StagePacket {
   const parsed = stagePacketSchema.safeParse(data);
@@ -109,8 +163,40 @@ export function validate(
 
   const problems: string[] = [];
 
+  // 0. The packet says which stage it is. Review mining is stage 2 and the
+  //    other three nodes are stage 1 — a packet that mixes them is two runs'
+  //    work in one envelope, and the node rules, tools and done-criteria of
+  //    the two have nothing in common.
+  const stage = stageForNodes(scope) ?? 1;
+  if (packet.stage !== stage) {
+    problems.push(
+      `packet says stage ${packet.stage}, but this run collects ${scope.join(", ")}, ` +
+        `which is stage ${stage}`,
+    );
+  }
+  const foreign = new Set<string>();
+  for (const items of [
+    packet.sources,
+    packet.excerpts,
+    packet.measurements,
+    packet.attributes,
+    packet.saturation,
+    packet.nodes,
+    packet.gaps,
+  ]) {
+    for (const { node } of items) {
+      if (NODES.includes(node as Node) && stageOf(node as Node) !== stage) foreign.add(node);
+    }
+  }
+  for (const node of foreign) {
+    problems.push(
+      `entries are recorded against ${node}, which is collected in stage ` +
+        `${stageOf(node as Node)}, not stage ${stage} — that is a separate run`,
+    );
+  }
+
   // 1. A run that covers part of the stage records nothing outside it — the
-  //    worked example shows all four nodes, and copying it is the easy mistake.
+  //    worked example shows the whole stage, and copying it is the easy mistake.
   //    It must also say how each node it did cover ended.
   if (isPartial(scope)) {
     const allowed = new Set<string>(scope);
@@ -299,7 +385,7 @@ export function validate(
 
 export function parse(
   output: string,
-  scope: readonly Node[] = NODES,
+  scope: readonly Node[] = STAGE_NODES[1],
   brief?: { product?: unknown; url?: unknown },
 ): StagePacket {
   return validate(extract(output), scope, brief);
@@ -361,7 +447,32 @@ export function brandLabels(brief: string): string[] | null {
 const NON_BRAND = new Set(["www", "co", "com", "net", "org", "gov", "edu", "ac", "shop", "store"]);
 
 /** The §2.2 test, and nothing else. */
-export function expectedRelation(competitorForm: string, referenceForm: string): CompetitorRelation {
+/**
+ * The §2.2 test, where the vocabulary can make it. `null` where it cannot.
+ *
+ * `other` is not a form, it is the absence of one. `FORMS` is a supplement
+ * vocabulary — capsule, tablet, gummy, powder, liquid, spray, tea, topical — and
+ * stage 1 now runs on toothbrushes, catheters, diffusers and dog treats, all of
+ * which land on `other`. Comparing `other` with `other` declares every pair
+ * direct, so the test does not apply and this returns `null`.
+ *
+ * Measured 2026-09-21, a Toxin Rebellion run, both directions in one packet: a
+ * manual bamboo toothbrush against Sonicare-compatible electric brush heads is
+ * genuinely **indirect** and was rejected for saying so; four other boar-bristle
+ * bamboo toothbrushes are genuinely **direct** and would have been rejected by
+ * the obvious repair of comparing `form_as_printed` as text ("4-pack, pure boar
+ * bristles & bamboo handle" is not the same string as "manual bamboo toothbrush,
+ * 100% natural boar bristles (firm)", and both are manual toothbrushes).
+ *
+ * So: where the vocabulary decides, it decides. Where it cannot, the agent's
+ * label stands and `form_as_printed` on both sides is what a human checks it
+ * against — which is why that field is required in this case.
+ */
+export function expectedRelation(
+  competitorForm: string,
+  referenceForm: string,
+): CompetitorRelation | null {
+  if (competitorForm === "other" && referenceForm === "other") return null;
   return competitorForm === referenceForm ? "direct" : "indirect";
 }
 
@@ -411,7 +522,21 @@ function competitorProblems(packet: StagePacket, sourceIds: ReadonlySet<string>)
     }
     if (reference) {
       const expected = expectedRelation(row.form, reference.form);
-      if (row.relation !== expected) {
+      if (expected === null) {
+        // Both `other`: the vocabulary cannot decide, so the agent's label
+        // stands and the printed forms are the audit trail for it.
+        const missing = !row.form_as_printed.trim()
+          ? "the competitor"
+          : !reference.form_as_printed.trim()
+            ? "the reference"
+            : "";
+        if (missing) {
+          problems.push(
+            `${label} and the reference are both \`other\`, so \`form_as_printed\` is ` +
+              `the only record of what makes them ${row.relation} — and it is empty on ${missing}`,
+          );
+        }
+      } else if (row.relation !== expected) {
         problems.push(
           `${label} is labelled ${row.relation}, but its form (${row.form}) ` +
             `${expected === "direct" ? "matches" : "differs from"} the reference's ` +

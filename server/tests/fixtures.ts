@@ -1,8 +1,66 @@
-/** A packet that validates. Tests mutate one thing and assert the failure. */
+/**
+ * Packets that validate. Tests mutate one thing and assert the failure.
+ *
+ * Two of them, because review mining became stage 2 on 2026-09-21: a packet
+ * belongs to one stage, and the validator rejects one that mixes them.
+ */
+
+/** Stage 1: the product, its competitors, its category. */
 export function minimalPacket(overrides: Record<string, unknown> = {}): Record<string, any> {
   const data: Record<string, any> = {
     contract_version: "1",
     stage: 1,
+    brief: { product: "MagnaCalm 400mg", url: "https://x", market: "UK" },
+    sources: [
+      {
+        id: "sha256:aaa",
+        url: "https://magnacalm.example/products/glycinate-400",
+        kind: "first_party",
+        publisher: "magnacalm.example",
+        fetched_at: "2026-09-10T09:00:00Z",
+        marketing: true,
+        admitted: true,
+        admission_reason: "first_party — the product's own page",
+        archived: true,
+        node: "product_data",
+      },
+    ],
+    attributes: [
+      {
+        id: "a1",
+        node: "product_data",
+        key: "dose_per_serving",
+        value: "400 mg",
+        source_id: "sha256:aaa",
+      },
+    ],
+    // product_data is the one node whose done-criterion is a checklist, so it
+    // needs no saturation curve — which keeps this fixture minimal.
+    nodes: [
+      {
+        node: "product_data",
+        status: "complete",
+        done_criterion_met: true,
+        why: "9 of 10 attributes; COA gapped",
+      },
+    ],
+    gaps: [
+      {
+        node: "product_data",
+        missing: "no certificate of analysis published",
+        would_need: "a batch COA on request",
+        blocking: false,
+      },
+    ],
+  };
+  return { ...data, ...overrides };
+}
+
+/** Stage 2: verbatim customer language, with its 3★ excerpt. */
+export function reviewPacket(overrides: Record<string, unknown> = {}): Record<string, any> {
+  const data: Record<string, any> = {
+    contract_version: "1",
+    stage: 2,
     brief: { product: "MagnaCalm 400mg", url: "https://x", market: "UK" },
     sources: [
       {
@@ -46,9 +104,9 @@ export function minimalPacket(overrides: Record<string, unknown> = {}): Record<s
     ],
     gaps: [
       {
-        node: "competitors",
-        missing: "CalmWell UK ad library empty",
-        would_need: "a UK-IP pull",
+        node: "review_mining",
+        missing: "no Trustpilot presence for this brand",
+        would_need: "a merchant profile to exist",
         blocking: false,
       },
     ],

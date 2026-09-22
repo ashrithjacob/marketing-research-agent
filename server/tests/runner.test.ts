@@ -24,7 +24,7 @@ import {
 import { runRequestSchema, type RunRequest } from "../src/schema.js";
 import { loadSettings, type Settings } from "../src/settings.js";
 import { SqliteResearchStore, type Judgement } from "../src/store.js";
-import { fenced, minimalPacket } from "./fixtures.js";
+import { fenced, minimalPacket, reviewPacket } from "./fixtures.js";
 
 const MODEL_ID = "faux-model";
 const FAST_RETRY = { attempts: 3, baseMs: 0, capMs: 0 };
@@ -71,7 +71,7 @@ describe("settling a run", () => {
     const runId = await runWith(fenced(minimalPacket()));
     const run = store.getRun(runId)!;
     expect(run.status).toBe("completed");
-    expect((run.packet as any).excerpts[0].star_rating).toBe(3);
+    expect((run.packet as any).attributes[0].key).toBe("dose_per_serving");
     expect(run.error).toBe("");
     expect(store.listEvents(runId).map((e) => e.kind)).toContain("packet.ready");
   });
@@ -166,6 +166,97 @@ describe("settling a run", () => {
     const run = store.listRuns()[0]!;
     expect(run.status).toBe("failed");
     expect(run.error).toMatch(/unknown model/);
+  });
+});
+
+describe("the packet check tool", () => {
+  /** A turn that calls validate_packet with `packet`, then a final text turn. */
+  const checkThen = (packet: unknown, final: string) => [
+    fauxAssistantMessage(fauxToolCall("validate_packet", { packet }), { stopReason: "toolUse" }),
+    fauxAssistantMessage(final),
+  ];
+
+  it("stores the packet the moment it validates, before the run ends", async () => {
+    let atToolTime: unknown = "not checked";
+    faux.setResponses([
+      fauxAssistantMessage(fauxToolCall("validate_packet", { packet: minimalPacket() }), {
+        stopReason: "toolUse",
+      }),
+      (_context) => {
+        // The next turn begins after the tool ran: the row must already have it.
+        atToolTime = store.getRun(runId)!.packet;
+        return fauxAssistantMessage(fenced(minimalPacket()));
+      },
+    ]);
+    const runId = supervisor.start(request());
+    await supervisor.waitFor(runId);
+
+    expect(atToolTime).not.toBeNull();
+    expect((atToolTime as any).stage).toBe(1);
+    const run = store.getRun(runId)!;
+    expect(run.status).toBe("completed");
+    expect(run.packet_source).toBe("tool");
+    const ready = store.listEvents(runId).find((e) => e.kind === "packet.ready")!;
+    expect(ready.payload.via).toBe("tool");
+  });
+
+  it("completes a run that validated and then died mid-stream", async () => {
+    // Three of the five runs lost in the week to 2026-09-21 had a good packet in
+    // hand when they died. The artefact is valid; the turn was not.
+    faux.setResponses([
+      fauxAssistantMessage(fauxToolCall("validate_packet", { packet: minimalPacket() }), {
+        stopReason: "toolUse",
+      }),
+      ...Array.from({ length: 5 }, () =>
+        fauxAssistantMessage("", { stopReason: "error", errorMessage: "terminated" }),
+      ),
+    ]);
+    const runId = supervisor.start(request());
+    await supervisor.waitFor(runId);
+
+    const run = store.getRun(runId)!;
+    expect(run.status).toBe("completed");
+    expect((run.packet as any).stage).toBe(1);
+    const early = store.listEvents(runId).find((e) => e.kind === "run.ended_early")!;
+    expect(early.payload.error).toBe("terminated");
+  });
+
+  it("does not ask for a packet it already has", async () => {
+    // The final turn is prose, which would normally earn a nudge.
+    faux.setResponses(checkThen(minimalPacket(), "Done — the packet is the one I validated."));
+    const runId = supervisor.start(request());
+    await supervisor.waitFor(runId);
+
+    expect(store.getRun(runId)!.status).toBe("completed");
+    expect(store.listEvents(runId).map((e) => e.kind)).not.toContain("run.nudged");
+  });
+
+  it("records every check, valid or not, with its problems", async () => {
+    const bad = minimalPacket();
+    bad.sources[0].kind = "marketplace";
+    faux.setResponses([
+      fauxAssistantMessage(fauxToolCall("validate_packet", { packet: bad }), {
+        stopReason: "toolUse",
+      }),
+      fauxAssistantMessage(fauxToolCall("validate_packet", { packet: minimalPacket() }), {
+        stopReason: "toolUse",
+      }),
+      fauxAssistantMessage(fenced(minimalPacket())),
+    ]);
+    const runId = supervisor.start(request());
+    await supervisor.waitFor(runId);
+
+    const checks = store.listPacketChecks(runId);
+    expect(checks.map((c) => c.valid)).toEqual([false, true]);
+    expect(checks[0]!.problems.join(" ")).toContain("received 'marketplace'");
+    expect(store.listEvents(runId).filter((e) => e.kind === "packet.checked")).toHaveLength(2);
+  });
+
+  it("still reads the final message when the tool was never called", async () => {
+    const runId = await runWith(fenced(minimalPacket()));
+    const run = store.getRun(runId)!;
+    expect(run.status).toBe("completed");
+    expect(run.packet_source).toBe("output");
   });
 });
 
@@ -702,19 +793,32 @@ describe("a run that covers part of the stage", () => {
     expect(store.getRun(runId)!.nodes).toEqual(["product_data"]);
     expect(seen!.system).toMatch(/This run covers only `product_data`/);
     expect(seen!.prompt).toContain("## Scope of this run");
-    expect(seen!.tools).toEqual(["web_search", "web_fetch"]);
+    expect(seen!.tools).toEqual(["web_search", "web_fetch", "validate_packet"]);
     const started = store.listEvents(runId).find((e) => e.kind === "run.started")!;
     expect(started.payload.nodes).toEqual(["product_data"]);
   });
 
   it("is invalid when its packet records other nodes", async () => {
-    // minimalPacket is a review-mining packet with a competitors gap.
-    faux.setResponses([fauxAssistantMessage(fenced(minimalPacket()))]);
+    // A category_data entry in a product_data run: same stage, wrong node.
+    const packet = minimalPacket();
+    packet.gaps.push({ node: "category_data", missing: "no three-year trend" });
+    faux.setResponses([fauxAssistantMessage(fenced(packet))]);
     const runId = supervisor.start(request({ nodes: ["product_data"] }));
     await supervisor.waitFor(runId);
     const run = store.getRun(runId)!;
     expect(run.status).toBe("invalid");
     expect(run.error).toMatch(/outside this run's scope \(product_data\)/);
+  });
+
+  it("is invalid when its packet belongs to the other stage", async () => {
+    // Review mining is stage 2 (2026-09-21). A stage-1 run that returns review
+    // excerpts has done a different run's work.
+    faux.setResponses([fauxAssistantMessage(fenced(reviewPacket()))]);
+    const runId = supervisor.start(request());
+    await supervisor.waitFor(runId);
+    const run = store.getRun(runId)!;
+    expect(run.status).toBe("invalid");
+    expect(run.error).toMatch(/collected in stage 2, not stage 1 — that is a separate run/);
   });
 
   it("offers a competitors run Amazon search for discovery, but not the review tools", async () => {
@@ -728,7 +832,7 @@ describe("a run that covers part of the stage", () => {
     supervisor = new RunSupervisor({ store, settings: { ...settings, apifyToken: "t" }, models });
     const runId = supervisor.start(request({ nodes: ["competitors"] }));
     await supervisor.waitFor(runId);
-    expect(tools).toEqual(["web_search", "web_fetch", "amazon_find_product"]);
+    expect(tools).toEqual(["web_search", "web_fetch", "amazon_find_product", "validate_packet"]);
   });
 
   it("offers the review tools when review mining is in scope", async () => {

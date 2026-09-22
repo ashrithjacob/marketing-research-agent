@@ -83,6 +83,7 @@ export interface Usage {
 export interface RunSummary {
   id: string;
   status: RunStatus;
+  /** 1 collects the product, its competitors and its category; 2 is review mining. */
   stage: number;
   model: string;
   brief: Brief;
@@ -225,6 +226,9 @@ export interface StagePacket {
 
 export interface RunDetail extends RunSummary {
   packet: StagePacket | null;
+  /** "tool" when the agent validated it mid-run; "output" when it was read from
+   *  the final message. Mirrors server/src/store.ts. */
+  packet_source?: string;
   output: string;
   reject_kinds: string[];
   live: boolean;

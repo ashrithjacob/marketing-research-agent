@@ -50,6 +50,20 @@ Host port `127.0.0.1:8080` maps to the container's `8000`.
 
 ### Step 1 — the modal
 
+**Stage 1 is three nodes now.** Review mining became **stage 2** on 2026-09-21
+(`STAGE_NODES` in `schema.ts`): stage 1 collects `product_data`, `competitors` and
+`category_data`; stage 2 collects `review_mining`. A run covers one stage, its packet
+carries `stage: 1` or `stage: 2`, and the validator rejects a packet holding another
+stage's nodes — that is a separate run. Downstream the compartment is six stages:
+1 raw material · 2 review mining · 3 product truth · 4 market truth · viability gate ·
+5 customer truth · 6 synthesis.
+
+**Stage 2 is gated.** `POST /runs` with `nodes: ["review_mining"]` returns **409**
+unless a stage-1 run for the same brief has completed. Subjects are matched with
+`briefKey()` — the site's host, else the product name reduced to letters and digits —
+so a retyped product name still counts. The rail greys the stage-2 ▶ for the same
+reason, before the click.
+
 `App.tsx` opens `StartRun.tsx`. It asks for two things, **product** and **markets**,
 and deliberately has no URL field: finding the product's site, reviews, competitors
 and ad-library entries is the agent's job.
@@ -78,7 +92,7 @@ POST /api/research/runs
 {"brief": {"product": "Mullein", "market": "UK"}, "model": "", "nodes": []}
 ```
 
-`nodes: []` is the whole stage. The **▶** beside a node in the stage rail opens the
+`nodes: []` is the whole of **stage 1**. The **▶** beside a node in the stage rail opens the
 same modal for that node alone — `"nodes": ["product_data"]` — with the brief of the
 run on screen filled in. See §2b for what changes when a run covers part of the stage.
 
@@ -143,6 +157,7 @@ which is how the status chip and counters change.
 | `amazon_find_product` | Apify `junglee/free-amazon-product-scraper` | asin, stars, `reviewsCount`, title, url — most-reviewed first | none |
 | `amazon_reviews` | Apify `junglee/amazon-reviews-scraper`, one star band per call | header (`source_id`, totals, any `GAP:`) + numbered verbatim reviews with star, date, verified flag, and a locator printed as packet JSON (`{"kind": "url", "url": …}`, or a `note` when there is only a review id) | the review JSON archived like a fetch |
 | `trustpilot_reviews` | Apify `memo23/trustpilot-scraper-ppe` | same shape as above | archived like a fetch |
+| `validate_packet` | `packet.ts` `validate()` — the same function `settle()` runs | `VALID` + counts, or the numbered problems and `Checks used: N of 5` | on the first pass: the packet is written to the run row with `packet_source = "tool"` and `packet.ready` fires mid-run |
 
 The three Apify tools exist **only when `APIFY_TOKEN` is set and the run covers
 `review_mining`**; otherwise they are not offered at all. Without the token the
@@ -179,7 +194,14 @@ lookup in the background, so by the end of the run only the last turn's is pendi
 
 ### Step 6 — the run is settled (runner.ts `settle()`)
 
-When the agent goes idle:
+**The short path first.** If the agent validated a packet mid-run with
+`validate_packet`, the run already has its deliverable: status `completed`, no
+extraction, no re-validation. If the agent *also* errored or the stream died after
+that, the run is still `completed` and an extra `run.ended_early {error}` event
+records it — the artefact is valid even though the turn was not, and calling such a
+run `failed` would be a lie about the packet. A Stop still wins over both.
+
+Otherwise, when the agent goes idle:
 
 0a. **Retry, up to three times** (`watch()`, `shouldRetry()`, `backoffMs()`): if the
    agent ended with an `errorMessage`, you did not press Stop, and pi-ai's
@@ -233,8 +255,20 @@ When the agent goes idle:
 2. **Error or Stop:** if the agent reported an error → `failed`, or `cancelled` if
    you had pressed Stop. A stop with no error → `cancelled`.
 3. **Extract** (`packet.ts`): every ```` ``` ```` block is collected by scanning
-   lines; the **last** one that parses as JSON and has a `stage` key is the packet.
-   No such block → `invalid`.
+   lines, and **every balanced `{ … }` in the output** is collected too
+   (`balancedObjects()`, which tracks strings and escapes so a brace inside a quote
+   closes nothing). The **last** candidate that parses as JSON and has a `stage` key
+   is the packet; the brace-derived ones are tried first. No such candidate →
+   `invalid`.
+
+   The brace pass exists because fences drift. Measured 2026-09-21 on a HappyWags
+   run that cost $0.065 and 1.16M tokens: the model wrote a placeholder
+   ```` ```json {...} ```` block, a stray ```` ``` ```` after "Now, finally,
+   emitting.", and two abandoned attempts — eight fence lines, unbalanced. One stray
+   fence inverts the pairing for everything after it, so the prose became block
+   content and the real 47k-character packet (22 sources, 16 excerpts, 15 gaps) sat
+   outside every block. The run was rejected with "found fenced blocks but none
+   decoded to a stage packet object" while its packet was right there in `output`.
 4. **Validate:** `stagePacketSchema` — every object `.strict()`, so a field that
    is not in the contract (a `summary`, a `finding`) fails the packet. A run that
    covers part of the stage then gets the scope rule (§2b). Then seven cross-object
@@ -257,8 +291,10 @@ When the agent goes idle:
      and `competitors` needs two, one with `class: "direct"` and one with
      `class: "indirect"` (§2c);
    - competitor rows obey the §2.2 test (§2c): `relation` is recomputed from the
-     forms, `shared_actives` must be in both the row's actives and the reference
-     product's, `competitor_reference` must exist once any competitor does, and
+     forms — **except where both are `other`**, the escape hatch for anything the
+     supplement vocabulary does not cover, where the agent's label stands and
+     `form_as_printed` is required on both sides as the evidence for it;
+     `shared_actives` must be in both the row's actives and the reference product's, `competitor_reference` must exist once any competitor does, and
      `ad_source_ids` must point at `ad_library` sources.
 5. **Invalid** → status `invalid` with the reason, event `packet.invalid`.
    **Valid** → status `completed`, packet stored, judgement `applied_count`s bumped,
@@ -586,7 +622,9 @@ What the start modal needs to warn you before you pay for a run.
   | `run.resumed` | `{error, attempt, delay_ms}` — the model stream dropped and the run was continued after a backoff |
   | `run.completed` | `{usage}` |
   | `run.billed` | `{billed: {total, turns, resolved}}` — after the terminal event |
-  | `packet.ready` | `{sources, excerpts, gaps}` |
+  | `packet.checked` | `{valid, problems[]}` — one per `validate_packet` call; a failed check is the loop working, not an error |
+  | `packet.ready` | `{sources, excerpts, gaps, via?}` — `via: "tool"` when it was validated mid-run, and then it arrives **before** the run ends |
+  | `run.ended_early` | `{error}` — the run died after validating a packet; the packet stands |
   | `packet.invalid` | `{error}` |
   | `run.failed` | `{error}` |
   | `run.cancelled` | `{}` or `{error}` |

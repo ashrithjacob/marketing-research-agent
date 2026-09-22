@@ -1,0 +1,228 @@
+#!/usr/bin/env bash
+# `mra` — drive and inspect the research cockpit, the same way every time.
+#
+# This exists so that "does it work?" has one answer produced by one command,
+# instead of a different improvised curl in every session. Run `mra help`.
+set -uo pipefail
+
+REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)"
+LOCAL_URL="${MRA_LOCAL_URL:-http://localhost:8080}"
+LIVE_URL="${MRA_LIVE_URL:-https://marketing.vanis.ai}"
+JAR="${TMPDIR:-/tmp}/mra-cookies.txt"
+
+die()  { printf '%s\n' "$*" >&2; exit 1; }
+note() { printf '==> %s\n' "$*"; }
+
+need() {
+  command -v "$1" >/dev/null 2>&1 || die "$1 is not installed, and $2 needs it."
+}
+
+# --- the gate --------------------------------------------------------------
+# One command that has to pass before any change is called done. Order is
+# cheapest-first so a failure arrives quickly.
+cmd_check() {
+  local failed=0 scope_server=1 scope_frontend=1
+
+  # `--changed` runs only the parts whose inputs moved. The Stop hook uses it so
+  # that ending a turn costs a few seconds rather than sixteen; type-checking
+  # the server after a CSS change proves nothing. Run plain `mra check` — the
+  # whole thing — before a deploy or a commit.
+  if [ "${1:-}" = "--changed" ] && git -C "$REPO" rev-parse --git-dir >/dev/null 2>&1; then
+    [ -n "$(git -C "$REPO" status --porcelain -- server)" ] || scope_server=0
+    [ -n "$(git -C "$REPO" status --porcelain -- frontend/src frontend/index.html)" ] || scope_frontend=0
+  fi
+
+  note "conventions"
+  node "$REPO/server/scripts/check-conventions.mjs" || failed=1
+  if [ "$scope_server" -eq 1 ]; then
+    note "server typecheck"
+    (cd "$REPO/server" && npm run typecheck --silent) || failed=1
+    note "server tests"
+    (cd "$REPO/server" && npm test --silent >/dev/null 2>&1) \
+      && echo "tests pass" \
+      || { (cd "$REPO/server" && npm test --silent); failed=1; }
+  else
+    note "server unchanged — skipped (run \`mra check\` with no flag to force)"
+  fi
+  if [ "$scope_frontend" -eq 1 ]; then
+    note "frontend build (this is also its only typecheck)"
+    (cd "$REPO/frontend" && npm run build >/dev/null 2>&1) \
+      && echo "build ok" \
+      || { (cd "$REPO/frontend" && npm run build); failed=1; }
+  else
+    note "frontend unchanged — skipped"
+  fi
+  # The build writes dist. Re-run the convention checks so a stale dist that
+  # the build has just refreshed is reported as needing a commit, not missed.
+  node "$REPO/server/scripts/check-conventions.mjs" >/dev/null || failed=1
+  if [ "$failed" -eq 0 ]; then
+    note "clean"
+  else
+    note "FAILED — see above. Nothing is done until this passes."
+  fi
+  return "$failed"
+}
+
+# --- the stack -------------------------------------------------------------
+cmd_up() {
+  need docker "mra up"
+  note "docker compose up -d --build (never do this on the VPS — no swap)"
+  (cd "$REPO" && docker compose up -d --build) || return 1
+  cmd_health local
+}
+
+cmd_down() { need docker "mra down"; (cd "$REPO" && docker compose down); }
+
+cmd_logs() {
+  need docker "mra logs"
+  (cd "$REPO" && docker compose logs --tail "${1:-80}" mra)
+}
+
+cmd_health() {
+  need curl "mra health"
+  local where="${1:-local}" url code
+  case "$where" in
+    local) url="$LOCAL_URL" ;;
+    live)  url="$LIVE_URL" ;;
+    *)     die "mra health takes 'local' or 'live', not '$where'" ;;
+  esac
+  # On a connection failure curl still prints 000 and exits non-zero, so a
+  # `|| echo 000` here appends a second 000 and you get "000000".
+  code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 15 "$url/api/health" 2>/dev/null)
+  [ -n "$code" ] || code=000
+  printf '%s %s/api/health -> %s\n' "$where" "$url" "$code"
+  [ "$code" = "200" ]
+}
+
+# --- runs ------------------------------------------------------------------
+# Auth: locally MRA_APP_PASSWORD_HASH is usually empty, which disables login
+# entirely. Against the live site, export MRA_PASSWORD first.
+api() {
+  local method="$1" path="$2" body="${3:-}" url="${BASE:-$LOCAL_URL}"
+  if [ -n "$body" ]; then
+    curl -s -b "$JAR" -c "$JAR" -X "$method" "$url$path" \
+      -H 'content-type: application/json' -d "$body"
+  else
+    curl -s -b "$JAR" -c "$JAR" -X "$method" "$url$path"
+  fi
+}
+
+cmd_login() {
+  need curl "mra login"
+  [ -n "${MRA_PASSWORD:-}" ] || die \
+    "Set MRA_PASSWORD first. It is not in .env — .env holds only the scrypt
+hash (MRA_APP_PASSWORD_HASH). Locally that hash is usually empty, which
+disables login altogether, so you probably do not need this at all."
+  local user="${MRA_APP_USER:-ash}"
+  api POST /api/auth/login \
+    "$(printf '{"username":"%s","password":"%s"}' "$user" "$MRA_PASSWORD")"
+  echo
+}
+
+cmd_run() {
+  need curl "mra run"; need jq "mra run"
+  local brief="${1:-}" nodes="${2:-}"
+  [ -n "$brief" ] || die 'usage: mra run "<product or https://url>" [node,node]'
+  # A brief that is a URL belongs in brief.url, never in brief.product — the
+  # agent searching for a URL string as if it were a product name is a failure
+  # this app has already had.
+  local payload
+  if [[ "$brief" =~ ^https?:// ]]; then
+    payload=$(jq -nc --arg u "$brief" '{brief:{product:"",url:$u}}')
+  else
+    payload=$(jq -nc --arg p "$brief" '{brief:{product:$p}}')
+  fi
+  if [ -n "$nodes" ]; then
+    payload=$(printf '%s' "$payload" | jq -c --arg n "$nodes" \
+      '.nodes = ($n | split(","))')
+  fi
+  local out; out=$(api POST /api/research/runs "$payload")
+  printf '%s\n' "$out" | jq -e '.id' >/dev/null 2>&1 \
+    || die "start refused: $out"
+  printf '%s\n' "$out" | jq -r '"run \(.id)  status=\(.status)  nodes=\(.nodes|join(","))"'
+  printf '%s\n' "$out" | jq -r '.id' > "${TMPDIR:-/tmp}/mra-last-run"
+}
+
+cmd_watch() {
+  need curl "mra watch"; need jq "mra watch"
+  local id="${1:-$(cat "${TMPDIR:-/tmp}/mra-last-run" 2>/dev/null || true)}"
+  [ -n "$id" ] || die "usage: mra watch <runId>   (or run one first)"
+  local status=""
+  while :; do
+    local body; body=$(api GET "/api/research/runs/$id")
+    status=$(printf '%s' "$body" | jq -r '.status // "?"')
+    printf '\r%s  %s' "$id" "$status"
+    case "$status" in
+      running|queued|"?") sleep 5 ;;
+      *) echo; printf '%s' "$body" | jq '{status, error, counts, usage: (.usage|{totalTokens, cost: .cost.total, billed: .billed.total})}'; break ;;
+    esac
+  done
+  # `invalid` is not `failed`: the agent finished and produced something the
+  # schema refused. That is the most informative failure this app has, so say so.
+  [ "$status" = "succeeded" ] || echo "(status is $status — 'invalid' means the packet was rejected, not that the run crashed; see \`mra calls $id\`)"
+}
+
+cmd_calls() {
+  need curl "mra calls"; need jq "mra calls"
+  local id="${1:-$(cat "${TMPDIR:-/tmp}/mra-last-run" 2>/dev/null || true)}"
+  [ -n "$id" ] || die "usage: mra calls <runId>"
+  api GET "/api/research/runs/$id/calls" \
+    | jq '{totals, calls: [.calls[] | {seq, node, model, stopReason, tokens: .usage.totalTokens}]}'
+}
+
+# --- the deploy ------------------------------------------------------------
+cmd_deployed() {
+  need curl "mra deployed"
+  cmd_health live || true
+  note "image on the VPS"
+  ssh owui 'docker inspect -f "{{.Image}} created {{.Created}}" mra 2>/dev/null || echo "container mra not running"' 2>/dev/null \
+    || echo "(could not reach the VPS over ssh)"
+  note "uncommitted work here"
+  git -C "$REPO" status --porcelain | head -20
+  echo
+  echo "Live health being 200 says the container is up. It does NOT say your"
+  echo "change is on it. Only a deploy does that:"
+  echo "  bash deploy/vps/deploy.sh    (from the repo root, builds locally)"
+}
+
+cmd_help() {
+  cat <<'HELP'
+mra — drive and inspect the research cockpit
+
+  check [--changed]        tests + typecheck + conventions + frontend build.
+                           The gate. Nothing is done until this passes.
+                           --changed runs only the parts whose inputs moved.
+
+  up                       docker compose up -d --build, then health
+  down                     stop the stack (volumes keep your runs)
+  logs [n]                 last n lines from the mra container
+  health [local|live]      /api/health against localhost or marketing.vanis.ai
+
+  login                    session cookie (needs MRA_PASSWORD; usually
+                           unnecessary locally, where login is disabled)
+  run "<brief>" [nodes]    start a run. A brief starting with http goes to
+                           brief.url, never brief.product.
+                           nodes: product_data,competitors,review_mining,category_data
+  watch [runId]            poll until the run settles, then print the totals
+  calls [runId]            the LLM call log, one line per turn
+
+  deployed                 what is actually live, and what is not yet shipped
+
+Against the live site: BASE=https://marketing.vanis.ai mra watch <id>
+HELP
+}
+
+case "${1:-help}" in
+  check)    shift; cmd_check "$@" ;;
+  up)       shift; cmd_up "$@" ;;
+  down)     shift; cmd_down "$@" ;;
+  logs)     shift; cmd_logs "$@" ;;
+  health)   shift; cmd_health "$@" ;;
+  login)    shift; cmd_login "$@" ;;
+  run)      shift; cmd_run "$@" ;;
+  watch)    shift; cmd_watch "$@" ;;
+  calls)    shift; cmd_calls "$@" ;;
+  deployed) shift; cmd_deployed "$@" ;;
+  help|-h|--help) cmd_help ;;
+  *) die "unknown command '$1'. Try: mra help" ;;
+esac

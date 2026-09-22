@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "permissions": {
+    "allow": [
+      "Bash(.claude/skills/mra-control/bin/mra:*)",
+      "Bash(node server/scripts/check-conventions.mjs:*)",
+      "Bash(npm test:*)",
+      "Bash(npm run typecheck:*)",
+      "Bash(npm run build:*)",
+      "Bash(npx vitest run:*)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)"
+    ]
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR/.claude/hooks/session-brief.sh\"",
+            "timeout": 20,
+            "statusMessage": "Checking what is actually running"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR/.claude/hooks/guard-edit.sh\"",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR/.claude/hooks/guard-bash.sh\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR/.claude/hooks/gate-stop.sh\"",
+            "timeout": 240,
+            "statusMessage": "Running the gate (mra check)"
+          }
+        ]
+      }
+    ]
+  }
+}

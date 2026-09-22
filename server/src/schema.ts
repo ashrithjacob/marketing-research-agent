@@ -23,6 +23,46 @@ export const NODES = [
 ] as const;
 export type Node = (typeof NODES)[number];
 
+/**
+ * Which stage each node belongs to.
+ *
+ * **Revised 2026-09-21: review mining is its own stage.** It was the fourth node
+ * of stage 1 and it behaves like nothing else in it: the only node with paid
+ * tools, the only one that can be blocked outright by a product having no
+ * marketplace presence, and the one whose failures (a missing 3★ band, reviews
+ * of a recycled listing) say nothing about whether the other three succeeded.
+ * Bundled together, one dead review node made a whole stage-1 packet `invalid`,
+ * and a product with no reviews could not produce a stage-1 packet at all.
+ *
+ * Splitting it means the two can fail independently, and the compartment reads
+ * the way the work actually happens: describe the thing and its market, then go
+ * and listen to customers.
+ */
+export const STAGE_NODES: Readonly<Record<Stage, readonly Node[]>> = {
+  1: ["product_data", "competitors", "category_data"],
+  2: ["review_mining"],
+};
+
+export const STAGES = [1, 2] as const;
+export type Stage = (typeof STAGES)[number];
+
+/** The stage a node is collected in. */
+export function stageOf(node: Node): Stage {
+  return STAGE_NODES[2].includes(node) ? 2 : 1;
+}
+
+/**
+ * The stage a set of nodes belongs to, or null when they straddle two.
+ *
+ * A run covers one stage. A request naming `product_data` and `review_mining`
+ * together is not a small mistake to normalise away — it is two runs.
+ */
+export function stageForNodes(nodes: readonly Node[]): Stage | null {
+  if (nodes.length === 0) return null;
+  const stages = new Set(nodes.map(stageOf));
+  return stages.size === 1 ? [...stages][0]! : null;
+}
+
 export const AXES = ["why_bought", "why_stayed", "why_quit"] as const;
 export type Axis = (typeof AXES)[number];
 
@@ -352,7 +392,8 @@ export type Competitor = z.infer<typeof competitorSchema>;
 export const stagePacketSchema = z
   .object({
     contract_version: z.string().default(CONTRACT_VERSION),
-    stage: z.literal(1).default(1),
+    // 1 for the product/competitors/category packet, 2 for review mining.
+    stage: z.union([z.literal(1), z.literal(2)]).default(1),
     run_id: z.string().default(""), // echoed; agentchat is the authority on run ids
     brief: briefSchema,
     sources: z.array(sourceSchema).default([]),
@@ -404,16 +445,42 @@ export const runRequestSchema = z
 export type RunRequest = z.infer<typeof runRequestSchema>;
 
 /**
+ * Two briefs name the same subject when their product or their site matches.
+ *
+ * Used to find the stage-1 run that a stage-2 run is allowed to follow, so it is
+ * deliberately forgiving about case and spacing and strict about nothing else:
+ * the alternative is an operator who cannot start review mining because they
+ * typed the product name slightly differently the second time.
+ */
+export function briefKey(brief: { product?: unknown; url?: unknown }): string {
+  const url = typeof brief.url === "string" ? brief.url.trim() : "";
+  if (url) {
+    try {
+      const parsed = new URL(/^[a-z][a-z0-9+.-]*:\/\//i.test(url) ? url : `https://${url}`);
+      return `site:${parsed.hostname.replace(/^www\./, "").toLowerCase()}`;
+    } catch {
+      return `site:${url.toLowerCase()}`;
+    }
+  }
+  const product = typeof brief.product === "string" ? brief.product : "";
+  return `product:${product.toLowerCase().replace(/[^a-z0-9]/g, "")}`;
+}
+
+/**
  * The nodes a run covers, in stage order and without repeats. Empty — the
  * default, and what every run before per-node runs stored — means all of them.
  */
 export function runNodes(nodes: readonly string[] | undefined): Node[] {
   const wanted = new Set(nodes ?? []);
   const scoped = NODES.filter((n) => wanted.has(n));
-  return scoped.length > 0 ? scoped : [...NODES];
+  // Empty means the whole of stage 1 — the default a bare "Start run" sends,
+  // and what every run stored before review mining moved to stage 2 was.
+  return scoped.length > 0 ? scoped : [...STAGE_NODES[1]];
 }
 
-/** True when a run covers only part of the stage. */
+/** True when a run covers only part of its stage. */
 export function isPartial(nodes: readonly Node[]): boolean {
-  return nodes.length < NODES.length;
+  const stage = stageForNodes(nodes);
+  if (stage === null) return true;
+  return nodes.length < STAGE_NODES[stage].length;
 }

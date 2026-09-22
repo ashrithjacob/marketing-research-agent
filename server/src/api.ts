@@ -15,9 +15,12 @@ import { streamSSE } from "hono/streaming";
 import { RunError, RunSupervisor, type EventFrame } from "./runner.js";
 import {
   DEFAULT_REJECTED_KINDS,
+  briefKey,
   judgementInSchema,
   normaliseBrief,
+  runNodes,
   runRequestSchema,
+  stageForNodes,
 } from "./schema.js";
 import type { Settings } from "./settings.js";
 import {
@@ -68,6 +71,28 @@ export function buildRouter(options: {
     if (!brief.product && !brief.url) {
       return c.json({ detail: "brief.product or brief.url is required" }, 400);
     }
+    // Stage 2 follows stage 1: review mining needs the product identified, its
+    // own site read and its competitors known before it is worth paying Apify
+    // to read reviews. The gate is on the brief, not on the run id, so a
+    // re-run of one stage-1 node does not unlock or re-lock anything.
+    const nodes = runNodes(parsed.data.nodes);
+    if ((stageForNodes(nodes) ?? 1) === 2) {
+      const key = briefKey(brief);
+      const done = store
+        .listRuns(200)
+        .some((r) => r.stage === 1 && r.status === "completed" && briefKey(r.brief as any) === key);
+      if (!done) {
+        return c.json(
+          {
+            detail:
+              "review mining is stage 2: run stage 1 for this brief first, and let it " +
+              "complete. Stage 1 names the product and finds the listings stage 2 mines.",
+          },
+          409,
+        );
+      }
+    }
+
     let runId: string;
     try {
       runId = supervisor.start({ ...parsed.data, brief });

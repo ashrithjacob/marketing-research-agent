@@ -18,7 +18,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AMAZON_REVIEWS_ACTOR, TRUSTPILOT_ACTOR, capFor } from "../src/apify.js";
 import { loadSettings, type Settings } from "../src/settings.js";
 import { archive, createResearchTools, reviewLimit, reviewLocator } from "../src/tools.js";
-import { locatorSchema } from "../src/schema.js";
+import { STAGE_NODES, locatorSchema } from "../src/schema.js";
+import { minimalPacket, reviewPacket } from "./fixtures.js";
 
 let dir: string;
 let settings: Settings;
@@ -419,5 +420,94 @@ describe("review volume is bounded by the server, not the agent", () => {
     expect(reviewLimit(-5, 10)).toBe(1);
     expect(reviewLimit(7.9, 10)).toBe(7);
     expect(reviewLimit(Number.NaN, 10)).toBe(10);
+  });
+});
+
+describe("validate_packet", () => {
+  const check = (overrides: Partial<Parameters<typeof createResearchTools>[0]["packetCheck"] & {}> = {}) => {
+    const valid: any[] = [];
+    const checked: Array<{ valid: boolean; problems: readonly string[] }> = [];
+    const list = createResearchTools({
+      settings,
+      runId: "run-v",
+      packetCheck: {
+        nodes: STAGE_NODES[1],
+        brief: { product: "MagnaCalm 400mg" },
+        onValid: (p) => valid.push(p),
+        onChecked: (v, problems) => checked.push({ valid: v, problems }),
+        ...overrides,
+      },
+    });
+    return { tool: list.find((t) => t.name === "validate_packet")!, valid, checked };
+  };
+  const text = (result: any) => result.content[0].text as string;
+
+  it("is offered to every run that has a contract to check", () => {
+    const names = createResearchTools({ settings, runId: "r" }).map((t) => t.name);
+    expect(names).not.toContain("validate_packet");
+    expect(check().tool).toBeDefined();
+  });
+
+  it("passes a good draft, and hands it over exactly once", async () => {
+    const { tool, valid, checked } = check();
+    const result = await tool.execute("1", { packet: minimalPacket() });
+    expect(text(result)).toMatch(/^VALID/);
+    expect(text(result)).toContain("sources 1");
+    expect(valid).toHaveLength(1);
+    expect(checked).toEqual([{ valid: true, problems: [] }]);
+
+    // First pass wins: a second valid draft does not replace it.
+    await tool.execute("2", { packet: minimalPacket() });
+    expect(valid).toHaveLength(1);
+  });
+
+  it("names the problems instead of rejecting a run for them", async () => {
+    // The two live shapes that each killed a run: an invented enum value and a
+    // float star rating.
+    const draft = minimalPacket();
+    draft.sources[0].kind = "marketplace";
+    draft.attributes[0].value = 400; // a number where the contract wants a string
+    const { tool, valid, checked } = check();
+    const result = await tool.execute("1", { packet: draft });
+
+    expect(text(result)).toMatch(/^NOT VALID — 2 problems/);
+    expect(text(result)).toContain("received 'marketplace'");
+    expect(text(result)).toContain("Checks used: 1 of 5");
+    expect(valid).toHaveLength(0);
+    expect(checked[0]!.valid).toBe(false);
+  });
+
+  it("refuses a draft that dropped evidence rather than fixing it", async () => {
+    const { tool } = check();
+    const full = minimalPacket();
+    full.sources.push({ ...full.sources[0], id: "sha256:second" });
+    await tool.execute("1", { packet: full });
+
+    const thinner = minimalPacket(); // one source again
+    const result = await tool.execute("2", { packet: thinner });
+    expect(text(result)).toMatch(/^NOT CHECKED/);
+    expect(text(result)).toContain("do not drop the evidence");
+    // A refusal is not a contract failure, so it costs no budget.
+    expect((result.details as any).reason).toBe("evidence_shrank");
+  });
+
+  it("stops after five checks", async () => {
+    const { tool } = check();
+    const bad = minimalPacket();
+    bad.gaps = [];
+    for (let i = 1; i <= 5; i++) {
+      expect(text(await tool.execute(String(i), { packet: bad }))).toMatch(/^NOT VALID/);
+    }
+    const spent = await tool.execute("6", { packet: bad });
+    expect(text(spent)).toMatch(/^NOT CHECKED/);
+    expect(text(spent)).toContain("checks for this run are spent");
+  });
+
+  it("checks against the run's own scope and brief", async () => {
+    // A review-mining packet is stage 2: not this run's work at all.
+    const { tool } = check({ nodes: ["product_data"] as any });
+    const answer = text(await tool.execute("1", { packet: reviewPacket() }));
+    expect(answer).toContain("which is collected in stage 2");
+    expect(answer).toContain("that is a separate run");
   });
 });

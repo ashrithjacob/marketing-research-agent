@@ -22,15 +22,24 @@
 import {
   DEFAULT_REJECTED_KINDS,
   FORMS,
-  NODES,
   PRODUCT_ATTRIBUTES,
   SOURCE_KIND_NOTES,
+  STAGE_NODES,
   isPartial,
+  stageForNodes,
+  stageOf,
   type Brief,
   type Node,
   type SourceKind,
+  type Stage,
 } from "./schema.js";
 import type { Judgement } from "./store.js";
+
+/** What each collection stage is called, for the prompt's own heading. */
+const STAGE_NAMES: Record<Stage, string> = {
+  1: "the product and its market",
+  2: "what customers said",
+};
 
 /**
  * A worked miniature. Models follow an example far more reliably than a prose
@@ -120,6 +129,19 @@ const EXAMPLE = {
       node: "competitors",
     },
     {
+      id: "sha256:b112…",
+      url: "https://trends.example/magnesium-glycinate-2023-2026",
+      title: "Magnesium glycinate — monthly search volume, 2023–2026",
+      kind: "keyword_data",
+      publisher: "trends.example",
+      fetched_at: "2026-09-10T09:22:03Z",
+      marketing: false,
+      admitted: true,
+      admission_reason: "keyword_data — admitted by policy",
+      archived: true,
+      node: "category_data",
+    },
+    {
       id: "sha256:d4f7…",
       url: "https://www.facebook.com/ads/library/?id=1234567890",
       title: "CalmWell — 'Finally sleeping through' ad",
@@ -168,7 +190,7 @@ const EXAMPLE = {
       value: 1900000,
       unit: "searches/month",
       period: "2026-08",
-      source_id: "sha256:2f1a…",
+      source_id: "sha256:b112…",
     },
   ],
   attributes: [
@@ -177,7 +199,7 @@ const EXAMPLE = {
       node: "product_data",
       key: "dose_per_serving",
       value: "400 mg",
-      source_id: "sha256:2f1a…",
+      source_id: "sha256:1c9d…",
     },
   ],
   competitor_reference: {
@@ -268,6 +290,18 @@ const EXAMPLE = {
   ],
   nodes: [
     {
+      node: "product_data",
+      status: "incomplete",
+      done_criterion_met: false,
+      why: "9 of 10 attributes captured; no COA published",
+    },
+    {
+      node: "category_data",
+      status: "incomplete",
+      done_criterion_met: false,
+      why: "three-year trend captured; category size is a single point estimate",
+    },
+    {
       node: "review_mining",
       status: "complete",
       done_criterion_met: true,
@@ -287,10 +321,48 @@ const EXAMPLE = {
       would_need: "a UK-IP ad-library pull, or a manual capture",
       blocking: false,
     },
+    {
+      node: "product_data",
+      missing: "no certificate of analysis published",
+      would_need: "the brand to publish one, or a batch COA on request",
+      blocking: false,
+    },
+    {
+      node: "review_mining",
+      missing: "forum coverage is thin outside Reddit",
+      would_need: "a niche sleep board with a readable archive",
+      blocking: false,
+    },
   ],
 };
 
-const SYSTEM_PROMPT = `You are the stage-1 researcher of a five-stage marketing research \
+/**
+ * The example, cut down to one stage.
+ *
+ * Review mining is stage 2 and the other three nodes are stage 1, so an example
+ * showing all four teaches every run to break the boundary it is about to be
+ * validated against.
+ */
+function exampleForStage(stage: Stage): Record<string, unknown> {
+  const mine = <T extends { node: string }>(items: readonly T[]): T[] =>
+    items.filter((item) => stageOf(item.node as Node) === stage);
+  const hasCompetitors = STAGE_NODES[stage].includes("competitors");
+  return {
+    ...EXAMPLE,
+    stage,
+    sources: mine(EXAMPLE.sources),
+    excerpts: mine(EXAMPLE.excerpts),
+    measurements: mine(EXAMPLE.measurements),
+    attributes: mine(EXAMPLE.attributes),
+    competitor_reference: hasCompetitors ? EXAMPLE.competitor_reference : null,
+    competitors: hasCompetitors ? EXAMPLE.competitors : [],
+    saturation: mine(EXAMPLE.saturation),
+    nodes: mine(EXAMPLE.nodes),
+    gaps: mine(EXAMPLE.gaps),
+  };
+}
+
+const SYSTEM_PROMPT = `You are the stage-{stage} researcher of a six-stage marketing research \
 compartment. You gather raw material from the open web and record it verbatim. You do not \
 interpret it, and the output schema has no field an interpretation could be written into.
 
@@ -309,17 +381,20 @@ next tool are the only route to marketplace reviews.
 band. Archived and hashed like \`web_fetch\`.
 - \`trustpilot_reviews\` — verbatim reviews for ONE company domain. These review the \
 **merchant**, not the product.
+- \`validate_packet\` — check a draft packet against the contract. It answers VALID, or \
+the exact problems to fix. Use it; a shape error costs one call here and the whole run \
+at the end.
 
 The last three may be absent. If they are, marketplace reviews cannot be reached at all \
 and \`review_mining\` is incomplete with a gap saying so — do not substitute blog roundups.
 
-Work through the four nodes methodically. Fetch before you write anything down.`;
+Work through this stage's nodes methodically. Fetch before you write anything down.`;
 
 const RULES = `\
-## Stage 1 — raw material. Gather only.
+## Stage {stage} — {stage_name}. Gather only.
 
-You are running stage 1 of a five-stage marketing research compartment. Stage 1
-collects material. It does not interpret it. Concluding while collecting is the
+You are running stage {stage} of a six-stage marketing research compartment.
+Collection stages put material in a box. They do not interpret it. Concluding while collecting is the
 single most common failure in this framework, and the output schema has no field
 a conclusion could be written into — if you find yourself wanting to write down
 what the material *means*, that belongs to a later stage and there is nowhere to
@@ -422,7 +497,14 @@ const NODE_RULES: Record<Node, string> = {
       positioning copy **verbatim** (the headline or tagline, character for
       character). \`shared_actives\` names the actives it has in common with the
       reference; \`relation\` follows from comparing its \`form\` with the
-      reference's, and the validator checks it.
+      reference's, and the validator checks it. The form vocabulary is built for
+      supplements, so a product outside that world — a brush, a device, a cloth —
+      is \`form: "other"\`. **When both sides are \`other\` the vocabulary cannot
+      decide, so your \`relation\` stands** — and \`form_as_printed\` is the only
+      record of why. Write it specifically enough that a reader can check the
+      call: "manual bamboo toothbrush, boar bristles" against "electric brush
+      heads, Sonicare-compatible" shows the difference; "toothbrush" on both does
+      not. Never leave it empty on an \`other\`.
    d. A brand that solves the same problem with a **different** active is
       neither class: do not list it — add a gap "same problem, different active:
       <brand> (<its active>)". Whether another molecule is a substitute is a
@@ -471,9 +553,10 @@ const NODE_RULES: Record<Node, string> = {
 const code = (names: readonly string[]) => names.map((n) => `\`${n}\``).join(", ");
 
 function nodesBlock(nodes: readonly Node[]): string {
+  const stage = stageForNodes(nodes) ?? 1;
   const heading = isPartial(nodes)
     ? `### This run's ${nodes.length === 1 ? "node" : "nodes"}`
-    : "### The four nodes";
+    : `### Stage ${stage}${STAGE_NODES[stage].length > 1 ? "'s nodes" : "'s node"}`;
   const items = nodes.map((node, i) => `${i + 1}. ${NODE_RULES[node]}`);
   return [heading, "", ...items].join("\n");
 }
@@ -481,12 +564,15 @@ function nodesBlock(nodes: readonly Node[]): string {
 /** Where a run-level problem goes, and which node names the packet may use. */
 function gapNodesBlock(nodes: readonly Node[]): string {
   if (!isPartial(nodes)) {
-    return `A run-level problem that is not one of the four nodes — a tool failing, a fetch
-path blocked, a site refusing to serve — still goes in this list. Attach it to
-the node it blocked; if it blocked nothing in particular, use
-\`node: "category_data"\`. Never invent a fifth node name (\`all\`, \`general\`,
-\`run\`): only \`product_data\`, \`competitors\`, \`review_mining\`, \`category_data\`
-are accepted, and anything else fails the whole packet.`;
+    const stage = stageForNodes(nodes) ?? 1;
+    const fallback = nodes[nodes.length - 1]!;
+    return `A run-level problem that is not one of this stage's nodes — a tool failing, a
+fetch path blocked, a site refusing to serve — still goes in this list. Attach it
+to the node it blocked; if it blocked nothing in particular, use
+\`node: "${fallback}"\`. Never invent a node name (\`all\`, \`general\`, \`run\`), and
+never use a node from another stage: only ${code(nodes)} ${
+      nodes.length === 1 ? "is" : "are"
+    } accepted in a stage-${stage} packet, and anything else fails the whole packet.`;
   }
   return `A run-level problem — a tool failing, a fetch path blocked, a site refusing
 to serve — still goes in this list, attached to \`node: "${nodes[0]}"\`. Use no
@@ -513,6 +599,12 @@ function scopeBlock(nodes: readonly Node[]): string {
 
 const OUTPUT = `\
 ## Output
+
+**Check before you finish.** Call \`validate_packet\` with your draft as soon as you
+have a few sources, and again after each fix — it names the exact problems, and a
+problem found there costs one call rather than the run. The first packet that passes
+is this run's result: emit that same packet, unchanged, as your final answer. You get
+five checks.
 
 End your reply with exactly one fenced JSON block containing the stage-1 packet.
 Everything outside the fence is ignored. The block must match this shape exactly
@@ -541,7 +633,10 @@ Field notes:
 - \`gaps\` must not be empty.
 - \`competitor_reference\` and \`competitors\` belong to the competitors node; leave
   them \`null\` and \`[]\` when it is not being researched. \`form\` is exactly one
-  of {forms}. \`relation\` is checked against the forms and must agree with them.
+  of {forms}, with \`other\` for anything that vocabulary does not cover.
+  \`relation\` is checked against the forms and must agree with them, except where
+  both are \`other\` — there your label stands and \`form_as_printed\` must not be
+  empty on either side.
 - \`saturation\` for competitors has two entries, \`"class": "direct"\` and
   \`"class": "indirect"\`; every other node's entry has no \`class\`.
 `;
@@ -550,13 +645,15 @@ Field notes:
  * The system prompt for a stage-1 run. The brief goes in the turn; only the
  * scope sentence varies, so a single-node run is not told to work four.
  */
-export function systemPrompt(nodes: readonly Node[] = NODES): string {
-  if (!isPartial(nodes)) return SYSTEM_PROMPT;
-  let text = SYSTEM_PROMPT.replace(
-    "Work through the four nodes methodically.",
+export function systemPrompt(nodes: readonly Node[] = STAGE_NODES[1]): string {
+  const stage = stageForNodes(nodes) ?? 1;
+  const base = SYSTEM_PROMPT.replace("{stage}", String(stage));
+  if (!isPartial(nodes)) return base;
+  let text = base.replace(
+    "Work through this stage's nodes methodically.",
     `This run covers only ${code(nodes)} — work through ${
       nodes.length === 1 ? "it" : "them"
-    } methodically and leave the rest of stage 1 alone.`,
+    } methodically and leave the rest of stage ${stage} alone.`,
   );
   // Describe only the tools this run is offered (`createResearchTools`). A run
   // told about review tools it does not have records their absence as a gap —
@@ -589,11 +686,14 @@ export function buildInstructions(options: {
   nodes?: readonly Node[];
 }): string {
   const { brief, rejectKinds, judgements } = options;
-  const nodes = options.nodes ?? NODES;
+  const nodes = options.nodes ?? STAGE_NODES[1];
+  const stage = stageForNodes(nodes) ?? 1;
   const rejected = rejectKinds.length > 0 ? rejectKinds : DEFAULT_REJECTED_KINDS;
   const parts = [
     // `{nodes}` first: the product_data rule carries its own `{attributes}`.
     RULES.replace("{nodes}", nodesBlock(nodes))
+      .replaceAll("{stage}", String(stage))
+      .replace("{stage_name}", STAGE_NAMES[stage])
       .replace("{attributes}", PRODUCT_ATTRIBUTES.map((a) => `\`${a}\``).join(", "))
       .replace("{kinds}", SOURCE_KIND_NOTES.map(([kind, note]) => `- \`${kind}\` — ${note}`).join("\n"))
       .replace("{rejected}", rejected.map((kind) => `- \`${kind}\``).join("\n") || "- (none)")
@@ -602,10 +702,13 @@ export function buildInstructions(options: {
   if (isPartial(nodes)) parts.push(scopeBlock(nodes));
   if (judgements.length > 0) parts.push(judgementBlock(judgements));
   parts.push(briefBlock(brief));
-  let output = OUTPUT.replace("{example}", JSON.stringify(EXAMPLE, null, 2))
+  let output = OUTPUT.replace("{example}", JSON.stringify(exampleForStage(stage), null, 2))
+    .replaceAll("{stage}", String(stage))
     .replace(
       "{nodes_note}",
-      isPartial(nodes) ? `each node in scope (${code(nodes)})` : "each of the four nodes",
+      isPartial(nodes)
+        ? `each node in scope (${code(nodes)})`
+        : `each of this stage's nodes (${code(nodes)})`,
     )
     .replace("{forms}", code(FORMS));
   if (isPartial(nodes)) {

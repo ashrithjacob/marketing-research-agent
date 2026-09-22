@@ -1,28 +1,41 @@
 import type { NodeStatus, ResearchNode, RunStatus, Saturation } from './api';
 
 /**
- * The compartment's five stages and its gate.
+ * The compartment's six stages and its gate.
  *
- * Stages 2-5 render as `not built` rather than being hidden. The rail is the
- * framework's dependency graph, and showing four fifths of it greyed out is an
- * accurate picture of where this is — hiding them would suggest a finished run
- * had done more than a fifth of the work.
+ * Stages 3-6 render as `not built` rather than being hidden. The rail is the
+ * framework's dependency graph, and showing most of it greyed out is an accurate
+ * picture of where this is — hiding them would suggest a finished run had done
+ * more of the work than it has.
+ *
+ * **Revised 2026-09-21: review mining left stage 1 and became stage 2.** It is
+ * the only node with paid tools, the only one a product can be structurally
+ * unable to satisfy, and its failures say nothing about the other three. As the
+ * fourth node of stage 1 it could sink a packet that had already described the
+ * product, its competitors and its category.
  */
 
 const STAGES = [
-  { id: '1', name: 'Raw material', note: 'gather only' },
-  { id: '2', name: 'Product truth', note: 'product in isolation' },
-  { id: '3', name: 'Market truth', note: 'product vs world' },
+  { id: '1', name: 'Raw material', note: 'product, competitors, category', nodes: 1 },
+  { id: '2', name: 'Review mining', note: 'verbatim customer language', nodes: 2 },
+  { id: '3', name: 'Product truth', note: 'product in isolation' },
+  { id: '4', name: 'Market truth', note: 'product vs world' },
   { id: 'gate', name: 'Viability gate', note: 'human decision' },
-  { id: '4', name: 'Customer truth', note: 'after the gate only' },
-  { id: '5', name: 'Synthesis', note: 'artifacts leave here' },
-];
+  { id: '5', name: 'Customer truth', note: 'after the gate only' },
+  { id: '6', name: 'Synthesis', note: 'artifacts leave here' },
+] as const;
 
 export const NODE_LABELS: Record<ResearchNode, string> = {
   product_data: 'Product data',
   competitors: 'Competitors',
   review_mining: 'Review mining',
   category_data: 'Category data',
+};
+
+/** Which nodes each collecting stage owns. Mirrors STAGE_NODES in the server. */
+export const STAGE_NODES: Record<1 | 2, ResearchNode[]> = {
+  1: ['product_data', 'competitors', 'category_data'],
+  2: ['review_mining'],
 };
 
 export const NODE_ORDER: ResearchNode[] = [
@@ -32,7 +45,12 @@ export const NODE_ORDER: ResearchNode[] = [
   'category_data',
 ];
 
-function stageOneState(status: RunStatus): { cls: string; label: string } {
+/** The stage a node is collected in. */
+export function stageOfNode(node: ResearchNode): 1 | 2 {
+  return node === 'review_mining' ? 2 : 1;
+}
+
+function runState(status: RunStatus): { cls: string; label: string } {
   switch (status) {
     case 'queued':
       return { cls: 'active', label: 'starting' };
@@ -53,9 +71,13 @@ function stageOneState(status: RunStatus): { cls: string; label: string } {
   }
 }
 
-/** "Product data" for one node, "Product data + Competitors" for two, "Whole stage" for four. */
+/** "Product data" for one node, "Whole stage" for all of the stage's nodes. */
 export function scopeLabel(nodes: readonly ResearchNode[]): string {
-  if (nodes.length === 0 || nodes.length === NODE_ORDER.length) return 'Whole stage';
+  if (nodes.length === 0) return 'Whole stage';
+  const stage = stageOfNode(nodes[0]);
+  if (nodes.length === STAGE_NODES[stage].length) {
+    return stage === 2 ? 'Review mining' : 'Whole stage';
+  }
   return nodes.map((n) => NODE_LABELS[n]).join(' + ');
 }
 
@@ -65,14 +87,18 @@ export default function StageRail({
   saturation,
   scope,
   onRunNode,
+  stageTwoReady,
 }: {
   status: RunStatus | null;
   nodes: NodeStatus[];
   saturation: Saturation[];
   /** The nodes the shown run covers; the others are marked as not in it. */
   scope: readonly ResearchNode[];
-  /** Start a run on one node. Offered per node, stage 1 only for now. */
+  /** Start a run on one node, or on a whole stage. */
   onRunNode?: (node: ResearchNode) => void;
+  /** Stage 2 mines what stage 1 found, so it waits for a completed stage 1 on
+   *  this brief. Null when there is no run on screen to judge it by. */
+  stageTwoReady?: boolean;
 }) {
   const byNode = new Map(nodes.map((n) => [n.node, n]));
   // Competitors carry two curves, one per class; every other node has one.
@@ -84,8 +110,10 @@ export default function StageRail({
     <div className="rail">
       <h3>Stages</h3>
       {STAGES.map((stage) => {
-        const isOne = stage.id === '1';
-        const state = isOne && status ? stageOneState(status) : null;
+        const collects = 'nodes' in stage ? (stage.nodes as 1 | 2) : null;
+        // The run on screen belongs to one stage; only that stage shows its state.
+        const shown = collects !== null && scope.length > 0 && stageOfNode(scope[0]) === collects;
+        const state = shown && status ? runState(status) : null;
         return (
           <div key={stage.id}>
             <div className={`stage ${state?.cls ?? 'unbuilt'}`}>
@@ -96,13 +124,19 @@ export default function StageRail({
                   {stage.name}
                 </div>
                 <div className="stage-s">
-                  {state ? state.label : isOne ? stage.note : 'not built'}
+                  {state
+                    ? state.label
+                    : collects === 2 && stageTwoReady === false
+                      ? 'needs a completed stage 1'
+                      : collects !== null
+                        ? stage.note
+                        : 'not built'}
                 </div>
               </div>
             </div>
-            {isOne && (
+            {collects !== null && (
               <div className="node-list">
-                {NODE_ORDER.map((node) => {
+                {STAGE_NODES[collects].map((node) => {
                   const record = byNode.get(node);
                   const covered = inScope.size === 0 || inScope.has(node);
                   const cls = !covered
@@ -128,7 +162,12 @@ export default function StageRail({
                       {onRunNode && (
                         <button
                           className="node-run"
-                          title={`Run ${NODE_LABELS[node]} on its own`}
+                          disabled={collects === 2 && stageTwoReady === false}
+                          title={
+                            collects === 2 && stageTwoReady === false
+                              ? 'Stage 2 mines what stage 1 found — run stage 1 for this brief first'
+                              : `Run ${NODE_LABELS[node]} on its own`
+                          }
                           aria-label={`Run ${NODE_LABELS[node]}`}
                           onClick={() => onRunNode(node)}
                         >
