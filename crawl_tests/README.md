@@ -153,8 +153,37 @@ That makes the ceiling combinatorial, not financial:
 
 | Plan | Per run | Reachable from one ASIN | Cost |
 |---|---|---|---|
-| FREE | 10 reviews, 1 start URL | 5 bands × 2 sorts × 10 = **100** | $0.60 |
+| FREE | 10 reviews, 1 start URL | 5 bands × 2 sorts × 10 = 100 asked, **76 distinct measured** | $0.60 |
 | Paid | actor's own limit | 5 bands × 100 = **500** (the actor's stated max is 100 per star band) | $3.00 |
+
+**You are billed for what you ask for, not for what is new.** Executed
+2026-09-22 on `amazon.com/dp/B000BD0RT0`, `--count 100 --all-stars`, ten runs,
+$0.6002 charged:
+
+```
+  1   3* recent    got 10  new 10  total 10
+  2   1* recent    got 10  new 10  total 20
+  3   2* recent    got 10  new 10  total 30
+  4   4* recent    got 10  new 10  total 40
+  5   5* recent    got 10  new 10  total 50
+  6   3* helpful   got 10  new 2   total 52     <- the second sort pass
+  7   1* helpful   got 10  new 8   total 60        mostly repeats the first
+  8   2* helpful   got 10  new 5   total 65
+  9   4* helpful   got 10  new 3   total 68
+  10  5* helpful   got 10  new 8   total 76
+```
+
+The `recent` pass is clean — five bands, fifty reviews, no overlap. The
+`helpful` pass costs another $0.30 and yields 26 new, because "most helpful" and
+"most recent" pull from the same pool. **Effective price: $0.0079 per distinct
+review, not $0.006**, and it gets worse the more sort passes you add. If you
+only need breadth, run the `recent` pass alone: 50 distinct for $0.30, at list
+price.
+
+Result: 76 distinct, spread `{1:18, 2:15, 3:12, 4:13, 5:18}`, 76/76 verified
+purchases, spanning 2014-07-14 to 2026-09-18, out of the 845 written reviews the
+listing reports. Twelve of them 3-star — which clears §2.3's floor of ten, the
+thing the free routes cannot reach at all.
 
 Beyond 500 from a single listing, there is no route at any price — that is the
 actor's ceiling, and `/dp/` pagination is behind a sign-in from every address.

@@ -257,6 +257,13 @@ def plan_runs(target: int, per_run: int, stars: int | None) -> list[tuple[int, s
     rows and bills you again for them. The only axes that yield new reviews are
     the star band, the sort order, and keyword search. So a volume job walks
     those instead of looping, and dedupes what comes back.
+
+    **The sort axis is much weaker than the band axis.** Measured 2026-09-22,
+    100 asked for across both: the five `recent` runs yielded 50 distinct with
+    no overlap at all, and the five `helpful` runs added only 26 more for the
+    same $0.30, because "most helpful" and "most recent" draw on one pool.
+    Bands first is therefore not cosmetic ordering — it is the whole of the
+    cheap yield, and a caller who only needs breadth should stop after them.
     """
     bands = [stars] if stars else BANDS
     runs, planned = [], 0
