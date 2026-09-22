@@ -132,6 +132,41 @@ because an actor run has to start.
 Rows come back with `totalCategoryReviews`, which is worth reading — on the
 example ASIN it is 845, against the 13 a `/dp/` fetch can see.
 
+## Getting hundreds of reviews
+
+Only one of the three scales, and not by spending alone. Check before you run:
+
+```bash
+python3 crawl_apify.py amazon --count 100 --all-stars --plan   # costs nothing
+```
+
+`--plan` prints the run plan, the projected cost and your **live Apify balance**,
+and spends nothing. Drop `--plan` to execute. It refuses outright if the
+projection exceeds what is left in the cycle.
+
+**Repeating a query does not page.** Identical input returns identical rows and
+bills you again for them. The axes that actually yield new reviews are the star
+band, the sort order (`recent` vs `helpful`) and keyword search, so `--count`
+walks those and dedupes, rather than looping.
+
+That makes the ceiling combinatorial, not financial:
+
+| Plan | Per run | Reachable from one ASIN | Cost |
+|---|---|---|---|
+| FREE | 10 reviews, 1 start URL | 5 bands × 2 sorts × 10 = **100** | $0.60 |
+| Paid | actor's own limit | 5 bands × 100 = **500** (the actor's stated max is 100 per star band) | $3.00 |
+
+Beyond 500 from a single listing, there is no route at any price — that is the
+actor's ceiling, and `/dp/` pagination is behind a sign-in from every address.
+
+**The other two do not have a volume knob at all.** Firecrawl returns 0 reviews
+from its addresses, and a residential fetch of `/dp/` tops out at the ~13 Amazon
+chose to render — `/product-reviews/?pageNumber=2` 302s to `/ap/signin`. Scaling
+those is not a budget question; there is nothing to scale.
+
+Where hundreds *are* free: **Trustpilot**, 20 per page, paginated, honest star
+filters, no vendor. But those are reviews of a merchant, not of a SKU.
+
 **Trustpilot** (not part of the comparison):
 
 ```bash

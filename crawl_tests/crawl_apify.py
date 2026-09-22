@@ -26,7 +26,7 @@ import argparse
 import json
 import sys
 
-from common import Result, load_env, need, post_json, save, spread_of, timed
+from common import HERE, Result, load_env, need, post_json, save, spread_of, timed
 
 # --- CHANGE ME -------------------------------------------------------------
 # A real magnesium listing with enough written reviews to be worth mining.
@@ -111,12 +111,17 @@ def _finish(result: Result, status: int, items, cap: float, want_star: int | Non
     return result
 
 
-def amazon_reviews(url: str = EXAMPLE_AMAZON_URL, star: int | None = 3, max_reviews: int = 5) -> Result:
+def amazon_reviews(
+    url: str = EXAMPLE_AMAZON_URL,
+    star: int | None = 3,
+    max_reviews: int = 5,
+    sort: str = "recent",
+) -> Result:
     payload = {
         "productUrls": [{"url": url}],
         "filterByRatings": [STAR_BAND[star] if star else "allStars"],
         "maxReviews": max_reviews,
-        "sort": "recent",
+        "sort": sort,
         # Reviewer names and profile ids are personal data and nothing
         # downstream needs them: text, star and date carry the whole excerpt.
         "includeGdprSensitive": False,
@@ -213,6 +218,125 @@ def trustpilot_reviews(domain: str = EXAMPLE_TRUSTPILOT, star: int | None = 3, m
     return result
 
 
+# --- volume: how to actually reach hundreds of reviews ---------------------
+
+
+def balance() -> tuple[float, float]:
+    """(spent, cap) this billing cycle, straight from Apify. Costs nothing.
+
+    Worth checking before a volume run rather than after: the FREE plan's cap is
+    a hard stop, and a job that dies halfway has still spent the money.
+    """
+    token = need("APIFY_TOKEN", "Apify cannot be called without it")
+    import urllib.request
+
+    def get(path: str) -> dict:
+        with urllib.request.urlopen(f"{API}/{path}?token={token}", timeout=20) as response:
+            return json.loads(response.read())["data"]
+
+    spent = get("users/me/usage/monthly").get("totalUsageCreditsUsdAfterVolumeDiscount") or 0.0
+    cap = get("users/me/limits")["limits"].get("maxMonthlyUsageUsd") or 0.0
+    return float(spent), float(cap)
+
+
+# The FREE plan is throttled by the actor itself: "as a free user, you are
+# limited to only 1 start URL and you'll get only 10 Amazon reviews per run".
+FREE_REVIEWS_PER_RUN = 10
+
+# The actor's own ceiling, from its input schema: "max amount of reviews per
+# product is 100 per star count". Five bands, so 500 per product is the most
+# any amount of money buys from one listing.
+MAX_PER_BAND = 100
+BANDS = [3, 1, 2, 4, 5]  # 3-star first: the band the contract actually requires
+
+
+def plan_runs(target: int, per_run: int, stars: int | None) -> list[tuple[int, str, int]]:
+    """(star, sort, n) for each run needed to reach `target` distinct reviews.
+
+    Repeating one query does NOT page — identical input returns the identical
+    rows and bills you again for them. The only axes that yield new reviews are
+    the star band, the sort order, and keyword search. So a volume job walks
+    those instead of looping, and dedupes what comes back.
+    """
+    bands = [stars] if stars else BANDS
+    runs, planned = [], 0
+    for sort in ("recent", "helpful"):
+        for band in bands:
+            if planned >= target:
+                break
+            n = min(per_run, MAX_PER_BAND, target - planned)
+            runs.append((band, sort, n))
+            planned += n
+    return runs
+
+
+def volume(url: str, target: int, stars: int | None, per_run: int, dry_run: bool) -> int:
+    runs = plan_runs(target, per_run, stars)
+    reachable = sum(n for _, _, n in runs)
+    projected = reachable * UNIT_PRICE_USD[AMAZON_REVIEWS]
+    spent, cap = balance()
+    left = cap - spent
+
+    print(f"target:     {target} distinct reviews from {url}")
+    print(f"runs:       {len(runs)} (the actor gives {per_run}/run on this plan)")
+    print(f"projected:  ${projected:.3f} at ${UNIT_PRICE_USD[AMAZON_REVIEWS]}/review")
+    print(f"balance:    ${spent:.3f} spent of ${cap:.2f} this cycle — ${left:.3f} left")
+
+    # Repeating a query does not page, so the reachable total is bounded by the
+    # number of distinct (band, sort) combinations — not by how much you spend.
+    if reachable < target:
+        bands = 1 if stars else len(BANDS)
+        print(
+            f"\nCEILING: {reachable} is the most this plan can reach, not {target}.\n"
+            f"  {bands} band(s) x 2 sort orders x {per_run}/run = {reachable}.\n"
+            + (
+                "  Drop --stars to walk all five bands (5 x 2 x "
+                f"{per_run} = {len(BANDS) * 2 * per_run}).\n"
+                if stars
+                else ""
+            )
+            + f"  Past that, a run of the same query returns the same rows and bills again.\n"
+            f"  More than {len(BANDS) * 2 * per_run} needs a plan whose per-run cap is above "
+            f"{per_run} — the actor itself allows {MAX_PER_BAND} per band."
+        )
+    print("\n  #   band   sort      ask")
+    for index, (band, sort, n) in enumerate(runs, 1):
+        print(f"  {index:<3} {band}*     {sort:<9} {n}")
+
+    if projected > left:
+        print(f"\nREFUSED: ${projected:.3f} projected against ${left:.3f} remaining.")
+        print("Lower --target, or pay: the cap resets at the end of the cycle.")
+        return 1
+    if dry_run:
+        print("\n--plan only. Nothing was spent. Drop --plan to run it.")
+        return 0
+
+    seen: dict[str, dict] = {}
+    charged = 0.0
+    for index, (band, sort, n) in enumerate(runs, 1):
+        result = amazon_reviews(url, band, n, sort=sort)
+        rows = json.load(open(HERE / result.raw_path)) if result.raw_path else []
+        new = {r.get("reviewId") or r.get("reviewUrl") or str(i): r for i, r in enumerate(rows)}
+        before = len(seen)
+        seen.update({k: v for k, v in new.items() if k not in seen})
+        # Billed per result RETURNED, not per result asked for — and an error
+        # record is a billed result, so a gap still costs $0.006.
+        charged += max(len(rows), 1) * UNIT_PRICE_USD[AMAZON_REVIEWS]
+        print(
+            f"  {index:<3} {band}* {sort:<9} got {len(rows):<3} "
+            f"new {len(seen) - before:<3} total {len(seen):<4} ~${charged:.3f}"
+        )
+        if len(seen) >= target:
+            break
+
+    rows = list(seen.values())
+    path = save("apify-volume", url, "json", json.dumps(rows, indent=2))
+    print(f"\n{len(rows)} distinct reviews, spread {spread_of(r.get('ratingScore') for r in rows)}")
+    print(f"~${charged:.3f} charged (the Apify console is the authority)")
+    print(f"Read it:  jq . {path} | less")
+    return 0
+
+
 def main() -> int:
     load_env()
     parser = argparse.ArgumentParser(description="Run one Apify actor. Spends money.")
@@ -221,11 +345,22 @@ def main() -> int:
     parser.add_argument("--stars", type=int, default=3, choices=[1, 2, 3, 4, 5])
     parser.add_argument("--all-stars", action="store_true", help="no star filter")
     parser.add_argument("--max", type=int, default=5, dest="max_items")
+    parser.add_argument("--count", type=int, default=0, metavar="N",
+                        help="collect N distinct reviews across bands and sorts")
+    parser.add_argument("--per-run", type=int, default=FREE_REVIEWS_PER_RUN,
+                        help=f"reviews the actor gives per run (FREE plan: {FREE_REVIEWS_PER_RUN})")
+    parser.add_argument("--plan", action="store_true",
+                        help="print the run plan, the projected cost and the balance; spend nothing")
     parser.add_argument("--budget", type=float, default=1.0, help="refuse a cap above this")
     parser.add_argument("--yes", action="store_true", help="skip the spend confirmation")
     args = parser.parse_args()
 
     star = None if args.all_stars else args.stars
+
+    if args.count:
+        if args.case != "amazon":
+            sys.exit("--count is for the amazon case only")
+        return volume(args.target or EXAMPLE_AMAZON_URL, args.count, star, args.per_run, args.plan)
     actor = {"amazon": AMAZON_REVIEWS, "search": AMAZON_SEARCH, "trustpilot": TRUSTPILOT}[args.case]
     cap = cap_for(actor, args.max_items)
 
