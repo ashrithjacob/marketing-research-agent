@@ -44,6 +44,20 @@ TRUSTPILOT = "memo23~trustpilot-scraper-ppe"
 # Apify rejects a cap BELOW the actor's own minimum with a 400 at call time.
 # These are floors, not budgets — measured 2026-09-17.
 MIN_CAP_USD = {AMAZON_REVIEWS: 0.50, TRUSTPILOT: 0.45, AMAZON_SEARCH: 0.005}
+
+# **These are FREE-tier prices, and the actor's price is tiered by your Apify
+# plan.** Read from `/v2/store` -> currentPricingInfo.pricingPerEvent, 2026-09-22
+# (`/v2/acts/{id}` returns currentPricingInfo: null — a cost check written
+# against the obvious endpoint silently sees no price):
+#
+#     FREE $0.006   BRONZE $0.005   SILVER $0.004
+#     GOLD $0.003   PLATINUM $0.002  DIAMOND $0.001    per review
+#
+# The actor's store page advertises "$3.00 / 1,000 reviews". That is the GOLD
+# price, not a FREE user's — budgeting against the headline figure undercounts
+# by 2x. Apify's docs say only that "each subscription plan includes a discount
+# tier (BRONZE, SILVER, GOLD)" without publishing which plan gets which, so if
+# the tier matters to a decision, confirm it with Apify rather than inferring.
 UNIT_PRICE_USD = {AMAZON_REVIEWS: 0.006, TRUSTPILOT: 0.00075, AMAZON_SEARCH: 0.012}
 START_FEE_USD = {TRUSTPILOT: 0.05}
 
