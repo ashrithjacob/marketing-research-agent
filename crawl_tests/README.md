@@ -319,17 +319,22 @@ This is worse than Amazon's own behaviour, not better: Amazon's `three_star`
 at least returns nothing, which is obviously broken. Ten rows that look like
 1-star reviews and are really eight 5-star reviews look like evidence.
 
-It is not just the star filter. `--check-filter` also asks whether any other
-parameter does anything, and none of them do:
+It is not just the star filter, and the reason is in Outscraper's own OpenAPI
+spec: **`GET /amazon-reviews` takes only `query`, `limit`, `domain` and
+plumbing, and documents `limit` as "Maximum is 12".** `filterByStar`, `sort`
+and `filterByReviewer` exist in its Python SDK but not in the API, so the SDK
+sends them and the API drops them.
 
-| Parameter | Behaviour |
-|---|---|
-| `filterByStar` | inert — five bands, one identical sample |
-| `sort` | inert — `recent` and `helpful` return the same rows in the same order |
-| `query` | a bare ASIN is treated as the `/dp/` url; a `/product-reviews/` url returns 0 |
-| `limit` | truncates only — ask for 50, get the page's own 13 |
+| Parameter | In the API? | Behaviour |
+|---|---|---|
+| `filterByStar` | **no** | five bands, one identical sample |
+| `sort` | **no** | `recent` and `helpful` return the same rows in the same order |
+| `filterByReviewer` | **no** | ignored |
+| `query` | yes | a bare ASIN is treated as the `/dp/` url; a `/product-reviews/` url returns 0 |
+| `limit` | yes, **max 12** | ask for 50, get 13 |
 
-So it is one `/dp/` fetch with parameters that are accepted and ignored.
+So it is a 12-review-per-product lookup, not a review miner. There is no
+filter to be broken — there is no filter.
 **11 of those 13 reviews are byte-identical to what anakin scraped free** from a
 residential IP: same page, same reviews, same ceiling, with a bill attached.
 

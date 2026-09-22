@@ -13,28 +13,33 @@ which is why this is worth measuring rather than assuming.
     python3 crawl_outscraper.py <url> --stars 3 --sort recent --verified-only
     python3 crawl_outscraper.py <url> --check-filter        # the test that matters
 
-**The test that matters is `--check-filter`.** It asks for each star band in
-turn, then asks whether any other parameter does anything either. Measured
-2026-09-22 against `amazon.com/dp/B000BD0RT0`, every answer was the same 13
-reviews in the same order:
+**Outscraper's Amazon endpoint is capped at 12 reviews per product, by design.**
+From its own OpenAPI spec (`GET /amazon-reviews` on `api.outscraper.cloud`), the
+whole parameter list is:
 
-    filterByStar   five bands, all returning the identical unfiltered sample
-    sort           recent == helpful, identical rows, identical order
-    query          a bare ASIN is treated as the /dp/ url; a /product-reviews/
-                   url returns 0 (that page is behind a sign-in from anywhere)
-    limit          truncates only — ask for 50, get the page's own 13
+    query     required — product url or ASIN
+    limit     "The parameter specifies the limit of reviews to get from one
+              query. Maximum is `12`."
+    domain    which Amazon marketplace
+    fields / async / ui / format / webhook    — plumbing
 
-So this is one `/dp/` fetch with parameters that are accepted and ignored. The
-star filter matters most: `filterByStar` takes Amazon's own value names, and
-spec-review-mining.md §3.4 measured Amazon's version LYING in two directions —
-`three_star` returns zero, `one_star` returns the unfiltered sample. Forwarding
-it inherits the lie, and cheap fabricated star data is worse than expensive
-honest data. Apify's actor was verified to honour the band on the same ASIN the
-same day.
+**`filterByStar`, `sort` and `filterByReviewer` are not in the API.** They exist
+in the Python SDK, which sends them; the API does not accept them and drops
+them silently. That is why `--check-filter` sees five identical unfiltered
+samples — not a broken filter, but no filter at all. Measured 2026-09-22 against
+`amazon.com/dp/B000BD0RT0`: every band, every sort order and a bare ASIN all
+returned the same 13 rows in the same order, and asking for 50 returned 13.
 
-**Endpoint contract taken from the official `outscraper` pip package (6.0.4),
-not the docs site**, which is a single-page app that serves HTML to every path
-including its own `swagger.json`, and whose marketing pages link back to it.
+So this is not a cheap Apify. It is a 12-review-per-product lookup, and 11 of
+the 13 rows it returns are byte-identical to what a plain residential GET of
+`/dp/` gets for nothing. `spec-review-mining.md` §2.3 wants ten 3-star reviews
+per product; this endpoint cannot select a band at all.
+
+**The docs site is not readable** — `app.outscraper.com/api-docs` redirects to a
+single-page app that serves HTML to every path including its own
+`swagger.json`, and the marketing pages link back to it. The contract above
+comes from the OpenAPI JSON itself; the SDK (pip `outscraper` 6.0.4) disagrees
+with it and the API wins.
 
 Needs OUTSCRAPER_API_KEY (picked up from ../.env).
 """
