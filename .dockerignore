@@ -6,3 +6,5 @@
 backend
 tutorial
 *.pdf
+crawl_tests
+probes

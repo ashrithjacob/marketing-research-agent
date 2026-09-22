@@ -1,0 +1,13 @@
+# Secrets. Never tracked.
+.env
+
+# Raw crawler output — regenerate it, do not commit it.
+out/
+*.html
+*.md.out
+
+# Harvested cookies (a live WAF token is a credential).
+tp_cookies.json
+
+__pycache__/
+*.pyc
