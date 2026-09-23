@@ -12,9 +12,9 @@
  * Exit 0 = clean. Exit 1 = at least one violation, each printed as
  * `path:line  rule  what is wrong` so it can be acted on without a search.
  */
-import { readFileSync, existsSync, readdirSync } from "node:fs";
+import { readFileSync, existsSync, readdirSync, statSync } from "node:fs";
 import { execFileSync } from "node:child_process";
-import { join, dirname, resolve } from "node:path";
+import { basename, join, relative, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const DEFAULT_REPO = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -71,6 +71,17 @@ function git(...args) {
 
 // --- 1. the cockpit may only read fields the server actually sends ----------
 //
+// server/src grew subdirectories when it grew layers, and a flat readdir here
+// silently stopped seeing most of the code — reporting a field as missing that
+// was two directories down. Every scan of the server walks the tree.
+function serverSources(dir) {
+  return readdirSync(dir).flatMap((name) => {
+    const full = join(dir, name);
+    if (statSync(full).isDirectory()) return serverSources(full);
+    return name.endsWith(".ts") ? [full] : [];
+  });
+}
+
 // `frontend/src/api.ts` mirrors the server's JSON by hand. Both sides are
 // TypeScript and neither checks the other, so a name that exists on only one
 // side is not a type error — it is `undefined` at runtime. That is exactly how
@@ -96,9 +107,8 @@ function checkClientServerFieldParity() {
 
   const serverDir = join(REPO, "server", "src");
   if (!existsSync(serverDir)) return skipped.push("server/src not found");
-  const server = readdirSync(serverDir)
-    .filter((f) => f.endsWith(".ts"))
-    .map((f) => readFileSync(join(serverDir, f), "utf8"))
+  const server = serverSources(serverDir)
+    .map((f) => readFileSync(f, "utf8"))
     .join("\n");
 
   const lines = client.split("\n");
@@ -129,15 +139,16 @@ function checkEnvDeclaration() {
   const serverDir = join(REPO, "server", "src");
   if (!existsSync(serverDir)) return skipped.push("server/src not found");
 
-  for (const f of readdirSync(serverDir).filter((f) => f.endsWith(".ts"))) {
-    if (f === "settings.ts") continue;
-    const text = readFileSync(join(serverDir, f), "utf8");
+  for (const full of serverSources(serverDir)) {
+    const f = relative(serverDir, full);
+    if (basename(f) === "settings.ts") continue;
+    const text = readFileSync(full, "utf8");
     text.split("\n").forEach((line, i) => {
       if (!line.includes("process.env")) return;
       fail(
         `server/src/${f}`, i + 1, "env-declared-in-settings",
-        "process.env is read outside settings.ts. Declare the variable in " +
-        "Settings + loadSettings() and thread it through, so one file still " +
+        "process.env is read outside config/settings.ts. Declare the variable in " +
+        "Settings + Env.settings() and thread it through, so one file still " +
         "lists everything this service reads.",
       );
     });
@@ -183,17 +194,28 @@ function checkEnvDeclaration() {
 
 // --- 3. a new column needs a migration -------------------------------------
 //
+// The DDL is read from every file under server/src, at HEAD and now, rather
+// than from one named path: this check went quiet for a whole commit when the
+// schema moved out of store.ts, which is the failure mode it exists to prevent.
+//
 // `CREATE TABLE IF NOT EXISTS` is a no-op against a database that already
 // exists, so adding a column to the CREATE statement does nothing to any
 // machine that has run this code before — including the VPS. The failure does
 // not appear at startup. It appears at the first INSERT, in production, as
 // "table research_runs has no column named X".
 function checkSqliteMigrations() {
-  const rel = "server/src/store.ts";
-  const now = read(rel);
-  if (!now) return skipped.push(`${rel} not found`);
-  const before = git("show", `HEAD:${rel}`);
-  if (before === null) return skipped.push("no HEAD revision of store.ts to compare against");
+  const serverDir = join(REPO, "server", "src");
+  if (!existsSync(serverDir)) return skipped.push("server/src not found");
+  const now = serverSources(serverDir)
+    .map((f) => readFileSync(f, "utf8"))
+    .join("\n");
+  const ddlFile = serverSources(serverDir).find((f) => readFileSync(f, "utf8").includes("CREATE TABLE"));
+  const rel = ddlFile ? relative(REPO, ddlFile) : "server/src";
+  const tracked = (git("ls-tree", "-r", "HEAD", "--name-only", "server/src") || "")
+    .split("\n")
+    .filter((f) => f.endsWith(".ts"));
+  if (tracked.length === 0) return skipped.push("no HEAD revision of server/src to compare against");
+  const before = tracked.map((f) => git("show", `HEAD:${f}`) ?? "").join("\n");
 
   const columns = (src) => {
     const out = new Map(); // table -> Set(columns)

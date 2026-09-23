@@ -21,9 +21,13 @@ import {
   effectiveRejectKinds,
   retryableError,
 } from "../src/runner.js";
-import { runRequestSchema, type RunRequest } from "../src/domain/index.js";
+import {
+  type Judgement,
+  type RunRequest,
+  runRequestSchema,
+} from "../src/domain/index.js";
+import { SqliteResearchStore } from "../src/adapters/index.js";
 import { Env, type Settings } from "../src/config/index.js";
-import { SqliteResearchStore, type Judgement } from "../src/store.js";
 import { fenced, minimalPacket, reviewPacket } from "./fixtures.js";
 
 const MODEL_ID = "faux-model";

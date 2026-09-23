@@ -26,21 +26,19 @@ import { OpenRouterCosts, RunBilling, type Pricing } from "./costs.js";
 import { PacketError, PacketExtractor, PacketValidator } from "./extract/index.js";
 import { buildInstructions, packetNudgeText, resumeText, steerText, systemPrompt } from "./prompt.js";
 import {
+  Clock,
   DEFAULT_REJECTED_KINDS,
-  Stages,
+  type Judgement,
+  type LlmCall,
   type Node,
+  type ResearchStore,
   type RunRequest,
   type SourceKind,
   type StagePacket,
+  Stages,
+  TERMINAL_STATUSES,
 } from "./domain/index.js";
 import type { Settings } from "./config/index.js";
-import {
-  TERMINAL_STATUSES,
-  nowIso,
-  type Judgement,
-  type LlmCall,
-  type ResearchStore,
-} from "./store.js";
 import { TOOL_LANES, createResearchTools } from "./tools.js";
 import { recordLlmCalls } from "./trace.js";
 
@@ -247,7 +245,7 @@ export class RunSupervisor {
     const listed = this.models.getModel("openrouter", modelId);
     if (!listed) {
       const error = `unknown model ${JSON.stringify(modelId)} for provider openrouter`;
-      this.store.updateRun(run.id, { status: "failed", error, ended_at: nowIso() });
+      this.store.updateRun(run.id, { status: "failed", error, ended_at: Clock.nowIso() });
       this.emit(run.id, "run.failed", { error });
       throw new RunError(error);
     }
@@ -336,7 +334,7 @@ export class RunSupervisor {
       this.store.updateRun(run.id, {
         status: "failed",
         error: "the server restarted while this run was in progress; the run did not survive it",
-        ended_at: nowIso(),
+        ended_at: Clock.nowIso(),
       });
       this.emit(run.id, "run.failed", { error: "server restarted mid-run" });
     }
@@ -458,7 +456,7 @@ export class RunSupervisor {
         error: `agent failed: ${message}`,
         output: output.join(""),
         usage: recorded(),
-        ended_at: nowIso(),
+        ended_at: Clock.nowIso(),
       });
       this.emit(runId, "run.failed", { error: message });
     } finally {
@@ -605,7 +603,7 @@ export class RunSupervisor {
     const run = this.store.getRun(runId);
     const stopping = run?.status === "stopping";
 
-    this.store.updateRun(runId, { output, usage, ended_at: nowIso() });
+    this.store.updateRun(runId, { output, usage, ended_at: Clock.nowIso() });
 
     // The agent validated a packet mid-run, so the run has its deliverable
     // whatever happened afterwards. Do not extract, do not re-validate.

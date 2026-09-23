@@ -18,7 +18,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AMAZON_REVIEWS_ACTOR, TRUSTPILOT_ACTOR, capFor } from "../src/apify.js";
 import { Env, type Settings } from "../src/config/index.js";
 import { archive, createResearchTools, reviewLimit, reviewLocator } from "../src/tools.js";
-import { STAGE_NODES, locatorSchema } from "../src/domain/index.js";
+import {
+  STAGE_NODES,
+  locatorSchema,
+} from "../src/domain/index.js";
 import { minimalPacket, reviewPacket } from "./fixtures.js";
 
 let dir: string;

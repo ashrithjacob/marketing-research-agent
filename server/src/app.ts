@@ -17,7 +17,10 @@ import { TokenService, verifyPassword } from "./auth.js";
 import { buildRouter } from "./api.js";
 import { RunSupervisor } from "./runner.js";
 import { Env, type Settings } from "./config/index.js";
-import { SqliteResearchStore, type ResearchStore } from "./store.js";
+import {
+  type ResearchStore,
+} from "./domain/index.js";
+import { SqliteResearchStore } from "./adapters/index.js";
 
 export const SESSION_COOKIE = "mra_session";
 

@@ -20,18 +20,18 @@
  */
 
 import {
+  type Brief,
   DEFAULT_REJECTED_KINDS,
   FORMS,
+  type Node,
   PRODUCT_ATTRIBUTES,
   SOURCE_KIND_NOTES,
   STAGE_NODES,
-  Stages,
-  type Brief,
-  type Node,
   type SourceKind,
   type Stage,
+  Stages,
 } from "./domain/index.js";
-import type { Judgement } from "./store.js";
+import type { Judgement } from "./domain/index.js";
 
 /** What each collection stage is called, for the prompt's own heading. */
 const STAGE_NAMES: Record<Stage, string> = {

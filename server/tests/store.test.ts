@@ -7,7 +7,10 @@ import { join } from "node:path";
 import Database from "better-sqlite3";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { SqliteResearchStore, summary } from "../src/store.js";
+import {
+  Runs,
+} from "../src/domain/index.js";
+import { SqliteResearchStore } from "../src/adapters/index.js";
 import { minimalPacket } from "./fixtures.js";
 
 let dir: string;
@@ -56,7 +59,7 @@ describe("runs", () => {
       node: "competitors",
     });
     store.updateRun(run.id, { packet });
-    const counts = summary(store.getRun(run.id)!).counts;
+    const counts = Runs.summary(store.getRun(run.id)!).counts;
     expect(counts.sources).toBe(1);
     expect(counts.rejected).toBe(1);
   });
@@ -131,7 +134,7 @@ describe("migration", () => {
     // Its `nodes` column arrives as `[]`, and every such run did all four.
     const run = newRun();
     expect(store.getRun(run.id)!.nodes).toEqual([]);
-    expect(summary(store.getRun(run.id)!).nodes).toEqual([
+    expect(Runs.summary(store.getRun(run.id)!).nodes).toEqual([
       "product_data",
       "competitors",
       "category_data",

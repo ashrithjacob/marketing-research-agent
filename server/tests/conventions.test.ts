@@ -305,3 +305,24 @@ describe("no-secrets", () => {
     expect(rules()).not.toContain("no-secrets");
   });
 });
+
+describe("scans reach into subdirectories", () => {
+  // server/src grew layers, and every scan here was a flat readdir. The
+  // field-parity rule reported applied_count as missing while it sat in
+  // src/domain/logs.ts, and the migration rule went silent when the schema
+  // moved out of store.ts. Both now walk the tree.
+  it("finds a client field declared in a nested server module", () => {
+    write("frontend/src/api.ts", ["export interface Usage {", "  nested_field?: number;", "}"].join("\n"));
+    write("server/src/domain/logs.ts", "export interface X { nested_field: number }\n");
+    git("add", "-A");
+    git("-c", "user.email=t@t", "-c", "user.name=t", "commit", "-m", "x");
+    expect(rules()).not.toContain("client-server-field-parity");
+  });
+
+  it("catches process.env read from a nested module", () => {
+    write("server/src/agent/runner.ts", "const key = process.env.SNEAKY;\n");
+    git("add", "-A");
+    git("-c", "user.email=t@t", "-c", "user.name=t", "commit", "-m", "x");
+    expect(rules()).toContain("env-declared-in-settings");
+  });
+});

@@ -16,18 +16,16 @@ import { RunError, RunSupervisor, type EventFrame } from "./runner.js";
 import {
   Briefs,
   DEFAULT_REJECTED_KINDS,
+  type LlmCall,
+  type ResearchRun,
+  type ResearchStore,
+  type RunEvent,
+  Runs,
   Stages,
   judgementInSchema,
   runRequestSchema,
 } from "./domain/index.js";
 import type { Settings } from "./config/index.js";
-import {
-  summary,
-  type LlmCall,
-  type ResearchRun,
-  type ResearchStore,
-  type RunEvent,
-} from "./store.js";
 
 /**
  * A source id is `sha256:<64 hex>`; the path segment is the bare hash. Anything
@@ -55,7 +53,7 @@ export function buildRouter(options: {
   api.get("/runs", (c) => {
     const limit = Number(c.req.query("limit") ?? 50);
     const safeLimit = Number.isFinite(limit) ? Math.min(Math.max(limit, 1), 200) : 50;
-    return c.json({ data: store.listRuns(safeLimit).map(summary) });
+    return c.json({ data: store.listRuns(safeLimit).map(Runs.summary) });
   });
 
   api.post("/runs", async (c) => {
@@ -101,14 +99,14 @@ export function buildRouter(options: {
       return c.json({ detail: error.message }, 502);
     }
     const run = store.getRun(runId);
-    return c.json(run ? summary(run) : { detail: "run vanished" }, run ? 200 : 500);
+    return c.json(run ? Runs.summary(run) : { detail: "run vanished" }, run ? 200 : 500);
   });
 
   api.get("/runs/:runId", (c) => {
     const run = runOr404(c.req.param("runId"));
     if (!run) return c.json({ detail: "no such run" }, 404);
     return c.json({
-      ...summary(run),
+      ...Runs.summary(run),
       packet: run.packet,
       output: run.output,
       reject_kinds: run.reject_kinds,
@@ -205,7 +203,7 @@ export function buildRouter(options: {
     const calls = store.listLlmCalls(run.id);
     const live = supervisor.isLive(run.id);
     return c.json({
-      run: { ...summary(run), live },
+      run: { ...Runs.summary(run), live },
       stats: callStats(run, calls, store.listEvents(run.id), live),
       calls: Number.isFinite(after) && after > 0 ? calls.filter((call) => call.seq > after) : calls,
     });

@@ -72,11 +72,21 @@ classDiagram
       isLive()
       waitFor()
     }
-    class ResearchRun {
+    class SearchHit {
       <<interface>>
     }
-    class RunSummary {
+    class FetchRecord {
       <<interface>>
+    }
+    class PacketCheckOptions {
+      <<interface>>
+    }
+  }
+  namespace domain {
+    class Briefs {
+      looksLikeUrl()
+      normalise()
+      key()
     }
     class RunEvent {
       <<interface>>
@@ -96,6 +106,12 @@ classDiagram
     class LlmCall {
       <<interface>>
     }
+    class Stages {
+      of()
+      covering()
+      expand()
+      isPartial()
+    }
     class ResearchStore {
       <<interface>>
       createRun()
@@ -107,37 +123,20 @@ classDiagram
       listJudgements()
       addJudgement()
     }
-    class SqliteResearchStore {
-      createRun()
-      getRun()
-      listRuns()
-      updateRun()
-      addEvent()
-      listEvents()
-      listJudgements()
-      addJudgement()
+    class Clock {
+      nowIso()
     }
-    class SearchHit {
+    class Ids {
+      next()
+    }
+    class ResearchRun {
       <<interface>>
     }
-    class FetchRecord {
+    class RunSummary {
       <<interface>>
     }
-    class PacketCheckOptions {
-      <<interface>>
-    }
-  }
-  namespace domain {
-    class Briefs {
-      looksLikeUrl()
-      normalise()
-      key()
-    }
-    class Stages {
-      of()
-      covering()
-      expand()
-      isPartial()
+    class Runs {
+      summary()
     }
   }
   namespace config {
@@ -202,6 +201,50 @@ classDiagram
       parse()
     }
   }
+  namespace adapters {
+    class CallLog {
+      add()
+      setBilled()
+      list()
+    }
+    class PacketCheckLog {
+      add()
+      list()
+    }
+    class EventLog {
+      add()
+      list()
+    }
+    class JudgementTable {
+      list()
+      add()
+      delete()
+      bump()
+    }
+    class Rows {
+      json()
+      run()
+    }
+    class RunTable {
+      create()
+      get()
+      list()
+      update()
+    }
+    class SqliteSchema {
+      apply()
+    }
+    class SqliteResearchStore {
+      createRun()
+      getRun()
+      listRuns()
+      updateRun()
+      addEvent()
+      listEvents()
+      listJudgements()
+      addJudgement()
+    }
+  }
   RunBilling --> OpenRouterCosts
 ```
 
@@ -209,13 +252,24 @@ classDiagram
 
 | Layer | Module | Classes |
 |---|---|---|
+| `adapters` | `adapters/sqlite/call-log.ts` | CallLog |
+| `adapters` | `adapters/sqlite/check-log.ts` | PacketCheckLog |
+| `adapters` | `adapters/sqlite/event-log.ts` | EventLog |
+| `adapters` | `adapters/sqlite/judgement-table.ts` | JudgementTable |
+| `adapters` | `adapters/sqlite/rows.ts` | Rows |
+| `adapters` | `adapters/sqlite/run-table.ts` | RunTable |
+| `adapters` | `adapters/sqlite/schema.ts` | SqliteSchema |
+| `adapters` | `adapters/sqlite/store.ts` | SqliteResearchStore |
 | `(unlayered)` | `apify.ts` | ReviewExcerpt, ReviewResult, AmazonProduct, ActorRunner, ApifyActorRunner |
 | `(unlayered)` | `app.ts` | App |
 | `(unlayered)` | `auth.ts` | TokenService |
 | `config` | `config/settings.ts` | Settings, Env |
 | `(unlayered)` | `costs.ts` | Rates, Pricing, Billed, OpenRouterCosts, RunBilling |
 | `domain` | `domain/brief.ts` | Briefs |
+| `domain` | `domain/logs.ts` | RunEvent, Judgement, PacketCheck, RunUpdate, LlmCallRecord, LlmCall |
 | `domain` | `domain/nodes.ts` | Stages |
+| `domain` | `domain/ports.ts` | ResearchStore |
+| `domain` | `domain/records.ts` | Clock, Ids, ResearchRun, RunSummary, Runs |
 | `extract` | `extract/blocks.ts` | JsonBlocks, PacketExtractor |
 | `extract` | `extract/brief-check.ts` | BriefCheck |
 | `extract` | `extract/check.ts` | PacketContext, PacketCheck |
@@ -227,5 +281,4 @@ classDiagram
 | `extract` | `extract/scope-check.ts` | ScopeCheck |
 | `extract` | `extract/validator.ts` | ZodProblems, PacketValidator |
 | `(unlayered)` | `runner.ts` | RunError, EventFrame, Live, RetryPolicy, RunSupervisor |
-| `(unlayered)` | `store.ts` | ResearchRun, RunSummary, RunEvent, Judgement, PacketCheck, RunUpdate, LlmCallRecord, LlmCall, ResearchStore, SqliteResearchStore |
 | `(unlayered)` | `tools.ts` | SearchHit, FetchRecord, PacketCheckOptions |

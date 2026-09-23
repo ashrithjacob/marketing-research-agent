@@ -4,3 +4,6 @@ export * from "./brief.js";
 export * from "./evidence.js";
 export * from "./packet.js";
 export * from "./request.js";
+export * from "./records.js";
+export * from "./logs.js";
+export * from "./ports.js";

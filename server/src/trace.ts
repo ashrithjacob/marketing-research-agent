@@ -19,7 +19,7 @@
 import type { StreamFn } from "@earendil-works/pi-agent-core";
 import type { AssistantMessage, Message } from "@earendil-works/pi-ai";
 
-import type { LlmCall, ResearchStore } from "./store.js";
+import type { LlmCall, ResearchStore } from "./domain/index.js";
 
 /**
  * A message as the provider receives it. A tool result's `details` and `usage`

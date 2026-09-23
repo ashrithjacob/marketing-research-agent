@@ -20,7 +20,8 @@ import { createApp, type App } from "../src/app.js";
 import { hashPassword } from "../src/auth.js";
 import { RunSupervisor } from "../src/runner.js";
 import { Env, type Settings } from "../src/config/index.js";
-import { SqliteResearchStore } from "../src/store.js";
+
+import { SqliteResearchStore } from "../src/adapters/index.js";
 import { fenced, minimalPacket, reviewPacket } from "./fixtures.js";
 
 const MODEL_ID = "faux-model";
