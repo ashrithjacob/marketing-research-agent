@@ -12,10 +12,10 @@
  * refresh loses everything that happened before it connected, and a second tab
  * sees a different run than the first.
  *
- * **Superseded:** under hermes a run outlived this process, so `recover()`
+ * **Superseded:** under hermes a run outlived this process, so `recoverRunsKilledByRestart()`
  * re-read the upstream run and settled it from what actually happened. In-process
  * that is no longer true — the agent dies with the process — so recovery can only
- * record the death honestly. See `recover()`.
+ * record the death honestly. See `recoverRunsKilledByRestart()`.
  */
 
 import { Agent, type AgentEvent } from "@earendil-works/pi-agent-core";
@@ -331,7 +331,7 @@ export class RunSupervisor {
    * it failed with the reason is the honest record, and it is better than a row
    * that says `running` forever.
    */
-  recover(): void {
+  recoverRunsKilledByRestart(): void {
     for (const run of this.store.listRuns(200)) {
       if (TERMINAL_STATUSES.has(run.status)) continue;
       this.store.updateRun(run.id, {

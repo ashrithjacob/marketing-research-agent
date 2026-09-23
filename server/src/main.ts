@@ -1,22 +1,10 @@
-/**
- * Process entry point: build the app, settle whatever the last process left
- * behind, and serve.
- */
-
 import { serve } from "@hono/node-server";
 
 import { createApp } from "./app.js";
 
 const app = createApp();
 
-// A run does not survive a restart now that the agent lives in this process, so
-// anything still marked `running` is a corpse. Say so before serving, or the
-// cockpit shows a run that will never move again.
-app.supervisor.recover();
-
-// OpenRouter's current prices, refreshed every six hours. Until the first fetch
-// lands (or if it fails), runs are priced from pi-ai's bundled snapshot and
-// their usage records say so.
+app.supervisor.recoverRunsKilledByRestart();
 app.supervisor.costs.start();
 
 const server = serve(

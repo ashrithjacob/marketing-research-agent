@@ -480,7 +480,7 @@ describe("recovery", () => {
       judgementIds: [],
     });
     store.updateRun(run.id, { status: "running" });
-    supervisor.recover();
+    supervisor.recoverRunsKilledByRestart();
     const settled = store.getRun(run.id)!;
     expect(settled.status).toBe("failed");
     expect(settled.error).toMatch(/restarted/);
@@ -488,7 +488,7 @@ describe("recovery", () => {
 
   it("leaves finished runs alone", async () => {
     const runId = await runWith(fenced(minimalPacket()));
-    supervisor.recover();
+    supervisor.recoverRunsKilledByRestart();
     expect(store.getRun(runId)!.status).toBe("completed");
   });
 });

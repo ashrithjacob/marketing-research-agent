@@ -62,6 +62,53 @@ is not the feature working: run it (`mra run`, `mra watch`), read the outcome,
 quote it. A healthy `/api/health` on the live site means the container is up —
 it does not mean your change is on it. Only `deploy/vps/deploy.sh` does that.
 
+## Architecture
+
+`server/tests/architecture.test.ts` is the rulebook. If a rule below and that
+file disagree, the file wins — change it on purpose, never to get a change
+through.
+
+The conversion to this shape is staged. Every module that predates it is named
+in that file's `LEGACY` list and exempt. **That list only shrinks**: a file on it
+that has stopped violating anything fails the suite until it is delisted.
+
+| Layer | Holds | May import |
+|---|---|---|
+| `domain` | Types, zod schemas, `interface` ports. No I/O. | nothing (owns `zod`) |
+| `config` | `Settings`, the only reader of `process.env` | nothing |
+| `extract` | Packet parsing and validation. Pure. | `domain` |
+| `adapters` | Apify, Firecrawl, SearXNG, OpenRouter prices, SQLite, corpus | `domain`, `config` |
+| `agent` | Prompt building, tools, the run loop | `domain`, `config`, `extract`, `adapters` |
+| `http` | Routes, auth, app wiring | everything above |
+| `main.ts` | Entry point. Wiring only. | everything |
+
+Package ownership, enforced: `apify-client` and `better-sqlite3` belong to
+`adapters`, `hono` to `http`, `pi-agent-core` and `pi-ai` to `agent`.
+
+The class diagram lives in `docs/class-diagram.md`. Regenerate it with
+`node server/scripts/class-diagram.mjs` whenever classes or relationships change.
+
+## Code rules
+
+- **Everything is a class.** No module-level functions outside `main.ts` and
+  `hashpw.ts`. A helper is a method, or a `static` on the class that needs it.
+- **One responsibility per class; modules stay under 150 lines.** If describing a
+  class needs "and", split it.
+- **Boundaries are interfaces in `domain/ports.ts`; adapters implement them.**
+  The run loop depends on `ReviewSource`, never on `ApifyClient`.
+- **Dependencies arrive through the constructor** and are held `private readonly`.
+  No globals, no singletons, no `process.env` outside `config`.
+- **Composition over inheritance.** Inherit only to implement an interface.
+- **No comments.** Names carry the meaning; a one-line docstring is the only prose
+  allowed. A measured fact goes in a spec, and the code keeps only the value.
+- **No workarounds.** A hack, with or without a comment explaining it, spreads.
+  Fix the cause or record it as a gap and stop.
+- Every behavioural fix gets a regression test next to the thing it fixes.
+
+The frontend is exempt from the class rule — React function components are its
+paved path. It keeps: no comments, components under 250 lines, fetching and
+shaping in `api.ts`. See the `oop-design` skill.
+
 ## Checks before you call something done
 
 ```bash
@@ -130,6 +177,9 @@ Still only written down, because no rule catches them:
   handed `https://…` as a product name searches for that literal string and
   comes back confidently wrong. This is the bug behind "why does it always go
   for magnesium".
+- **`npm run hashpw` separates its hash with `:`, not `$`.** The value lands in a
+  `.env` read by `docker compose`, which interpolates `$...` and would mangle it
+  silently.
 - **`invalid` is not `failed`.** `failed` is a crash; `invalid` means the agent
   finished and produced something the schema refused, which is the most
   informative failure this app has. Do not collapse them.
@@ -145,3 +195,6 @@ Still only written down, because no rule catches them:
 | Control | `.claude/skills/mra-control/` | improvised curl; claims that something works |
 | Memory | `FEATURE_MAP.md` | guessing at a screenshot |
 | House style | `.claude/skills/client-doc/` | the client-document rewrite loop |
+| Shape | `server/tests/architecture.test.ts` | layers, module size, comments, stray functions |
+| Design | `.claude/skills/oop-design/` | guessing where a class goes |
+| Corrections | `.claude/skills/gardener/` | the same correction being needed twice |

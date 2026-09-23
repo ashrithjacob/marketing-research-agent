@@ -1,12 +1,3 @@
-/**
- * Produce a password hash for MRA_APP_PASSWORD_HASH.
- *
- *     npm run hashpw
- *
- * The separator is ":" rather than "$" because this value lands in a .env file
- * read by docker compose, which interpolates "$..." and would silently mangle it.
- */
-
 import { createInterface } from "node:readline/promises";
 import { stdin, stdout } from "node:process";
 
