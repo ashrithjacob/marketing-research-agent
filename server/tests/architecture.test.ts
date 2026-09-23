@@ -38,6 +38,16 @@ const PACKAGE_OWNERS: Record<string, string> = {
   "@earendil-works/pi-ai": "agent",
 };
 
+/**
+ * Prompt text and worked examples: prose the model reads, held as data.
+ *
+ * The line cap exists to stop a class doing too much, and these do nothing —
+ * splitting a 200-line instruction across modules to satisfy it would make the
+ * prompt harder to read and easier to get wrong. They are exempt from the cap
+ * and, in exchange, may hold no logic at all.
+ */
+const TEXT_MODULE = /(^|[\\/])text[\\/]/;
+
 /** Entry points, which exist to wire concrete things together. */
 const WIRING = new Set(["main.ts", "hashpw.ts"]);
 
@@ -52,7 +62,6 @@ const LEGACY = new Set([
   "auth.ts",
   "costs.ts",
   "http.ts",
-  "prompt.ts",
   "runner.ts",
   "tools.ts",
   "trace.ts",
@@ -131,6 +140,15 @@ function commentLines(rel: string, file: ts.SourceFile): number[] {
   return found;
 }
 
+function declaredLogic(file: ts.SourceFile): string[] {
+  const out: string[] = [];
+  file.forEachChild((node) => {
+    if (ts.isClassDeclaration(node) && node.name) out.push(`class ${node.name.text}`);
+    if (ts.isFunctionDeclaration(node) && node.name) out.push(`function ${node.name.text}`);
+  });
+  return out;
+}
+
 function topLevelFunctions(file: ts.SourceFile): string[] {
   const out: string[] = [];
   file.forEachChild((node) => {
@@ -160,9 +178,15 @@ function violations(rel: string): string[] {
     found.push(`is in unknown layer '${layer}'`);
   }
 
+  const isText = TEXT_MODULE.test(rel);
   const lines = file.getFullText().split("\n").length;
-  if (lines > MAX_MODULE_LINES) {
+  if (!isText && lines > MAX_MODULE_LINES) {
     found.push(`is ${lines} lines, over the ${MAX_MODULE_LINES} limit`);
+  }
+  if (isText) {
+    for (const name of declaredLogic(file)) {
+      found.push(`is a text module but declares ${name}; text modules hold data only`);
+    }
   }
 
   for (const line of commentLines(rel, file)) {

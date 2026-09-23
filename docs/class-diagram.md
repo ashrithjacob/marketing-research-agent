@@ -245,6 +245,28 @@ classDiagram
       addJudgement()
     }
   }
+  namespace agent {
+    class PromptBlocks {
+      code()
+      nodes()
+      gapNodes()
+      scope()
+      judgements()
+      brief()
+    }
+    class PromptBuilder {
+      system()
+      instructions()
+    }
+    class WorkedExample {
+      forStage()
+    }
+    class AgentMessages {
+      steer()
+      packetNudge()
+      resume()
+    }
+  }
   RunBilling --> OpenRouterCosts
 ```
 
@@ -260,6 +282,10 @@ classDiagram
 | `adapters` | `adapters/sqlite/run-table.ts` | RunTable |
 | `adapters` | `adapters/sqlite/schema.ts` | SqliteSchema |
 | `adapters` | `adapters/sqlite/store.ts` | SqliteResearchStore |
+| `agent` | `agent/prompt/blocks.ts` | PromptBlocks |
+| `agent` | `agent/prompt/builder.ts` | PromptBuilder |
+| `agent` | `agent/prompt/example-picker.ts` | WorkedExample |
+| `agent` | `agent/prompt/messages.ts` | AgentMessages |
 | `(unlayered)` | `apify.ts` | ReviewExcerpt, ReviewResult, AmazonProduct, ActorRunner, ApifyActorRunner |
 | `(unlayered)` | `app.ts` | App |
 | `(unlayered)` | `auth.ts` | TokenService |

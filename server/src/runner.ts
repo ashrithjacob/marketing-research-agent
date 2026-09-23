@@ -24,7 +24,7 @@ import { openrouterProvider } from "@earendil-works/pi-ai/providers/openrouter";
 
 import { OpenRouterCosts, RunBilling, type Pricing } from "./costs.js";
 import { PacketError, PacketExtractor, PacketValidator } from "./extract/index.js";
-import { buildInstructions, packetNudgeText, resumeText, steerText, systemPrompt } from "./prompt.js";
+
 import {
   Clock,
   DEFAULT_REJECTED_KINDS,
@@ -41,6 +41,9 @@ import {
 import type { Settings } from "./config/index.js";
 import { TOOL_LANES, createResearchTools } from "./tools.js";
 import { recordLlmCalls } from "./trace.js";
+import { AgentMessages, PromptBuilder } from "./agent/prompt/index.js";
+
+const prompts = new PromptBuilder();
 
 /** Raised when a run cannot be started, steered or stopped. */
 export class RunError extends Error {
@@ -253,7 +256,7 @@ export class RunSupervisor {
     // ones frozen into the package.
     const { model, pricing } = this.costs.price(listed);
 
-    const instructions = buildInstructions({
+    const instructions = prompts.instructions({
       brief: request.brief,
       rejectKinds,
       judgements,
@@ -284,7 +287,7 @@ export class RunSupervisor {
       // warm across its many turns rather than paying full price every time.
       sessionId: `research-${run.id}`,
       initialState: {
-        systemPrompt: systemPrompt(nodes),
+        systemPrompt: prompts.system(nodes),
         model,
         tools: createResearchTools({
           settings: this.settings,
@@ -363,7 +366,7 @@ export class RunSupervisor {
     const live = this.controllable(runId);
     live.agent.steer({
       role: "user",
-      content: [{ type: "text", text: steerText(judgement) }],
+      content: [{ type: "text", text: AgentMessages.steer(judgement) }],
       timestamp: Date.now(),
     } as any);
     this.emit(runId, "run.steered", { judgement_id: judgement.id, text: judgement.text });
@@ -437,14 +440,14 @@ export class RunSupervisor {
         if (this.store.getRun(runId)?.status === "stopping") break;
         // `prompt()` clears `errorMessage` and keeps the transcript, so this is
         // a continuation rather than a restart: the turns already paid for stay.
-        await agent.prompt(resumeText(dropped));
+        await agent.prompt(AgentMessages.resume(dropped));
         await agent.waitForIdle();
       }
       if (this.lacksPacket(runId, output.join(""), agent)) {
         // Once, with tools off, so the only thing the turn can produce is text.
         agent.state.tools = [];
         this.emit(runId, "run.nudged", { reason: "the run ended without a packet" });
-        await agent.prompt(packetNudgeText());
+        await agent.prompt(AgentMessages.packetNudge());
         await agent.waitForIdle();
       }
       this.settle(runId, output.join(""), recorded(), nodes, agent.state.errorMessage);

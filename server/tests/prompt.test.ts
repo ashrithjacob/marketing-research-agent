@@ -10,7 +10,7 @@
 import { describe, expect, it } from "vitest";
 
 import { PacketError, PacketExtractor, PacketValidator } from "../src/extract/index.js";
-import { buildInstructions, steerText, systemPrompt } from "../src/prompt.js";
+
 import {
   FORMS,
   SOURCE_KINDS,
@@ -18,6 +18,9 @@ import {
   briefSchema,
 } from "../src/domain/index.js";
 import type { Judgement } from "../src/domain/index.js";
+import { AgentMessages, PromptBuilder } from "../src/agent/prompt/index.js";
+
+const prompts = new PromptBuilder();
 
 const packets = new PacketValidator();
 const extractor = new PacketExtractor();
@@ -25,8 +28,8 @@ const extractor = new PacketExtractor();
 const brief = (overrides: Record<string, unknown> = {}) =>
   briefSchema.parse({ product: "MagnaCalm", ...overrides });
 
-const build = (overrides: Parameters<typeof buildInstructions>[0] | Record<string, unknown> = {}) =>
-  buildInstructions({
+const build = (overrides: Parameters<PromptBuilder["instructions"]>[0] | Record<string, unknown> = {}) =>
+  prompts.instructions({
     brief: brief(),
     rejectKinds: [],
     judgements: [],
@@ -178,7 +181,7 @@ describe("standing judgements", () => {
   });
 
   it("becomes a rule, not a request, when steered mid-run", () => {
-    const text = steerText(judgement);
+    const text = AgentMessages.steer(judgement);
     expect(text).toMatch(/apply it for the rest of the run/);
     expect(text).toContain("`seo_listicle`");
     expect(text).toMatch(/admitted: false/);
@@ -187,7 +190,7 @@ describe("standing judgements", () => {
 
 describe("the system prompt", () => {
   it("names both tools and says a snippet is not a source", () => {
-    const text = systemPrompt();
+    const text = prompts.system();
     expect(text).toContain("web_search");
     expect(text).toContain("web_fetch");
     expect(text).toMatch(/never cite a url you have only seen in search results/);
@@ -231,15 +234,15 @@ describe("a run that covers part of the stage", () => {
   });
 
   it("scopes the system prompt too", () => {
-    expect(systemPrompt(["competitors"])).toMatch(/This run covers only `competitors`/);
-    expect(systemPrompt()).toMatch(/Work through this stage's nodes methodically/);
+    expect(prompts.system(["competitors"])).toMatch(/This run covers only `competitors`/);
+    expect(prompts.system()).toMatch(/Work through this stage's nodes methodically/);
   });
 
   it("tells each stage which stage it is", () => {
-    expect(systemPrompt()).toMatch(/You are the stage-1 researcher of a six-stage/);
-    expect(systemPrompt(["review_mining"])).toMatch(/You are the stage-2 researcher of a six-stage/);
+    expect(prompts.system()).toMatch(/You are the stage-1 researcher of a six-stage/);
+    expect(prompts.system(["review_mining"])).toMatch(/You are the stage-2 researcher of a six-stage/);
     // A whole stage is not a partial run, whichever stage it is.
-    expect(systemPrompt(["review_mining"])).not.toMatch(/This run covers only/);
+    expect(prompts.system(["review_mining"])).not.toMatch(/This run covers only/);
     expect(build({ nodes: ["review_mining"] })).toMatch(/## Stage 2 — what customers said/);
   });
 });
@@ -269,19 +272,19 @@ describe("the system prompt names only the tools a run is given", () => {
   // The first competitors-only run gapped "amazon_reviews was not available" —
   // told about tools it did not have, it reported their absence as a finding.
   it("gives a product-data run web search and fetch only", () => {
-    const text = systemPrompt(["product_data"]);
+    const text = prompts.system(["product_data"]);
     expect(text).toContain("web_fetch");
     expect(text).not.toMatch(/amazon_|trustpilot_/);
   });
 
   it("gives a competitors run Amazon search as discovery, and no review tools", () => {
-    const text = systemPrompt(["competitors"]);
+    const text = prompts.system(["competitors"]);
     expect(text).toMatch(/`amazon_find_product` — .*a way to find competitors/);
     expect(text).not.toMatch(/amazon_reviews|trustpilot_reviews|The last three may be absent/);
   });
 
   it("describes all five to a run that covers review mining", () => {
-    const text = systemPrompt(["review_mining"]);
+    const text = prompts.system(["review_mining"]);
     expect(text).toContain("amazon_reviews");
     expect(text).toContain("The last three may be absent");
   });
