@@ -16,8 +16,7 @@ import { createModels, type MutableModels } from "@earendil-works/pi-ai";
 import { fauxAssistantMessage, fauxProvider, fauxToolCall } from "@earendil-works/pi-ai/providers/faux";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { createApp, type App } from "../src/app.js";
-import { hashPassword } from "../src/auth.js";
+import { App, Passwords } from "../src/http/index.js";
 import { RunSupervisor } from "../src/agent/index.js";
 import { Env, type Settings } from "../src/config/index.js";
 
@@ -54,7 +53,7 @@ function build(settingsOverrides: Partial<Settings> = {}): App {
     models,
     retry: { attempts: 3, baseMs: 0, capMs: 0 },
   });
-  return createApp({ settings, store, supervisor });
+  return new App({ settings, store, supervisor });
 }
 
 beforeEach(() => {
@@ -250,7 +249,7 @@ describe("auth", () => {
 
   it("guards the research routes when a hash is set", async () => {
     await app.close();
-    app = build({ appPasswordHash: await hashPassword("hunter2"), jwtSecret: "s".repeat(32) });
+    app = build({ appPasswordHash: await Passwords.hash("hunter2"), jwtSecret: "s".repeat(32) });
 
     expect((await get("/api/research/runs")).status).toBe(401);
 

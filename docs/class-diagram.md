@@ -6,16 +6,6 @@ Arrows are constructor dependencies: `A --> B` means A is given a B.
 
 ```mermaid
 classDiagram
-  namespace unlayered {
-    class App {
-      <<interface>>
-      close()
-    }
-    class TokenService {
-      issue()
-      verify()
-    }
-  }
   namespace domain {
     class Briefs {
       looksLikeUrl()
@@ -383,6 +373,46 @@ classDiagram
       add()
     }
   }
+  namespace http {
+    class App {
+      close()
+    }
+    class AuthGate {
+      register()
+    }
+    class CallStats {
+      of()
+    }
+    class ConfigRoute {
+      register()
+    }
+    class CorpusRoute {
+      register()
+    }
+    class EventStream {
+      register()
+    }
+    class Frontend {
+      mount()
+    }
+    class JudgementRoutes {
+      register()
+    }
+    class Passwords {
+      hash()
+      verify()
+    }
+    class ResearchApi {
+      router()
+    }
+    class RunRoutes {
+      register()
+    }
+    class TokenService {
+      issue()
+      verify()
+    }
+  }
   AmazonReviews --> ActorRunner
   AmazonProducts --> ActorRunner
   TrustpilotReviews --> ActorRunner
@@ -413,6 +443,15 @@ classDiagram
   WebFetchTool --> Settings
   WebFetchTool --> Firecrawl
   WebFetchTool --> Corpus
+  AuthGate --> Settings
+  ConfigRoute --> Settings
+  CorpusRoute --> ResearchStore
+  CorpusRoute --> Settings
+  EventStream --> ResearchStore
+  EventStream --> RunSupervisor
+  JudgementRoutes --> ResearchStore
+  RunRoutes --> ResearchStore
+  RunRoutes --> RunSupervisor
 ```
 
 ## Inventory
@@ -464,8 +503,6 @@ classDiagram
 | `agent` | `agent/tools/review-tools.ts` | FindProductTool, AmazonReviewsTool, TrustpilotReviewsTool |
 | `agent` | `agent/tools/web-tools.ts` | WebSearchTool, WebFetchTool |
 | `agent` | `agent/usage.ts` | UsageTotals |
-| `(unlayered)` | `app.ts` | App |
-| `(unlayered)` | `auth.ts` | TokenService |
 | `config` | `config/settings.ts` | Settings, Env |
 | `domain` | `domain/brief.ts` | Briefs |
 | `domain` | `domain/logs.ts` | RunEvent, Judgement, PacketCheck, RunUpdate, LlmCallRecord, LlmCall |
@@ -483,3 +520,15 @@ classDiagram
 | `extract` | `extract/names.ts` | Names, BrandLabels, Relations |
 | `extract` | `extract/scope-check.ts` | ScopeCheck |
 | `extract` | `extract/validator.ts` | ZodProblems, PacketValidator |
+| `http` | `http/app.ts` | App |
+| `http` | `http/auth-gate.ts` | AuthGate |
+| `http` | `http/call-stats.ts` | CallStats |
+| `http` | `http/config-route.ts` | ConfigRoute |
+| `http` | `http/corpus-route.ts` | CorpusRoute |
+| `http` | `http/event-stream.ts` | EventStream |
+| `http` | `http/frontend.ts` | Frontend |
+| `http` | `http/judgement-routes.ts` | JudgementRoutes |
+| `http` | `http/passwords.ts` | Passwords |
+| `http` | `http/research-api.ts` | ResearchApi |
+| `http` | `http/run-routes.ts` | RunRoutes |
+| `http` | `http/token-service.ts` | TokenService |

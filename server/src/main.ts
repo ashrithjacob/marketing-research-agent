@@ -1,8 +1,8 @@
 import { serve } from "@hono/node-server";
 
-import { createApp } from "./app.js";
+import { App } from "./http/index.js";
 
-const app = createApp();
+const app = new App();
 
 app.supervisor.recoverRunsKilledByRestart();
 app.supervisor.costs.start();

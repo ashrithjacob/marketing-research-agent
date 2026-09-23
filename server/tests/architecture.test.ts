@@ -5,10 +5,9 @@
  * file is the other half: the shape the code is being moved to, enforced as it
  * arrives rather than promised in prose.
  *
- * The conversion is staged, so every module that predates it is named in
- * `LEGACY` and exempt. That list is a ratchet — a file on it that has stopped
- * violating anything fails the suite until it is removed, so the exemption
- * cannot outlive the mess it covers. Never add to it.
+ * The conversion was staged: modules that predated the rules sat exempt in
+ * `LEGACY`, a list that could only shrink. It is empty now and stays that way —
+ * every module is governed.
  */
 import { describe, expect, it } from "vitest";
 import { readdirSync, readFileSync, statSync } from "node:fs";
@@ -52,14 +51,11 @@ const TEXT_MODULE = /(^|[\\/])text[\\/]/;
 const WIRING = new Set(["main.ts", "hashpw.ts"]);
 
 /**
- * Modules written before the conversion. Exempt from every rule below.
- * This list only ever shrinks; `the legacy list only shrinks` proves it.
+ * Modules written before the conversion were exempt while it was staged. The
+ * conversion is done: this list is empty, and adding to it is a decision to
+ * weaken every rule above, not a convenience.
  */
-const LEGACY = new Set([
-  "api.ts",
-  "app.ts",
-  "auth.ts",
-]);
+const LEGACY = new Set<string>([]);
 
 function sourceFiles(dir: string = SRC): string[] {
   return readdirSync(dir).flatMap((name) => {

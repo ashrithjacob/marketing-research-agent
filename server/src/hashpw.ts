@@ -1,7 +1,7 @@
 import { createInterface } from "node:readline/promises";
 import { stdin, stdout } from "node:process";
 
-import { hashPassword } from "./auth.js";
+import { Passwords } from "./http/index.js";
 
 /** Read a line without echoing it. Falls back to a visible prompt when stdin is not a tty. */
 async function prompt(question: string): Promise<string> {
@@ -42,7 +42,7 @@ async function main(): Promise<void> {
     console.error("password is empty");
     process.exit(1);
   }
-  console.log(await hashPassword(password));
+  console.log(await Passwords.hash(password));
 }
 
 await main();
