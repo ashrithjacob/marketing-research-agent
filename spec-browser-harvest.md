@@ -1,19 +1,109 @@
 # Browser harvest — reviews from a real, signed-in browser — spec
 
-Every route this project has measured hits one of two walls, and Amazon has both:
+**Destined for its own repository.** This was written inside
+`agent-collection/marketing-research-agent` and is being extracted. Everything it
+depends on from that repo is restated in §0 rather than cited, so the document
+stands on its own; where a measurement lives in the old repo the filename is
+given, but you should not need to open it.
 
-| Wall | What it does | Measured |
+Status: **not built.** §11 is the gate — two measurements decide whether any of
+this is worth writing. §12 is the checklist.
+
+---
+
+## 0. The problem
+
+### 0.1 What the reviews are for
+
+The consumer is a market-research agent. One of the things it gathers is
+**verbatim customer language**: what a buyer actually wrote, with the star
+rating, the date, and a code on three axes — **why they bought**, **why they
+stayed**, **why they quit**.
+
+The word doing the work is *verbatim*. The instruction the agent is given:
+
+> Never clean up, summarise or paraphrase a quote: "I wake up at 3am and can't
+> get back to sleep" is usable and "sleep maintenance issues" is not, and the
+> degradation is irreversible.
+
+That single rule rules out most of the market. Every vendor selling "review
+intelligence", "AI review summaries" or "pain point analysis" is selling the
+paraphrase, which is the thing that has already destroyed the value. What is
+needed is the sentence, unmodified, with a locator that can be re-read.
+
+It also rules out putting a language model in the extraction path, however
+convenient — a model reporting what it saw is a paraphrase hazard sitting exactly
+where paraphrase is forbidden. See §9.
+
+### 0.2 Why 3-star specifically
+
+One-star reviews are mostly logistics: it arrived broken, it never arrived, the
+seller was rude. Five-star reviews are mostly enthusiasm, and a proportion of
+them are incentivised. **The 3-star band is where somebody kept the product and
+still says what is wrong with it** — the only place `why_stayed` and `why_quit`
+routinely appear in the same paragraph.
+
+So a route that returns "reviews" in bulk but cannot select a star band is not
+useful for this. It returns the 5-star mass, because that is what a product page
+shows by default. Star control is the requirement, not a nice-to-have, and it is
+the requirement that every cheap route fails.
+
+**The target is hundreds of reviews per product across the bands, with 3-star
+well represented.** A contract floor of ten exists downstream; it is a floor, not
+the goal.
+
+### 0.3 What is in the way
+
+Two separate walls, and Amazon has both. They look alike and have opposite fixes,
+which is the single most expensive confusion available here:
+
+| Wall | What it does | Where it was measured |
 |---|---|---|
-| **Address** | Hetzner gets a 3.7 KB bot page **at HTTP 200** — to curl, to headless Chrome, to Firecrawl in both proxy modes | `spec-review-mining.md` §3.1–3.2 |
-| **Sign-in** | `/product-reviews/` 302s to `/ap/signin` from **every** address tested, residential included | §3.4 |
+| **Address** | A datacentre IP gets a 3.7 KB bot page **at HTTP 200** — to curl, to headless Chrome, and to Firecrawl in both proxy modes. A residential IP gets 13 real reviews from the same URL. | `spec-review-mining.md` §3.1–3.2 |
+| **Sign-in** | `/product-reviews/`, the page that paginates, 302s to `/ap/signin` from **every** address tested, residential included. Only `/dp/` is readable signed-out, and it holds ~13 reviews. | §3.4 |
+
+A better browser does not solve the first. A better address does not solve the
+second. **Always record which machine a measurement came from** — a laptop result
+does not predict a server one, and on this question they disagree completely.
+
+There is a third trap that is not a wall but corrupts data: on `/dp/`, Amazon's
+own `filterByStar` parameter **lies in two directions**. `three_star` returns
+zero containers, which reads as "no 3-star reviews exist". `one_star` returns the
+*unfiltered* sample — thirteen reviews presented as 1-star, eleven of them really
+5-star. Fabricated star data, undetectable from the page alone. Any harvester
+must check the spread that came back against the band it asked for, and discard
+the page when they differ.
+
+### 0.4 What has been tried, and what each of them actually returns
+
+All measured 2026-09-22 against `amazon.com/dp/B000BD0RT0`, a listing the actor
+reports as having **845 written reviews**:
+
+| Route | Reviews it returned | Star control | Cost |
+|---|---|---|---|
+| **Firecrawl** (cloud scraping API) | **0** of 1,455,348 characters — a real product page with a sign-in prompt where the reviews should be | none | ~1 credit |
+| **AnakinScraper**, self-hosted, plain HTTP handler from a residential IP | **13**, spread `{3:1, 4:1, 5:11}` | none — you get what Amazon chose | free |
+| **Outscraper** | **13** (asked for 50) | **none, and the API has no star parameter at all**; its spec documents `limit` as "Maximum is 12" | free to 500, then $2/1k |
+| **Apify** `junglee/amazon-reviews-scraper` | **76 distinct** in a ten-run walk, spread `{1:18, 2:15, 3:12, 4:13, 5:18}`, 76/76 verified purchases | **yes, verified** — asked 3-star, got 3-star | **$0.6002 charged** |
+
+Reading that table: **only the paid actor can express the question.** The free
+routes all return the same ~13 reviews the `/dp/` page renders, of which exactly
+**one** is 3-star. The gap between "one 3-star review" and "a hundred" is the
+entire problem.
+
+Apify's ceiling is 500 per product — 100 per star band, from its own input
+schema — at $0.006/review on the entry tier, so $3.00 per product and $60 for a
+twenty-product run.
+
+### 0.5 What is left
 
 A real browser, on a residential address, with a signed-in session, is the only
-thing that clears both at once. **This spec records the decision to build that as
-an operator-driven harvest tool, and to write down exactly why the unattended
-version is not the same thing.**
+thing that clears both walls at once — and being signed in is what makes
+`/product-reviews/` reachable, which is what makes pagination past ~13 possible.
 
-Status: **not built.** §11 is the gate — one measurement decides whether any of
-this is worth writing. §12 is the checklist.
+**This spec records the decision to build that as an operator-driven harvest
+tool, and to write down exactly why the unattended version is not the same
+thing.**
 
 ---
 
@@ -29,8 +119,8 @@ Three consequences, in increasing order of importance:
    reviews are archived and content-hashed exactly like a `web_fetch` body, so
    nothing downstream changes.
 2. **Volume becomes reachable, not just the floor.** The target is **hundreds of
-   reviews per product across the bands, and 3-star in particular** — not
-   §2.3's minimum of ten, which is a floor for the contract, not an ambition.
+   reviews per product across the bands, and 3-star in particular** — not the
+   downstream contract's minimum of ten (§0.2), which is a floor, not an aim.
    At the documented ceiling that is up to 100 per band and 500 per product.
    Apify can sell that for $3.00/product; this route would be free — *if* §11
    passes.
@@ -282,17 +372,23 @@ Not optional, and not only for etiquette — it is what keeps a session alive:
 
 ---
 
-## 8. Corpus integration
+## 8. Handing the data over
 
-Harvested reviews enter the corpus exactly as a fetched page does, because
-everything downstream already depends on that:
+The harvester's output is an archive, not a database. Whatever consumes it — the
+research agent today, something else later — gets files it can re-read and
+re-hash, because that is what makes a quote checkable a month after the run:
 
-- One JSON document per (asin, band), written verbatim.
-- `source_id` = sha256 **of the exact bytes written**, so
-  `GET /runs/:id/sources/:sha` re-hashes and matches. Hashing a normalised form
+- One JSON document per (asin, band), written verbatim. No normalisation, no
+  trimming, no re-encoding — see §0.1.
+- `source_id` = sha256 **of the exact bytes written**. The consumer re-hashes the
+  file to prove the quote still matches its source; hashing a normalised form
   turns that audit into a permanent false negative.
-- `kind: marketplace_review`, `publisher: amazon.com`, locator per review from its
-  own permalink.
+- Per review: text, star, date, verified-purchase flag, and its own permalink as
+  the locator.
+- For the research agent specifically, that lands as `kind: marketplace_review`,
+  `publisher: amazon.com`, under `corpus/runs/<runId>/sources/<sha256>` — the
+  same path and rules its `web_fetch` tool already uses, so nothing downstream
+  changes.
 - **Gaps are recorded, not inferred.** Reuse the four diagnoses already in
   `amazon_reviews()`: unloaded placeholder, sign-in prompt, stale selectors, no
   markup. Add a fifth: `session_expired`. Only "the page rendered, the band was
@@ -421,3 +517,30 @@ integration. It is a probe, and probes live there.
   harvests on behalf of strangers is a different product and a different spec.
 - **Not Amazon-general.** Reviews on `/product-reviews/`. Not orders, not prices,
   not anything requiring a purchase.
+
+---
+
+## 14. What moves into the new repo
+
+The scraper is being extracted, so this is the inventory. Most of it exists.
+
+**Comes with it, already written and tested:**
+
+| From | What it is |
+|---|---|
+| `crawl_tests/common.py` → `amazon_reviews()` | The extractor: the measured `data-hook` selectors, plus the four-way diagnosis that distinguishes *unloaded placeholder*, *sign-in prompt*, *stale selectors* and *no markup*. **Do not rewrite this.** |
+| `crawl_tests/common.py` → `wall_check()` | Detects a bot page that arrived as a successful fetch. Tiered, because a naive version flagged a real 20,181-character product page on the word "captcha" in a newsletter form. |
+| `crawl_tests/test_common.py` | 24 cases pinning both of the above, including fixtures taken from real blocked bodies. |
+| `crawl_tests/crawl_apify.py` | The incumbent to benchmark against, including the band-and-sort walk and the live-balance preflight. |
+
+**Written fresh in the new repo:** the harvester itself (§7), the consent flow
+(§4), session storage (§5), and the §11 gate probe.
+
+**Stays behind:** the research agent, the corpus writer, the cockpit. The new
+repo produces archived review files and knows nothing about what reads them.
+
+**Why the extractor must travel rather than be rewritten:** the selectors most
+guides publish are stale, and stale selectors fail *silently* —
+`data-hook="review-body"` and `data-hook="reviewTextContent"` both return zero
+matches on a page holding thirteen reviews. The only defence is one extractor
+with tests that fail loudly when the markup moves.
