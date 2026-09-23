@@ -18,7 +18,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { createApp, type App } from "../src/app.js";
 import { hashPassword } from "../src/auth.js";
-import { RunSupervisor } from "../src/runner.js";
+import { RunSupervisor } from "../src/agent/index.js";
 import { Env, type Settings } from "../src/config/index.js";
 
 import { SqliteResearchStore } from "../src/adapters/index.js";

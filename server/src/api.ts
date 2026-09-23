@@ -12,7 +12,7 @@ import { join, resolve, sep } from "node:path";
 import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
 
-import { RunError, RunSupervisor, type EventFrame } from "./runner.js";
+import { RunError, RunSupervisor, type EventFrame } from "./agent/index.js";
 import {
   Briefs,
   DEFAULT_REJECTED_KINDS,

@@ -15,7 +15,8 @@ import { fauxAssistantMessage, fauxProvider, fauxToolCall } from "@earendil-work
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { OpenRouterPrices } from "../src/adapters/index.js";
-import { RunSupervisor, effectiveRejectKinds } from "../src/runner.js";
+import { RunSupervisor } from "../src/agent/index.js";
+import { RejectKinds } from "../src/domain/index.js";
 import { DEFAULT_RETRY, Retries } from "../src/agent/retry.js";
 import {
   type Judgement,
@@ -423,14 +424,14 @@ describe("judgements", () => {
       applied_count: 0,
       created_at: "",
     };
-    const kinds = effectiveRejectKinds(request(), [judgement]);
+    const kinds = RejectKinds.effective(request(), [judgement]);
     expect(kinds).toEqual(
       expect.arrayContaining(["seo_listicle", "review_roundup", "ai_generated", "competitor_marketing"]),
     );
   });
 
   it("lets an explicit reject_kinds replace the defaults", () => {
-    expect(effectiveRejectKinds(request({ reject_kinds: ["ai_generated"] }), [])).toEqual([
+    expect(RejectKinds.effective(request({ reject_kinds: ["ai_generated"] }), [])).toEqual([
       "ai_generated",
     ]);
   });

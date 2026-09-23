@@ -6,4 +6,5 @@ export * from "./packet.js";
 export * from "./request.js";
 export * from "./records.js";
 export * from "./logs.js";
+export * from "./reject-kinds.js";
 export * from "./ports.js";

@@ -59,8 +59,6 @@ const LEGACY = new Set([
   "api.ts",
   "app.ts",
   "auth.ts",
-  "runner.ts",
-  "trace.ts",
 ]);
 
 function sourceFiles(dir: string = SRC): string[] {

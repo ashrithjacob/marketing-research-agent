@@ -15,16 +15,6 @@ classDiagram
       issue()
       verify()
     }
-    class RunSupervisor {
-      subscribe()
-      isLive()
-      waitFor()
-      start()
-      recoverRunsKilledByRestart()
-      steer()
-      stop()
-      close()
-    }
   }
   namespace domain {
     class Briefs {
@@ -81,6 +71,9 @@ classDiagram
     }
     class Runs {
       summary()
+    }
+    class RejectKinds {
+      effective()
     }
   }
   namespace config {
@@ -265,7 +258,16 @@ classDiagram
     }
   }
   namespace agent {
+    class BilledCosts {
+    }
     class RunError {
+    }
+    class TurnEnd {
+      <<interface>>
+    }
+    class AgentEventRecorder {
+      record()
+      text()
     }
     class EventFrame {
       <<interface>>
@@ -286,6 +288,9 @@ classDiagram
       drain()
       has()
       waitFor()
+    }
+    class LlmCallLog {
+      wrap()
     }
     class ModelPricing {
       apply()
@@ -317,6 +322,24 @@ classDiagram
       isRetryable()
       backoffMs()
       sleep()
+    }
+    class RunAgentFactory {
+      assemble()
+    }
+    class RunSettlement {
+      keepValidated()
+      hasValidated()
+      settle()
+    }
+    class RunSupervisor {
+      start()
+      recoverRunsKilledByRestart()
+      steer()
+      stop()
+      close()
+    }
+    class RunWatch {
+      run()
     }
     class ToolsetOptions {
       <<interface>>
@@ -366,8 +389,19 @@ classDiagram
   Firecrawl --> Settings
   RunBilling --> OpenRouterPrices
   Searxng --> Settings
+  BilledCosts --> ResearchStore
+  BilledCosts --> LiveRuns
+  AgentEventRecorder --> LiveRuns
   LiveRuns --> ResearchStore
   ModelPricing --> OpenRouterPrices
+  RunAgentFactory --> Settings
+  RunAgentFactory --> ResearchStore
+  RunAgentFactory --> LiveRuns
+  RunAgentFactory --> OpenRouterPrices
+  RunAgentFactory --> RetryPolicy
+  RunAgentFactory --> PromptBuilder
+  RunSettlement --> ResearchStore
+  RunSettlement --> LiveRuns
   ResearchToolset --> ToolsetOptions
   PacketCheckTool --> PacketCheckOptions
   FindProductTool --> AmazonProducts
@@ -407,15 +441,22 @@ classDiagram
 | `adapters` | `adapters/sqlite/run-table.ts` | RunTable |
 | `adapters` | `adapters/sqlite/schema.ts` | SqliteSchema |
 | `adapters` | `adapters/sqlite/store.ts` | SqliteResearchStore |
+| `agent` | `agent/billed-costs.ts` | BilledCosts |
 | `agent` | `agent/errors.ts` | RunError |
+| `agent` | `agent/event-recorder.ts` | TurnEnd, AgentEventRecorder |
 | `agent` | `agent/frames.ts` | EventFrame, Frames |
 | `agent` | `agent/live-runs.ts` | Live, LiveRuns |
+| `agent` | `agent/llm-call-log.ts` | LlmCallLog |
 | `agent` | `agent/pricing.ts` | ModelPricing |
 | `agent` | `agent/prompt/blocks.ts` | PromptBlocks |
 | `agent` | `agent/prompt/builder.ts` | PromptBuilder |
 | `agent` | `agent/prompt/example-picker.ts` | WorkedExample |
 | `agent` | `agent/prompt/messages.ts` | AgentMessages |
 | `agent` | `agent/retry.ts` | RetryPolicy, Retries |
+| `agent` | `agent/run-agent-factory.ts` | RunAgentFactory |
+| `agent` | `agent/run-settlement.ts` | RunSettlement |
+| `agent` | `agent/run-supervisor.ts` | RunSupervisor |
+| `agent` | `agent/run-watch.ts` | RunWatch |
 | `agent` | `agent/tools/factory.ts` | ToolsetOptions, ResearchToolset |
 | `agent` | `agent/tools/lanes.ts` | FetchRecord, PacketCheckOptions |
 | `agent` | `agent/tools/packet-check-tool.ts` | PacketCheckTool |
@@ -431,6 +472,7 @@ classDiagram
 | `domain` | `domain/nodes.ts` | Stages |
 | `domain` | `domain/ports.ts` | ResearchStore |
 | `domain` | `domain/records.ts` | Clock, Ids, ResearchRun, RunSummary, Runs |
+| `domain` | `domain/reject-kinds.ts` | RejectKinds |
 | `extract` | `extract/blocks.ts` | JsonBlocks, PacketExtractor |
 | `extract` | `extract/brief-check.ts` | BriefCheck |
 | `extract` | `extract/check.ts` | PacketContext, PacketCheck |
@@ -441,4 +483,3 @@ classDiagram
 | `extract` | `extract/names.ts` | Names, BrandLabels, Relations |
 | `extract` | `extract/scope-check.ts` | ScopeCheck |
 | `extract` | `extract/validator.ts` | ZodProblems, PacketValidator |
-| `(unlayered)` | `runner.ts` | RunSupervisor |

@@ -15,7 +15,7 @@ import { deleteCookie, getCookie, setCookie } from "hono/cookie";
 
 import { TokenService, verifyPassword } from "./auth.js";
 import { buildRouter } from "./api.js";
-import { RunSupervisor } from "./runner.js";
+import { RunSupervisor } from "./agent/index.js";
 import { Env, type Settings } from "./config/index.js";
 import {
   type ResearchStore,
