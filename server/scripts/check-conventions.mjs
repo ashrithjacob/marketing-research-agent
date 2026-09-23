@@ -29,6 +29,22 @@ export function runChecks(REPO = DEFAULT_REPO) {
 const violations = [];
 const skipped = [];
 
+/**
+ * The one file whose job is to contain violations.
+ *
+ * Every rule is proved by handing the checker a fixture repo containing exactly
+ * the bug it catches, so `conventions.test.ts` necessarily holds one bad string
+ * per rule — a chat.vanis.ai line, a key-shaped literal, and whatever the next
+ * rule needs. Scanning it makes every rule report its own test, which is how
+ * both `app-domain` and `no-secrets` went red on a clean tree.
+ *
+ * Excluded once, by exact path, so a rule added later inherits this instead of
+ * rediscovering it. Any rule that walks tracked files should filter on
+ * `scannable`.
+ */
+const FIXTURE_FILE = "server/tests/conventions.test.ts";
+const scannable = (rel) => rel !== FIXTURE_FILE;
+
 function fail(file, line, rule, message) {
   violations.push({ file, line, rule, message });
 }
@@ -283,7 +299,8 @@ function checkPublishedPorts() {
 function checkAppDomain() {
   const files = (git("ls-files") || "")
     .split("\n")
-    .filter((f) => /\.(md|ts|tsx|yaml|yml)$/.test(f));
+    .filter((f) => /\.(md|ts|tsx|yaml|yml)$/.test(f))
+    .filter(scannable);
   for (const rel of files) {
     const text = read(rel);
     if (!text) continue;
@@ -317,6 +334,7 @@ function checkSecrets() {
     [/\bapify_api_[A-Za-z0-9]{20,}/, "an Apify token"],
   ];
   for (const rel of tracked) {
+    if (!scannable(rel)) continue;
     if (/^(frontend\/dist|.*\.(png|jpg|pdf|ico|lock)$|package-lock\.json)/.test(rel)) continue;
     const text = read(rel);
     if (!text || text.length > 2_000_000) continue;

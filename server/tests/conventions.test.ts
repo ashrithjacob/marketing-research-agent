@@ -245,6 +245,27 @@ describe("no-published-ports", () => {
   });
 });
 
+describe("the checker does not report its own fixtures", () => {
+  // Every rule above is proved with a deliberately-bad fixture, so this file
+  // holds one bad string per rule. Both `app-domain` and `no-secrets` used to
+  // scan it and report themselves, which made the gate red on a clean tree and
+  // trained everyone to ignore it. `scannable` in check-conventions.mjs excludes
+  // this path; a rule added later must filter on it too.
+  it("stays quiet about bad strings inside conventions.test.ts", () => {
+    write(
+      "server/tests/conventions.test.ts",
+      [
+        'write("README.md", "Live at https://chat.vanis.ai\\n");',
+        'write("server/src/tools.ts", \'const key = "fc-0123456789abcdef0123456789abcdef";\');',
+      ].join("\n"),
+    );
+    git("add", "-A");
+    git("-c", "user.email=t@t", "-c", "user.name=t", "commit", "-m", "x");
+    expect(rules()).not.toContain("app-domain");
+    expect(rules()).not.toContain("no-secrets");
+  });
+});
+
 describe("app-domain", () => {
   it("catches this app being given agentchat's address", () => {
     write("README.md", "Live at https://chat.vanis.ai\n");
