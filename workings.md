@@ -23,17 +23,18 @@ this one is right and the page needs rebuilding.
 browser (React, frontend/src)
    │  fetch /api/...            SSE /api/research/runs/:id/events
    ▼
-mra container — one Node process (server/src)
-   ├─ app.ts        auth, routes, serves the built SPA
-   ├─ api.ts        /api/research/*
-   ├─ runner.ts     RunSupervisor: one pi-agent-core Agent per run, in-process
-   ├─ costs.ts      OpenRouter live prices, and the billed cost read back per turn
-   ├─ trace.ts      wraps the agent's streamFn: every LLM call, prompt and answer
-   ├─ prompt.ts     brief + scope + rules + judgements  → the agent's instructions
-   ├─ tools.ts      the only things the agent can do (below)
-   ├─ apify.ts      Amazon / Trustpilot through Apify actors
-   ├─ packet.ts     pull the JSON packet out of the output and validate it
-   └─ store.ts      SQLite at /data/research.db  (volume mra_data)
+mra container — one Node process (server/src, layered — see CLAUDE.md)
+   ├─ http/         App (auth, the SPA), ResearchApi (/api/research/*)
+   ├─ agent/        RunSupervisor: one pi-agent-core Agent per run, in-process
+   │                LlmCallLog wraps the streamFn: every call, prompt and answer
+   │                prompt/   brief + scope + rules + judgements → instructions
+   │                tools/    the only things the agent can do (below)
+   ├─ adapters/     OpenRouterPrices: live prices, billed cost read back per turn
+   │                apify/     Amazon / Trustpilot through Apify actors
+   │                sqlite/    SQLite at /data/research.db  (volume mra_data)
+   ├─ extract/      pull the JSON packet out of the output and validate it
+   ├─ domain/       the packet schema, the vocabulary, the ports
+   └─ config/       Settings — the only reader of process.env
         │
         ├──▶ OpenRouter            the model (MRA_MODEL); /models prices; /generation cost
         ├──▶ searxng:8080          web_search (container on the same network)
@@ -51,7 +52,7 @@ Host port `127.0.0.1:8080` maps to the container's `8000`.
 ### Step 1 — the modal
 
 **Stage 1 is three nodes now.** Review mining became **stage 2** on 2026-09-21
-(`STAGE_NODES` in `schema.ts`): stage 1 collects `product_data`, `competitors` and
+(`STAGE_NODES` in `domain/nodes.ts`): stage 1 collects `product_data`, `competitors` and
 `category_data`; stage 2 collects `review_mining`. A run covers one stage, its packet
 carries `stage: 1` or `stage: 2`, and the validator rejects a packet holding another
 stage's nodes — that is a separate run. Downstream the compartment is six stages:
@@ -98,13 +99,13 @@ run on screen filled in. See §2b for what changes when a run covers part of the
 
 ### Step 2 — the request is checked
 
-- `app.ts`: every `/api/research/*` request passes the session check. With
+- `http/auth-gate.ts`: every `/api/research/*` request passes the session check. With
   `MRA_APP_PASSWORD_HASH` empty (the local default) auth is off and every request is
   user `MRA_APP_USER`.
-- `api.ts`: the body is parsed with `runRequestSchema` (`schema.ts`). The schema is
+- `http/run-routes.ts`: the body is parsed with `runRequestSchema` (`domain/request.ts`). The schema is
   `.strict()`, so an unknown key is a 400. A blank product is a 400.
 
-### Step 3 — `RunSupervisor.start()` (runner.ts)
+### Step 3 — `RunSupervisor.start()` (`agent/run-supervisor.ts`)
 
 All of this happens **before the HTTP response is sent**:
 
@@ -121,7 +122,7 @@ All of this happens **before the HTTP response is sent**:
    The model is then **priced**: `costs.price()` writes OpenRouter's current list
    rates onto its `cost`, so pi-ai's per-turn arithmetic uses them rather than the
    snapshot bundled in the package (see §2a).
-5. **Instructions** — `prompt.ts` builds two things:
+5. **Instructions** — `agent/prompt/`'s `PromptBuilder` builds two things:
    - the **system prompt**: "you are the stage-1 researcher", the tool list, and
      what to do if the review tools are absent;
    - the **user turn**, in this order: the rules (gather, never conclude; the four
@@ -133,7 +134,7 @@ All of this happens **before the HTTP response is sent**:
 6. **Agent** — a `pi-agent-core` `Agent` is created in this process with that
    system prompt, the model, session id `research-<runId>` and the tools from
    `createResearchTools()`. Its `streamFn` — the one function that sends a request
-   to the model — is wrapped by `recordLlmCalls()` (`trace.ts`), so every call is
+   to the model — is wrapped by `LlmCallLog` (`agent/llm-call-log.ts`), so every call is
    logged exactly as sent and answered (§2b).
 7. The row becomes `running`, a `run.started {model, nodes}` event is written, and
    `watch()` is started **without awaiting it**. The endpoint returns the run summary.
@@ -145,7 +146,7 @@ All of this happens **before the HTTP response is sent**:
 (SSE). Every event with a kind starting `run.` or `packet.` makes it re-fetch the run,
 which is how the status chip and counters change.
 
-### Step 5 — the agent works (runner.ts `watch()`)
+### Step 5 — the agent works (`agent/run-watch.ts` `run()`)
 
 `agent.prompt(instructions)` runs the loop: model turn → tool calls → model turn →
 … until the model stops calling tools. The tools are the agent's entire surface:
@@ -157,7 +158,7 @@ which is how the status chip and counters change.
 | `amazon_find_product` | Apify `junglee/free-amazon-product-scraper` | asin, stars, `reviewsCount`, title, url — most-reviewed first | none |
 | `amazon_reviews` | Apify `junglee/amazon-reviews-scraper`, one star band per call | header (`source_id`, totals, any `GAP:`) + numbered verbatim reviews with star, date, verified flag, and a locator printed as packet JSON (`{"kind": "url", "url": …}`, or a `note` when there is only a review id) | the review JSON archived like a fetch |
 | `trustpilot_reviews` | Apify `memo23/trustpilot-scraper-ppe` | same shape as above | archived like a fetch |
-| `validate_packet` | `packet.ts` `validate()` — the same function `settle()` runs | `VALID` + counts, or the numbered problems and `Checks used: N of 5` | on the first pass: the packet is written to the run row with `packet_source = "tool"` and `packet.ready` fires mid-run |
+| `validate_packet` | `extract/`'s `PacketValidator` — the same class `RunSettlement` runs | `VALID` + counts, or the numbered problems and `Checks used: N of 5` | on the first pass: the packet is written to the run row with `packet_source = "tool"` and `packet.ready` fires mid-run |
 
 The three Apify tools exist **only when `APIFY_TOKEN` is set and the run covers
 `review_mining`**; otherwise they are not offered at all. Without the token the
@@ -192,7 +193,7 @@ usage is added to a running total (the last turn alone would understate cost by 
 order of magnitude). Its `responseId` — OpenRouter's `gen-…` id — starts a billed-cost
 lookup in the background, so by the end of the run only the last turn's is pending.
 
-### Step 6 — the run is settled (runner.ts `settle()`)
+### Step 6 — the run is settled (`agent/run-settlement.ts` `settle()`)
 
 **The short path first.** If the agent validated a packet mid-run with
 `validate_packet`, the run already has its deliverable: status `completed`, no
@@ -254,7 +255,7 @@ Otherwise, when the agent goes idle:
 1. `output` (all assistant text, in order), `usage` and `ended_at` are saved.
 2. **Error or Stop:** if the agent reported an error → `failed`, or `cancelled` if
    you had pressed Stop. A stop with no error → `cancelled`.
-3. **Extract** (`packet.ts`): every ```` ``` ```` block is collected by scanning
+3. **Extract** (`extract/`'s `PacketExtractor`): every ```` ``` ```` block is collected by scanning
    lines, and **every balanced `{ … }` in the output** is collected too
    (`balancedObjects()`, which tracks strings and escapes so a brace inside a quote
    closes nothing). The **last** candidate that parses as JSON and has a `stage` key
@@ -339,7 +340,7 @@ Neither includes Apify, which bills separately per event.
 **A run on one node** (or any subset) differs from a whole-stage run in four places,
 all keyed off the run's `nodes`:
 
-- **Prompt** (`prompt.ts`). Only the covered nodes' rules are included, under
+- **Prompt** (`agent/prompt/`). Only the covered nodes' rules are included, under
   "This run's node". A `## Scope of this run` section says to research nothing
   else, and the system prompt's "work through the four nodes" becomes "this run
   covers only …". Run-level gaps are attached to the first covered node, not
@@ -347,7 +348,7 @@ all keyed off the run's `nodes`:
 - **Tools.** The Apify review tools are offered only if `review_mining` is covered;
   `amazon_find_product` alone also if `competitors` is. The system prompt describes
   exactly the tools offered.
-- **Validation** (`packet.ts`). Any source, excerpt, measurement, attribute,
+- **Validation** (`extract/`). Any source, excerpt, measurement, attribute,
   saturation curve, node or gap recorded against a node outside the scope fails the
   packet (`invalid`, naming the node and the count). So does a covered node with no
   `nodes[]` entry. The worked example shows all four nodes, so copying it is the
@@ -393,7 +394,7 @@ different form. A brand that solves the same problem with a *different* active i
 neither — it becomes a gap ("same problem, different active"), because whether
 another molecule is a substitute is a stage-2 judgement.
 
-The packet carries this as two things (`schema.ts`):
+The packet carries this as two things (`domain/packet.ts`):
 
 - `competitor_reference` — the product being compared against, read off its own
   page: `name`, `form`, `form_as_printed`, `actives` (normalised names), `source_id`.
@@ -467,10 +468,10 @@ Worth knowing, because the prompt or a spec can suggest otherwise:
 - **A restart kills a live run.** The agent lives in this process; `recover()` marks
   anything left `running`/`queued`/`stopping` as `failed` on startup.
 - **Billing is lost for a run killed by a restart.** The lookups live in the
-  process; `recover()` marks the run failed and it has no `usage.billed`.
+  process; `recoverRunsKilledByRestart()` marks the run failed and it has no `usage.billed`.
 - *Fixed 2026-09-18:* the cockpit's "Tokens" line was always "—". The server sends
   `usage` as `{input, output, cacheRead, totalTokens, cost: {...}}`; `RunView.tsx`
-  read `usage.total_tokens`, and `api.ts` declared that field too (optional), so
+  read `usage.total_tokens`, and `frontend/src/api.ts` declared that field too (optional), so
   `tsc` could not catch it. Both now use pi-ai's field names, and the cockpit also
   shows the calculated and billed cost (§2a).
 
@@ -481,7 +482,7 @@ Worth knowing, because the prompt or a spec can suggest otherwise:
 All bodies are JSON unless stated. Every error is `{"detail": "<message>"}` with a
 4xx/5xx status.
 
-### Auth — `app.ts`
+### Auth — `http/auth-gate.ts`
 
 #### `GET /api/auth/session`
 
@@ -506,7 +507,7 @@ All bodies are JSON unless stated. Every error is `{"detail": "<message>"}` with
 - **In:** nothing; no auth.
 - **Out:** `{"status": "ok"}`. The Docker healthcheck calls this.
 
-### Research — `api.ts`, all behind the session check (`401 {"detail": "not authenticated"}`)
+### Research — `http/research-api.ts`, all behind the session check (`401 {"detail": "not authenticated"}`)
 
 #### `GET /api/research/config`
 
@@ -560,8 +561,8 @@ What the start modal needs to warn you before you pay for a run.
    "reject_kinds": [],
    "nodes": []}
   ```
-  **A url typed as the product is moved to `url`.** `normaliseBrief()`
-  (`schema.ts`) runs on every POST: if `brief.product` looks like a url — a bare
+  **A url typed as the product is moved to `url`.** `Briefs.normalise()`
+  (`domain/brief.ts`) runs on every POST: if `brief.product` looks like a url — a bare
   `example.com` or a full `https://…`, no spaces — it is moved into `brief.url`
   (adding `https://` if missing) and `product` is left **empty**. `product` is a
   name; a url never belongs in it. Either field satisfies the request, so
@@ -582,7 +583,7 @@ What the start modal needs to warn you before you pay for a run.
 - **In:** the run id.
 - **Out:** `RunSummary` plus:
   - `packet` — the validated `StagePacket`, or `null` until `completed`. Shape in
-    `schema.ts`: `contract_version, stage, run_id, brief, sources[], excerpts[],
+    `domain/packet.ts`: `contract_version, stage, run_id, brief, sources[], excerpts[],
     measurements[], attributes[], saturation[], nodes[], gaps[]`.
   - `output` — every assistant message's text, concatenated. The packet was parsed
     from this; on an `invalid` run it is where to look.
@@ -719,7 +720,7 @@ What the start modal needs to warn you before you pay for a run.
 - **In:** the id.
 - **Out:** `{"ok": true}` — a hard delete, and also `ok` for an id that did not exist.
 
-### Everything else — `app.ts` `mountFrontend`
+### Everything else — `http/frontend.ts`'s `Frontend`
 
 #### `GET /*`
 
