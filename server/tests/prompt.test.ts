@@ -9,10 +9,13 @@
 
 import { describe, expect, it } from "vitest";
 
-import { parse, validate } from "../src/packet.js";
+import { PacketError, PacketExtractor, PacketValidator } from "../src/extract/index.js";
 import { buildInstructions, steerText, systemPrompt } from "../src/prompt.js";
 import { FORMS, SOURCE_KINDS, STAGE_NODES, briefSchema } from "../src/domain/index.js";
 import type { Judgement } from "../src/store.js";
+
+const packets = new PacketValidator();
+const extractor = new PacketExtractor();
 
 const brief = (overrides: Record<string, unknown> = {}) =>
   briefSchema.parse({ product: "MagnaCalm", ...overrides });
@@ -28,7 +31,7 @@ const build = (overrides: Parameters<typeof buildInstructions>[0] | Record<strin
 describe("the worked example", () => {
   it("is itself a valid packet", () => {
     // If the example drifts out of the contract, every run copies the drift.
-    const parsed = parse(build());
+    const parsed = packets.parse(build());
     expect(parsed.sources.length).toBeGreaterThan(0);
     expect(parsed.gaps.length).toBeGreaterThan(0);
   });
@@ -36,12 +39,12 @@ describe("the worked example", () => {
   it("is cut to the stage it is shown in", () => {
     // Review mining is stage 2, so a stage-1 example that shows review excerpts
     // teaches every run to break the boundary it is about to be validated against.
-    const stage1 = parse(build(), STAGE_NODES[1]);
+    const stage1 = packets.parse(build(), STAGE_NODES[1]);
     expect(stage1.stage).toBe(1);
     expect(stage1.excerpts).toHaveLength(0);
     expect(stage1.competitors.length).toBeGreaterThan(0);
 
-    const stage2 = parse(build({ nodes: ["review_mining"] }), STAGE_NODES[2]);
+    const stage2 = packets.parse(build({ nodes: ["review_mining"] }), STAGE_NODES[2]);
     expect(stage2.stage).toBe(2);
     expect(stage2.competitors).toHaveLength(0);
     // The 3★ coverage the validator demands, shown where it belongs.
@@ -187,8 +190,8 @@ describe("the system prompt", () => {
 });
 
 describe("the example survives the validator's cross-object rules", () => {
-  it("passes validate() directly, not just extract()", () => {
-    expect(() => validate(parse(build()))).not.toThrow();
+  it("passes packets.validate() directly, not just extractor.extract()", () => {
+    expect(() => packets.validate(packets.parse(build()))).not.toThrow();
   });
 });
 
@@ -251,7 +254,7 @@ describe("the competitors node", () => {
   });
 
   it("shows a direct and an indirect competitor in the example", () => {
-    const parsed = parse(build());
+    const parsed = packets.parse(build());
     expect(parsed.competitors.map((c) => c.relation).sort()).toEqual(["direct", "indirect"]);
     expect(parsed.competitor_reference?.form).toBe("capsule");
   });

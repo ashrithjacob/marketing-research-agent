@@ -52,7 +52,6 @@ const LEGACY = new Set([
   "auth.ts",
   "costs.ts",
   "http.ts",
-  "packet.ts",
   "prompt.ts",
   "runner.ts",
   "store.ts",

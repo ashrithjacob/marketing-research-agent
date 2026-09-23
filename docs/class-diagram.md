@@ -51,8 +51,6 @@ classDiagram
       track()
       settle()
     }
-    class PacketError {
-    }
     class RunError {
     }
     class EventFrame {
@@ -153,6 +151,57 @@ classDiagram
       settings()
     }
   }
+  namespace extract {
+    class JsonBlocks {
+      fenced()
+      balanced()
+    }
+    class PacketExtractor {
+      extract()
+    }
+    class BriefCheck {
+      problems()
+    }
+    class PacketContext {
+      <<interface>>
+    }
+    class PacketCheck {
+      <<interface>>
+      problems()
+    }
+    class CitationCheck {
+      problems()
+    }
+    class CompetitorCheck {
+      problems()
+    }
+    class CompletenessCheck {
+      problems()
+    }
+    class PacketError {
+    }
+    class Names {
+      normalise()
+      squash()
+      sameHost()
+    }
+    class BrandLabels {
+      of()
+    }
+    class Relations {
+      expected()
+    }
+    class ScopeCheck {
+      problems()
+    }
+    class ZodProblems {
+      readable()
+    }
+    class PacketValidator {
+      validate()
+      parse()
+    }
+  }
   RunBilling --> OpenRouterCosts
 ```
 
@@ -167,7 +216,16 @@ classDiagram
 | `(unlayered)` | `costs.ts` | Rates, Pricing, Billed, OpenRouterCosts, RunBilling |
 | `domain` | `domain/brief.ts` | Briefs |
 | `domain` | `domain/nodes.ts` | Stages |
-| `(unlayered)` | `packet.ts` | PacketError |
+| `extract` | `extract/blocks.ts` | JsonBlocks, PacketExtractor |
+| `extract` | `extract/brief-check.ts` | BriefCheck |
+| `extract` | `extract/check.ts` | PacketContext, PacketCheck |
+| `extract` | `extract/citation-check.ts` | CitationCheck |
+| `extract` | `extract/competitor-check.ts` | CompetitorCheck |
+| `extract` | `extract/completeness-check.ts` | CompletenessCheck |
+| `extract` | `extract/errors.ts` | PacketError |
+| `extract` | `extract/names.ts` | Names, BrandLabels, Relations |
+| `extract` | `extract/scope-check.ts` | ScopeCheck |
+| `extract` | `extract/validator.ts` | ZodProblems, PacketValidator |
 | `(unlayered)` | `runner.ts` | RunError, EventFrame, Live, RetryPolicy, RunSupervisor |
 | `(unlayered)` | `store.ts` | ResearchRun, RunSummary, RunEvent, Judgement, PacketCheck, RunUpdate, LlmCallRecord, LlmCall, ResearchStore, SqliteResearchStore |
 | `(unlayered)` | `tools.ts` | SearchHit, FetchRecord, PacketCheckOptions |

@@ -9,19 +9,15 @@
 
 import { describe, expect, it } from "vitest";
 
-import {
-  PacketError,
-  balancedObjects,
-  brandLabels,
-  extract,
-  parse,
-  validate,
-} from "../src/packet.js";
+import { BrandLabels, JsonBlocks, PacketError, PacketExtractor, PacketValidator } from "../src/extract/index.js";
 import {
   STAGE_NODES,
   Stages,
 } from "../src/domain/index.js";
 import { fenced, minimalPacket, reviewPacket } from "./fixtures.js";
+
+const packets = new PacketValidator();
+const extractor = new PacketExtractor();
 
 /** Stage 1 is the product, its competitors and its category; stage 2 is review
  *  mining. A packet belongs to one of them, so its scope comes with it. */
@@ -30,23 +26,23 @@ const REVIEW = STAGE_NODES[2];
 
 describe("extraction", () => {
   it("reads a fenced block", () => {
-    expect(extract(fenced(minimalPacket())).stage).toBe(1);
+    expect(extractor.extract(fenced(minimalPacket())).stage).toBe(1);
   });
 
   it("takes the last packet — an agent that shows its working writes the example first", () => {
     const first = minimalPacket();
     first.brief.product = "an example";
     const output = fenced(first, "For illustration:") + fenced(minimalPacket(), "And the real one:");
-    expect((extract(output).brief as any).product).toBe("MagnaCalm 400mg");
+    expect((extractor.extract(output).brief as any).product).toBe("MagnaCalm 400mg");
   });
 
   it("accepts bare JSON", () => {
-    expect(extract(JSON.stringify(minimalPacket())).stage).toBe(1);
+    expect(extractor.extract(JSON.stringify(minimalPacket())).stage).toBe(1);
   });
 
   it("ignores unrelated fences", () => {
     const output = "```python\nprint('hi')\n```\n\n" + fenced(minimalPacket());
-    expect(extract(output).stage).toBe(1);
+    expect(extractor.extract(output).stage).toBe(1);
   });
 
   it("finds the packet when the model's fences do not pair", () => {
@@ -73,34 +69,34 @@ describe("extraction", () => {
       JSON.stringify(minimalPacket(), null, 2),
       "```",
     ].join("\n");
-    expect(extract(output).stage).toBe(1);
-    expect((extract(output).brief as any).product).toBe("MagnaCalm 400mg");
+    expect(extractor.extract(output).stage).toBe(1);
+    expect((extractor.extract(output).brief as any).product).toBe("MagnaCalm 400mg");
   });
 
   it("is not fooled by braces inside quoted text", () => {
     const packet = reviewPacket();
     packet.excerpts[0].text = 'She wrote "it arrived broken }" and left it at that {';
     const output = `here you go\n\`\`\`\n${JSON.stringify(packet)}\n\`\`\`\ndone`;
-    expect((extract(output).excerpts as any)[0].text).toContain("arrived broken");
+    expect((extractor.extract(output).excerpts as any)[0].text).toContain("arrived broken");
   });
 
   it("collects balanced objects and skips the unbalanced", () => {
-    expect(balancedObjects('noise {"a":1} more {"b":{"c":2}} and {"d": unterminated')).toEqual([
+    expect(JsonBlocks.balanced('noise {"a":1} more {"b":{"c":2}} and {"d": unterminated')).toEqual([
       '{"a":1}',
       '{"b":{"c":2}}',
     ]);
     // A stray closing brace in prose closes nothing.
-    expect(balancedObjects("} nothing here")).toEqual([]);
+    expect(JsonBlocks.balanced("} nothing here")).toEqual([]);
   });
 
   it("errors when there is no JSON at all", () => {
-    expect(() => extract("I did the research and here is what I think.")).toThrow(
+    expect(() => extractor.extract("I did the research and here is what I think.")).toThrow(
       /no fenced JSON/,
     );
   });
 
   it("errors on empty output", () => {
-    expect(() => extract("   ")).toThrow(/no output/);
+    expect(() => extractor.extract("   ")).toThrow(/no output/);
   });
 });
 
@@ -109,49 +105,49 @@ describe("validation: stage 1 does not conclude", () => {
     // The point of the whole schema. An invented field is a hard failure.
     const data = minimalPacket();
     data.findings = ["Buyers are motivated by 3am waking"];
-    expect(() => validate(data)).toThrow(/not in the stage-1 contract/);
+    expect(() => packets.validate(data)).toThrow(/not in the stage-1 contract/);
   });
 
   it("rejects a conclusion smuggled onto an excerpt", () => {
     const data = reviewPacket();
     data.excerpts[0].interpretation = "sleep maintenance issues";
-    expect(() => validate(data, REVIEW)).toThrow(/not in the stage-1 contract/);
+    expect(() => packets.validate(data, REVIEW)).toThrow(/not in the stage-1 contract/);
   });
 
   it("refuses a theme carrying a description", () => {
     // §5: a theme with prose attached is a conclusion wearing a hat.
     const data = reviewPacket();
     data.excerpts[0].themes = [{ label: "3am waking", meaning: "…" }];
-    expect(() => validate(data, REVIEW)).toThrow(PacketError);
+    expect(() => packets.validate(data, REVIEW)).toThrow(PacketError);
   });
 });
 
 describe("validation: the cross-object rules", () => {
   it("fails a run with an empty gap list", () => {
     // spec.md §4.3 — a run reporting no holes stopped looking.
-    expect(() => validate(minimalPacket({ gaps: [] }))).toThrow(/gap list is empty/);
+    expect(() => packets.validate(minimalPacket({ gaps: [] }))).toThrow(/gap list is empty/);
   });
 
   it("rejects an excerpt citing an absent source", () => {
     const data = reviewPacket();
     data.excerpts[0].source_id = "sha256:nope";
-    expect(() => validate(data, REVIEW)).toThrow(/not in the packet/);
+    expect(() => packets.validate(data, REVIEW)).toThrow(/not in the packet/);
   });
 
   it("rejects a saturation curve citing an absent source", () => {
     const data = reviewPacket();
     data.saturation[0].curve[0].source_id = "sha256:ghost";
-    expect(() => validate(data, REVIEW)).toThrow(/not in the packet/);
+    expect(() => packets.validate(data, REVIEW)).toThrow(/not in the packet/);
   });
 
   it("rejects a complete review_mining node without 3-star coverage", () => {
     const data = reviewPacket();
     data.excerpts[0].star_rating = 5;
-    expect(() => validate(data, REVIEW)).toThrow(/no 3-star excerpt/);
+    expect(() => packets.validate(data, REVIEW)).toThrow(/no 3-star excerpt/);
   });
 
   it("requires a saturation curve for a complete node", () => {
-    expect(() => validate(reviewPacket({ saturation: [] }), REVIEW)).toThrow(/saturation curve/);
+    expect(() => packets.validate(reviewPacket({ saturation: [] }), REVIEW)).toThrow(/saturation curve/);
   });
 
   it("treats product_data as a checklist, not a search", () => {
@@ -166,7 +162,7 @@ describe("validation: the cross-object rules", () => {
       },
     ];
     data.saturation = [];
-    expect(() => validate(data)).not.toThrow();
+    expect(() => packets.validate(data)).not.toThrow();
   });
 
   it("requires a gap recording an undated ad", () => {
@@ -183,7 +179,7 @@ describe("validation: the cross-object rules", () => {
       node: "competitors",
     });
     // The gap that exists is about the COA, not about the ad.
-    expect(() => validate(data)).toThrow(/first_seen/);
+    expect(() => packets.validate(data)).toThrow(/first_seen/);
   });
 
   it("accepts an undated ad when it is gapped", () => {
@@ -199,7 +195,7 @@ describe("validation: the cross-object rules", () => {
       node: "competitors",
     });
     data.gaps.push({ node: "competitors", missing: "CalmWell ad carries no first-seen date" });
-    expect(() => validate(data)).not.toThrow();
+    expect(() => packets.validate(data)).not.toThrow();
   });
 
   it("keeps rejected sources in the packet", () => {
@@ -214,7 +210,7 @@ describe("validation: the cross-object rules", () => {
       archived: false,
       node: "competitors",
     });
-    expect(validate(data).sources.map((s) => s.admitted)).toEqual([true, false]);
+    expect(packets.validate(data).sources.map((s) => s.admitted)).toEqual([true, false]);
   });
 
   it("accepts a review excerpt located by its permalink", () => {
@@ -224,18 +220,18 @@ describe("validation: the cross-object rules", () => {
       kind: "url",
       url: "https://www.amazon.com/gp/customer-reviews/R83A6B2PFC42",
     };
-    expect(() => validate(data, REVIEW)).not.toThrow();
+    expect(() => packets.validate(data, REVIEW)).not.toThrow();
   });
 
   it("still rejects a locator shape the contract does not name", () => {
     // What a run invented before the tools printed the locator ready to copy.
     const data = reviewPacket();
     data.excerpts[0].locator = { kind: "url", value: "https://www.amazon.com/gp/customer-reviews/R1" };
-    expect(() => validate(data, REVIEW)).toThrow(/locator\.value: field not in the stage-1 contract/);
+    expect(() => packets.validate(data, REVIEW)).toThrow(/locator\.value: field not in the stage-1 contract/);
   });
 
   it("round-trips a valid packet", () => {
-    const parsed = parse(fenced(reviewPacket()), REVIEW);
+    const parsed = packets.parse(fenced(reviewPacket()), REVIEW);
     expect(parsed.excerpts[0]!.text.startsWith("I wake up at 3am")).toBe(true);
     expect(parsed.excerpts[0]!.star_rating).toBe(3);
   });
@@ -246,31 +242,31 @@ describe("validation: the packet answers the brief it was given", () => {
     // The prompt's example names a product; a model that anchors on it
     // researches the example instead of the brief — a "completed" run about
     // the wrong product is the most expensive failure there is.
-    expect(() => validate(minimalPacket(), STAGE1, { product: "mullein" })).toThrow(
+    expect(() => packets.validate(minimalPacket(), STAGE1, { product: "mullein" })).toThrow(
       /packet brief is about 'MagnaCalm 400mg', but this run's brief is 'mullein'/,
     );
   });
 
   it("accepts an echo of the brief, case and detail aside", () => {
-    expect(() => validate(minimalPacket(), STAGE1, { product: "magnacalm" })).not.toThrow();
-    expect(() => validate(minimalPacket(), STAGE1, { product: "MagnaCalm 400mg" })).not.toThrow();
+    expect(() => packets.validate(minimalPacket(), STAGE1, { product: "magnacalm" })).not.toThrow();
+    expect(() => packets.validate(minimalPacket(), STAGE1, { product: "MagnaCalm 400mg" })).not.toThrow();
   });
 
   it("lets the agent fill out a sparse product name", () => {
     // "mullein" researched as "Mullein leaf 500mg capsules" is the job done well.
     const data = minimalPacket();
     data.brief.product = "Mullein leaf 500mg capsules";
-    expect(() => validate(data, STAGE1, { product: "mullein" })).not.toThrow();
+    expect(() => packets.validate(data, STAGE1, { product: "mullein" })).not.toThrow();
   });
 
   it("takes the brand from a URL brief", () => {
     // A store URL is a valid brief; no product name contains the URL itself.
     const data = minimalPacket();
     data.brief.product = "Surity urinary incontinence management — Female External Catheter";
-    expect(() => validate(data, STAGE1, { product: "https://www.surity.care/" })).not.toThrow();
-    expect(() => validate(data, STAGE1, { product: "surity.care" })).not.toThrow();
+    expect(() => packets.validate(data, STAGE1, { product: "https://www.surity.care/" })).not.toThrow();
+    expect(() => packets.validate(data, STAGE1, { product: "surity.care" })).not.toThrow();
     data.brief.product = "Mayaverse lash serum";
-    expect(() => validate(data, STAGE1, { product: "https://shop.mayaverse.co.uk/x" })).not.toThrow();
+    expect(() => packets.validate(data, STAGE1, { product: "https://shop.mayaverse.co.uk/x" })).not.toThrow();
   });
 
   it("matches a multi-word brand against its squashed domain", () => {
@@ -281,7 +277,7 @@ describe("validation: the packet answers the brief it was given", () => {
     data.brief.product = "Droplet (The Droplet Co) — luxury reed diffuser home fragrance";
     data.brief.url = "";
     expect(() =>
-      validate(data, STAGE1, { product: "", url: "https://thedropletco.co.uk/" }),
+      packets.validate(data, STAGE1, { product: "", url: "https://thedropletco.co.uk/" }),
     ).not.toThrow();
   });
 
@@ -292,13 +288,13 @@ describe("validation: the packet answers the brief it was given", () => {
     data.brief.product = "Rose Reed Diffuser";
     data.brief.url = "https://thedropletco.co.uk/products/rose-reed-diffuser";
     expect(() =>
-      validate(data, STAGE1, { product: "", url: "https://www.thedropletco.co.uk/" }),
+      packets.validate(data, STAGE1, { product: "", url: "https://www.thedropletco.co.uk/" }),
     ).not.toThrow();
   });
 
   it("rejects a packet about the example when the brief is a site", () => {
     expect(() =>
-      validate(minimalPacket(), STAGE1, { product: "", url: "https://thedropletco.co.uk/" }),
+      packets.validate(minimalPacket(), STAGE1, { product: "", url: "https://thedropletco.co.uk/" }),
     ).toThrow(/this run's brief is the site 'https:\/\/thedropletco.co.uk\/'/);
   });
 
@@ -308,26 +304,26 @@ describe("validation: the packet answers the brief it was given", () => {
     const data = minimalPacket();
     data.brief.product = "https://thedropletco.co.uk/";
     expect(() =>
-      validate(data, STAGE1, { product: "", url: "https://thedropletco.co.uk/" }),
+      packets.validate(data, STAGE1, { product: "", url: "https://thedropletco.co.uk/" }),
     ).toThrow(/which is a url — it must be the product's name/);
   });
 
   it("still rejects the worked example when the brief is a URL", () => {
-    expect(() => validate(minimalPacket(), STAGE1, { product: "https://www.surity.care/" })).toThrow(
+    expect(() => packets.validate(minimalPacket(), STAGE1, { product: "https://www.surity.care/" })).toThrow(
       /packet brief is about 'MagnaCalm 400mg', but this run's brief is 'https:\/\/www.surity.care\/'/,
     );
   });
 
   it("reads brand labels from URLs and nothing else", () => {
-    expect(brandLabels("https://www.surity.care/")).toEqual(["surity"]);
-    expect(brandLabels("https://shop.mayaverse.co.uk/")).toEqual(["mayaverse"]);
-    expect(brandLabels("surity.care")).toEqual(["surity"]);
-    expect(brandLabels("mullein")).toBeNull();
-    expect(brandLabels("mullein leaf 500mg")).toBeNull();
+    expect(BrandLabels.of("https://www.surity.care/")).toEqual(["surity"]);
+    expect(BrandLabels.of("https://shop.mayaverse.co.uk/")).toEqual(["mayaverse"]);
+    expect(BrandLabels.of("surity.care")).toEqual(["surity"]);
+    expect(BrandLabels.of("mullein")).toBeNull();
+    expect(BrandLabels.of("mullein leaf 500mg")).toBeNull();
   });
 
   it("checks nothing when no brief is handed over", () => {
-    expect(() => validate(minimalPacket())).not.toThrow();
+    expect(() => packets.validate(minimalPacket())).not.toThrow();
   });
 });
 
@@ -356,14 +352,14 @@ describe("validation: a run that covers part of the stage", () => {
     });
 
   it("accepts a packet that stays inside its scope", () => {
-    expect(() => validate(productOnly(), ["product_data"])).not.toThrow();
+    expect(() => packets.validate(productOnly(), ["product_data"])).not.toThrow();
   });
 
   it("rejects anything recorded against a node outside the scope, and says which", () => {
     // Copying the worked example, which shows all four nodes, is the easy way here.
     const data = productOnly();
     data.gaps.push({ node: "competitors", missing: "CalmWell ad library empty" });
-    expect(() => validate(data, ["product_data"])).toThrow(
+    expect(() => packets.validate(data, ["product_data"])).toThrow(
       /1 entry is recorded against competitors, which is outside this run's scope \(product_data\)/,
     );
   });
@@ -371,14 +367,14 @@ describe("validation: a run that covers part of the stage", () => {
   it("requires the covered node to say how it ended", () => {
     const data = productOnly();
     data.nodes = [];
-    expect(() => validate(data, ["product_data"])).toThrow(/nodes has no entry for product_data/);
+    expect(() => packets.validate(data, ["product_data"])).toThrow(/nodes has no entry for product_data/);
   });
 
   it("leaves a whole-stage run exactly as it was", () => {
     // minimalPacket reports one of stage 1's three nodes — fine for a full run,
     // which is not required to carry an entry per node.
-    expect(() => validate(minimalPacket())).not.toThrow();
-    expect(() => validate(minimalPacket(), [...STAGE1])).not.toThrow();
+    expect(() => packets.validate(minimalPacket())).not.toThrow();
+    expect(() => packets.validate(minimalPacket(), [...STAGE1])).not.toThrow();
   });
 });
 
@@ -422,7 +418,7 @@ describe("validation: competitors, direct and indirect", () => {
   };
 
   it("accepts rows whose relation agrees with the forms", () => {
-    const packet = validate(withCompetitors());
+    const packet = packets.validate(withCompetitors());
     expect(packet.competitors.map((c) => c.relation)).toEqual(["direct", "indirect"]);
   });
 
@@ -430,7 +426,7 @@ describe("validation: competitors, direct and indirect", () => {
     // A spray against a capsule is indirect by §2.2, whatever the agent thinks.
     const data = withCompetitors();
     data.competitors[1].relation = "direct";
-    expect(() => validate(data)).toThrow(
+    expect(() => packets.validate(data)).toThrow(
       /'SleepMist spray' is labelled direct, but its form \(spray\) differs from the reference's \(capsule\), which makes it indirect/,
     );
   });
@@ -451,12 +447,12 @@ describe("validation: competitors, direct and indirect", () => {
     data.competitors[1].form = "other";
     data.competitors[1].form_as_printed = "electric brush heads, Sonicare-compatible";
     data.competitors[1].relation = "indirect";
-    expect(() => validate(data)).not.toThrow();
+    expect(() => packets.validate(data)).not.toThrow();
 
     // And the opposite call on the same rows is accepted too: with no vocabulary
     // to appeal to, the packet records the judgement and the evidence for it.
     data.competitors[0].relation = "indirect";
-    expect(() => validate(data)).not.toThrow();
+    expect(() => packets.validate(data)).not.toThrow();
   });
 
   it("requires the printed form when the vocabulary cannot decide", () => {
@@ -465,7 +461,7 @@ describe("validation: competitors, direct and indirect", () => {
     data.competitor_reference.form_as_printed = "manual bamboo toothbrush";
     data.competitors[0].form = "other";
     data.competitors[0].form_as_printed = "   ";
-    expect(() => validate(data)).toThrow(
+    expect(() => packets.validate(data)).toThrow(
       /both `other`, so `form_as_printed` is the only record of what makes them direct — and it is empty on the competitor/,
     );
   });
@@ -475,7 +471,7 @@ describe("validation: competitors, direct and indirect", () => {
     const data = withCompetitors();
     data.competitors[0].form = "other";
     data.competitors[0].form_as_printed = "toothbrush";
-    expect(() => validate(data)).toThrow(/its form \(other\) differs from the reference's \(capsule\)/);
+    expect(() => packets.validate(data)).toThrow(/its form \(other\) differs from the reference's \(capsule\)/);
   });
 
   it("rejects a shared active the reference product does not have", () => {
@@ -484,49 +480,49 @@ describe("validation: competitors, direct and indirect", () => {
     const melatonin = { name_as_printed: "Melatonin", name_normalised: "melatonin" };
     data.competitors[0].active_ingredients = [melatonin];
     data.competitors[0].shared_actives = ["melatonin"];
-    expect(() => validate(data)).toThrow(/is neither direct nor indirect/);
+    expect(() => packets.validate(data)).toThrow(/is neither direct nor indirect/);
   });
 
   it("rejects a shared active the competitor does not list itself", () => {
     const data = withCompetitors();
     data.competitors[0].shared_actives = ["magnesium citrate"];
-    expect(() => validate(data)).toThrow(/'magnesium citrate' as shared, but not among its own actives/);
+    expect(() => packets.validate(data)).toThrow(/'magnesium citrate' as shared, but not among its own actives/);
   });
 
   it("needs the reference product before it can classify anything", () => {
     const data = withCompetitors();
     data.competitor_reference = null;
-    expect(() => validate(data)).toThrow(/competitor_reference is missing/);
+    expect(() => packets.validate(data)).toThrow(/competitor_reference is missing/);
   });
 
   it("only links ad-library sources as ads", () => {
     const data = withCompetitors();
     data.competitors[0].ad_source_ids = ["sha256:sm"];
-    expect(() => validate(data)).toThrow(/links 'sha256:sm' as an ad, but that source is competitor_marketing/);
+    expect(() => packets.validate(data)).toThrow(/links 'sha256:sm' as an ad, but that source is competitor_marketing/);
   });
 
   it("rejects a form outside the vocabulary", () => {
     // "veg caps" and "capsule" must be one word or the test stops being mechanical.
     const data = withCompetitors();
     data.competitors[0].form = "veg caps";
-    expect(() => validate(data)).toThrow(/competitors\.0\.form/);
+    expect(() => packets.validate(data)).toThrow(/competitors\.0\.form/);
   });
 
   it("needs a saturation curve per class before competitors can be complete", () => {
     const data = withCompetitors();
     data.nodes.push({ node: "competitors", status: "complete", done_criterion_met: true, why: "saturated" });
     data.saturation.push({ node: "competitors", class: "direct", curve: [{ source_id: "sha256:cw", new_themes: 1, cumulative_themes: 1 }] });
-    expect(() => validate(data)).toThrow(/competitors is complete with no indirect saturation curve/);
+    expect(() => packets.validate(data)).toThrow(/competitors is complete with no indirect saturation curve/);
 
     data.saturation.push({ node: "competitors", class: "indirect", curve: [{ source_id: "sha256:sm", new_themes: 1, cumulative_themes: 1 }] });
-    expect(() => validate(data)).not.toThrow();
+    expect(() => packets.validate(data)).not.toThrow();
   });
 
   it("counts competitor rows as out of scope on a run that does not cover competitors", () => {
     // A product-data run: same stage, so this is the scope rule rather than the
     // stage rule. Competitor rows carry no `node`, and are counted anyway.
     const data = withCompetitors();
-    expect(() => validate(data, ["product_data"])).toThrow(
+    expect(() => packets.validate(data, ["product_data"])).toThrow(
       /entries are recorded against competitors, which is outside this run's scope \(product_data\)/,
     );
   });

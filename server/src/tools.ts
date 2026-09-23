@@ -31,7 +31,7 @@ import {
   type ReviewResult,
 } from "./apify.js";
 import { fetchWithTimeout } from "./http.js";
-import { PacketError, validate } from "./packet.js";
+import { PacketError, PacketValidator } from "./extract/index.js";
 import type { Node, StagePacket } from "./domain/index.js";
 import type { Settings } from "./config/index.js";
 
@@ -424,7 +424,7 @@ function packetCheckTool(check: PacketCheckOptions): AgentTool<typeof packetPara
       let packet: StagePacket | null = null;
       let problems: string[] = [];
       try {
-        packet = validate(draft, check.nodes, check.brief);
+        packet = new PacketValidator().validate(draft, check.nodes, check.brief);
       } catch (error) {
         problems =
           error instanceof PacketError

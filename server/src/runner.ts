@@ -23,7 +23,7 @@ import { createModels, type Models, type Usage } from "@earendil-works/pi-ai";
 import { openrouterProvider } from "@earendil-works/pi-ai/providers/openrouter";
 
 import { OpenRouterCosts, RunBilling, type Pricing } from "./costs.js";
-import { PacketError, extract, parse as parsePacket } from "./packet.js";
+import { PacketError, PacketExtractor, PacketValidator } from "./extract/index.js";
 import { buildInstructions, packetNudgeText, resumeText, steerText, systemPrompt } from "./prompt.js";
 import {
   DEFAULT_REJECTED_KINDS,
@@ -508,7 +508,7 @@ export class RunSupervisor {
     }
     if (this.store.getRun(runId)?.status === "stopping") return false;
     try {
-      extract(output);
+      new PacketExtractor().extract(output);
       return false;
     } catch {
       return true;
@@ -637,7 +637,7 @@ export class RunSupervisor {
 
     let parsed: StagePacket;
     try {
-      parsed = parsePacket(output, nodes, run?.brief);
+      parsed = new PacketValidator().parse(output, nodes, run?.brief);
     } catch (error) {
       if (!(error instanceof PacketError)) throw error;
       this.store.updateRun(runId, { status: "invalid", error: error.message });
