@@ -15,8 +15,6 @@ export default function Login({ onSuccess }: { onSuccess: () => void }) {
       await api.login(username, password);
       onSuccess();
     } catch {
-      // Deliberately vague: which of the two was wrong is not the user's
-      // business and is useful only to someone guessing.
       setError('Invalid credentials');
     } finally {
       setBusy(false);

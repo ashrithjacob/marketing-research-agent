@@ -1,14 +1,5 @@
 import { useState } from 'react';
 
-/**
- * Correct the research strategy.
- *
- * A judgement is stored whether or not the run is still live: a correction the
- * human made is worth keeping even if the run it was aimed at has just ended.
- * When the run *is* live it also goes upstream as a steer, so the agent does
- * not have to be told twice.
- */
-
 interface Preset {
   id: string;
   kind: string;

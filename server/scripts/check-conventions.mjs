@@ -28,6 +28,13 @@ const DEFAULT_REPO = resolve(dirname(fileURLToPath(import.meta.url)), "..", ".."
 export function runChecks(REPO = DEFAULT_REPO) {
 const violations = [];
 const skipped = [];
+/**
+ * A check that could not run because the thing it guards is missing. Distinct
+ * from `skipped` (not applicable here): a dark check and a passed check must
+ * not look the same to the exit code, or a rename retires the rule silently —
+ * which is how field-parity nearly went quiet when api.ts was split.
+ */
+const dark = [];
 
 /**
  * The one file whose job is to contain violations.
@@ -100,33 +107,53 @@ const CLIENT_ONLY_FIELDS = new Set([
   "logsUrl", "sourceUrl", "arguments", "toolCallId",
 ]);
 
+// The client's declared server surface: `frontend/src/api.ts`, or the
+// `frontend/src/api/` directory it grew into. Named as a discovery, not one
+// path — the api.ts this check was written for has since been split, and a
+// check that reads one named file goes quiet the day it moves.
+function clientSurface() {
+  const files = [];
+  const single = join(REPO, "frontend", "src", "api.ts");
+  if (existsSync(single)) files.push(single);
+  const dir = join(REPO, "frontend", "src", "api");
+  if (existsSync(dir)) {
+    for (const f of serverSources(dir)) files.push(f);
+  }
+  return files;
+}
+
 function checkClientServerFieldParity() {
-  const clientPath = "frontend/src/api.ts";
-  const client = read(clientPath);
-  if (!client) return skipped.push(`${clientPath} not found`);
+  const clients = clientSurface();
+  if (clients.length === 0) {
+    return dark.push("the client's API surface (frontend/src/api.ts or frontend/src/api/) not found");
+  }
 
   const serverDir = join(REPO, "server", "src");
-  if (!existsSync(serverDir)) return skipped.push("server/src not found");
+  if (!existsSync(serverDir)) return dark.push("server/src not found — field-parity cannot run");
   const server = serverSources(serverDir)
     .map((f) => readFileSync(f, "utf8"))
     .join("\n");
 
-  const lines = client.split("\n");
-  lines.forEach((line, i) => {
-    // A field declaration inside an interface or object type: indented,
-    // `name:` or `name?:`. Not a top-level `export const x: T`.
-    const m = /^\s{2,}([A-Za-z_][A-Za-z0-9_]*)\??:\s/.exec(line);
-    if (!m) return;
-    const field = m[1];
-    if (CLIENT_ONLY_FIELDS.has(field)) return;
-    if (new RegExp(`\\b${field}\\b`).test(server)) return;
-    fail(
-      clientPath, i + 1, "client-server-field-parity",
-      `the client reads "${field}" but no file in server/src mentions it — ` +
-      `it will be undefined at runtime and tsc will not say so. ` +
-      `Fix the name, or add it to CLIENT_ONLY_FIELDS if it is browser-only.`,
-    );
-  });
+  for (const full of clients) {
+    const rel = relative(REPO, full);
+    readFileSync(full, "utf8")
+      .split("\n")
+      .forEach((line, i) => {
+        // A field declaration inside an interface or object type: indented,
+        // `name:` or `name?:`. Not a top-level `export const x: T`.
+        const m = /^\s{2,}([A-Za-z_][A-Za-z0-9_]*)\??:\s/.exec(line);
+        if (!m) return;
+        const field = m[1];
+        if (CLIENT_ONLY_FIELDS.has(field)) return;
+        if (new RegExp(`\\b${field}\\b`).test(server)) return;
+        fail(
+          rel, i + 1, "client-server-field-parity",
+          `the client reads "${field}" but no file in server/src mentions it — ` +
+          `it will be undefined at runtime and tsc will not say so. ` +
+          `Fix the name, or add it to CLIENT_ONLY_FIELDS if it is browser-only.`,
+        );
+      });
+  }
 }
 
 // --- 2. every env var is declared in settings.ts ----------------------------
@@ -137,7 +164,7 @@ function checkClientServerFieldParity() {
 // needs it.
 function checkEnvDeclaration() {
   const serverDir = join(REPO, "server", "src");
-  if (!existsSync(serverDir)) return skipped.push("server/src not found");
+  if (!existsSync(serverDir)) return dark.push("server/src not found — env check cannot run");
 
   for (const full of serverSources(serverDir)) {
     const f = relative(serverDir, full);
@@ -205,7 +232,7 @@ function checkEnvDeclaration() {
 // "table research_runs has no column named X".
 function checkSqliteMigrations() {
   const serverDir = join(REPO, "server", "src");
-  if (!existsSync(serverDir)) return skipped.push("server/src not found");
+  if (!existsSync(serverDir)) return dark.push("server/src not found — migration check cannot run");
   const now = serverSources(serverDir)
     .map((f) => readFileSync(f, "utf8"))
     .join("\n");
@@ -383,20 +410,25 @@ const checks = [
 ];
 
 for (const [, fn] of checks) fn();
-return { violations, skipped, count: checks.length };
+return { violations, skipped, dark, count: checks.length };
 }
 
 // --- CLI -------------------------------------------------------------------
 // Guarded, so `import { runChecks }` in the tests does not run the CLI and call
 // process.exit() out from under vitest.
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  const { violations, skipped, count } = runChecks(process.argv[2] ?? undefined);
+  const { violations, skipped, dark, count } = runChecks(process.argv[2] ?? undefined);
 
-  if (violations.length === 0) {
+  if (violations.length === 0 && dark.length === 0) {
     console.log(`conventions: ${count} checks, clean`);
     for (const s of skipped) console.log(`  (skipped: ${s})`);
     process.exit(0);
   }
+
+  for (const d of dark) {
+    console.error(`conventions: a check could not run: ${d}`);
+  }
+  if (dark.length > 0 && violations.length === 0) process.exit(1);
 
   console.error(`conventions: ${violations.length} violation(s)\n`);
   for (const v of violations) {

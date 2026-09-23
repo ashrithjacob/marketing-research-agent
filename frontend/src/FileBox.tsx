@@ -1,15 +1,5 @@
 import { useState } from 'react';
 
-/** Chat text from the agent, with generated files lifted into their own boxes.
- *
- *  The stage-1 packet reaches the cockpit as a fenced ```json block inside the
- *  agent's chat output (spec-stage-1.md §6). Prose and code deserve different
- *  rendering — a box with a type label and a copy button for markdown/JSON,
- *  plain text for the rest. Detection is deliberately narrow: fenced blocks of
- *  any language, and whole-message JSON. Anything looser catches stray braces
- *  in ordinary prose, which costs more than it saves.
- */
-
 export interface ChatSegment {
   /** Fence language, normalised lower-case; `null` marks a plain-text segment. */
   lang: string | null;
@@ -90,8 +80,6 @@ export default function FileBox({ text, lang }: { text: string; lang: string }) 
   );
 }
 
-/** Clipboard API first; it needs a secure context, so keep the textarea route.
- *  `execCommand` is deprecated but still the only fallback that exists. */
 async function copyToClipboard(text: string): Promise<boolean> {
   try {
     if (navigator.clipboard) {
@@ -99,7 +87,6 @@ async function copyToClipboard(text: string): Promise<boolean> {
       return true;
     }
   } catch {
-    /* fall through to the long way around */
   }
   const area = document.createElement('textarea');
   area.value = text;

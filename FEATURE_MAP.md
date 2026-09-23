@@ -86,8 +86,13 @@ for a node that has not run.
 
 ### The run view — middle and right (`RunView.tsx`)
 
-The middle column carries the run itself; the right rail carries its meta and
-the run list.
+The left rail carries the stage rail, the run meta and the run list; the middle
+column carries the run itself; the right rail its counts, voice of customer,
+gaps and standing judgements.
+
+**Voice of customer** shows only `review_mining` excerpts. A competitors run
+also files brands' own taglines as verbatim excerpts, and under this heading
+they would read as customer words.
 
 | Panel | Field | Source |
 |---|---|---|

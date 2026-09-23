@@ -13,13 +13,6 @@ import RunView from './RunView';
 import StartRun from './StartRun';
 import StepIn from './StepIn';
 
-/** The cockpit shell: a header bar over the three-column run view.
- *
- *  The header is the demo's (`cockpit-demo/`) — subject chip, run clock, the
- *  two buttons that matter. Everything a run needs is asked for in the Start
- *  run modal: a product and a market, nothing else. Finding the URLs is the
- *  agent's job, not the operator's.
- */
 /** `/runs/<id>/logs` — the LLM call log, opened in its own tab from a run. */
 const LOGS_PATH = /^\/runs\/([0-9a-f]+)\/logs\/?$/;
 
@@ -32,7 +25,6 @@ export default function App() {
   const [startNodes, setStartNodes] = useState<ResearchNode[] | null>(null);
   const [stepInOpen, setStepInOpen] = useState(false);
   const [error, setError] = useState('');
-  // Bumped when a judgement is saved at this level so RunView reloads them.
   const [judgementsRev, setJudgementsRev] = useState(0);
 
   useEffect(() => {
@@ -177,7 +169,6 @@ export default function App() {
         <StartRun
           config={config}
           nodes={startNodes}
-          // A per-node run is almost always "this product again, one node".
           initial={startNodes.length > 0 ? activeRun?.brief : undefined}
           onClose={() => setStartNodes(null)}
           onStarted={async (run) => {

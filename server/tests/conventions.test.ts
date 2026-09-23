@@ -110,6 +110,28 @@ describe("client-server-field-parity", () => {
     write("server/src/store.ts", "const sql = 'select created_at from runs';");
     expect(rules()).not.toContain("client-server-field-parity");
   });
+
+  it("still bites when the client surface is a directory, not one file", () => {
+    // api.ts was split into frontend/src/api/; a check reading one named path
+    // would have gone quiet the day it moved.
+    execFileSync("rm", [join(repo, "frontend/src/api.ts")]);
+    write("frontend/src/api/types.ts", [
+      "export interface Usage {",
+      "  total_tokens?: number;",
+      "}",
+    ].join("\n"));
+    expect(rules()).toContain("client-server-field-parity");
+    expect(messageFor("client-server-field-parity")).toContain("total_tokens");
+  });
+
+  it("reports dark, not clean, when the client surface is gone entirely", () => {
+    execFileSync("rm", [join(repo, "frontend/src/api.ts")]);
+    const result = runChecks(repo);
+    expect(result.violations.map((v: { rule: string }) => v.rule)).not.toContain(
+      "client-server-field-parity",
+    );
+    expect(result.dark.join(" ")).toContain("API surface");
+  });
 });
 
 describe("env-declared-in-settings", () => {

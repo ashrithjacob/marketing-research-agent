@@ -115,8 +115,8 @@ function commentLines(rel: string, file: ts.SourceFile): number[] {
       if (trimmed.includes("*/")) inBlock = false;
       return;
     }
-    if (trimmed.startsWith("/*")) {
-      const oneLine = trimmed.endsWith("*/");
+    if (trimmed.startsWith("/*") || trimmed.startsWith("{/*")) {
+      const oneLine = trimmed.includes("*/");
       if (!oneLine) {
         found.push(i + 1);
         inBlock = true;
@@ -206,6 +206,69 @@ function violations(rel: string): string[] {
 
 const FILES = sourceFiles();
 const GOVERNED = FILES.filter((f) => !LEGACY.has(f));
+
+/**
+ * The frontend keeps its own rules: React function components are the paved
+ * path, so the class rule does not reach it. What holds there: no comments,
+ * modules under 250 lines, and `fetch` only inside `api/` — fetching and
+ * shaping in one place is what makes the field-parity check possible at all.
+ */
+const FRONTEND_SRC = new URL("../../frontend/src", import.meta.url).pathname;
+const FRONTEND_MAX_LINES = 250;
+const FRONTEND_LEGACY = new Set<string>([]);
+
+function frontendFiles(dir: string = FRONTEND_SRC): string[] {
+  return readdirSync(dir).flatMap((name) => {
+    const full = join(dir, name);
+    if (statSync(full).isDirectory()) return frontendFiles(full);
+    return /\.(ts|tsx)$/.test(name) ? [relative(FRONTEND_SRC, full)] : [];
+  });
+}
+
+function frontendViolations(rel: string): string[] {
+  const file = ts.createSourceFile(
+    rel,
+    readFileSync(join(FRONTEND_SRC, rel), "utf8"),
+    ts.ScriptTarget.Latest,
+    true,
+    rel.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
+  );
+  const found: string[] = [];
+  const lines = file.getFullText().split("\n").length;
+  if (lines > FRONTEND_MAX_LINES) {
+    found.push(`is ${lines} lines, over the ${FRONTEND_MAX_LINES} limit`);
+  }
+  for (const line of commentLines(rel, file)) {
+    found.push(`has a comment at line ${line}; names should carry the meaning`);
+  }
+  if (!rel.startsWith("api/") && file.getFullText().includes("fetch(")) {
+    found.push(`calls fetch(); fetching belongs in api/`);
+  }
+  return found;
+}
+
+const FRONTEND_FILES = frontendFiles();
+const FRONTEND_GOVERNED = FRONTEND_FILES.filter((f) => !FRONTEND_LEGACY.has(f));
+
+describe("frontend", () => {
+  it("every governed module obeys every rule", () => {
+    const failures = FRONTEND_GOVERNED.flatMap((f) =>
+      frontendViolations(f).map((v) => `${f} ${v}`),
+    );
+    expect(failures).toEqual([]);
+  });
+
+  it("the legacy list only shrinks", () => {
+    const stale = [...FRONTEND_LEGACY].filter(
+      (f) => FRONTEND_FILES.includes(f) && frontendViolations(f).length === 0,
+    );
+    expect(stale, "these are clean now — delete them from FRONTEND_LEGACY").toEqual([]);
+  });
+
+  it("names only files that exist", () => {
+    expect([...FRONTEND_LEGACY].filter((f) => !FRONTEND_FILES.includes(f))).toEqual([]);
+  });
+});
 
 describe("layers", () => {
   it("every governed module obeys every rule", () => {

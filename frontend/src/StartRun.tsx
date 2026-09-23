@@ -2,18 +2,10 @@ import { useState } from 'react';
 import { api, type Brief, type Config, type ResearchNode, type RunSummary } from './api';
 import { scopeLabel } from './StageRail';
 
-/** The markets a run covers unless you say otherwise.
- *
- *  All five are ticked when the modal opens: these are the English-language
- *  markets we sell into, and a run that wanders outside them spends its budget
- *  on sources nobody will act on. Untick what does not apply, or name something
- *  else in the free-text box — the brief is the joined list either way.
- */
+/** The markets a run covers unless you say otherwise — the English-language markets sold into. */
 export const DEFAULT_MARKETS = ['US', 'UK', 'Australia', 'New Zealand', 'Canada'] as const;
 
-/** A bare `example.com` or a full `https://…`, with no spaces in it.
- *  Mirrors `looksLikeUrl` in server/src/schema.ts — the server normalises the
- *  brief too, so a script posting straight to the API gets the same treatment. */
+/** A url-shaped string, no spaces. Mirrors `Briefs.looksLikeUrl` in `server/src/domain/brief.ts`. */
 const URL_LIKE = /^(https?:\/\/\S+|(?!.*\s)[a-z0-9-]+(\.[a-z0-9-]+)+(\/\S*)?)$/i;
 
 export function looksLikeUrl(value: string): boolean {
@@ -33,17 +25,6 @@ export function splitMarkets(market: string): { ticked: string[]; other: string 
   };
 }
 
-/** Start a stage-1 run — the whole stage, or the nodes in `nodes`.
- *
- *  The brief is a product and its markets — deliberately no URL field. Finding
- *  the product's own site, its reviews, its competitors and its ad-library
- *  entries is the agent's job (SearXNG to find, Firecrawl to fetch); a human
- *  pasting in a URL only anchors the run to one page.
- *
- *  A per-node run is opened from the stage rail with the brief of the run on
- *  screen already filled in, because re-running one node of a product is the
- *  usual reason to press it.
- */
 export default function StartRun({
   config,
   nodes,
@@ -60,10 +41,7 @@ export default function StartRun({
   onFailed: () => Promise<void>;
   onClose: () => void;
 }) {
-  // A re-run keeps the brief it is re-running; a fresh run gets the five.
   const from = initial?.market ? splitMarkets(initial.market) : null;
-  // A site brief has no product name, so the url is what the re-run carries.
-  // Typing it back in means it is re-detected and lands in `url` again.
   const [product, setProduct] = useState(initial?.product || initial?.url || '');
   const [ticked, setTicked] = useState<string[]>(from ? from.ticked : [...DEFAULT_MARKETS]);
   const [other, setOther] = useState(from?.other ?? '');
@@ -73,8 +51,6 @@ export default function StartRun({
   const partial = nodes.length > 0 && !(stage === 2 && nodes.length === 1);
   const reviewsInScope = nodes.length === 0 ? false : nodes.includes('review_mining');
   const isUrl = looksLikeUrl(product);
-  // Ticks first, in the order they are shown, so the same choice reads the same
-  // way twice. Free text is split on commas and deduped against the ticks.
   const market = [
     ...DEFAULT_MARKETS.filter((m) => ticked.includes(m)),
     ...other.split(',').map((part) => part.trim()),
@@ -94,8 +70,6 @@ export default function StartRun({
     setBusy(true);
     setError('');
     try {
-      // A url goes in `url`, never in `product`: `product` is a name, and the
-      // agent's first job on a site brief is to read that name off the page.
       const typed = product.trim();
       const brief = isUrl
         ? { product: '', url: /^https?:\/\//i.test(typed) ? typed : `https://${typed}`, market }
@@ -104,8 +78,6 @@ export default function StartRun({
       await onStarted(run);
     } catch (e) {
       setError((e as Error).message);
-      // The run row exists and is marked failed — surface it rather than
-      // losing the attempt.
       await onFailed();
     } finally {
       setBusy(false);

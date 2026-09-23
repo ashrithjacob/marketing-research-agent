@@ -1,41 +1,26 @@
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   api,
-  briefLabel,
   streamRunEvents,
   TERMINAL_STATUSES,
-  type Billed,
-  type Brief,
-  type Competitor,
   type Judgement,
-  type Pricing,
   type ResearchNode,
   type RunDetail,
   type RunEvent,
   type RunSummary,
-  type Source,
-  type StagePacket,
 } from './api';
-import StageRail, { NODE_LABELS, NODE_ORDER, scopeLabel } from './StageRail';
 import { ChatText } from './FileBox';
-
-/** Live fetch lanes, derived from tool events.
- *
- *  Worth being honest about: `tool.started` carries the primary argument
- *  truncated for display, and `web_extract` takes a list and previews only its
- *  first element. Lanes are a liveness indicator, never a count — the packet is
- *  the record of what was actually collected. The bar is indeterminate for the
- *  same reason: a tool call reports no progress, only start and end.
- */
-interface Lane {
-  key: string;
-  tool: string;
-  kind: string;
-  preview: string;
-  state: 'running' | 'done' | 'error';
-}
-
-const AWARENESS = ['Unaware', 'Problem', 'Solution', 'Product', 'Most'];
+import { LanesSection, applyToLanes, type Lane } from './run-view/lanes';
+import { nowPanel } from './run-view/now';
+import {
+  AttributesSection,
+  CompetitorsView,
+  MeasurementsSection,
+  SourcesSection,
+} from './run-view/packet-sections';
+import { RailColumn } from './run-view/rail';
+import { RightRail } from './run-view/right-rail';
+import { TraceSection, groupEvents } from './run-view/trace';
 
 export default function RunView({
   runId,
@@ -76,13 +61,10 @@ export default function RunView({
     void reload();
   }, [runId, reload]);
 
-  // A judgement saved from the header applies to this run; refresh the list.
   useEffect(() => {
     api.judgements().then(({ data }) => setJudgements(data)).catch(() => undefined);
   }, [judgementsRev]);
 
-  // Follow the run. The backend replays from `after=0` before going live, so a
-  // refresh or a second tab both get the whole run rather than the tail of it.
   useEffect(() => {
     const stop = streamRunEvents(runId, 0, {
       onEvent: (event) => {
@@ -113,8 +95,6 @@ export default function RunView({
     [admitted],
   );
 
-  // Customers' words only. A competitors run also files brands' own taglines as
-  // verbatim excerpts, and under this heading they would read as customer voice.
   const voice = useMemo(
     () => (packet?.excerpts ?? []).filter((e) => e.node === 'review_mining'),
     [packet],
@@ -125,8 +105,6 @@ export default function RunView({
     [events],
   );
 
-  // The deltas are chunks of one message; merge consecutive ones so fenced
-  // blocks that straddle several events still render as one box.
   const traceRows = useMemo(() => groupEvents(events), [events]);
 
   if (!run) return <div className="empty">Loading run…</div>;
@@ -135,690 +113,81 @@ export default function RunView({
 
   return (
     <div className="cols">
-      <div className="rail-col">
-        <StageRail
-          status={run.status}
-          nodes={packet?.nodes ?? []}
-          saturation={packet?.saturation ?? []}
-          scope={run.nodes ?? []}
-          onRunNode={onRunNode}
-          // Stage 2 mines what stage 1 found. The server enforces this with a
-          // 409; the rail greys the button so it is visible before the click.
-          stageTwoReady={runs.some(
-            (r) =>
-              r.status === 'completed' &&
-              (r.stage ?? 1) === 1 &&
-              sameSubject(r.brief, run.brief),
-          )}
-        />
-
-        <h3 style={{ marginTop: 18 }}>
-          Run{' '}
-          <a
-            className="logs-link"
-            href={api.logsUrl(run.id)}
-            target="_blank"
-            rel="noreferrer"
-            title="Every LLM call this run made — prompt, answer, tokens, cost and time — in a new tab"
-          >
-            Logs ↗
-          </a>
-        </h3>
-        <div className="runmeta">
-          <div>
-            Scope <span>{scopeLabel(run.nodes ?? [])}</span>
-          </div>
-          <div>
-            {/* Markets are a scope the agent is held to, like nodes, so they
-                belong next to Scope rather than only in the header chip. */}
-            Markets <span>{run.brief?.market || 'anywhere'}</span>
-          </div>
-          <div>
-            Harness <span>pi-agent-core</span>
-          </div>
-          <div>
-            {/* Every run names its model now. The fallback is only ever hit by a
-                row written when a gateway default still existed. */}
-            Model <span>{run.model || 'unrecorded'}</span>
-          </div>
-          <div>
-            Skill <span>research-compartment v1.0</span>
-          </div>
-          <div>
-            Started <span>{new Date(run.created_at).toLocaleString()}</span>
-          </div>
-          <div>
-            Tokens{' '}
-            <span>
-              {run.usage?.totalTokens
-                ? `${(run.usage.totalTokens / 1000).toFixed(0)}k`
-                : '—'}
-            </span>
-          </div>
-          <div title={pricingNote(run.usage?.pricing)}>
-            Calc. cost{' '}
-            <span>
-              {run.usage?.cost?.total ? `$${run.usage.cost.total.toFixed(4)}` : '—'}
-              {run.usage?.pricing?.source === 'pi-ai-snapshot' ? ' (snapshot prices)' : ''}
-            </span>
-          </div>
-          <div title="What OpenRouter charged, read back per turn from /generation">
-            Billed{' '}
-            <span>{billedText(run.usage?.billed, live)}</span>
-          </div>
-        </div>
-
-        <h3 style={{ marginTop: 18 }}>Runs</h3>
-        <div className="runlist">
-          {runs.map((r) => (
-            <div
-              key={r.id}
-              className={`runrow ${r.id === runId ? 'active' : ''}`}
-              onClick={() => onSelectRun(r.id)}
-            >
-              <div className="runrow-top">
-                <span className="runrow-title">{briefLabel(r.brief)}</span>
-                <span className={`status ${r.status}`}>{r.status}</span>
-              </div>
-              <div className="runrow-sub">
-                {r.nodes && r.nodes.length < NODE_ORDER.length && (
-                  <span className="runrow-scope">{scopeLabel(r.nodes)} · </span>
-                )}
-                {r.counts.competitors &&
-                  r.counts.competitors.direct + r.counts.competitors.indirect > 0 &&
-                  `${r.counts.competitors.direct} direct · ${r.counts.competitors.indirect} indirect · `}
-                {r.counts.sources} sources · {r.counts.excerpts} excerpts ·{' '}
-                {r.counts.gaps} gaps
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
+      <RailColumn
+        run={run}
+        runs={runs}
+        runId={runId}
+        live={live}
+        packet={packet}
+        onSelectRun={onSelectRun}
+        onRunNode={onRunNode}
+      />
 
       <div className="mid">
         {error && <div className="error">{error}</div>}
-        {run.status === 'invalid' && (
-          <div className="error">
-            <b>Packet rejected.</b> {run.error}
-            <div className="error-note">
-              The agent finished and what it produced broke the stage-1 contract.
-              That is a more useful failure than a crash — the raw output is below.
-            </div>
-          </div>
-        )}
+
+  {run.status === 'invalid' && (
+    <div className="error">
+      <b>Packet rejected.</b> {run.error}
+      <div className="error-note">
+        The agent finished and what it produced broke the stage-1 contract.
+        That is a more useful failure than a crash — the raw output is below.
+      </div>
+    </div>
+  )}
         {run.status === 'failed' && <div className="error">{run.error}</div>}
 
-        <section>
-          <h3>
-            Now <span className="n">{live ? 'live' : 'finished'}</span>
-          </h3>
-          <div className="now">
-            <span className={`pulse ${live ? '' : 'off'}`} />
-            <div className="txt">
-              <b>{now.title}</b>
-              <div className="sub">{now.sub}</div>
-            </div>
-          </div>
-        </section>
+  <section>
+    <h3>
+      Now <span className="n">{live ? 'live' : 'finished'}</span>
+    </h3>
+    <div className="now">
+      <span className={`pulse ${live ? '' : 'off'}`} />
+      <div className="txt">
+        <b>{now.title}</b>
+        <div className="sub">{now.sub}</div>
+      </div>
+    </div>
+  </section>
 
-        <section>
-          <h3>
-            Crawling <span className="n">{live ? 'live' : `${lanes.length} calls`}</span>
-          </h3>
-          <div className="lanes">
-            {lanes.length === 0 && <p className="muted">No activity yet.</p>}
-            {lanes.slice(-8).map((lane) => (
-              <div key={lane.key} className={`lane ${lane.state}`}>
-                <span className="st">
-                  {lane.state === 'running'
-                    ? lane.kind === 'search'
-                      ? 'SEARCH'
-                      : lane.kind === 'corpus'
-                        ? 'WRITE'
-                        : 'FETCH'
-                    : lane.state === 'error'
-                      ? 'ERROR'
-                      : 'DONE'}
-                </span>
-                <div className="lane-body">
-                  <div className="url">{lane.preview || lane.tool}</div>
-                  {lane.state === 'running' && (
-                    <div className="bar">
-                      <i />
-                    </div>
-                  )}
-                </div>
-                <span className="kind">{lane.tool}</span>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        <section>
-          <h3>
-            Reasoning trace <span className="n">{events.length} events</span>
-          </h3>
-          <div className="trace" ref={traceRef}>
-            {events.length === 0 && <p className="muted">Nothing yet.</p>}
-            {traceRows.map((row) =>
-              row.message ? (
-                <div key={row.id} className="chatmsg">
-                  <span className="tag">
-                    {new Date(row.events[0].created_at).toLocaleTimeString()}
-                  </span>
-                  <ChatText
-                    text={row.events
-                      .map((e) => String((e.payload as { delta?: string }).delta ?? ''))
-                      .join('')}
-                  />
-                </div>
-              ) : (
-                <p key={row.id} className={row.cls}>
-                  <span className="tag">
-                    {new Date(row.events[0].created_at).toLocaleTimeString()}
-                  </span>
-                  {traceText(row.events[0])}
-                </p>
-              ),
-            )}
-          </div>
-        </section>
+        <LanesSection lanes={lanes} live={live} />
+        <TraceSection events={events} traceRows={traceRows} traceRef={traceRef} />
 
         {packet && (packet.competitor_reference || (packet.competitors ?? []).length > 0) && (
           <CompetitorsView packet={packet} />
         )}
-
         {packet && (
-          <section>
-            <h3>
-              Sources{' '}
-              <span className="n">
-                {admitted.length} admitted · {rejected.length} rejected
-              </span>
-            </h3>
-            <div className="src-list">
-              {sources.map((source) => (
-                <SourceRow key={source.id} runId={runId} source={source} />
-              ))}
-            </div>
-          </section>
+          <SourcesSection
+            runId={runId}
+            sources={sources}
+            admitted={admitted}
+            rejected={rejected}
+          />
         )}
-
         {packet && packet.attributes.length > 0 && (
-          <section>
-            <h3>
-              Attributes <span className="n">read off a page, not worked out</span>
-            </h3>
-            <div className="kv">
-              {packet.attributes.map((attribute) => (
-                <div key={attribute.id} className="kv-row">
-                  <span className="k">{attribute.key}</span>
-                  <span className="v">{attribute.value}</span>
-                </div>
-              ))}
-            </div>
-          </section>
+          <AttributesSection attributes={packet.attributes} />
         )}
-
         {packet && packet.measurements.length > 0 && (
-          <section>
-            <h3>
-              Measurements <span className="n">numbers a source states</span>
-            </h3>
-            <div className="kv">
-              {packet.measurements.map((measurement) => (
-                <div key={measurement.id} className="kv-row">
-                  <span className="k">{measurement.metric}</span>
-                  <span className="v">
-                    {measurement.value} {measurement.unit}
-                    {measurement.period ? ` · ${measurement.period}` : ''}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </section>
+          <MeasurementsSection measurements={packet.measurements} />
         )}
 
-        {run.status === 'invalid' && (
-          <section>
-            <h3>Raw output</h3>
-            <div className="trace">
-              <ChatText text={run.output} />
-            </div>
-          </section>
-        )}
-      </div>
-
-      <div className="right">
-        <div className="cards">
-          <Card label="Sources" value={run.counts.sources} />
-          <Card label="Excerpts" value={run.counts.excerpts} />
-          <Card label="Measurements" value={run.counts.measurements} />
-          <Card label="Gaps" value={run.counts.gaps} tone="gap" />
-        </div>
-
-        {unarchived > 0 && (
-          <div className="warn">
-            {unarchived} admitted source{unarchived === 1 ? '' : 's'} not archived —
-            those spans cannot be checked against the page they came from.
-          </div>
-        )}
-
-        <section>
-          <h3>
-            Angle map <span className="n">avatar × awareness</span>
-          </h3>
-          <div className="grid">
-            <div />
-            {AWARENESS.map((a) => (
-              <div key={a} className="gh">
-                {a}
-              </div>
-            ))}
-            {[0, 1, 2, 3].map((row) => (
-              <Fragment key={row}>
-                <div className="rh">—</div>
-                {AWARENESS.map((_, col) => (
-                  <div key={col} className="cell no" />
-                ))}
-              </Fragment>
-            ))}
-          </div>
-          <div className="legend">
-            <span>
-              <i className="sw" style={{ background: 'rgba(74,222,128,.5)' }} />
-              evidenced
-            </span>
-            <span>
-              <i className="sw" style={{ background: 'rgba(192,132,252,.5)' }} />
-              inferred
-            </span>
-            <span>
-              <i className="sw" style={{ background: '#1b2130' }} />
-              empty
-            </span>
-          </div>
-          <p className="muted">
-            Stage-4 output, rendered empty here for the same reason the rail
-            shows stages 2–5 greyed out: an accurate picture of where this is.
-          </p>
-        </section>
-
-        <section>
-          <h3>
-            Voice of customer <span className="n">verbatim, never paraphrased</span>
-          </h3>
-          {voice.length === 0 && <p className="muted">Nothing yet.</p>}
-          {voice.slice(0, 25).map((excerpt) => (
-            <div key={excerpt.id} className="item">
-              <div className="q">
-                “{excerpt.text}”
-                {excerpt.star_rating != null && (
-                  <span className="pill star">{excerpt.star_rating}★</span>
-                )}
-              </div>
-              <div className="src">
-                {NODE_LABELS[excerpt.node]}
-                {excerpt.axis ? ` · ${excerpt.axis.replace('why_', 'why ')}` : ''}
-                {excerpt.posted_at ? ` · ${excerpt.posted_at}` : ''}
-              </div>
-            </div>
-          ))}
-        </section>
-
-        <section>
-          <h3>
-            Gaps <span className="n">{run.counts.gaps}</span>
-          </h3>
-          {(packet?.gaps ?? []).length === 0 && (
-            <p className="muted">
-              Nothing yet. An empty gap list on a finished run means the run
-              stopped looking, and the packet is rejected for it.
-            </p>
-          )}
-          {(packet?.gaps ?? []).map((gap, index) => (
-            <div key={index} className="item">
-              <div className="q">{gap.missing}</div>
-              <div className="src">
-                {NODE_LABELS[gap.node]}
-                {gap.would_need ? ` · needs: ${gap.would_need}` : ''}
-              </div>
-            </div>
-          ))}
-        </section>
-
-        <section>
-          <h3>
-            Standing judgements <span className="n">{judgements.length}</span>
-          </h3>
-          {judgements.length === 0 && (
-            <p className="muted">None yet. “Step in” to correct the agent.</p>
-          )}
-          {judgements.map((judgement) => (
-            <div key={judgement.id} className="judge">
-              <div className="w">{judgement.kind.replace('_', ' ')}</div>
-              <div>{judgement.text}</div>
-              <div className="used">
-                applied {judgement.applied_count} time
-                {judgement.applied_count === 1 ? '' : 's'}
-              </div>
-            </div>
-          ))}
-        </section>
-      </div>
-    </div>
-  );
-}
-
-/** The "Now" panel: one glance, what is the run doing. */
-function nowPanel(
-  run: RunDetail,
-  live: boolean,
-  lastTool: RunEvent | undefined,
-): { title: string; sub: string } {
-  if (!live) {
-    switch (run.status) {
-      case 'completed':
-        return {
-          title: 'Run complete',
-          sub: `packet accepted — ${run.counts.sources} sources, ${run.counts.excerpts} excerpts, ${run.counts.gaps} gaps`,
-        };
-      case 'invalid':
-        return { title: 'Packet rejected', sub: run.error };
-      case 'failed':
-        return { title: 'Run failed', sub: run.error };
-      case 'cancelled':
-        return { title: 'Run stopped', sub: 'cancelled before the packet was written' };
-      default:
-        return { title: run.status, sub: '' };
-    }
-  }
-  const where =
-    run.nodes && run.nodes.length < NODE_ORDER.length ? scopeLabel(run.nodes) : 'Raw material';
-  if (lastTool) {
-    const p = lastTool.payload as Record<string, string>;
-    return {
-      title: `Stage 1 · ${where} · ${p.tool ?? 'working'}`,
-      sub: p.preview ?? '',
-    };
-  }
-  return {
-    title: `Stage 1 · ${where}`,
-    sub: 'gathering only — no conclusions drawn here',
-  };
-}
-
-function Card({ label, value, tone }: { label: string; value: number; tone?: string }) {
-  return (
-    <div className={`card ${tone ?? ''}`}>
-      <div className="v">{value}</div>
-      <div className="l">{label}</div>
-    </div>
-  );
-}
-
-/**
- * §2.2's two classes, side by side. The relation shown is the one the server's
- * validator has already checked against the forms — this view only lays it out.
- */
-function CompetitorsView({ packet }: { packet: StagePacket }) {
-  const reference = packet.competitor_reference ?? null;
-  const rows = packet.competitors ?? [];
-  const curves = packet.saturation.filter((s) => s.node === 'competitors');
-  return (
+  {run.status === 'invalid' && (
     <section>
-      <h3>
-        Competitors{' '}
-        <span className="n">same active · direct = same form, indirect = different form</span>
-      </h3>
-      {reference && (
-        <p className="comp-ref">
-          Measured against <b>{reference.name}</b> — {reference.form}
-          {reference.form_as_printed ? ` (${reference.form_as_printed})` : ''} ·{' '}
-          {reference.actives.join(', ')}
-        </p>
-      )}
-      {(['direct', 'indirect'] as const).map((relation) => {
-        const group = rows.filter((c) => c.relation === relation);
-        const curve = curves.find((s) => s.class === relation);
-        return (
-          <div key={relation} className="comp-group">
-            <div className="comp-head">
-              <span className={`comp-tag ${relation}`}>{relation}</span>
-              <span>
-                {group.length} found
-                {curve?.stopped_because ? ` · ${curve.stopped_because}` : ''}
-              </span>
-            </div>
-            {group.length === 0 && <p className="muted">None recorded.</p>}
-            {group.map((c) => (
-              <CompetitorRow key={c.id} competitor={c} />
-            ))}
-          </div>
-        );
-      })}
+      <h3>Raw output</h3>
+      <div className="trace">
+        <ChatText text={run.output} />
+      </div>
     </section>
-  );
-}
+  )}
+      </div>
 
-function CompetitorRow({ competitor: c }: { competitor: Competitor }) {
-  const ads = c.ad_source_ids?.length ?? 0;
-  return (
-    <div className="comp">
-      <div className="comp-top">
-        <a href={c.url} target="_blank" rel="noreferrer" className="comp-name">
-          {c.name}
-        </a>
-        <span className="comp-form">
-          {c.form}
-          {c.form_as_printed ? ` · ${c.form_as_printed}` : ''}
-        </span>
-      </div>
-      <div className="comp-facts">
-        <span>shares {c.shared_actives.join(', ')}</span>
-        {c.dose_per_serving && <span>{c.dose_per_serving}</span>}
-        {c.price && (
-          <span>
-            {c.price}
-            {c.price_per_dose ? ` (${c.price_per_dose})` : ''}
-          </span>
-        )}
-        {ads > 0 && <span>{ads} ad{ads === 1 ? '' : 's'}</span>}
-      </div>
-      {c.positioning_copy && <div className="comp-copy">“{c.positioning_copy}”</div>}
+      <RightRail
+        run={run}
+        packet={packet}
+        unarchived={unarchived}
+        voice={voice}
+        judgements={judgements}
+      />
     </div>
   );
-}
-
-function SourceRow({ runId, source }: { runId: string; source: Source }) {
-  const body = source.archived ? api.sourceUrl(runId, source.id) : null;
-  return (
-    <div className={`src-row ${source.admitted ? '' : 'rejected'}`}>
-      <span className="st">{source.admitted ? 'ADMITTED' : 'SKIPPED'}</span>
-      <span className="url" title={source.admission_reason || source.url}>
-        {source.url}
-      </span>
-      <span className="kind">
-        {source.kind}
-        {source.marketing ? ' · marketing' : ''}
-      </span>
-      {body ? (
-        <a className="archived" href={body} target="_blank" rel="noreferrer">
-          body
-        </a>
-      ) : (
-        <span className="archived off" title="not archived">
-          —
-        </span>
-      )}
-    </div>
-  );
-}
-
-function applyToLanes(
-  event: RunEvent,
-  setLanes: (fn: (current: Lane[]) => Lane[]) => void,
-) {
-  const payload = event.payload as Record<string, string | boolean>;
-  if (event.kind === 'tool.started') {
-    setLanes((current) => [
-      ...current,
-      {
-        key: `${event.id}`,
-        tool: String(payload.tool ?? ''),
-        kind: String(payload.lane ?? 'other'),
-        preview: String(payload.preview ?? ''),
-        state: 'running',
-      },
-    ]);
-  } else if (event.kind === 'tool.completed') {
-    // No correlation id upstream, so settle the newest running lane for that
-    // tool. Wrong only when the same tool has two calls genuinely in flight,
-    // and it costs a misplaced tick rather than a wrong number.
-    setLanes((current) => {
-      const reversed = [...current]
-        .reverse()
-        .findIndex((l) => l.tool === payload.tool && l.state === 'running');
-      if (reversed === -1) return current;
-      const at = current.length - 1 - reversed;
-      const next = [...current];
-      next[at] = { ...next[at], state: payload.error ? 'error' : 'done' };
-      return next;
-    });
-  }
-}
-
-/** Two briefs name the same subject. Mirrors `briefKey` in server/src/schema.ts. */
-function sameSubject(a: Brief | undefined, b: Brief | undefined): boolean {
-  const key = (brief: Brief | undefined): string => {
-    const url = brief?.url?.trim();
-    if (url) return `site:${url.replace(/^https?:\/\//i, '').replace(/^www\./, '').split('/')[0].toLowerCase()}`;
-    return `product:${(brief?.product ?? '').toLowerCase().replace(/[^a-z0-9]/g, '')}`;
-  };
-  return key(a) === key(b);
-}
-
-function traceClass(kind: string): string {
-  if (
-    kind === 'run.steered' ||
-    kind === 'run.nudged' ||
-    kind === 'run.resumed' ||
-    kind === 'packet.checked' ||
-    kind === 'run.ended_early'
-  ) {
-    return 'rule';
-  }
-  if (kind === 'packet.invalid' || kind === 'run.failed') return 'bad';
-  return '';
-}
-
-interface TraceRow {
-  /** First event id of the row — events are unique, so the key survives grouping. */
-  id: number;
-  message: boolean;
-  cls: string;
-  events: RunEvent[];
-}
-
-/** One rendered row per event, except chat: consecutive `message.delta` chunks
- *  are one message, and fences that span chunks need the whole of it. */
-function groupEvents(events: RunEvent[]): TraceRow[] {
-  const rows: TraceRow[] = [];
-  for (const event of events) {
-    const isMessage = event.kind === 'message.delta';
-    const last = rows[rows.length - 1];
-    if (isMessage && last?.message) {
-      last.events.push(event);
-    } else {
-      rows.push({
-        id: event.id,
-        message: isMessage,
-        cls: traceClass(event.kind),
-        events: [event],
-      });
-    }
-  }
-  return rows;
-}
-
-export function formatTokens(n: number): string {
-  return n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n);
-}
-
-function pricingNote(pricing: Pricing | undefined): string {
-  if (!pricing) return 'Priced before rates were recorded';
-  const r = pricing.rates;
-  const rates = `$${r.input ?? '?'}/$${r.output ?? '?'}/$${r.cacheRead ?? '?'} per M input/output/cache read`;
-  return pricing.source === 'openrouter-live'
-    ? `OpenRouter list prices fetched ${new Date(pricing.fetched_at).toLocaleString()}: ${rates}`
-    : `pi-ai's bundled price snapshot, which may be stale: ${rates}`;
-}
-
-/** Billing is read back after the run settles, so "pending" is a real state. */
-function billedText(billed: Billed | undefined, live: boolean): string {
-  if (!billed) return live ? 'after the run' : '—';
-  const partial = billed.resolved < billed.turns ? ` (${billed.resolved} of ${billed.turns} turns)` : '';
-  return `$${billed.total.toFixed(4)}${partial}`;
-}
-
-function traceText(event: RunEvent): string {
-  const p = event.payload as Record<string, unknown>;
-  switch (event.kind) {
-    case 'run.started':
-      return 'run admitted — stage 1, gather only';
-    case 'tool.started':
-      return `${p.tool}: ${p.preview ?? ''}`;
-    case 'tool.completed':
-      return `${p.tool} ${p.error ? 'failed' : 'done'}${
-        p.duration ? ` in ${p.duration}s` : ''
-      }`;
-    case 'reasoning.available':
-      return String(p.text ?? '');
-    case 'run.steered':
-      return `judgement applied mid-run — ${p.text ?? ''}`;
-    case 'run.nudged':
-      return 'the run ended without a packet — asked once more, tools off';
-    case 'run.resumed':
-      return (
-        `the model stream dropped (${p.error || 'no detail'}) — retry ${p.attempt ?? 1} of 3` +
-        `${p.delay_ms ? ` after ${(Number(p.delay_ms) / 1000).toFixed(1)}s` : ''}`
-      );
-    case 'packet.ready':
-      return (
-        `packet accepted${p.via === 'tool' ? ' (checked during the run)' : ''} — ` +
-        `${p.sources} sources, ${p.excerpts} excerpts, ${p.gaps} gaps`
-      );
-    case 'packet.checked': {
-      // A failed check is the loop working, not an error state.
-      const problems = (p.problems as string[] | undefined) ?? [];
-      return p.valid
-        ? 'packet checked — valid, this is the run\'s result'
-        : `packet checked — ${problems.length} problem${problems.length === 1 ? '' : 's'}: ${
-            problems[0] ?? ''
-          }${problems.length > 1 ? ` (+${problems.length - 1} more)` : ''}`;
-    }
-    case 'run.ended_early':
-      return `the run ended early (${p.error || 'no detail'}) — the packet was already validated`;
-    case 'packet.invalid':
-      return `packet rejected — ${p.error ?? ''}`;
-    case 'run.failed':
-      return `run failed — ${p.error ?? ''}`;
-    case 'llm.call': {
-      const tokens = Number(p.input_tokens ?? 0) + Number(p.cache_read_tokens ?? 0);
-      const tools = Number(p.tool_calls ?? 0);
-      return (
-        `LLM call ${p.seq} — ${(Number(p.duration_ms ?? 0) / 1000).toFixed(1)}s, ` +
-        `${formatTokens(tokens)} in / ${formatTokens(Number(p.output_tokens ?? 0))} out, ` +
-        `$${Number(p.cost ?? 0).toFixed(4)}` +
-        (tools ? `, ${tools} tool call${tools === 1 ? '' : 's'}` : '') +
-        (p.error ? ` — ${p.error}` : '')
-      );
-    }
-    case 'run.billed': {
-      const b = p.billed as Billed;
-      return `OpenRouter billed $${b.total.toFixed(4)} — ${b.resolved} of ${b.turns} turns`;
-    }
-    default:
-      return event.kind;
-  }
 }

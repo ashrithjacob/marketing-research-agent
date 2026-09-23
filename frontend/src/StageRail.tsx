@@ -1,20 +1,5 @@
 import type { NodeStatus, ResearchNode, RunStatus, Saturation } from './api';
 
-/**
- * The compartment's six stages and its gate.
- *
- * Stages 3-6 render as `not built` rather than being hidden. The rail is the
- * framework's dependency graph, and showing most of it greyed out is an accurate
- * picture of where this is — hiding them would suggest a finished run had done
- * more of the work than it has.
- *
- * **Revised 2026-09-21: review mining left stage 1 and became stage 2.** It is
- * the only node with paid tools, the only one a product can be structurally
- * unable to satisfy, and its failures say nothing about the other three. As the
- * fourth node of stage 1 it could sink a packet that had already described the
- * product, its competitors and its category.
- */
-
 const STAGES = [
   { id: '1', name: 'Raw material', note: 'product, competitors, category', nodes: 1 },
   { id: '2', name: 'Review mining', note: 'verbatim customer language', nodes: 2 },
@@ -33,6 +18,7 @@ export const NODE_LABELS: Record<ResearchNode, string> = {
 };
 
 /** Which nodes each collecting stage owns. Mirrors STAGE_NODES in the server. */
+/** Which nodes each collecting stage owns. Mirrors `STAGE_NODES` in `server/src/domain/nodes.ts`. */
 export const STAGE_NODES: Record<1 | 2, ResearchNode[]> = {
   1: ['product_data', 'competitors', 'category_data'],
   2: ['review_mining'],
@@ -96,12 +82,9 @@ export default function StageRail({
   scope: readonly ResearchNode[];
   /** Start a run on one node, or on a whole stage. */
   onRunNode?: (node: ResearchNode) => void;
-  /** Stage 2 mines what stage 1 found, so it waits for a completed stage 1 on
-   *  this brief. Null when there is no run on screen to judge it by. */
   stageTwoReady?: boolean;
 }) {
   const byNode = new Map(nodes.map((n) => [n.node, n]));
-  // Competitors carry two curves, one per class; every other node has one.
   const curves = new Map<ResearchNode, Saturation[]>();
   for (const entry of saturation) curves.set(entry.node, [...(curves.get(entry.node) ?? []), entry]);
   const inScope = new Set(scope);
@@ -111,7 +94,6 @@ export default function StageRail({
       <h3>Stages</h3>
       {STAGES.map((stage) => {
         const collects = 'nodes' in stage ? (stage.nodes as 1 | 2) : null;
-        // The run on screen belongs to one stage; only that stage shows its state.
         const shown = collects !== null && scope.length > 0 && stageOfNode(scope[0]) === collects;
         const state = shown && status ? runState(status) : null;
         return (
@@ -186,13 +168,6 @@ export default function StageRail({
   );
 }
 
-/**
- * The saturation curve as a sparkline: new themes per additional source.
- *
- * This is the one place "done" is visible as a measurement rather than an
- * assertion. A curve that flattens is a node that stopped yielding; a curve
- * that flattens at source three every time means the threshold is too eager.
- */
 function Curve({ entry }: { entry?: Saturation }) {
   if (!entry || entry.curve.length === 0) return <span className="node-why">—</span>;
   const peak = Math.max(1, ...entry.curve.map((p) => p.new_themes));
