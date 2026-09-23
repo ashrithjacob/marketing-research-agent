@@ -195,6 +195,6 @@ Still only written down, because no rule catches them:
 | Control | `.claude/skills/mra-control/` | improvised curl; claims that something works |
 | Memory | `FEATURE_MAP.md` | guessing at a screenshot |
 | House style | `.claude/skills/client-doc/` | the client-document rewrite loop |
-| Shape | `server/tests/architecture.test.ts` | layers, module size, comments, stray functions |
+| Shape | `server/tests/architecture.test.ts` | layers, module size, comments, stray functions; the same rules reach `frontend/src` (250-line cap, fetch only in `api/`) |
 | Design | `.claude/skills/oop-design/` | guessing where a class goes |
 | Corrections | `.claude/skills/gardener/` | the same correction being needed twice |
