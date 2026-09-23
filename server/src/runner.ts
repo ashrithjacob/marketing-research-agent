@@ -46,158 +46,32 @@ import {
 } from "./agent/tools/index.js";
 import { recordLlmCalls } from "./trace.js";
 import { AgentMessages, PromptBuilder } from "./agent/prompt/index.js";
+import { Frames, type EventFrame } from "./agent/frames.js";
+export type { EventFrame } from "./agent/frames.js";
+import { DEFAULT_RETRY, Retries, type RetryPolicy } from "./agent/retry.js";
+import { UsageTotals } from "./agent/usage.js";
+import { LiveRuns, type Live, type Subscriber } from "./agent/live-runs.js";
+import { RunError } from "./agent/errors.js";
+export { RunError } from "./agent/errors.js";
 
 const prompts = new PromptBuilder();
 
 /** Raised when a run cannot be started, steered or stopped. */
-export class RunError extends Error {
-  override readonly name = "RunError";
-}
-
-export interface EventFrame {
-  id: number;
-  kind: string;
-  payload: Record<string, unknown>;
-  created_at: string;
-}
-
 /** A live subscriber. `null` pushed onto the queue means "no more live frames". */
-type Subscriber = (frame: EventFrame | null) => void;
-
-interface Live {
-  agent: Agent;
-  subscribers: Set<Subscriber>;
-  done: Promise<void>;
-}
-
 /** The tool argument the cockpit should show in a lane. */
-function preview(toolName: string, args: unknown): string {
-  const a = (args ?? {}) as Record<string, unknown>;
-  if (toolName === "web_search") return String(a.query ?? "");
-  if (toolName === "web_fetch") return String(a.url ?? "");
-  return "";
-}
-
-/**
- * The `llm.call` event: enough for a trace line and a live counter. The prompt
- * and answer stay in `research_llm_calls` — putting them on the event stream
- * would replay megabytes to every tab that opens the run.
- */
-function callSummary(call: LlmCall): Record<string, unknown> {
-  const usage = call.usage as Partial<Usage>;
-  const content = ((call.output as { content?: Array<{ type?: string }> }).content ?? []);
-  return {
-    seq: call.seq,
-    duration_ms: call.duration_ms,
-    input_tokens: usage.input ?? 0,
-    output_tokens: usage.output ?? 0,
-    cache_read_tokens: usage.cacheRead ?? 0,
-    cost: usage.cost?.total ?? 0,
-    stop_reason: call.stop_reason,
-    tool_calls: content.filter((c) => c?.type === "toolCall").length,
-    error: call.error,
-  };
-}
-
-function emptyUsage(): Usage {
-  return {
-    input: 0,
-    output: 0,
-    cacheRead: 0,
-    cacheWrite: 0,
-    reasoning: 0,
-    totalTokens: 0,
-    cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
-  };
-}
-
-/**
- * Sum usage across every turn.
- *
- * §11 asks what a stage-1 run costs. The final assistant message carries only
- * its own turn, and a run is dozens of turns, so reporting that number would
- * understate the cost by an order of magnitude.
- */
-function addUsage(total: Usage, next: Usage | undefined): Usage {
-  if (!next) return total;
-  return {
-    input: total.input + (next.input ?? 0),
-    output: total.output + (next.output ?? 0),
-    cacheRead: total.cacheRead + (next.cacheRead ?? 0),
-    cacheWrite: total.cacheWrite + (next.cacheWrite ?? 0),
-    reasoning: (total.reasoning ?? 0) + (next.reasoning ?? 0),
-    totalTokens: total.totalTokens + (next.totalTokens ?? 0),
-    cost: {
-      input: total.cost.input + (next.cost?.input ?? 0),
-      output: total.cost.output + (next.cost?.output ?? 0),
-      cacheRead: total.cost.cacheRead + (next.cost?.cacheRead ?? 0),
-      cacheWrite: total.cost.cacheWrite + (next.cost?.cacheWrite ?? 0),
-      total: total.cost.total + (next.cost?.total ?? 0),
-    },
-  };
-}
-
-/**
- * How hard to try again when the model's stream drops.
- *
- * Bounded, because a retry here is not free: the whole transcript is re-sent, so
- * a retry on a long run costs a full context of input tokens — the HappyWags run
- * was carrying 93k by the time it broke. Three attempts at 2s, 4s, 8s covers the
- * restart of an upstream without turning a genuine outage into a bill.
- */
-export interface RetryPolicy {
-  /** Continuations after the first failure. 0 disables retrying. */
-  attempts: number;
-  baseMs: number;
-  /** Ceiling per wait, before jitter. */
-  capMs: number;
-}
-
-export const DEFAULT_RETRY: RetryPolicy = { attempts: 3, baseMs: 2000, capMs: 30000 };
-
-/**
- * Errors no amount of waiting fixes. Everything else is retried.
- *
- * The first cut delegated the whole judgement to pi-ai's
- * `isRetryableAssistantError`, which retries what it recognises and refuses
- * what it does not. That is the wrong default here. Two runs died on two
- * different wordings — `terminated`, which it knows, and "Upstream error from
- * Relace: The model stopped before completing the response", which it does not
- * — and the second threw away 140k tokens of research without one retry.
- * Providers and gateways word stream failures however they like, so an unknown
- * message is now assumed transient: the attempt budget caps what that can cost,
- * while a lost run cannot be recovered.
- *
- * The list is pi-ai's own non-retryable vocabulary (quota, billing) plus the
- * deterministic failures: bad key, bad request, a context that will not fit,
- * and a refusal. Retrying any of those buys the same answer at the same price.
- */
-const TERMINAL_ERROR =
-  /insufficient_quota|quota exceeded|out of budget|billing|payment required|\b402\b|usage limit|credits? (exhausted|required)|unauthorized|unauthenticated|invalid api key|invalid_api_key|forbidden|\b401\b|\b403\b|context (length|window)|maximum context|too many tokens|prompt is too long|invalid_request|invalid request|unknown model|model not found|content[ _-]?(policy|filter)|safety/i;
-
-/** Whether a failed turn is worth trying again. */
-export function retryableError(errorMessage: string): boolean {
-  return errorMessage.trim() !== "" && !TERMINAL_ERROR.test(errorMessage);
-}
-
-/**
- * Exponential backoff with equal jitter: half the delay fixed, half random.
- *
- * Full jitter (random across the whole window) can pick a few milliseconds and
- * hammer a provider that has just dropped the connection; no jitter at all makes
- * concurrent runs retry in lockstep. Half and half keeps the floor and breaks
- * the sync.
- */
-export function backoffMs(attempt: number, policy: RetryPolicy = DEFAULT_RETRY): number {
-  const window = Math.min(policy.capMs, policy.baseMs * 2 ** (attempt - 1));
-  return Math.round(window / 2 + Math.random() * (window / 2));
-}
-
-const sleep = (ms: number): Promise<void> =>
-  ms > 0 ? new Promise((resolve) => setTimeout(resolve, ms)) : Promise.resolve();
-
-/** Starts runs and keeps them alive independently of any HTTP connection. */
 export class RunSupervisor {
+  subscribe(runId: string, subscriber: Subscriber): (() => void) | null {
+    return this.runs.subscribe(runId, subscriber);
+  }
+
+  isLive(runId: string): boolean {
+    return this.runs.has(runId);
+  }
+
+  async waitFor(runId: string): Promise<void> {
+    await this.runs.waitFor(runId);
+  }
+
   private readonly store: ResearchStore;
   private readonly settings: Settings;
   private readonly models: Models;
@@ -207,7 +81,7 @@ export class RunSupervisor {
   private readonly validated = new Map<string, StagePacket>();
   /** Injected in tests, so a retry test does not wait out a real backoff. */
   private readonly retry: RetryPolicy;
-  private readonly live = new Map<string, Live>();
+  private readonly runs: LiveRuns;
 
   constructor(options: {
     store: ResearchStore;
@@ -217,6 +91,7 @@ export class RunSupervisor {
     retry?: RetryPolicy;
   }) {
     this.store = options.store;
+    this.runs = new LiveRuns(options.store);
     this.settings = options.settings;
     this.retry = options.retry ?? DEFAULT_RETRY;
     this.costs =
@@ -253,7 +128,7 @@ export class RunSupervisor {
     if (!listed) {
       const error = `unknown model ${JSON.stringify(modelId)} for provider openrouter`;
       this.store.updateRun(run.id, { status: "failed", error, ended_at: Clock.nowIso() });
-      this.emit(run.id, "run.failed", { error });
+      this.runs.emit(run.id, "run.failed", { error });
       throw new RunError(error);
     }
     // pi-ai prices each turn from `model.cost`; give it today's rates, not the
@@ -281,7 +156,7 @@ export class RunSupervisor {
       onCall: (call) => {
         const cost = billed.get(call.response_id);
         if (cost !== undefined) this.store.setLlmCallBilled(run.id, call.response_id, cost);
-        this.emit(run.id, "llm.call", callSummary(call));
+        this.runs.emit(run.id, "llm.call", Frames.callSummary(call));
       },
     });
 
@@ -307,7 +182,7 @@ export class RunSupervisor {
             onValid: (packet) => this.storeValidated(run.id, packet),
             onChecked: (valid, problems) => {
               this.store.addPacketCheck(run.id, valid, problems);
-              this.emit(run.id, "packet.checked", { valid, problems: [...problems] });
+              this.runs.emit(run.id, "packet.checked", { valid, problems: [...problems] });
             },
           },
         }).build(),
@@ -319,10 +194,10 @@ export class RunSupervisor {
       session_id: `research-${run.id}`,
       status: "running",
     });
-    this.emit(run.id, "run.started", { model: modelId, nodes });
+    this.runs.emit(run.id, "run.started", { model: modelId, nodes });
 
     const done = this.watch(run.id, agent, instructions, pricing, nodes, onBilled);
-    this.live.set(run.id, { agent, subscribers: new Set(), done });
+    this.runs.add(run.id, { agent, subscribers: new Set(), done });
     return run.id;
   }
 
@@ -343,7 +218,7 @@ export class RunSupervisor {
         error: "the server restarted while this run was in progress; the run did not survive it",
         ended_at: Clock.nowIso(),
       });
-      this.emit(run.id, "run.failed", { error: "server restarted mid-run" });
+      this.runs.emit(run.id, "run.failed", { error: "server restarted mid-run" });
     }
   }
 
@@ -356,39 +231,29 @@ export class RunSupervisor {
    * `completed` with `stopping`, and nothing ever settled it again. The stored
    * status is the truth: `settle()` writes it before billing starts.
    */
-  private controllable(runId: string): Live {
-    const live = this.live.get(runId);
-    if (!live) throw new RunError(`run ${runId} is not running here`);
-    const status = this.store.getRun(runId)?.status;
-    if (status && TERMINAL_STATUSES.has(status)) {
-      throw new RunError(`run ${runId} has already finished (${status})`);
-    }
-    return live;
-  }
 
   steer(runId: string, judgement: Judgement): void {
-    const live = this.controllable(runId);
+    const live = this.runs.controllable(runId);
     live.agent.steer({
       role: "user",
       content: [{ type: "text", text: AgentMessages.steer(judgement) }],
       timestamp: Date.now(),
     } as any);
-    this.emit(runId, "run.steered", { judgement_id: judgement.id, text: judgement.text });
+    this.runs.emit(runId, "run.steered", { judgement_id: judgement.id, text: judgement.text });
   }
 
   stop(runId: string): void {
-    const live = this.controllable(runId);
+    const live = this.runs.controllable(runId);
     this.store.updateRun(runId, { status: "stopping" });
-    this.emit(runId, "run.stopping", {});
+    this.runs.emit(runId, "run.stopping", {});
     live.agent.abort();
   }
 
   async close(): Promise<void> {
     // Abandon billing lookups first, or shutdown waits out their retries.
     this.costs.stop();
-    for (const [, live] of this.live) live.agent.abort();
-    await Promise.allSettled([...this.live.values()].map((l) => l.done));
-    this.live.clear();
+    this.runs.abortAll();
+    await this.runs.drain();
   }
 
   // -- watching ---------------------------------------------------------
@@ -403,7 +268,7 @@ export class RunSupervisor {
     onBilled: (responseId: string, cost: number) => void,
   ): Promise<void> {
     const output: string[] = [];
-    let usage = emptyUsage();
+    let usage = UsageTotals.empty();
     const billing = new RunBilling(this.costs);
     // The rates travel with the usage they priced, so an old run's cost can be
     // read against the prices it was actually calculated from.
@@ -416,7 +281,7 @@ export class RunSupervisor {
     const unsubscribe = agent.subscribe((event: AgentEvent) => {
       try {
         this.onAgentEvent(runId, event, messageText, output, (message) => {
-          usage = addUsage(usage, message.usage);
+          usage = UsageTotals.add(usage, message.usage);
           // Looked up now, while the run goes on, so only the last turn's lookup
           // is still pending when the run ends.
           const responseId = message.responseId;
@@ -437,9 +302,9 @@ export class RunSupervisor {
       for (let attempt = 1; attempt <= this.retry.attempts; attempt++) {
         const dropped = agent.state.errorMessage ?? "";
         if (!this.shouldRetry(runId, dropped)) break;
-        const delayMs = backoffMs(attempt, this.retry);
-        this.emit(runId, "run.resumed", { error: dropped, attempt, delay_ms: delayMs });
-        await sleep(delayMs);
+        const delayMs = Retries.backoffMs(attempt, this.retry);
+        this.runs.emit(runId, "run.resumed", { error: dropped, attempt, delay_ms: delayMs });
+        await Retries.sleep(delayMs);
         // The operator may have pressed Stop while we were waiting.
         if (this.store.getRun(runId)?.status === "stopping") break;
         // `prompt()` clears `errorMessage` and keeps the transcript, so this is
@@ -450,7 +315,7 @@ export class RunSupervisor {
       if (this.lacksPacket(runId, output.join(""), agent)) {
         // Once, with tools off, so the only thing the turn can produce is text.
         agent.state.tools = [];
-        this.emit(runId, "run.nudged", { reason: "the run ended without a packet" });
+        this.runs.emit(runId, "run.nudged", { reason: "the run ended without a packet" });
         await agent.prompt(AgentMessages.packetNudge());
         await agent.waitForIdle();
       }
@@ -465,13 +330,13 @@ export class RunSupervisor {
         usage: recorded(),
         ended_at: Clock.nowIso(),
       });
-      this.emit(runId, "run.failed", { error: message });
+      this.runs.emit(runId, "run.failed", { error: message });
     } finally {
       unsubscribe();
       // A failed or cancelled run was still billed for the turns it took.
       await this.recordBilling(runId, billing);
-      this.closeSubscribers(runId);
-      this.live.delete(runId);
+      this.runs.closeSubscribers(runId);
+      this.runs.remove(runId);
       this.validated.delete(runId);
     }
   }
@@ -490,7 +355,7 @@ export class RunSupervisor {
    * of its own, so this is where it goes.
    */
   private shouldRetry(runId: string, errorMessage: string): boolean {
-    if (!retryableError(errorMessage)) return false;
+    if (!Retries.isRetryable(errorMessage)) return false;
     return this.store.getRun(runId)?.status !== "stopping";
   }
 
@@ -530,7 +395,7 @@ export class RunSupervisor {
       if (!billed) return;
       const usage = this.store.getRun(runId)?.usage ?? {};
       this.store.updateRun(runId, { usage: { ...usage, billed } });
-      this.emit(runId, "run.billed", { billed });
+      this.runs.emit(runId, "run.billed", { billed });
     } catch (error) {
       console.error(`research run ${runId}: recording the billed cost failed`, error);
     }
@@ -557,7 +422,7 @@ export class RunSupervisor {
         if (text.length > already.length) {
           const delta = text.slice(already.length);
           messageText.set(key, text);
-          if (delta) this.emit(runId, "message.delta", { delta });
+          if (delta) this.runs.emit(runId, "message.delta", { delta });
         }
         if (event.type === "message_end") {
           // The packet is read from the whole transcript's assistant text, so
@@ -569,19 +434,19 @@ export class RunSupervisor {
             .filter((c: any) => c?.type === "thinking")
             .map((c: any) => c.thinking ?? c.text ?? "")
             .join("");
-          if (thinking.trim()) this.emit(runId, "reasoning.available", { text: thinking });
+          if (thinking.trim()) this.runs.emit(runId, "reasoning.available", { text: thinking });
         }
         return;
       }
       case "tool_execution_start":
-        this.emit(runId, "tool.started", {
+        this.runs.emit(runId, "tool.started", {
           tool: event.toolName,
-          preview: preview(event.toolName, event.args),
+          preview: Frames.toolPreview(event.toolName, event.args),
           lane: TOOL_LANES[event.toolName] ?? "other",
         });
         return;
       case "tool_execution_end":
-        this.emit(runId, "tool.completed", {
+        this.runs.emit(runId, "tool.completed", {
           tool: event.toolName,
           error: Boolean(event.isError),
           lane: TOOL_LANES[event.toolName] ?? "other",
@@ -618,11 +483,11 @@ export class RunSupervisor {
     if (validated && !stopping) {
       this.store.updateRun(runId, { status: "completed", error: "" });
       this.countJudgementApplications(runId, validated);
-      this.emit(runId, "run.completed", { usage });
+      this.runs.emit(runId, "run.completed", { usage });
       if (errorMessage) {
         // Honest about both halves: the artefact is valid, the run did not end
         // cleanly. Calling this `failed` would be a lie about the packet.
-        this.emit(runId, "run.ended_early", { error: errorMessage });
+        this.runs.emit(runId, "run.ended_early", { error: errorMessage });
       }
       return;
     }
@@ -631,12 +496,12 @@ export class RunSupervisor {
       // An abort the operator asked for is a cancellation, not a failure.
       const status = stopping ? "cancelled" : "failed";
       this.store.updateRun(runId, { status, error: errorMessage });
-      this.emit(runId, `run.${status}`, { error: errorMessage });
+      this.runs.emit(runId, `run.${status}`, { error: errorMessage });
       return;
     }
     if (stopping) {
       this.store.updateRun(runId, { status: "cancelled", error: "stopped by the operator" });
-      this.emit(runId, "run.cancelled", {});
+      this.runs.emit(runId, "run.cancelled", {});
       return;
     }
 
@@ -646,7 +511,7 @@ export class RunSupervisor {
     } catch (error) {
       if (!(error instanceof PacketError)) throw error;
       this.store.updateRun(runId, { status: "invalid", error: error.message });
-      this.emit(runId, "packet.invalid", { error: error.message });
+      this.runs.emit(runId, "packet.invalid", { error: error.message });
       return;
     }
     this.store.updateRun(runId, {
@@ -658,8 +523,8 @@ export class RunSupervisor {
       packet_source: "output",
     });
     this.countJudgementApplications(runId, parsed);
-    this.emit(runId, "run.completed", { usage });
-    this.emit(runId, "packet.ready", {
+    this.runs.emit(runId, "run.completed", { usage });
+    this.runs.emit(runId, "packet.ready", {
       sources: parsed.sources.length,
       excerpts: parsed.excerpts.length,
       gaps: parsed.gaps.length,
@@ -678,7 +543,7 @@ export class RunSupervisor {
     if (this.validated.has(runId)) return;
     this.validated.set(runId, packet);
     this.store.updateRun(runId, { packet, packet_source: "tool", error: "" });
-    this.emit(runId, "packet.ready", {
+    this.runs.emit(runId, "packet.ready", {
       sources: packet.sources.length,
       excerpts: packet.excerpts.length,
       gaps: packet.gaps.length,
@@ -704,54 +569,11 @@ export class RunSupervisor {
   // -- fan-out ----------------------------------------------------------
 
   /** Persist first, then fan out. Order matters on a crash. */
-  private emit(runId: string, kind: string, payload: Record<string, unknown>): void {
-    const event = this.store.addEvent(runId, kind, payload);
-    const live = this.live.get(runId);
-    if (!live) return;
-    const frame: EventFrame = {
-      id: event.id,
-      kind,
-      payload,
-      created_at: event.created_at,
-    };
-    for (const subscriber of [...live.subscribers]) {
-      try {
-        subscriber(frame);
-      } catch {
-        // A browser that cannot keep up loses live frames, not events:
-        // everything is in SQLite and it can reconnect with `after`.
-      }
-    }
-  }
 
   /** A live feed, or null when the run is no longer running here. */
-  subscribe(runId: string, subscriber: Subscriber): (() => void) | null {
-    const live = this.live.get(runId);
-    if (!live) return null;
-    live.subscribers.add(subscriber);
-    return () => live.subscribers.delete(subscriber);
-  }
-
-  isLive(runId: string): boolean {
-    return this.live.has(runId);
-  }
 
   /** Await a run's completion. Tests need it; nothing in the HTTP path does. */
-  async waitFor(runId: string): Promise<void> {
-    await this.live.get(runId)?.done;
-  }
 
-  private closeSubscribers(runId: string): void {
-    const live = this.live.get(runId);
-    if (!live) return;
-    for (const subscriber of [...live.subscribers]) {
-      try {
-        subscriber(null); // sentinel: no more live frames
-      } catch {
-        // as above
-      }
-    }
-  }
 }
 
 /**

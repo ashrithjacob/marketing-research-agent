@@ -596,6 +596,9 @@ What the start modal needs to warn you before you pay for a run.
 - **Out:** `text/event-stream`. The server subscribes to live events *first*, then
   replays every stored event with `id > after`, then streams live ones, dropping any
   it already replayed. A refresh or a second tab therefore sees the whole run.
+  Delivery to a subscriber is best-effort: every event is written to SQLite
+  *before* it is pushed, so a browser that throws or cannot keep up loses live
+  frames, never events, and picks them up again on reconnect with `?after=`.
   Frames:
   ```
   event: event

@@ -15,26 +15,15 @@ classDiagram
       issue()
       verify()
     }
-    class RunError {
-    }
-    class EventFrame {
-      <<interface>>
-    }
-    class Live {
-      <<interface>>
-    }
-    class RetryPolicy {
-      <<interface>>
-    }
     class RunSupervisor {
+      subscribe()
+      isLive()
+      waitFor()
       start()
       recoverRunsKilledByRestart()
       steer()
       stop()
       close()
-      subscribe()
-      isLive()
-      waitFor()
     }
   }
   namespace domain {
@@ -276,6 +265,28 @@ classDiagram
     }
   }
   namespace agent {
+    class RunError {
+    }
+    class EventFrame {
+      <<interface>>
+    }
+    class Frames {
+      toolPreview()
+      callSummary()
+    }
+    class Live {
+      <<interface>>
+    }
+    class LiveRuns {
+      add()
+      remove()
+      get()
+      ids()
+      abortAll()
+      drain()
+      has()
+      waitFor()
+    }
     class ModelPricing {
       apply()
     }
@@ -298,6 +309,14 @@ classDiagram
       steer()
       packetNudge()
       resume()
+    }
+    class RetryPolicy {
+      <<interface>>
+    }
+    class Retries {
+      isRetryable()
+      backoffMs()
+      sleep()
     }
     class ToolsetOptions {
       <<interface>>
@@ -336,6 +355,10 @@ classDiagram
     class WebFetchTool {
       tool()
     }
+    class UsageTotals {
+      empty()
+      add()
+    }
   }
   AmazonReviews --> ActorRunner
   AmazonProducts --> ActorRunner
@@ -343,6 +366,7 @@ classDiagram
   Firecrawl --> Settings
   RunBilling --> OpenRouterPrices
   Searxng --> Settings
+  LiveRuns --> ResearchStore
   ModelPricing --> OpenRouterPrices
   ResearchToolset --> ToolsetOptions
   PacketCheckTool --> PacketCheckOptions
@@ -383,17 +407,22 @@ classDiagram
 | `adapters` | `adapters/sqlite/run-table.ts` | RunTable |
 | `adapters` | `adapters/sqlite/schema.ts` | SqliteSchema |
 | `adapters` | `adapters/sqlite/store.ts` | SqliteResearchStore |
+| `agent` | `agent/errors.ts` | RunError |
+| `agent` | `agent/frames.ts` | EventFrame, Frames |
+| `agent` | `agent/live-runs.ts` | Live, LiveRuns |
 | `agent` | `agent/pricing.ts` | ModelPricing |
 | `agent` | `agent/prompt/blocks.ts` | PromptBlocks |
 | `agent` | `agent/prompt/builder.ts` | PromptBuilder |
 | `agent` | `agent/prompt/example-picker.ts` | WorkedExample |
 | `agent` | `agent/prompt/messages.ts` | AgentMessages |
+| `agent` | `agent/retry.ts` | RetryPolicy, Retries |
 | `agent` | `agent/tools/factory.ts` | ToolsetOptions, ResearchToolset |
 | `agent` | `agent/tools/lanes.ts` | FetchRecord, PacketCheckOptions |
 | `agent` | `agent/tools/packet-check-tool.ts` | PacketCheckTool |
 | `agent` | `agent/tools/review-rendering.ts` | ReviewRendering |
 | `agent` | `agent/tools/review-tools.ts` | FindProductTool, AmazonReviewsTool, TrustpilotReviewsTool |
 | `agent` | `agent/tools/web-tools.ts` | WebSearchTool, WebFetchTool |
+| `agent` | `agent/usage.ts` | UsageTotals |
 | `(unlayered)` | `app.ts` | App |
 | `(unlayered)` | `auth.ts` | TokenService |
 | `config` | `config/settings.ts` | Settings, Env |
@@ -412,4 +441,4 @@ classDiagram
 | `extract` | `extract/names.ts` | Names, BrandLabels, Relations |
 | `extract` | `extract/scope-check.ts` | ScopeCheck |
 | `extract` | `extract/validator.ts` | ZodProblems, PacketValidator |
-| `(unlayered)` | `runner.ts` | RunError, EventFrame, Live, RetryPolicy, RunSupervisor |
+| `(unlayered)` | `runner.ts` | RunSupervisor |

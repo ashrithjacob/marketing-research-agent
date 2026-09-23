@@ -15,12 +15,8 @@ import { fauxAssistantMessage, fauxProvider, fauxToolCall } from "@earendil-work
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { OpenRouterPrices } from "../src/adapters/index.js";
-import {
-  RunSupervisor,
-  backoffMs,
-  effectiveRejectKinds,
-  retryableError,
-} from "../src/runner.js";
+import { RunSupervisor, effectiveRejectKinds } from "../src/runner.js";
+import { DEFAULT_RETRY, Retries } from "../src/agent/retry.js";
 import {
   type Judgement,
   type RunRequest,
@@ -625,14 +621,14 @@ describe("a stream that drops mid-run", () => {
       [2, 2000, 4000],
       [3, 4000, 8000],
     ] as const) {
-      const waits = Array.from({ length: 40 }, () => backoffMs(attempt, policy));
+      const waits = Array.from({ length: 40 }, () => Retries.backoffMs(attempt, policy));
       expect(Math.min(...waits)).toBeGreaterThanOrEqual(low);
       expect(Math.max(...waits)).toBeLessThanOrEqual(high);
       // Jitter, not a constant: two runs that drop together must not retry in step.
       expect(new Set(waits).size).toBeGreaterThan(1);
     }
     // The cap binds before the exponent runs away.
-    expect(backoffMs(20, policy)).toBeLessThanOrEqual(30000);
+    expect(Retries.backoffMs(20, policy)).toBeLessThanOrEqual(30000);
   });
 
   it("carries on from the transcript rather than losing the run", async () => {
@@ -691,7 +687,7 @@ describe("a stream that drops mid-run", () => {
     // classifier does not recognise this one, and refusing it threw away 140k
     // tokens of research without a single retry.
     expect(
-      retryableError("Upstream error from Relace: The model stopped before completing the response."),
+      Retries.isRetryable("Upstream error from Relace: The model stopped before completing the response."),
     ).toBe(true);
     for (const transient of [
       "terminated",
@@ -701,7 +697,7 @@ describe("a stream that drops mid-run", () => {
       "stream ended before message_stop",
       "something nobody has written down yet",
     ]) {
-      expect(retryableError(transient)).toBe(true);
+      expect(Retries.isRetryable(transient)).toBe(true);
     }
   });
 
@@ -715,9 +711,9 @@ describe("a stream that drops mid-run", () => {
       "invalid_request_error: unknown model",
       "flagged by the content policy",
     ]) {
-      expect(retryableError(terminal)).toBe(false);
+      expect(Retries.isRetryable(terminal)).toBe(false);
     }
-    expect(retryableError("")).toBe(false);
+    expect(Retries.isRetryable("")).toBe(false);
   });
 
   it("asks for a packet from what it gathered when the retries run out", async () => {
