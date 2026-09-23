@@ -60,7 +60,6 @@ const LEGACY = new Set([
   "app.ts",
   "auth.ts",
   "runner.ts",
-  "tools.ts",
   "trace.ts",
 ]);
 

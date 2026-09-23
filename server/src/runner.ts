@@ -40,7 +40,10 @@ import {
   TERMINAL_STATUSES,
 } from "./domain/index.js";
 import type { Settings } from "./config/index.js";
-import { TOOL_LANES, createResearchTools } from "./tools.js";
+import {
+  ResearchToolset,
+  TOOL_LANES,
+} from "./agent/tools/index.js";
 import { recordLlmCalls } from "./trace.js";
 import { AgentMessages, PromptBuilder } from "./agent/prompt/index.js";
 
@@ -290,7 +293,7 @@ export class RunSupervisor {
       initialState: {
         systemPrompt: prompts.system(nodes),
         model,
-        tools: createResearchTools({
+        tools: new ResearchToolset({
           settings: this.settings,
           runId: run.id,
           reviewTools: nodes.includes("review_mining"),
@@ -307,7 +310,7 @@ export class RunSupervisor {
               this.emit(run.id, "packet.checked", { valid, problems: [...problems] });
             },
           },
-        }),
+        }).build(),
       },
     });
 

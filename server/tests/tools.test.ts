@@ -9,6 +9,7 @@
  */
 
 import { readFileSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { Corpus } from "../src/adapters/corpus.js";
 import { createHash } from "node:crypto";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -21,7 +22,11 @@ import {
   TRUSTPILOT_ACTOR,
 } from "../src/adapters/apify/index.js";
 import { Env, type Settings } from "../src/config/index.js";
-import { archive, createResearchTools, reviewLimit, reviewLocator } from "../src/tools.js";
+import {
+  ResearchToolset,
+  ReviewRendering,
+  type ToolsetOptions,
+} from "../src/agent/tools/index.js";
 import {
   STAGE_NODES,
   locatorSchema,
@@ -49,7 +54,7 @@ afterEach(() => {
 });
 
 const tools = (runId = "run-1") => {
-  const list = createResearchTools({ settings, runId });
+  const list = new ResearchToolset({ settings, runId }).build();
   return {
     search: list.find((t) => t.name === "web_search")!,
     fetch: list.find((t) => t.name === "web_fetch")!,
@@ -189,7 +194,7 @@ describe("web_fetch", () => {
 describe("archive", () => {
   it("hashes the exact bytes written, not a normalised form", async () => {
     const text = "  leading and trailing whitespace matters  \r\n";
-    const { sourceId, archived } = await archive(join(dir, "corpus"), "run-9", text);
+    const { sourceId, archived } = await new Corpus(join(dir, "corpus")).write("run-9", text);
     expect(archived).toBe(true);
     const expected = createHash("sha256").update(Buffer.from(text, "utf-8")).digest("hex");
     expect(sourceId).toBe(`sha256:${expected}`);
@@ -213,40 +218,40 @@ describe("review tools", () => {
   });
 
   const reviewTools = (actorRunner: any, runId = "run-r") =>
-    createResearchTools({ settings, runId, actorRunner });
+    new ResearchToolset({ settings, runId, actorRunner }).build();
 
   it("are withheld entirely when no Apify token is configured", () => {
     // Withheld rather than stubbed: an agent told it has a tool that always
     // throws burns turns rediscovering that, and the prompt knows how to gap.
-    const names = createResearchTools({
+    const names = new ResearchToolset({
       settings: { ...settings, apifyToken: "" },
       runId: "run-x",
       actorRunner: null,
-    }).map((t) => t.name);
+    }).build().map((t) => t.name);
 
     expect(names).toEqual(["web_search", "web_fetch"]);
   });
 
   it("are withheld from a run that does not cover review mining, token or not", () => {
     // The only tools that cost money per call; a product-data run has no use for them.
-    const names = createResearchTools({
+    const names = new ResearchToolset({
       settings,
       runId: "run-x",
       actorRunner: runner([]),
       reviewTools: false,
-    }).map((t) => t.name);
+    }).build().map((t) => t.name);
     expect(names).toEqual(["web_search", "web_fetch"]);
   });
 
   it("offers Amazon product search alone to a competitors run", () => {
     // Discovery, not reviews: the review tools stay withheld.
-    const names = createResearchTools({
+    const names = new ResearchToolset({
       settings,
       runId: "run-x",
       actorRunner: runner([]),
       reviewTools: false,
       productSearch: true,
-    }).map((t) => t.name);
+    }).build().map((t) => t.name);
     expect(names).toEqual(["web_search", "web_fetch", "amazon_find_product"]);
   });
 
@@ -318,7 +323,7 @@ describe("review tools", () => {
   });
 
   it("falls back to a note locator when the actor gives only a review id", () => {
-    const printed = JSON.parse(reviewLocator("R83A6B2PFC42"));
+    const printed = JSON.parse(ReviewRendering.locator("R83A6B2PFC42"));
     expect(printed).toEqual({ kind: "note", note: "review id R83A6B2PFC42" });
     expect(locatorSchema.safeParse(printed).success).toBe(true);
   });
@@ -384,7 +389,7 @@ describe("review volume is bounded by the server, not the agent", () => {
   };
 
   const tool = (actorRunner: any, name: string) =>
-    createResearchTools({ settings: { ...settings, apifyMaxReviews: 10 }, runId: "run-cap", actorRunner })
+    new ResearchToolset({ settings: { ...settings, apifyMaxReviews: 10 }, runId: "run-cap", actorRunner }).build()
       .find((t) => t.name === name)!;
 
   it("cuts an Amazon request to the setting, and sizes the spend cap from the cut number", async () => {
@@ -422,19 +427,19 @@ describe("review volume is bounded by the server, not the agent", () => {
   });
 
   it("uses the setting when the agent asks for nothing, and never goes below one", () => {
-    expect(reviewLimit(undefined, 10)).toBe(10);
-    expect(reviewLimit(0, 10)).toBe(1);
-    expect(reviewLimit(-5, 10)).toBe(1);
-    expect(reviewLimit(7.9, 10)).toBe(7);
-    expect(reviewLimit(Number.NaN, 10)).toBe(10);
+    expect(ReviewRendering.limit(undefined, 10)).toBe(10);
+    expect(ReviewRendering.limit(0, 10)).toBe(1);
+    expect(ReviewRendering.limit(-5, 10)).toBe(1);
+    expect(ReviewRendering.limit(7.9, 10)).toBe(7);
+    expect(ReviewRendering.limit(Number.NaN, 10)).toBe(10);
   });
 });
 
 describe("validate_packet", () => {
-  const check = (overrides: Partial<Parameters<typeof createResearchTools>[0]["packetCheck"] & {}> = {}) => {
+  const check = (overrides: Partial<ToolsetOptions["packetCheck"] & {}> = {}) => {
     const valid: any[] = [];
     const checked: Array<{ valid: boolean; problems: readonly string[] }> = [];
-    const list = createResearchTools({
+    const list = new ResearchToolset({
       settings,
       runId: "run-v",
       packetCheck: {
@@ -444,13 +449,13 @@ describe("validate_packet", () => {
         onChecked: (v, problems) => checked.push({ valid: v, problems }),
         ...overrides,
       },
-    });
+    }).build();
     return { tool: list.find((t) => t.name === "validate_packet")!, valid, checked };
   };
   const text = (result: any) => result.content[0].text as string;
 
   it("is offered to every run that has a contract to check", () => {
-    const names = createResearchTools({ settings, runId: "r" }).map((t) => t.name);
+    const names = new ResearchToolset({ settings, runId: "r" }).build().map((t) => t.name);
     expect(names).not.toContain("validate_packet");
     expect(check().tool).toBeDefined();
   });

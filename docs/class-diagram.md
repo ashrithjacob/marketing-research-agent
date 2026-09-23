@@ -36,15 +36,6 @@ classDiagram
       isLive()
       waitFor()
     }
-    class SearchHit {
-      <<interface>>
-    }
-    class FetchRecord {
-      <<interface>>
-    }
-    class PacketCheckOptions {
-      <<interface>>
-    }
   }
   namespace domain {
     class Briefs {
@@ -201,6 +192,12 @@ classDiagram
     class AmazonProduct {
       <<interface>>
     }
+    class Corpus {
+      write()
+    }
+    class Firecrawl {
+      scrape()
+    }
     class Http {
       withTimeout()
       pool()
@@ -228,6 +225,12 @@ classDiagram
     class RunBilling {
       track()
       settle()
+    }
+    class SearchHit {
+      <<interface>>
+    }
+    class Searxng {
+      find()
     }
     class CallLog {
       add()
@@ -296,12 +299,62 @@ classDiagram
       packetNudge()
       resume()
     }
+    class ToolsetOptions {
+      <<interface>>
+    }
+    class ResearchToolset {
+      build()
+    }
+    class FetchRecord {
+      <<interface>>
+    }
+    class PacketCheckOptions {
+      <<interface>>
+    }
+    class PacketCheckTool {
+      tool()
+    }
+    class ReviewRendering {
+      limit()
+      cappedNote()
+      starBand()
+      locator()
+      render()
+    }
+    class FindProductTool {
+      tool()
+    }
+    class AmazonReviewsTool {
+      tool()
+    }
+    class TrustpilotReviewsTool {
+      tool()
+    }
+    class WebSearchTool {
+      tool()
+    }
+    class WebFetchTool {
+      tool()
+    }
   }
   AmazonReviews --> ActorRunner
   AmazonProducts --> ActorRunner
   TrustpilotReviews --> ActorRunner
+  Firecrawl --> Settings
   RunBilling --> OpenRouterPrices
+  Searxng --> Settings
   ModelPricing --> OpenRouterPrices
+  ResearchToolset --> ToolsetOptions
+  PacketCheckTool --> PacketCheckOptions
+  FindProductTool --> AmazonProducts
+  AmazonReviewsTool --> Settings
+  AmazonReviewsTool --> AmazonReviews
+  TrustpilotReviewsTool --> Settings
+  TrustpilotReviewsTool --> TrustpilotReviews
+  WebSearchTool --> Searxng
+  WebFetchTool --> Settings
+  WebFetchTool --> Firecrawl
+  WebFetchTool --> Corpus
 ```
 
 ## Inventory
@@ -315,10 +368,13 @@ classDiagram
 | `adapters` | `adapters/apify/runner.ts` | ActorRunner, ApifyActorRunner, ActorRunners |
 | `adapters` | `adapters/apify/trustpilot-reviews.ts` | TrustpilotReviews |
 | `adapters` | `adapters/apify/types.ts` | ReviewExcerpt, ReviewResult, AmazonProduct |
+| `adapters` | `adapters/corpus.ts` | Corpus |
+| `adapters` | `adapters/firecrawl.ts` | Firecrawl |
 | `adapters` | `adapters/http.ts` | Http |
 | `adapters` | `adapters/openrouter-prices.ts` | OpenRouterPrices |
 | `adapters` | `adapters/rates.ts` | Rates, Pricing, Billed, Money |
 | `adapters` | `adapters/run-billing.ts` | RunBilling |
+| `adapters` | `adapters/searxng.ts` | SearchHit, Searxng |
 | `adapters` | `adapters/sqlite/call-log.ts` | CallLog |
 | `adapters` | `adapters/sqlite/check-log.ts` | PacketCheckLog |
 | `adapters` | `adapters/sqlite/event-log.ts` | EventLog |
@@ -332,6 +388,12 @@ classDiagram
 | `agent` | `agent/prompt/builder.ts` | PromptBuilder |
 | `agent` | `agent/prompt/example-picker.ts` | WorkedExample |
 | `agent` | `agent/prompt/messages.ts` | AgentMessages |
+| `agent` | `agent/tools/factory.ts` | ToolsetOptions, ResearchToolset |
+| `agent` | `agent/tools/lanes.ts` | FetchRecord, PacketCheckOptions |
+| `agent` | `agent/tools/packet-check-tool.ts` | PacketCheckTool |
+| `agent` | `agent/tools/review-rendering.ts` | ReviewRendering |
+| `agent` | `agent/tools/review-tools.ts` | FindProductTool, AmazonReviewsTool, TrustpilotReviewsTool |
+| `agent` | `agent/tools/web-tools.ts` | WebSearchTool, WebFetchTool |
 | `(unlayered)` | `app.ts` | App |
 | `(unlayered)` | `auth.ts` | TokenService |
 | `config` | `config/settings.ts` | Settings, Env |
@@ -351,4 +413,3 @@ classDiagram
 | `extract` | `extract/scope-check.ts` | ScopeCheck |
 | `extract` | `extract/validator.ts` | ZodProblems, PacketValidator |
 | `(unlayered)` | `runner.ts` | RunError, EventFrame, Live, RetryPolicy, RunSupervisor |
-| `(unlayered)` | `tools.ts` | SearchHit, FetchRecord, PacketCheckOptions |
