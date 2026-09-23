@@ -5,7 +5,8 @@
 
 import { describe, expect, it } from "vitest";
 
-import { OpenRouterCosts, RunBilling, parseRates } from "../src/costs.js";
+import { Money, OpenRouterPrices, RunBilling } from "../src/adapters/index.js";
+import { ModelPricing } from "../src/agent/pricing.js";
 
 type Reply = { status: number; body?: unknown };
 
@@ -46,7 +47,7 @@ function snapshotModel(): any {
 
 describe("parseRates", () => {
   it("converts OpenRouter's dollars-per-token strings to pi-ai's dollars per million", () => {
-    const rates = parseRates(MODELS.data[0]!.pricing)!;
+    const rates = Money.rates(MODELS.data[0]!.pricing)!;
     expect(rates.input).toBeCloseTo(0.06, 10);
     expect(rates.output).toBeCloseTo(0.12, 10);
     expect(rates.cacheRead).toBeCloseTo(0.012, 10);
@@ -54,15 +55,15 @@ describe("parseRates", () => {
   });
 
   it("refuses a router model's -1 sentinel rather than pricing it negative", () => {
-    expect(parseRates(MODELS.data[1]!.pricing)).toBeUndefined();
+    expect(Money.rates(MODELS.data[1]!.pricing)).toBeUndefined();
   });
 });
 
 describe("calculated cost", () => {
   it("prices a model from the snapshot until live prices arrive, and says so", () => {
-    const costs = new OpenRouterCosts({ apiKey: "" });
+    const costs = new OpenRouterPrices({ apiKey: "" });
     const model = snapshotModel();
-    const { model: priced, pricing } = costs.price(model);
+    const { model: priced, pricing } = new ModelPricing(costs).apply(model);
     expect(priced).toBe(model);
     expect(pricing.source).toBe("pi-ai-snapshot");
     expect(pricing.rates.output).toBe(0.18);
@@ -71,9 +72,9 @@ describe("calculated cost", () => {
   it("writes live rates onto the model and drops the snapshot's stale tiers", async () => {
     // The snapshot was 50% high on output for this model when measured.
     const { fetch } = scripted(() => ({ status: 200, body: MODELS }));
-    const costs = new OpenRouterCosts({ apiKey: "", fetch });
+    const costs = new OpenRouterPrices({ apiKey: "", fetch });
     await costs.refreshPrices();
-    const { model, pricing } = costs.price(snapshotModel());
+    const { model, pricing } = new ModelPricing(costs).apply(snapshotModel());
     expect(model.cost.output).toBeCloseTo(0.12, 10);
     expect(model.cost.cacheRead).toBeCloseTo(0.012, 10);
     // Not listed by OpenRouter: keeps the snapshot's value.
@@ -86,11 +87,11 @@ describe("calculated cost", () => {
   it("keeps the last good prices when a refresh fails", async () => {
     let up = true;
     const { fetch } = scripted(() => (up ? { status: 200, body: MODELS } : { status: 503 }));
-    const costs = new OpenRouterCosts({ apiKey: "", fetch });
+    const costs = new OpenRouterPrices({ apiKey: "", fetch });
     await costs.refreshPrices();
     up = false;
     await costs.refreshPrices();
-    expect(costs.price(snapshotModel()).pricing.source).toBe("openrouter-live");
+    expect(new ModelPricing(costs).apply(snapshotModel()).pricing.source).toBe("openrouter-live");
   });
 });
 
@@ -101,28 +102,28 @@ describe("billed cost", () => {
     const { fetch } = scripted(() =>
       ++asked < 3 ? { status: 404 } : { status: 200, body: { data: { total_cost: 8.008e-6 } } },
     );
-    const costs = new OpenRouterCosts({ apiKey: "k", fetch, lookupDelaysMs: [0, 0, 0] });
+    const costs = new OpenRouterPrices({ apiKey: "k", fetch, lookupDelaysMs: [0, 0, 0] });
     expect(await costs.generationCost("gen-1")).toBe(8.008e-6);
     expect(asked).toBe(3);
   });
 
   it("gives up after the retry schedule instead of holding the run open", async () => {
     const { fetch, calls } = scripted(() => ({ status: 404 }));
-    const costs = new OpenRouterCosts({ apiKey: "k", fetch, lookupDelaysMs: [0, 0] });
+    const costs = new OpenRouterPrices({ apiKey: "k", fetch, lookupDelaysMs: [0, 0] });
     expect(await costs.generationCost("gen-1")).toBeNull();
     expect(calls).toHaveLength(3);
   });
 
   it("does not retry an error that waiting will not fix", async () => {
     const { fetch, calls } = scripted(() => ({ status: 401 }));
-    const costs = new OpenRouterCosts({ apiKey: "k", fetch, lookupDelaysMs: [0, 0] });
+    const costs = new OpenRouterPrices({ apiKey: "k", fetch, lookupDelaysMs: [0, 0] });
     expect(await costs.generationCost("gen-1")).toBeNull();
     expect(calls).toHaveLength(1);
   });
 
   it("abandons a pending lookup on stop, so shutdown does not wait out retries", async () => {
     const { fetch } = scripted(() => ({ status: 404 }));
-    const costs = new OpenRouterCosts({ apiKey: "k", fetch, lookupDelaysMs: [60_000] });
+    const costs = new OpenRouterPrices({ apiKey: "k", fetch, lookupDelaysMs: [60_000] });
     const pending = costs.generationCost("gen-1");
     await new Promise((r) => setTimeout(r, 10));
     costs.stop();
@@ -135,7 +136,7 @@ describe("billed cost", () => {
         ? { status: 500 }
         : { status: 200, body: { data: { total_cost: 0.01 } } },
     );
-    const billing = new RunBilling(new OpenRouterCosts({ apiKey: "k", fetch, lookupDelaysMs: [] }));
+    const billing = new RunBilling(new OpenRouterPrices({ apiKey: "k", fetch, lookupDelaysMs: [] }));
     billing.track("gen-a");
     billing.track("gen-a");
     billing.track("gen-b");
@@ -148,7 +149,7 @@ describe("billed cost", () => {
   });
 
   it("reports nothing rather than $0 when there was nothing to look up", async () => {
-    const billing = new RunBilling(new OpenRouterCosts({ apiKey: "" }));
+    const billing = new RunBilling(new OpenRouterPrices({ apiKey: "" }));
     billing.track("gen-a"); // no key: /generation is authenticated, so no lookup
     expect(await billing.settle()).toBeNull();
   });

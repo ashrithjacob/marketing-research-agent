@@ -22,7 +22,8 @@ import { Agent, type AgentEvent } from "@earendil-works/pi-agent-core";
 import { createModels, type Models, type Usage } from "@earendil-works/pi-ai";
 import { openrouterProvider } from "@earendil-works/pi-ai/providers/openrouter";
 
-import { OpenRouterCosts, RunBilling, type Pricing } from "./costs.js";
+import { OpenRouterPrices, RunBilling, type Pricing } from "./adapters/index.js";
+import { ModelPricing } from "./agent/pricing.js";
 import { PacketError, PacketExtractor, PacketValidator } from "./extract/index.js";
 
 import {
@@ -198,7 +199,7 @@ export class RunSupervisor {
   private readonly settings: Settings;
   private readonly models: Models;
   /** Live prices and billed-cost lookups. `main.ts` starts the price refresh. */
-  readonly costs: OpenRouterCosts;
+  readonly costs: OpenRouterPrices;
   /** Packets that passed `validate_packet` mid-run, by run id. */
   private readonly validated = new Map<string, StagePacket>();
   /** Injected in tests, so a retry test does not wait out a real backoff. */
@@ -209,14 +210,14 @@ export class RunSupervisor {
     store: ResearchStore;
     settings: Settings;
     models?: Models;
-    costs?: OpenRouterCosts;
+    costs?: OpenRouterPrices;
     retry?: RetryPolicy;
   }) {
     this.store = options.store;
     this.settings = options.settings;
     this.retry = options.retry ?? DEFAULT_RETRY;
     this.costs =
-      options.costs ?? new OpenRouterCosts({ apiKey: options.settings.openrouterApiKey });
+      options.costs ?? new OpenRouterPrices({ apiKey: options.settings.openrouterApiKey });
     if (options.models) {
       this.models = options.models;
     } else {
@@ -254,7 +255,7 @@ export class RunSupervisor {
     }
     // pi-ai prices each turn from `model.cost`; give it today's rates, not the
     // ones frozen into the package.
-    const { model, pricing } = this.costs.price(listed);
+    const { model, pricing } = new ModelPricing(this.costs).apply(listed);
 
     const instructions = prompts.instructions({
       brief: request.brief,

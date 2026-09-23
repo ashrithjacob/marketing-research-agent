@@ -23,14 +23,14 @@ import type { AgentTool } from "@earendil-works/pi-agent-core";
 import { Type } from "@earendil-works/pi-ai";
 
 import {
-  amazonReviews,
-  createActorRunner,
-  findAmazonProducts,
-  trustpilotReviews,
   type ActorRunner,
+  AmazonProducts,
+  AmazonReviews,
   type ReviewResult,
-} from "./apify.js";
-import { fetchWithTimeout } from "./http.js";
+  TrustpilotReviews,
+  ActorRunners,
+} from "./adapters/apify/index.js";
+import { Http } from "./adapters/index.js";
 import { PacketError, PacketValidator } from "./extract/index.js";
 import type { Node, StagePacket } from "./domain/index.js";
 import type { Settings } from "./config/index.js";
@@ -94,7 +94,7 @@ export async function searxngSearch(
   url.searchParams.set("q", query);
   url.searchParams.set("format", "json");
 
-  const response = await fetchWithTimeout(
+  const response = await Http.withTimeout(
     url.toString(),
     { headers: { Accept: "application/json" } },
     settings.webTimeoutSeconds,
@@ -122,7 +122,7 @@ export async function firecrawlScrape(
   if (!settings.firecrawlApiKey) {
     throw new Error("FIRECRAWL_API_KEY is not set — web_fetch cannot read pages");
   }
-  const response = await fetchWithTimeout(
+  const response = await Http.withTimeout(
     `${settings.firecrawlBaseUrl.replace(/\/$/, "")}/v2/scrape`,
     {
       method: "POST",
@@ -496,7 +496,7 @@ export function createResearchTools(options: {
   const reviews = options.reviewTools !== false;
   const runner =
     reviews || options.productSearch
-      ? (options.actorRunner ?? createActorRunner(settings))
+      ? (options.actorRunner ?? ActorRunners.forSettings(settings))
       : null;
 
   const webSearch: AgentTool<typeof searchParameters> = {
@@ -593,7 +593,7 @@ export function createResearchTools(options: {
     parameters: findProductParameters,
     async execute(_id, params, signal) {
       const max = Math.min(Math.max(Math.trunc(params.max_results ?? 5), 1), 20);
-      const products = await findAmazonProducts(runner, {
+      const products = await new AmazonProducts(runner).find( {
         query: params.query,
         maxResults: max,
         signal,
@@ -630,7 +630,7 @@ export function createResearchTools(options: {
     parameters: amazonReviewParameters,
     async execute(_id, params, signal) {
       const limit = reviewLimit(params.max_reviews, settings.apifyMaxReviews);
-      const result = await amazonReviews(runner, {
+      const result = await new AmazonReviews(runner).fetch( {
         productUrl: params.product_url,
         star: starBand(params.star),
         maxReviews: limit,
@@ -659,7 +659,7 @@ export function createResearchTools(options: {
     parameters: trustpilotReviewParameters,
     async execute(_id, params, signal) {
       const limit = reviewLimit(params.max_reviews, settings.apifyMaxReviews);
-      const result = await trustpilotReviews(runner, {
+      const result = await new TrustpilotReviews(runner).fetch( {
         domainOrUrl: params.domain,
         star: starBand(params.star),
         maxItems: limit,

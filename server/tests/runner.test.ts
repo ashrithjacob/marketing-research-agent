@@ -14,7 +14,7 @@ import { createModels, type MutableModels } from "@earendil-works/pi-ai";
 import { fauxAssistantMessage, fauxProvider, fauxToolCall } from "@earendil-works/pi-ai/providers/faux";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { OpenRouterCosts } from "../src/costs.js";
+import { OpenRouterPrices } from "../src/adapters/index.js";
 import {
   RunSupervisor,
   backoffMs,
@@ -270,7 +270,7 @@ describe("cost", () => {
       const { status, body } = replies(String(input));
       return new Response(JSON.stringify(body ?? {}), { status });
     }) as typeof globalThis.fetch;
-    return new OpenRouterCosts({ apiKey: "k", fetch, lookupDelaysMs: [] });
+    return new OpenRouterPrices({ apiKey: "k", fetch, lookupDelaysMs: [] });
   }
 
   it("hands pi-ai the live rates, and records which rates priced the run", async () => {
@@ -344,7 +344,7 @@ describe("cost", () => {
         init?.signal?.throwIfAborted();
         return new Response(JSON.stringify({ data: { total_cost: 0.01 } }), { status: 200 });
       }) as typeof globalThis.fetch;
-      return { costs: new OpenRouterCosts({ apiKey: "k", fetch, lookupDelaysMs: [] }), release };
+      return { costs: new OpenRouterPrices({ apiKey: "k", fetch, lookupDelaysMs: [] }), release };
     }
 
     async function settledButLive(): Promise<{ runId: string; release: () => void }> {
@@ -594,7 +594,7 @@ describe("the LLM call trace", () => {
         JSON.stringify({ data: { total_cost: String(input).includes("gen-2") ? 0.02 : 0.01 } }),
         { status: 200 },
       )) as typeof globalThis.fetch;
-    const costs = new OpenRouterCosts({ apiKey: "k", fetch, lookupDelaysMs: [] });
+    const costs = new OpenRouterPrices({ apiKey: "k", fetch, lookupDelaysMs: [] });
     supervisor = new RunSupervisor({ store, settings, models, costs });
     twoTurns();
     const runId = supervisor.start(request());

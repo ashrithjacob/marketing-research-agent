@@ -15,7 +15,11 @@ import { join } from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { AMAZON_REVIEWS_ACTOR, TRUSTPILOT_ACTOR, capFor } from "../src/apify.js";
+import {
+  AMAZON_REVIEWS_ACTOR,
+  Spend,
+  TRUSTPILOT_ACTOR,
+} from "../src/adapters/apify/index.js";
 import { Env, type Settings } from "../src/config/index.js";
 import { archive, createResearchTools, reviewLimit, reviewLocator } from "../src/tools.js";
 import {
@@ -392,8 +396,8 @@ describe("review volume is bounded by the server, not the agent", () => {
     });
 
     expect(calls[0]!.input.maxReviews).toBe(10);
-    expect(calls[0]!.cap).toBe(capFor(AMAZON_REVIEWS_ACTOR, 10));
-    expect(calls[0]!.cap).toBeLessThan(capFor(AMAZON_REVIEWS_ACTOR, 500));
+    expect(calls[0]!.cap).toBe(Spend.capFor(AMAZON_REVIEWS_ACTOR, 10));
+    expect(calls[0]!.cap).toBeLessThan(Spend.capFor(AMAZON_REVIEWS_ACTOR, 500));
     // Told, so a capped pull is not mistaken for a product with few reviews.
     expect((result.content[0] as any).text).toMatch(/asked for 500 reviews; this server caps each call at 10/);
   });
@@ -403,7 +407,7 @@ describe("review volume is bounded by the server, not the agent", () => {
     await tool(actorRunner, "trustpilot_reviews").execute("1", { domain: "huel.com", max_reviews: 500 });
 
     expect(calls[0]!.input.maxItems).toBe(10);
-    expect(calls[0]!.cap).toBe(capFor(TRUSTPILOT_ACTOR, 10));
+    expect(calls[0]!.cap).toBe(Spend.capFor(TRUSTPILOT_ACTOR, 10));
   });
 
   it("leaves a request within the limit alone, with no note", async () => {

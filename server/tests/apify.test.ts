@@ -18,14 +18,14 @@ import { describe, expect, it } from "vitest";
 import {
   AMAZON_REVIEWS_ACTOR,
   AMAZON_SEARCH_ACTOR,
-  MIN_CAP_USD,
-  capFor,
-  TRUSTPILOT_ACTOR,
-  amazonReviews,
-  findAmazonProducts,
-  trustpilotReviews,
   type ActorRunner,
-} from "../src/apify.js";
+  AmazonProducts,
+  AmazonReviews,
+  MIN_CAP_USD,
+  Spend,
+  TRUSTPILOT_ACTOR,
+  TrustpilotReviews,
+} from "../src/adapters/apify/index.js";
 
 interface Call {
   actorId: string;
@@ -66,7 +66,7 @@ const amazonRow = (star: number, text: string, extra: Record<string, unknown> = 
 describe("amazonReviews", () => {
   it("maps the live field names, which are not the documented ones", async () => {
     const { runner } = stub([amazonRow(3, "It works but you must reapply several times a day.")]);
-    const result = await amazonReviews(runner, {
+    const result = await new AmazonReviews(runner).fetch( {
       productUrl: "https://www.amazon.com/dp/B0H2JVQ9GR",
       star: 3,
       maxReviews: 10,
@@ -89,7 +89,7 @@ describe("amazonReviews", () => {
 
   it("asks for one discrete band and caps spend at the actor's enforced floor", async () => {
     const { runner, calls } = stub([amazonRow(3, "fine")]);
-    await amazonReviews(runner, {
+    await new AmazonReviews(runner).fetch( {
       productUrl: "https://www.amazon.com/dp/B0H2JVQ9GR",
       star: 3,
       maxReviews: 7,
@@ -120,7 +120,7 @@ describe("amazonReviews", () => {
       },
     ]);
 
-    const result = await amazonReviews(runner, {
+    const result = await new AmazonReviews(runner).fetch( {
       productUrl: "https://www.amazon.com/dp/B0H2JVQ9GR",
       star: 3,
       maxReviews: 10,
@@ -142,7 +142,7 @@ describe("amazonReviews", () => {
       amazonRow(5, "nor this"),
     ]);
 
-    const result = await amazonReviews(runner, {
+    const result = await new AmazonReviews(runner).fetch( {
       productUrl: "https://www.amazon.com/dp/B0H2JVQ9GR",
       star: 3,
       maxReviews: 10,
@@ -155,7 +155,7 @@ describe("amazonReviews", () => {
 
   it("keeps a mixed spread when no band was requested", async () => {
     const { runner, calls } = stub([amazonRow(1, "bad"), amazonRow(5, "good")]);
-    const result = await amazonReviews(runner, {
+    const result = await new AmazonReviews(runner).fetch( {
       productUrl: "https://www.amazon.com/dp/B0H2JVQ9GR",
       star: null,
       maxReviews: 10,
@@ -171,7 +171,7 @@ describe("amazonReviews", () => {
     // nothing. Recording it as "this product has no reviews" is the failure
     // that put page furniture in the corpus in run `yoracare`.
     const { runner } = stub([]);
-    const result = await amazonReviews(runner, {
+    const result = await new AmazonReviews(runner).fetch( {
       productUrl: "https://www.amazon.com/dp/B0H2JVQ9GR",
       star: 3,
       maxReviews: 10,
@@ -184,7 +184,7 @@ describe("amazonReviews", () => {
 
   it("skips rows with no review text rather than storing an empty excerpt", async () => {
     const { runner } = stub([amazonRow(3, "   "), amazonRow(3, "real text")]);
-    const result = await amazonReviews(runner, {
+    const result = await new AmazonReviews(runner).fetch( {
       productUrl: "https://www.amazon.com/dp/B0H2JVQ9GR",
       star: 3,
       maxReviews: 10,
@@ -211,7 +211,7 @@ describe("trustpilotReviews", () => {
     const { runner, calls } = stub([
       row(3, "Product itself is ok, what was really bad was the experience with the order"),
     ]);
-    const result = await trustpilotReviews(runner, {
+    const result = await new TrustpilotReviews(runner).fetch( {
       domainOrUrl: "huel.com",
       star: 3,
       maxItems: 10,
@@ -233,7 +233,7 @@ describe("trustpilotReviews", () => {
     // vendor's paraphrase, which spec-stage-1.md §2.3 forbids in an excerpt
     // regardless of price. One boolean away at all times.
     const { runner, calls } = stub([row(3, "text")]);
-    await trustpilotReviews(runner, { domainOrUrl: "huel.com", star: 3, maxItems: 5 });
+    await new TrustpilotReviews(runner).fetch( { domainOrUrl: "huel.com", star: 3, maxItems: 5 });
 
     expect(calls[0]!.input.painPointAnalysis).toBeUndefined();
     expect(calls[0]!.input.reviewInsights).toBeUndefined();
@@ -241,7 +241,7 @@ describe("trustpilotReviews", () => {
 
   it("discards rows whose star does not match", async () => {
     const { runner } = stub([row(3, "asked for this"), row(1, "did not ask for this")]);
-    const result = await trustpilotReviews(runner, {
+    const result = await new TrustpilotReviews(runner).fetch( {
       domainOrUrl: "huel.com",
       star: 3,
       maxItems: 10,
@@ -263,7 +263,7 @@ describe("findAmazonProducts", () => {
       { asin: "B0H4X2HJT2", title: "also good", stars: 4.1, reviewsCount: 52, url: "" },
     ]);
 
-    const products = await findAmazonProducts(runner, {
+    const products = await new AmazonProducts(runner).find( {
       query: "intertrigo cream",
       maxResults: 5,
     });
@@ -279,7 +279,7 @@ describe("findAmazonProducts", () => {
 
   it("ignores rows with no asin", async () => {
     const { runner } = stub([{ title: "sponsored slot", reviewsCount: 9 }, { asin: "B01", title: "real" }]);
-    const products = await findAmazonProducts(runner, { query: "x", maxResults: 5 });
+    const products = await new AmazonProducts(runner).find( { query: "x", maxResults: 5 });
     expect(products).toHaveLength(1);
     expect(products[0]!.asin).toBe("B01");
   });
@@ -290,20 +290,20 @@ describe("spend caps", () => {
     // Found live: AMAZON_SEARCH_ACTOR accepts its own $0.005 minimum and then
     // dies with "Charge limit has already been reached" because one result
     // costs $0.012 — returning an empty dataset that reads as "no products".
-    expect(capFor(AMAZON_SEARCH_ACTOR, 5)).toBeGreaterThanOrEqual(5 * 0.012);
-    expect(capFor(AMAZON_SEARCH_ACTOR, 5)).toBeGreaterThan(MIN_CAP_USD[AMAZON_SEARCH_ACTOR]);
+    expect(Spend.capFor(AMAZON_SEARCH_ACTOR, 5)).toBeGreaterThanOrEqual(5 * 0.012);
+    expect(Spend.capFor(AMAZON_SEARCH_ACTOR, 5)).toBeGreaterThan(MIN_CAP_USD[AMAZON_SEARCH_ACTOR]);
   });
 
   it("never drops below the floor Apify will accept", () => {
     // Below these, the call is rejected outright with a 400.
-    expect(capFor(AMAZON_REVIEWS_ACTOR, 1)).toBe(MIN_CAP_USD[AMAZON_REVIEWS_ACTOR]);
-    expect(capFor(TRUSTPILOT_ACTOR, 1)).toBe(MIN_CAP_USD[TRUSTPILOT_ACTOR]);
+    expect(Spend.capFor(AMAZON_REVIEWS_ACTOR, 1)).toBe(MIN_CAP_USD[AMAZON_REVIEWS_ACTOR]);
+    expect(Spend.capFor(TRUSTPILOT_ACTOR, 1)).toBe(MIN_CAP_USD[TRUSTPILOT_ACTOR]);
   });
 
   it("covers Trustpilot's per-run start fee as well as the items", () => {
     // $0.05 of a $0.0538 bill was the start fee; a cap sized on items alone
     // would not pay for the run at all.
-    expect(capFor(TRUSTPILOT_ACTOR, 1000)).toBeGreaterThan(0.05 + 1000 * 0.00075);
+    expect(Spend.capFor(TRUSTPILOT_ACTOR, 1000)).toBeGreaterThan(0.05 + 1000 * 0.00075);
   });
 });
 
@@ -313,7 +313,7 @@ describe("findAmazonProducts failure handling", () => {
     // of ours. The distinction is the whole point of the wall detector.
     const { runner } = stub([], "FAILED");
     await expect(
-      findAmazonProducts(runner, { query: "intertrigo cream", maxResults: 5 }),
+      new AmazonProducts(runner).find( { query: "intertrigo cream", maxResults: 5 }),
     ).rejects.toThrow(/failed lookup, not proof/);
   });
 });

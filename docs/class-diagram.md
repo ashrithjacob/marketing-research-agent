@@ -7,22 +7,6 @@ Arrows are constructor dependencies: `A --> B` means A is given a B.
 ```mermaid
 classDiagram
   namespace unlayered {
-    class ReviewExcerpt {
-      <<interface>>
-    }
-    class ReviewResult {
-      <<interface>>
-    }
-    class AmazonProduct {
-      <<interface>>
-    }
-    class ActorRunner {
-      <<interface>>
-      run()
-    }
-    class ApifyActorRunner {
-      run()
-    }
     class App {
       <<interface>>
       close()
@@ -30,26 +14,6 @@ classDiagram
     class TokenService {
       issue()
       verify()
-    }
-    class Rates {
-      <<interface>>
-    }
-    class Pricing {
-      <<interface>>
-    }
-    class Billed {
-      <<interface>>
-    }
-    class OpenRouterCosts {
-      start()
-      refreshPrices()
-      price()
-      generationCost()
-      stop()
-    }
-    class RunBilling {
-      track()
-      settle()
     }
     class RunError {
     }
@@ -202,6 +166,69 @@ classDiagram
     }
   }
   namespace adapters {
+    class Spend {
+      capFor()
+    }
+    class AmazonReviews {
+      fetch()
+    }
+    class Field {
+      text()
+      numberOrNull()
+    }
+    class AmazonProducts {
+      find()
+    }
+    class ActorRunner {
+      <<interface>>
+      run()
+    }
+    class ApifyActorRunner {
+      run()
+    }
+    class ActorRunners {
+      forSettings()
+    }
+    class TrustpilotReviews {
+      fetch()
+    }
+    class ReviewExcerpt {
+      <<interface>>
+    }
+    class ReviewResult {
+      <<interface>>
+    }
+    class AmazonProduct {
+      <<interface>>
+    }
+    class Http {
+      withTimeout()
+      pool()
+    }
+    class OpenRouterPrices {
+      start()
+      refreshPrices()
+      ratesFor()
+      generationCost()
+      stop()
+    }
+    class Rates {
+      <<interface>>
+    }
+    class Pricing {
+      <<interface>>
+    }
+    class Billed {
+      <<interface>>
+    }
+    class Money {
+      perMillion()
+      rates()
+    }
+    class RunBilling {
+      track()
+      settle()
+    }
     class CallLog {
       add()
       setBilled()
@@ -246,6 +273,9 @@ classDiagram
     }
   }
   namespace agent {
+    class ModelPricing {
+      apply()
+    }
     class PromptBlocks {
       code()
       nodes()
@@ -267,13 +297,28 @@ classDiagram
       resume()
     }
   }
-  RunBilling --> OpenRouterCosts
+  AmazonReviews --> ActorRunner
+  AmazonProducts --> ActorRunner
+  TrustpilotReviews --> ActorRunner
+  RunBilling --> OpenRouterPrices
+  ModelPricing --> OpenRouterPrices
 ```
 
 ## Inventory
 
 | Layer | Module | Classes |
 |---|---|---|
+| `adapters` | `adapters/apify/actors.ts` | Spend |
+| `adapters` | `adapters/apify/amazon-reviews.ts` | AmazonReviews |
+| `adapters` | `adapters/apify/fields.ts` | Field |
+| `adapters` | `adapters/apify/products.ts` | AmazonProducts |
+| `adapters` | `adapters/apify/runner.ts` | ActorRunner, ApifyActorRunner, ActorRunners |
+| `adapters` | `adapters/apify/trustpilot-reviews.ts` | TrustpilotReviews |
+| `adapters` | `adapters/apify/types.ts` | ReviewExcerpt, ReviewResult, AmazonProduct |
+| `adapters` | `adapters/http.ts` | Http |
+| `adapters` | `adapters/openrouter-prices.ts` | OpenRouterPrices |
+| `adapters` | `adapters/rates.ts` | Rates, Pricing, Billed, Money |
+| `adapters` | `adapters/run-billing.ts` | RunBilling |
 | `adapters` | `adapters/sqlite/call-log.ts` | CallLog |
 | `adapters` | `adapters/sqlite/check-log.ts` | PacketCheckLog |
 | `adapters` | `adapters/sqlite/event-log.ts` | EventLog |
@@ -282,15 +327,14 @@ classDiagram
 | `adapters` | `adapters/sqlite/run-table.ts` | RunTable |
 | `adapters` | `adapters/sqlite/schema.ts` | SqliteSchema |
 | `adapters` | `adapters/sqlite/store.ts` | SqliteResearchStore |
+| `agent` | `agent/pricing.ts` | ModelPricing |
 | `agent` | `agent/prompt/blocks.ts` | PromptBlocks |
 | `agent` | `agent/prompt/builder.ts` | PromptBuilder |
 | `agent` | `agent/prompt/example-picker.ts` | WorkedExample |
 | `agent` | `agent/prompt/messages.ts` | AgentMessages |
-| `(unlayered)` | `apify.ts` | ReviewExcerpt, ReviewResult, AmazonProduct, ActorRunner, ApifyActorRunner |
 | `(unlayered)` | `app.ts` | App |
 | `(unlayered)` | `auth.ts` | TokenService |
 | `config` | `config/settings.ts` | Settings, Env |
-| `(unlayered)` | `costs.ts` | Rates, Pricing, Billed, OpenRouterCosts, RunBilling |
 | `domain` | `domain/brief.ts` | Briefs |
 | `domain` | `domain/logs.ts` | RunEvent, Judgement, PacketCheck, RunUpdate, LlmCallRecord, LlmCall |
 | `domain` | `domain/nodes.ts` | Stages |

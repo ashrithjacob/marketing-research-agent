@@ -57,11 +57,8 @@ const WIRING = new Set(["main.ts", "hashpw.ts"]);
  */
 const LEGACY = new Set([
   "api.ts",
-  "apify.ts",
   "app.ts",
   "auth.ts",
-  "costs.ts",
-  "http.ts",
   "runner.ts",
   "tools.ts",
   "trace.ts",
