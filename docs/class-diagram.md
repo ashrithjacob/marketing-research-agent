@@ -74,9 +74,6 @@ classDiagram
       isLive()
       waitFor()
     }
-    class Settings {
-      <<interface>>
-    }
     class ResearchRun {
       <<interface>>
     }
@@ -132,6 +129,30 @@ classDiagram
       <<interface>>
     }
   }
+  namespace domain {
+    class Briefs {
+      looksLikeUrl()
+      normalise()
+      key()
+    }
+    class Stages {
+      of()
+      covering()
+      expand()
+      isPartial()
+    }
+  }
+  namespace config {
+    class Settings {
+      <<interface>>
+    }
+    class Env {
+      text()
+      number()
+      flag()
+      settings()
+    }
+  }
   RunBilling --> OpenRouterCosts
 ```
 
@@ -142,9 +163,11 @@ classDiagram
 | `(unlayered)` | `apify.ts` | ReviewExcerpt, ReviewResult, AmazonProduct, ActorRunner, ApifyActorRunner |
 | `(unlayered)` | `app.ts` | App |
 | `(unlayered)` | `auth.ts` | TokenService |
+| `config` | `config/settings.ts` | Settings, Env |
 | `(unlayered)` | `costs.ts` | Rates, Pricing, Billed, OpenRouterCosts, RunBilling |
+| `domain` | `domain/brief.ts` | Briefs |
+| `domain` | `domain/nodes.ts` | Stages |
 | `(unlayered)` | `packet.ts` | PacketError |
 | `(unlayered)` | `runner.ts` | RunError, EventFrame, Live, RetryPolicy, RunSupervisor |
-| `(unlayered)` | `settings.ts` | Settings |
 | `(unlayered)` | `store.ts` | ResearchRun, RunSummary, RunEvent, Judgement, PacketCheck, RunUpdate, LlmCallRecord, LlmCall, ResearchStore, SqliteResearchStore |
 | `(unlayered)` | `tools.ts` | SearchHit, FetchRecord, PacketCheckOptions |

@@ -21,8 +21,8 @@ import {
   effectiveRejectKinds,
   retryableError,
 } from "../src/runner.js";
-import { runRequestSchema, type RunRequest } from "../src/schema.js";
-import { loadSettings, type Settings } from "../src/settings.js";
+import { runRequestSchema, type RunRequest } from "../src/domain/index.js";
+import { Env, type Settings } from "../src/config/index.js";
 import { SqliteResearchStore, type Judgement } from "../src/store.js";
 import { fenced, minimalPacket, reviewPacket } from "./fixtures.js";
 
@@ -39,7 +39,7 @@ let supervisor: RunSupervisor;
 beforeEach(() => {
   dir = mkdtempSync(join(tmpdir(), "mra-runner-"));
   store = new SqliteResearchStore(join(dir, "research.db"));
-  settings = { ...loadSettings(), model: MODEL_ID, corpusPath: join(dir, "corpus") };
+  settings = { ...Env.settings(), model: MODEL_ID, corpusPath: join(dir, "corpus") };
   faux = fauxProvider({ provider: "openrouter", models: [{ id: MODEL_ID }] });
   models = createModels();
   models.setProvider(faux.provider);

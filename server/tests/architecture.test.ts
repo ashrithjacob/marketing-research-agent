@@ -55,8 +55,6 @@ const LEGACY = new Set([
   "packet.ts",
   "prompt.ts",
   "runner.ts",
-  "schema.ts",
-  "settings.ts",
   "store.ts",
   "tools.ts",
   "trace.ts",

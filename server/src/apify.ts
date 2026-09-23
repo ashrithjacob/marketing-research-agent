@@ -17,7 +17,7 @@
  * returns `undefined` for every excerpt and looks like an empty source.
  */
 
-import type { Settings } from "./settings.js";
+import type { Settings } from "./config/index.js";
 
 /** Reviews for one product. `filterByRatings` takes one discrete band per call. */
 export const AMAZON_REVIEWS_ACTOR = "junglee/amazon-reviews-scraper";

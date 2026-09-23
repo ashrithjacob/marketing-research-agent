@@ -16,7 +16,7 @@ import { deleteCookie, getCookie, setCookie } from "hono/cookie";
 import { TokenService, verifyPassword } from "./auth.js";
 import { buildRouter } from "./api.js";
 import { RunSupervisor } from "./runner.js";
-import { loadSettings, type Settings } from "./settings.js";
+import { Env, type Settings } from "./config/index.js";
 import { SqliteResearchStore, type ResearchStore } from "./store.js";
 
 export const SESSION_COOKIE = "mra_session";
@@ -34,7 +34,7 @@ export function createApp(overrides?: {
   store?: ResearchStore;
   supervisor?: RunSupervisor;
 }): App {
-  const settings = overrides?.settings ?? loadSettings();
+  const settings = overrides?.settings ?? Env.settings();
   const store = overrides?.store ?? new SqliteResearchStore(settings.databasePath);
   const supervisor = overrides?.supervisor ?? new RunSupervisor({ store, settings });
   const authRequired = Boolean(settings.appPasswordHash);

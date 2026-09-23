@@ -32,8 +32,8 @@ import {
 } from "./apify.js";
 import { fetchWithTimeout } from "./http.js";
 import { PacketError, validate } from "./packet.js";
-import type { Node, StagePacket } from "./schema.js";
-import type { Settings } from "./settings.js";
+import type { Node, StagePacket } from "./domain/index.js";
+import type { Settings } from "./config/index.js";
 
 export interface SearchHit {
   title: string;

@@ -25,14 +25,12 @@ import {
   PRODUCT_ATTRIBUTES,
   SOURCE_KIND_NOTES,
   STAGE_NODES,
-  isPartial,
-  stageForNodes,
-  stageOf,
+  Stages,
   type Brief,
   type Node,
   type SourceKind,
   type Stage,
-} from "./schema.js";
+} from "./domain/index.js";
 import type { Judgement } from "./store.js";
 
 /** What each collection stage is called, for the prompt's own heading. */
@@ -345,7 +343,7 @@ const EXAMPLE = {
  */
 function exampleForStage(stage: Stage): Record<string, unknown> {
   const mine = <T extends { node: string }>(items: readonly T[]): T[] =>
-    items.filter((item) => stageOf(item.node as Node) === stage);
+    items.filter((item) => Stages.of(item.node as Node) === stage);
   const hasCompetitors = STAGE_NODES[stage].includes("competitors");
   return {
     ...EXAMPLE,
@@ -553,8 +551,8 @@ const NODE_RULES: Record<Node, string> = {
 const code = (names: readonly string[]) => names.map((n) => `\`${n}\``).join(", ");
 
 function nodesBlock(nodes: readonly Node[]): string {
-  const stage = stageForNodes(nodes) ?? 1;
-  const heading = isPartial(nodes)
+  const stage = Stages.covering(nodes) ?? 1;
+  const heading = Stages.isPartial(nodes)
     ? `### This run's ${nodes.length === 1 ? "node" : "nodes"}`
     : `### Stage ${stage}${STAGE_NODES[stage].length > 1 ? "'s nodes" : "'s node"}`;
   const items = nodes.map((node, i) => `${i + 1}. ${NODE_RULES[node]}`);
@@ -563,8 +561,8 @@ function nodesBlock(nodes: readonly Node[]): string {
 
 /** Where a run-level problem goes, and which node names the packet may use. */
 function gapNodesBlock(nodes: readonly Node[]): string {
-  if (!isPartial(nodes)) {
-    const stage = stageForNodes(nodes) ?? 1;
+  if (!Stages.isPartial(nodes)) {
+    const stage = Stages.covering(nodes) ?? 1;
     const fallback = nodes[nodes.length - 1]!;
     return `A run-level problem that is not one of this stage's nodes — a tool failing, a
 fetch path blocked, a site refusing to serve — still goes in this list. Attach it
@@ -646,9 +644,9 @@ Field notes:
  * scope sentence varies, so a single-node run is not told to work four.
  */
 export function systemPrompt(nodes: readonly Node[] = STAGE_NODES[1]): string {
-  const stage = stageForNodes(nodes) ?? 1;
+  const stage = Stages.covering(nodes) ?? 1;
   const base = SYSTEM_PROMPT.replace("{stage}", String(stage));
-  if (!isPartial(nodes)) return base;
+  if (!Stages.isPartial(nodes)) return base;
   let text = base.replace(
     "Work through this stage's nodes methodically.",
     `This run covers only ${code(nodes)} — work through ${
@@ -687,7 +685,7 @@ export function buildInstructions(options: {
 }): string {
   const { brief, rejectKinds, judgements } = options;
   const nodes = options.nodes ?? STAGE_NODES[1];
-  const stage = stageForNodes(nodes) ?? 1;
+  const stage = Stages.covering(nodes) ?? 1;
   const rejected = rejectKinds.length > 0 ? rejectKinds : DEFAULT_REJECTED_KINDS;
   const parts = [
     // `{nodes}` first: the product_data rule carries its own `{attributes}`.
@@ -699,19 +697,19 @@ export function buildInstructions(options: {
       .replace("{rejected}", rejected.map((kind) => `- \`${kind}\``).join("\n") || "- (none)")
       .replace("{gap_nodes}", gapNodesBlock(nodes)),
   ];
-  if (isPartial(nodes)) parts.push(scopeBlock(nodes));
+  if (Stages.isPartial(nodes)) parts.push(scopeBlock(nodes));
   if (judgements.length > 0) parts.push(judgementBlock(judgements));
   parts.push(briefBlock(brief));
   let output = OUTPUT.replace("{example}", JSON.stringify(exampleForStage(stage), null, 2))
     .replaceAll("{stage}", String(stage))
     .replace(
       "{nodes_note}",
-      isPartial(nodes)
+      Stages.isPartial(nodes)
         ? `each node in scope (${code(nodes)})`
         : `each of this stage's nodes (${code(nodes)})`,
     )
     .replace("{forms}", code(FORMS));
-  if (isPartial(nodes)) {
+  if (Stages.isPartial(nodes)) {
     output += `\nThe example shows every node, for shape only. Your packet records only ${code(nodes)}.\n`;
   }
   parts.push(output);

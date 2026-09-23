@@ -16,9 +16,9 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AMAZON_REVIEWS_ACTOR, TRUSTPILOT_ACTOR, capFor } from "../src/apify.js";
-import { loadSettings, type Settings } from "../src/settings.js";
+import { Env, type Settings } from "../src/config/index.js";
 import { archive, createResearchTools, reviewLimit, reviewLocator } from "../src/tools.js";
-import { STAGE_NODES, locatorSchema } from "../src/schema.js";
+import { STAGE_NODES, locatorSchema } from "../src/domain/index.js";
 import { minimalPacket, reviewPacket } from "./fixtures.js";
 
 let dir: string;
@@ -27,7 +27,7 @@ let settings: Settings;
 beforeEach(() => {
   dir = mkdtempSync(join(tmpdir(), "mra-tools-"));
   settings = {
-    ...loadSettings(),
+    ...Env.settings(),
     corpusPath: join(dir, "corpus"),
     searxngUrl: "http://searxng.test",
     firecrawlApiKey: "test-key",
@@ -125,7 +125,7 @@ describe("web_fetch", () => {
     const saved = process.env.MRA_FETCH_CHAR_LIMIT;
     delete process.env.MRA_FETCH_CHAR_LIMIT;
     try {
-      expect(loadSettings().fetchCharLimit).toBe(25000);
+      expect(Env.settings().fetchCharLimit).toBe(25000);
     } finally {
       if (saved !== undefined) process.env.MRA_FETCH_CHAR_LIMIT = saved;
     }

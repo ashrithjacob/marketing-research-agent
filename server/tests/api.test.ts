@@ -19,7 +19,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createApp, type App } from "../src/app.js";
 import { hashPassword } from "../src/auth.js";
 import { RunSupervisor } from "../src/runner.js";
-import { loadSettings, type Settings } from "../src/settings.js";
+import { Env, type Settings } from "../src/config/index.js";
 import { SqliteResearchStore } from "../src/store.js";
 import { fenced, minimalPacket, reviewPacket } from "./fixtures.js";
 
@@ -34,7 +34,7 @@ let models: MutableModels;
 
 function build(settingsOverrides: Partial<Settings> = {}): App {
   settings = {
-    ...loadSettings(),
+    ...Env.settings(),
     model: MODEL_ID,
     corpusPath: join(dir, "corpus"),
     staticDir: join(dir, "static"),

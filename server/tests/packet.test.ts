@@ -17,7 +17,10 @@ import {
   parse,
   validate,
 } from "../src/packet.js";
-import { STAGE_NODES, runNodes } from "../src/schema.js";
+import {
+  STAGE_NODES,
+  Stages,
+} from "../src/domain/index.js";
 import { fenced, minimalPacket, reviewPacket } from "./fixtures.js";
 
 /** Stage 1 is the product, its competitors and its category; stage 2 is review
@@ -381,14 +384,14 @@ describe("validation: a run that covers part of the stage", () => {
 
 describe("runNodes", () => {
   it("orders by stage, drops repeats, and reads empty as the whole of stage 1", () => {
-    expect(runNodes(["category_data", "product_data", "product_data"])).toEqual([
+    expect(Stages.expand(["category_data", "product_data", "product_data"])).toEqual([
       "product_data",
       "category_data",
     ]);
     // Empty is stage 1, which is what a bare "Start run" sends and what every
     // run stored before review mining moved to stage 2 actually was.
-    expect(runNodes([])).toEqual([...STAGE1]);
-    expect(runNodes(undefined)).toEqual([...STAGE1]);
+    expect(Stages.expand([])).toEqual([...STAGE1]);
+    expect(Stages.expand(undefined)).toEqual([...STAGE1]);
   });
 });
 

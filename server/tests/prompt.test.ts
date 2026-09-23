@@ -11,7 +11,7 @@ import { describe, expect, it } from "vitest";
 
 import { parse, validate } from "../src/packet.js";
 import { buildInstructions, steerText, systemPrompt } from "../src/prompt.js";
-import { FORMS, SOURCE_KINDS, STAGE_NODES, briefSchema } from "../src/schema.js";
+import { FORMS, SOURCE_KINDS, STAGE_NODES, briefSchema } from "../src/domain/index.js";
 import type { Judgement } from "../src/store.js";
 
 const brief = (overrides: Record<string, unknown> = {}) =>

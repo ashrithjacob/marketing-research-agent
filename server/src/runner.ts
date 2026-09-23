@@ -27,14 +27,13 @@ import { PacketError, extract, parse as parsePacket } from "./packet.js";
 import { buildInstructions, packetNudgeText, resumeText, steerText, systemPrompt } from "./prompt.js";
 import {
   DEFAULT_REJECTED_KINDS,
-  runNodes,
-  stageForNodes,
+  Stages,
   type Node,
   type RunRequest,
   type SourceKind,
   type StagePacket,
-} from "./schema.js";
-import type { Settings } from "./settings.js";
+} from "./domain/index.js";
+import type { Settings } from "./config/index.js";
 import {
   TERMINAL_STATUSES,
   nowIso,
@@ -233,7 +232,7 @@ export class RunSupervisor {
     const judgements = this.store.listJudgements(true);
     const rejectKinds = effectiveRejectKinds(request, judgements);
     const modelId = request.model || this.settings.model;
-    const nodes = runNodes(request.nodes);
+    const nodes = Stages.expand(request.nodes);
 
     const run = this.store.createRun({
       brief: request.brief as unknown as Record<string, unknown>,
@@ -242,7 +241,7 @@ export class RunSupervisor {
       judgementIds: judgements.map((j) => j.id),
       nodes,
       // Review mining is stage 2; the other three nodes are stage 1.
-      stage: stageForNodes(nodes) ?? 1,
+      stage: Stages.covering(nodes) ?? 1,
     });
 
     const listed = this.models.getModel("openrouter", modelId);

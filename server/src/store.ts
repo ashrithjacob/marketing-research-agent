@@ -24,7 +24,11 @@ import { randomUUID } from "node:crypto";
 
 import Database from "better-sqlite3";
 
-import { runNodes, type SourceKind, type StagePacket } from "./schema.js";
+import {
+  Stages,
+  type SourceKind,
+  type StagePacket,
+} from "./domain/index.js";
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS research_runs (
@@ -187,7 +191,7 @@ export function summary(run: ResearchRun): RunSummary {
     stage: run.stage,
     model: run.model,
     brief: run.brief,
-    nodes: runNodes(run.nodes),
+    nodes: Stages.expand(run.nodes),
     error: run.error,
     created_at: run.created_at,
     updated_at: run.updated_at,

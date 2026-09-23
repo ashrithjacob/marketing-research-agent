@@ -14,15 +14,13 @@ import { streamSSE } from "hono/streaming";
 
 import { RunError, RunSupervisor, type EventFrame } from "./runner.js";
 import {
+  Briefs,
   DEFAULT_REJECTED_KINDS,
-  briefKey,
+  Stages,
   judgementInSchema,
-  normaliseBrief,
-  runNodes,
   runRequestSchema,
-  stageForNodes,
-} from "./schema.js";
-import type { Settings } from "./settings.js";
+} from "./domain/index.js";
+import type { Settings } from "./config/index.js";
 import {
   summary,
   type LlmCall,
@@ -67,7 +65,7 @@ export function buildRouter(options: {
     }
     // A url typed into the product box moves to `url`; `product` then stays
     // empty until the agent names what the site sells.
-    const brief = normaliseBrief(parsed.data.brief);
+    const brief = Briefs.normalise(parsed.data.brief);
     if (!brief.product && !brief.url) {
       return c.json({ detail: "brief.product or brief.url is required" }, 400);
     }
@@ -75,12 +73,12 @@ export function buildRouter(options: {
     // own site read and its competitors known before it is worth paying Apify
     // to read reviews. The gate is on the brief, not on the run id, so a
     // re-run of one stage-1 node does not unlock or re-lock anything.
-    const nodes = runNodes(parsed.data.nodes);
-    if ((stageForNodes(nodes) ?? 1) === 2) {
-      const key = briefKey(brief);
+    const nodes = Stages.expand(parsed.data.nodes);
+    if ((Stages.covering(nodes) ?? 1) === 2) {
+      const key = Briefs.key(brief);
       const done = store
         .listRuns(200)
-        .some((r) => r.stage === 1 && r.status === "completed" && briefKey(r.brief as any) === key);
+        .some((r) => r.stage === 1 && r.status === "completed" && Briefs.key(r.brief as any) === key);
       if (!done) {
         return c.json(
           {

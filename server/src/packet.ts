@@ -13,18 +13,16 @@
 import { z } from "zod";
 
 import {
+  Briefs,
   COMPETITOR_RELATIONS,
   NODES,
   STAGE_NODES,
-  isPartial,
-  stageForNodes,
-  stageOf,
-  looksLikeUrl,
+  Stages,
   stagePacketSchema,
   type CompetitorRelation,
   type Node,
   type StagePacket,
-} from "./schema.js";
+} from "./domain/index.js";
 
 /** The output carried no packet, or one that violates the contract. */
 export class PacketError extends Error {
@@ -167,7 +165,7 @@ export function validate(
   //    other three nodes are stage 1 — a packet that mixes them is two runs'
   //    work in one envelope, and the node rules, tools and done-criteria of
   //    the two have nothing in common.
-  const stage = stageForNodes(scope) ?? 1;
+  const stage = Stages.covering(scope) ?? 1;
   if (packet.stage !== stage) {
     problems.push(
       `packet says stage ${packet.stage}, but this run collects ${scope.join(", ")}, ` +
@@ -185,20 +183,20 @@ export function validate(
     packet.gaps,
   ]) {
     for (const { node } of items) {
-      if (NODES.includes(node as Node) && stageOf(node as Node) !== stage) foreign.add(node);
+      if (NODES.includes(node as Node) && Stages.of(node as Node) !== stage) foreign.add(node);
     }
   }
   for (const node of foreign) {
     problems.push(
       `entries are recorded against ${node}, which is collected in stage ` +
-        `${stageOf(node as Node)}, not stage ${stage} — that is a separate run`,
+        `${Stages.of(node as Node)}, not stage ${stage} — that is a separate run`,
     );
   }
 
   // 1. A run that covers part of the stage records nothing outside it — the
   //    worked example shows the whole stage, and copying it is the easy mistake.
   //    It must also say how each node it did cover ended.
-  if (isPartial(scope)) {
+  if (Stages.isPartial(scope)) {
     const allowed = new Set<string>(scope);
     const outside = new Map<string, number>();
     const tally = (items: ReadonlyArray<{ node: string }>) => {
@@ -247,7 +245,7 @@ export function validate(
   const wanted = typeof brief?.product === "string" ? normaliseName(brief.product) : "";
   const site = typeof brief?.url === "string" ? brief.url.trim() : "";
   const got = normaliseName(packet.brief.product);
-  if (got && looksLikeUrl(got)) {
+  if (got && Briefs.looksLikeUrl(got)) {
     // The brief carries the url; `product` is the name the agent read off the
     // site. A url here means it never did that job.
     problems.push(
