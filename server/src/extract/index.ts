@@ -1,5 +1,6 @@
 export * from "./errors.js";
 export * from "./blocks.js";
+export * from "./draft.js";
 export * from "./names.js";
 export * from "./check.js";
 export * from "./scope-check.js";

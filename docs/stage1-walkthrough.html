@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stage 1, outcome first — how a research run works</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { font: 16px/1.65 ui-sans-serif, system-ui, sans-serif; max-width: 50rem;
+         margin: 2rem auto; padding: 0 1.25rem; }
+  h1 { font-size: 1.7rem; } h2 { font-size: 1.25rem; margin-top: 2.25rem;
+         border-bottom: 1px solid color-mix(in srgb, currentColor 20%, transparent);
+         padding-bottom: .3rem; }
+  code, pre { font: .9rem/1.5 ui-monospace, monospace; }
+  code { background: color-mix(in srgb, currentColor 8%, transparent);
+         padding: .1em .3em; border-radius: 4px; }
+  pre { background: color-mix(in srgb, currentColor 7%, transparent);
+        padding: .9rem 1rem; border-radius: 8px; overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; margin: 1rem 0; font-size: .92rem; }
+  th, td { border: 1px solid color-mix(in srgb, currentColor 25%, transparent);
+           padding: .45rem .6rem; text-align: left; vertical-align: top; }
+  th { background: color-mix(in srgb, currentColor 6%, transparent); }
+  .muted { opacity: .7; }
+  ol.steps > li { margin-bottom: .9rem; }
+  footer { margin-top: 3rem; border-top: 1px solid
+           color-mix(in srgb, currentColor 20%, transparent); padding-top: 1rem; }
+</style>
+</head>
+<body>
+
+<h1>Stage 1, outcome first</h1>
+<p class="muted">How a research run works, consumer-side, with a measured trace.
+Source of truth for mechanisms: <code>workings.md</code>. This page is the
+outcome-first mirror of it: start from what a run produced and work back to the code.</p>
+
+<p>Every number below is measured from run <code>5368c5fa…</code>, brief
+“vitamin D tablets”, whole stage 1, 2026-09-23: <strong>20 LLM calls, 36 tool
+calls, 9m17s wall, 1.2M tokens (955k of them cache reads), $0.0405 billed</strong>
+— a normal, healthy run.</p>
+
+<h2>What the consumer sees</h2>
+<ol>
+<li><strong>Start run</strong> modal: product name (or a URL — a URL typed as the
+product is moved to <code>brief.url</code> by <code>Briefs.normalise()</code>),
+five market checkboxes (US/UK/AU/NZ/CA), free-text for others. No URL field on
+purpose: finding the product’s site is the agent’s job.</li>
+<li>During the run: three lanes (search / fetch / other) filling with tool
+events, assistant text streaming as deltas, a <strong>Tokens</strong> line,
+then <strong>Calc cost</strong> and <strong>Billed</strong> when done. Red rows
+are tool errors — the run continues.</li>
+<li>At the end, the right-hand column shows the <strong>packet</strong>:
+sources, excerpts (voice of customer), measurements, attributes, gaps, and the
+stage rail’s node statuses.</li>
+</ol>
+
+<h2>What happens when Start run is clicked</h2>
+<p>Before the HTTP response even returns (<code>RunSupervisor.start()</code>):</p>
+<ol class="steps">
+<li>Standing judgements and reject-kinds are loaded (defaults:
+<code>seo_listicle</code>, <code>review_roundup</code>, <code>ai_generated</code>).</li>
+<li>A run row is written (<code>queued</code>), the model is looked up and priced
+from OpenRouter’s live rates (unknown model → row is <code>failed</code>,
+endpoint 502).</li>
+<li>The prompt is built: a system prompt naming only the tools this run gets,
+and a user turn of rules → judgements → brief → output contract with a worked
+example packet (its product is invented; a packet about <em>it</em> is rejected
+as wrong-subject).</li>
+<li>A pi-agent-core <code>Agent</code> runs in-process; its <code>streamFn</code>
+is wrapped so every LLM call is logged (<code>research_llm_calls</code>). The
+row becomes <code>running</code>, SSE opens, the browser follows
+<code>GET /runs/:id/events?after=0</code>.</li>
+</ol>
+
+<h2>The agent loop, turn by turn</h2>
+<p>One <strong>LLM call</strong> = one turn: the whole transcript so far is
+sent, the model answers with text, thinking, and/or tool calls, tools execute,
+results append to the transcript, repeat — until the model stops calling tools
+or calls <code>validate_packet</code> and then stops. In the measured run the
+context grew 6,160 → 45,782 tokens per call as pages piled up; ~80% of tokens
+were cache reads, which is why a run this size costs $0.04 rather than $0.40.</p>
+
+<p>Tool calls in the real run (36 total):</p>
+<table>
+<tr><th>Tool</th><th>Count</th><th>Where it actually went</th></tr>
+<tr><td><code>web_search</code></td><td>17</td><td>SearXNG container → aggregates Google/Bing/DDG etc.</td></tr>
+<tr><td><code>web_fetch</code></td><td>13</td><td>Firecrawl cloud API → brand/retailer/market-research pages</td></tr>
+<tr><td><code>amazon_find_product</code></td><td>3</td><td>Apify actor → amazon.com (always .com, whatever the market)</td></tr>
+<tr><td><code>amazon_reviews</code></td><td>1</td><td>Apify actor → amazon.com reviews</td></tr>
+<tr><td><code>validate_packet</code></td><td>2</td><td>local — the same validator that settles the run</td></tr>
+</table>
+
+<p>The sites it visited, in order (from the event log): <strong>amazon.com</strong>
+(product discovery), <strong>naturemade.com</strong> (the reference product’s
+own page — a first-party source), <strong>hollandandbarrett.com</strong> and
+<strong>vitabiotics.com</strong> (UK competitors),
+<strong>thehealthpharmacy.co.uk</strong>, <strong>solgar.com</strong>,
+<strong>betteryou.com</strong> (oral spray — indirect competitor),
+<strong>swisse.com.au</strong> (AU), <strong>mordorintelligence.com</strong>
+(market size for category_data), <strong>naturesbest.co.uk</strong>,
+naturemade.com again for gummies (indirect form). Note the pattern:
+<strong>search first, fetch the product’s own page, then competitors across
+forms (tablet/softgel/spray/gummy), then market-level sources</strong> — that is
+the competitors direct/indirect rule (same active, same vs different form) and
+saturation driving behaviour.</p>
+
+<p>Each <code>web_fetch</code> body is archived to
+<code>/corpus/runs/&lt;id&gt;/sources/&lt;sha256&gt;</code> and its hash becomes
+the <code>source_id</code> — so every excerpt in the packet cites bytes that
+still exist on disk (<code>GET /runs/:id/sources/:sha</code> re-hashes and
+confirms).</p>
+
+<h2>The response format</h2>
+<p>The deliverable is one JSON <strong>packet</strong>
+(<code>domain/packet.ts</code>), <code>.strict()</code> at every object:</p>
+<pre>contract_version, stage: 1, run_id, brief,
+sources[]          {id (sha256:…), url, title, kind, publisher, admitted,
+                    admission_reason, node, …}
+excerpts[]         verbatim voice-of-customer quotes, each citing a source_id
+measurements[]     numeric facts with unit and source
+attributes[]       product claims (e.g. dose, form) with source
+competitor_reference + competitors[]   the §2.2 direct/indirect rows
+saturation[]       “after N sources on this node, the last K added nothing”
+nodes[]            per-node status: complete (needs saturation) or incomplete
+gaps[]             REQUIRED, never empty — what could not be found and why</pre>
+<p>Measured packet: 11 sources, 1 excerpt, 4 measurements, 6 attributes, 2
+saturation curves, 3 node entries, 6 gaps. All three nodes honestly
+<code>incomplete</code> — <strong><code>completed</code> means the schema
+accepted the packet, not that every node finished.</strong> Honesty about
+saturation is the design; a node may call itself complete only with a
+saturation curve behind it.</p>
+
+<p>The model emits the packet either by calling <code>validate_packet</code>
+mid-run (<code>packet.ready</code> fires with <code>via: "tool"</code> — the
+short path at settlement) or as a final JSON block, which
+<code>PacketExtractor</code> pulls from the last balanced <code>{ … }</code>
+with a <code>stage</code> key. Then seven cross-object rules run: brief echoes
+the run’s brief (no wrong-subject packets), cited source_ids exist, complete
+nodes have saturation, competitor relations recomputed from forms, gaps
+non-empty, scope respected.</p>
+
+<h2>Outcome-first debug table</h2>
+<table>
+<tr><th>You observed</th><th>Mechanism</th><th>Look at</th></tr>
+<tr><td><code>completed</code>, thin packet</td>
+    <td>Schema was satisfied; nodes may be <code>incomplete</code>, saturation
+        never reached. Thin = agent stopped early or rejected most sources.</td>
+    <td>packet <code>nodes[].status</code>, <code>counts</code>, gaps list</td></tr>
+<tr><td><code>invalid</code></td>
+    <td>The agent FINISHED; the schema refused the packet. Most informative
+        failure there is.</td>
+    <td><code>packet.invalid</code> payload names the field/rule; <code>output</code>
+        on the run; <code>mra calls &lt;id&gt;</code> for the last turns</td></tr>
+<tr><td><code>failed</code></td>
+    <td>A crash: stream died past 3 retries (deny-list retries, 2/4/8s ±
+        jitter), bad model, restart killed it.</td>
+    <td><code>error</code> on the run row; <code>run.resumed</code> count in events</td></tr>
+<tr><td><code>cancelled</code></td>
+    <td>You pressed Stop, or a Stop landed in the ~30s billing window.</td>
+    <td>—</td></tr>
+<tr><td><code>completed</code> but <code>ended_early</code></td>
+    <td>Packet validated mid-run, THEN the stream died. The packet stands.</td>
+    <td><code>run.ended_early</code> payload</td></tr>
+<tr><td>Lots of red tool rows</td>
+    <td>Firecrawl 4xx / SearXNG down / Apify 402 — handed to the model as
+        errors, run continues.</td>
+    <td><code>tool.completed</code> payloads with <code>error</code></td></tr>
+<tr><td>Run about the wrong product</td>
+    <td>The model anchored on the worked example, or a url-as-product mixup.</td>
+    <td>packet <code>brief.product</code> vs the run’s brief (containment,
+        letters+digits)</td></tr>
+<tr><td>Zero excerpts</td>
+    <td>Excerpts aren’t checked against archived bodies; zero means the agent
+        didn’t quote — a prompt/scope issue, not a validator one.</td>
+    <td><code>mra watch</code> counts while live</td></tr>
+<tr><td>Cost looks wrong</td>
+    <td>Calc (pi-ai × live rates, <code>usage.pricing.source</code>) vs Billed
+        (<code>/generation</code> per <code>gen-…</code> id, 404s for ~4s after
+        each turn; <code>billed.resolved &lt; turns</code> = undercount). Apify
+        is separate and never in either.</td>
+    <td><code>usage</code> on the run, <code>/runs/&lt;id&gt;/logs</code> page</td></tr>
+</table>
+
+<p>A run costs real money. Scope debugging to one node
+(<code>mra run "X" product_data</code>), and read the outcome with
+<code>mra watch</code> before touching code.</p>
+
+<footer class="muted">Generated from <code>.claude/skills/stage1-debug/SKILL.md</code>.
+Run trace: <code>5368c5fa7e3249289c5b3cd570eb7e52</code>, 2026-09-23. When this
+page and <code>workings.md</code> disagree, <code>workings.md</code> is right and
+this page needs regenerating.</footer>
+
+</body>
+</html>

@@ -104,6 +104,9 @@ classDiagram
     class CompletenessCheck {
       problems()
     }
+    class PacketDraft {
+      coerce()
+    }
     class PacketError {
     }
     class Names {
@@ -516,6 +519,7 @@ classDiagram
 | `extract` | `extract/citation-check.ts` | CitationCheck |
 | `extract` | `extract/competitor-check.ts` | CompetitorCheck |
 | `extract` | `extract/completeness-check.ts` | CompletenessCheck |
+| `extract` | `extract/draft.ts` | PacketDraft |
 | `extract` | `extract/errors.ts` | PacketError |
 | `extract` | `extract/names.ts` | Names, BrandLabels, Relations |
 | `extract` | `extract/scope-check.ts` | ScopeCheck |

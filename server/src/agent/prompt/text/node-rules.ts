@@ -1,9 +1,12 @@
 import type { Node } from "../../../domain/index.js";
 
 export const NODE_RULES: Record<Node, string> = {
-  product_data: `**product_data** — a finite checklist, not a search. Capture every one of:
-   {attributes}. Anything you cannot find is a gap entry, not an omission and
-   not a zero. A missing certificate of analysis is a gap.`,
+  product_data: `**product_data** — the checklist below is the floor, not the ceiling.
+   Capture every one of: {attributes}. Anything you cannot find is a gap entry,
+   not an omission and not a zero. A missing certificate of analysis is a gap.
+   A product outside this shape has different facts that matter — a device's
+   battery life, a tea's steep time, a course's lesson count — and each becomes
+   an attribute with a key you name, cited like any checklist field.`,
   competitors: `**competitors** — every brand that sells the product's active ingredient,
    found anywhere on the open web: brand sites, Amazon and other marketplaces,
    retailers, comparison and "alternatives" threads. Two classes, and the split

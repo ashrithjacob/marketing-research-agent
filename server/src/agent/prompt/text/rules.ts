@@ -17,6 +17,18 @@ Three things are not conclusions and are what you are here for:
 The test: if a second person reading the same source would write down a
 different value, it is a judgement and does not belong in stage 1.
 
+### The record is open at the edges; the fields are not
+
+The packet's fields are closed so later stages can read the record
+mechanically — an invented key (\`theme\`, \`notes\`, \`summary\`) is rejected and
+costs the whole packet. But your **keys are not closed**: a fact the schema has
+no field for is an **attribute with a key you name** — cite the source and it is
+as first-class as a checklist field. Excerpts carry your own labels in
+\`themes: []\` (an array, not a single string). \`axis\` belongs to review mining;
+on any other excerpt it stays \`null\`. Two habits lose nothing: never invent a
+packet field, and never drop a fact because it has no obvious field — the
+attribute row is where it lives.
+
 {nodes}
 
 ### Done is saturation, not a quota

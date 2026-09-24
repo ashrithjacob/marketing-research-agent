@@ -515,6 +515,32 @@ describe("validate_packet", () => {
     expect(text(spent)).toContain("checks for this run are spent");
   });
 
+  it("takes the packet as one JSON string as well as an object", async () => {
+    // A live glm run stringified the packet on every one of six calls and got
+    // back "Expected object, received string", so the contract problems it was
+    // there to learn about were never named and the run settled invalid.
+    const { tool, valid, checked } = check();
+    const result = await tool.execute("1", { packet: JSON.stringify(minimalPacket()) });
+    expect(text(result)).toMatch(/^VALID/);
+    expect(valid).toHaveLength(1);
+    expect(checked).toEqual([{ valid: true, problems: [] }]);
+  });
+
+  it("refuses a string that is not one JSON object, without spending budget", async () => {
+    const { tool } = check();
+    const truncated = await tool.execute("1", { packet: '{"contract_version": "1"' });
+    expect(text(truncated)).toMatch(/^NOT CHECKED/);
+    expect(text(truncated)).toContain("one string");
+    expect((truncated.details as any).reason).toBe("not_a_packet_object");
+
+    const prose = await tool.execute("2", { packet: "here is the packet you asked for" });
+    expect(text(prose)).toMatch(/^NOT CHECKED/);
+    expect((prose.details as any).reason).toBe("not_a_packet_object");
+
+    const good = await tool.execute("3", { packet: minimalPacket() });
+    expect(text(good)).toMatch(/^VALID/);
+  });
+
   it("checks against the run's own scope and brief", async () => {
     // A review-mining packet is stage 2: not this run's work at all.
     const { tool } = check({ nodes: ["product_data"] as any });

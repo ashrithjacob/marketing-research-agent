@@ -156,6 +156,13 @@ export const EXAMPLE = {
       value: "400 mg",
       source_id: "sha256:1c9d…",
     },
+    {
+      id: "a2",
+      node: "product_data",
+      key: "third_party_lab_tested",
+      value: "USP verified, batch 2026-07, certificate linked on page",
+      source_id: "sha256:1c9d…",
+    },
   ],
   competitor_reference: {
     name: "MagnaCalm Magnesium Glycinate 400mg",

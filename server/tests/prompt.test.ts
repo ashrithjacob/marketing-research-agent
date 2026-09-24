@@ -78,6 +78,29 @@ describe("what the instructions must state", () => {
     expect(build()).toMatch(/Never `null`/);
   });
 
+  it("names the open channels: facts with no field are attributes, not invented keys", () => {
+    // Two live glm runs invented packet fields (`theme`, `text_verbatim`,
+    // `axis: "efficacy"`) because nothing said where the open record lives.
+    const text = build();
+    expect(text).toMatch(/attribute with a key you name/);
+    expect(text).toMatch(/`themes: \[\]`/);
+    expect(text).toMatch(/axis[\s\S]*?stays `null`/);
+    expect(text).toMatch(/never invent a[\s\S]*packet field/);
+  });
+
+  it("presents the product checklist as a floor, not a ceiling", () => {
+    const text = build();
+    expect(text).toMatch(/floor, not the ceiling/);
+    expect(text).toMatch(/attribute with a key you name/);
+  });
+
+  it("shows a custom-key attribute in the worked example", () => {
+    // The example is the shape the model copies; the open channel is taught by
+    // showing one, or every packet copies only the ten checklist keys.
+    const text = build();
+    expect(text).toContain(`"third_party_lab_tested"`);
+  });
+
   it("says the worked example is not the brief", () => {
     // A run once anchored on the example's product and researched it instead of
     // the product it was given. The disclaimer is what stands between runs and
@@ -209,7 +232,7 @@ describe("a run that covers part of the stage", () => {
   it("describes only the nodes it covers", () => {
     const text = scoped(["product_data"]);
     expect(text).toContain("### This run's node");
-    expect(text).toContain("**product_data** — a finite checklist");
+    expect(text).toContain("**product_data** — the checklist below is the floor");
     expect(text).not.toContain("**review_mining** —");
     expect(text).not.toContain("amazon_find_product");
     expect(text).not.toContain("### The four nodes");

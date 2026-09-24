@@ -1,7 +1,7 @@
 import type { AgentTool } from "@earendil-works/pi-agent-core";
 
 import type { StagePacket } from "../../domain/index.js";
-import { PacketError, PacketValidator } from "../../extract/index.js";
+import { PacketDraft, PacketError, PacketValidator } from "../../extract/index.js";
 
 import { PACKET_CHECK_BUDGET, type PacketCheckOptions } from "./lanes.js";
 import { packetParameters } from "./parameters.js";
@@ -28,7 +28,23 @@ export class PacketCheckTool {
           `packet as your final answer. ${PACKET_CHECK_BUDGET} checks per run.`,
         parameters: packetParameters,
         async execute(_id, params) {
-          const draft = (params.packet ?? {}) as Record<string, unknown>;
+          const coerced = PacketDraft.coerce(params.packet);
+          if ("unparseable" in coerced) {
+            return {
+              content: [
+                {
+                  type: "text",
+                  text:
+                    "NOT CHECKED — the packet argument did not decode to one JSON " +
+                    "object. Pass the packet itself: a JSON object, or one string " +
+                    "containing exactly the packet's JSON and nothing else — not " +
+                    "truncated, not wrapped in prose.",
+                },
+              ],
+              details: { checked: false, reason: "not_a_packet_object" },
+            };
+          }
+          const draft = coerced.draft;
           const count = (key: string) => (Array.isArray(draft[key]) ? (draft[key] as unknown[]).length : 0);
           const now = {
             sources: count("sources"),

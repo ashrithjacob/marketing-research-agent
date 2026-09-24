@@ -194,6 +194,7 @@ Still only written down, because no rule catches them:
 | Orientation | `.claude/hooks/session-brief.sh` | "is it running?", "is it deployed?" asked out loud |
 | Control | `.claude/skills/mra-control/` | improvised curl; claims that something works |
 | Memory | `FEATURE_MAP.md` | guessing at a screenshot |
+| Outcome | `.claude/skills/stage1-debug/` | debugging a run from what it produced, not from the code; how a run works consumer-side, with a measured trace |
 | House style | `.claude/skills/client-doc/` | the client-document rewrite loop |
 | Shape | `server/tests/architecture.test.ts` | layers, module size, comments, stray functions; the same rules reach `frontend/src` (250-line cap, fetch only in `api/`) |
 | Design | `.claude/skills/oop-design/` | guessing where a class goes |

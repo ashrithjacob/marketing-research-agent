@@ -12,7 +12,9 @@ export const fetchParameters = Type.Object({
 });
 
 export const packetParameters = Type.Object({
-  packet: Type.Unknown({ description: "The full stage-1 packet object, as JSON." }),
+  packet: Type.Unknown({
+    description: "The full stage-1 packet, as a JSON object or one JSON string.",
+  }),
 });
 
 export const findProductParameters = Type.Object({
