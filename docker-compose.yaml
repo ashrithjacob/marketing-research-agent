@@ -91,7 +91,7 @@ services:
       # gateway in between any more, so there is also no gateway default: the
       # model is always named. See .env.example for why this one.
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
-      - MRA_MODEL=${MRA_MODEL:-deepseek/deepseek-v4-flash-0731}
+      - MRA_MODEL=${MRA_MODEL:-z-ai/glm-5.3-flash}
       # Search by service name on this network; page content from Firecrawl's
       # cloud API. Leave FIRECRAWL_API_KEY blank and web_fetch fails loudly on
       # every call, which is more useful than a run that quietly records

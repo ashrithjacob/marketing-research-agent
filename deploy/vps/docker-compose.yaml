@@ -51,7 +51,7 @@ services:
       - MRA_DATABASE_PATH=/data/research.db
       - MRA_CORPUS_PATH=/corpus
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:?OPENROUTER_API_KEY is not set}
-      - MRA_MODEL=${MRA_MODEL:-deepseek/deepseek-v4-flash-0731}
+      - MRA_MODEL=${MRA_MODEL:-z-ai/glm-5.3-flash}
       - SEARXNG_URL=http://searxng:8080
       - FIRECRAWL_API_KEY=${FIRECRAWL_API_KEY:?FIRECRAWL_API_KEY is not set}
       # Review mining only, and deliberately NOT `:?` like the two above. This

@@ -8,6 +8,11 @@
 # 2. `secret_key` ships as a public placeholder. SEARXNG_SECRET (set in
 #    docker-compose.yaml) overrides it at runtime, so the literal value below
 #    is never actually used — it just has to be present.
+# 3. Three stock engines can never serve this stack and error on every boot:
+#    ahmia and torch need Tor (no proxy on this network), and radio browser is
+#    a radio-station directory whose init does a DNS lookup at startup, so it
+#    also races the container's own networking. All three are dark for product
+#    research; they are disabled rather than left to fail.
 use_default_settings: true
 
 server:
@@ -18,3 +23,11 @@ search:
   formats:
     - html
     - json
+
+engines:
+  - name: ahmia
+    inactive: true
+  - name: torch
+    inactive: true
+  - name: radio browser
+    inactive: true

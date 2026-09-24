@@ -59,7 +59,7 @@ export class Env {
       cookieSecure: Env.flag("MRA_COOKIE_SECURE", true),
 
       openrouterApiKey: Env.text("OPENROUTER_API_KEY", ""),
-      model: Env.text("MRA_MODEL", "deepseek/deepseek-v4-flash-0731"),
+      model: Env.text("MRA_MODEL", "z-ai/glm-5.3-flash"),
 
       searxngUrl: Env.text("SEARXNG_URL", "http://searxng:8080"),
       firecrawlApiKey: Env.text("FIRECRAWL_API_KEY", ""),
