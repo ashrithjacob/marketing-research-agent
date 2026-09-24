@@ -1,5 +1,7 @@
 import type Database from "better-sqlite3";
 
+import { SqliteReviewLedger } from "./review-ledger.js";
+
 const MIGRATIONS: ReadonlyArray<readonly [string, string]> = [
   ["output", "ALTER TABLE research_runs ADD COLUMN output TEXT NOT NULL DEFAULT ''"],
   ["judgement_ids", "ALTER TABLE research_runs ADD COLUMN judgement_ids TEXT NOT NULL DEFAULT '[]'"],
@@ -13,6 +15,7 @@ const MIGRATIONS: ReadonlyArray<readonly [string, string]> = [
 export class SqliteSchema {
   static apply(db: Database.Database): void {
     db.exec(SqliteSchema.DDL);
+    db.exec(SqliteReviewLedger.DDL);
     const have = new Set(
       (db.pragma("table_info(research_runs)") as Array<{ name: string }>).map((row) => row.name),
     );

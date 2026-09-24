@@ -14,6 +14,7 @@ import {
   findProductParameters,
   trustpilotReviewParameters,
 } from "./parameters.js";
+import { ReviewPull } from "./review-pull.js";
 import { ReviewRendering } from "./review-rendering.js";
 
 export class FindProductTool {
@@ -61,12 +62,13 @@ export class AmazonReviewsTool {
   constructor(
     private readonly settings: Settings,
     private readonly reviews: AmazonReviews,
+    private readonly pull: ReviewPull,
     private readonly runId: string,
     private readonly onFetch?: (record: FetchRecord) => void,
   ) {}
 
   tool(): AgentTool<typeof amazonReviewParameters> {
-    const { settings, reviews, runId, onFetch } = this;
+    const { settings, reviews, pull, runId, onFetch } = this;
     return {
       name: "amazon_reviews",
       label: "Amazon reviews",
@@ -79,19 +81,22 @@ export class AmazonReviewsTool {
       parameters: amazonReviewParameters,
       async execute(_id, params, signal) {
         const limit = ReviewRendering.limit(params.max_reviews, settings.apifyMaxReviews);
-        const result = await reviews.fetch({
-          productUrl: params.product_url,
-          star: ReviewRendering.starBand(params.star),
-          maxReviews: limit,
-          signal,
-        });
+        const star = ReviewRendering.starBand(params.star);
+        const outcome = await pull.collect(
+          ReviewPull.amazonKey(params.product_url, star),
+          limit,
+          runId,
+          "amazon",
+          (maxReviews) =>
+            reviews.fetch({ productUrl: params.product_url, star, maxReviews, signal }),
+        );
         return ReviewRendering.render(
           settings,
           runId,
           params.product_url,
-          result,
+          outcome.result,
           onFetch,
-          ReviewRendering.cappedNote(params.max_reviews, limit),
+          ReviewRendering.pullNote(params.max_reviews, limit, outcome),
         );
       },
     };
@@ -102,12 +107,13 @@ export class TrustpilotReviewsTool {
   constructor(
     private readonly settings: Settings,
     private readonly reviews: TrustpilotReviews,
+    private readonly pull: ReviewPull,
     private readonly runId: string,
     private readonly onFetch?: (record: FetchRecord) => void,
   ) {}
 
   tool(): AgentTool<typeof trustpilotReviewParameters> {
-    const { settings, reviews, runId, onFetch } = this;
+    const { settings, reviews, pull, runId, onFetch } = this;
     return {
       name: "trustpilot_reviews",
       label: "Trustpilot reviews",
@@ -120,19 +126,22 @@ export class TrustpilotReviewsTool {
       parameters: trustpilotReviewParameters,
       async execute(_id, params, signal) {
         const limit = ReviewRendering.limit(params.max_reviews, settings.apifyMaxReviews);
-        const result = await reviews.fetch({
-          domainOrUrl: params.domain,
-          star: ReviewRendering.starBand(params.star),
-          maxItems: limit,
-          signal,
-        });
+        const star = ReviewRendering.starBand(params.star);
+        const outcome = await pull.collect(
+          ReviewPull.trustpilotKey(params.domain, star),
+          limit,
+          runId,
+          "trustpilot",
+          (maxItems) =>
+            reviews.fetch({ domainOrUrl: params.domain, star, maxItems, signal }),
+        );
         return ReviewRendering.render(
           settings,
           runId,
           params.domain,
-          result,
+          outcome.result,
           onFetch,
-          ReviewRendering.cappedNote(params.max_reviews, limit),
+          ReviewRendering.pullNote(params.max_reviews, limit, outcome),
         );
       },
     };

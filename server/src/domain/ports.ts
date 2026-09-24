@@ -1,3 +1,4 @@
+import type { ReviewLedger } from "./review-ledger.js";
 import type { SourceKind } from "./vocabulary.js";
 import type {
   Judgement,
@@ -32,6 +33,8 @@ export interface ResearchStore {
   addLlmCall(call: LlmCallRecord): LlmCall;
   setLlmCallBilled(runId: string, responseId: string, cost: number): void;
   listLlmCalls(runId: string): LlmCall[];
+
+  reviewLedger(): ReviewLedger;
 
   close(): void;
 }

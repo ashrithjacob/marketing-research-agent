@@ -82,6 +82,7 @@ export class RunAgentFactory {
           productSearch: nodes.includes("competitors"),
           subject: options.brief.product || options.brief.url,
           market: options.brief.market,
+          reviewLedger: this.store.reviewLedger(),
           packetCheck: {
             nodes,
             brief: options.brief,

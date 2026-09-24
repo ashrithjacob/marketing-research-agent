@@ -19,6 +19,26 @@ export class ReviewRendering {
     );
   }
 
+  static pullNote(
+    requested: number | undefined,
+    limit: number,
+    pull: { fromLedger: boolean; knownCount: number; fetchedCount: number },
+  ): string {
+    if (pull.fromLedger) {
+      return (
+        `NOTE: served from this server's review ledger — an earlier run already pulled these ` +
+        "reviews, so nothing was spent on this call."
+      );
+    }
+    const ledgerNote =
+      pull.knownCount > 0
+        ? `NOTE: ${pull.knownCount} review(s) come from this server's review ledger; Apify was ` +
+          `asked for the remaining ${pull.fetchedCount} only. Newest-first ordering means some ` +
+          "of those may already be in the ledger; already-known excerpts are shown once, here."
+        : "";
+    return [ReviewRendering.cappedNote(requested, limit), ledgerNote].filter(Boolean).join("\n");
+  }
+
   static starBand(value: number | undefined): 1 | 2 | 3 | 4 | 5 | null {
     if (value === undefined) return null;
     const n = Math.trunc(value);

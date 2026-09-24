@@ -10,6 +10,7 @@ import type {
   PacketCheck,
   ResearchRun,
   ResearchStore,
+  ReviewLedger,
   RunEvent,
   RunUpdate,
   SourceKind,
@@ -19,6 +20,7 @@ import { CallLog } from "./call-log.js";
 import { EventLog } from "./event-log.js";
 import { JudgementTable } from "./judgement-table.js";
 import { PacketCheckLog } from "./check-log.js";
+import { SqliteReviewLedger } from "./review-ledger.js";
 import { RunTable } from "./run-table.js";
 import { SqliteSchema } from "./schema.js";
 
@@ -29,6 +31,7 @@ export class SqliteResearchStore implements ResearchStore {
   private readonly judgements: JudgementTable;
   private readonly checks: PacketCheckLog;
   private readonly calls: CallLog;
+  private readonly ledger: SqliteReviewLedger;
 
   constructor(path: string) {
     if (path !== ":memory:") mkdirSync(dirname(path), { recursive: true });
@@ -42,6 +45,11 @@ export class SqliteResearchStore implements ResearchStore {
     this.judgements = new JudgementTable(this.db);
     this.checks = new PacketCheckLog(this.db);
     this.calls = new CallLog(this.db);
+    this.ledger = new SqliteReviewLedger(this.db);
+  }
+
+  reviewLedger(): ReviewLedger {
+    return this.ledger;
   }
 
   createRun(input: {

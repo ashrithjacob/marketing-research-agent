@@ -72,6 +72,14 @@ classDiagram
     class RejectKinds {
       effective()
     }
+    class LedgerExcerpt {
+      <<interface>>
+    }
+    class ReviewLedger {
+      <<interface>>
+      cached()
+      record()
+    }
   }
   namespace config {
     class Settings {
@@ -241,6 +249,10 @@ classDiagram
       delete()
       bump()
     }
+    class SqliteReviewLedger {
+      cached()
+      record()
+    }
     class Rows {
       json()
       run()
@@ -255,6 +267,7 @@ classDiagram
       apply()
     }
     class SqliteResearchStore {
+      reviewLedger()
       createRun()
       getRun()
       listRuns()
@@ -262,7 +275,6 @@ classDiagram
       addEvent()
       listEvents()
       listJudgements()
-      addJudgement()
     }
   }
   namespace agent {
@@ -373,9 +385,18 @@ classDiagram
     class PacketCheckTool {
       tool()
     }
+    class ReviewPullOutcome {
+      <<interface>>
+    }
+    class ReviewPull {
+      amazonKey()
+      trustpilotKey()
+      collect()
+    }
     class ReviewRendering {
       limit()
       cappedNote()
+      pullNote()
       starBand()
       locator()
       render()
@@ -466,11 +487,14 @@ classDiagram
   StageTwoHandoff --> ResearchStore
   ResearchToolset --> ToolsetOptions
   PacketCheckTool --> PacketCheckOptions
+  ReviewPull --> ReviewLedger
   FindProductTool --> AmazonProducts
   AmazonReviewsTool --> Settings
   AmazonReviewsTool --> AmazonReviews
+  AmazonReviewsTool --> ReviewPull
   TrustpilotReviewsTool --> Settings
   TrustpilotReviewsTool --> TrustpilotReviews
+  TrustpilotReviewsTool --> ReviewPull
   WebSearchTool --> Searxng
   WebFetchTool --> Settings
   WebFetchTool --> Firecrawl
@@ -513,6 +537,7 @@ classDiagram
 | `adapters` | `adapters/sqlite/check-log.ts` | PacketCheckLog |
 | `adapters` | `adapters/sqlite/event-log.ts` | EventLog |
 | `adapters` | `adapters/sqlite/judgement-table.ts` | JudgementTable |
+| `adapters` | `adapters/sqlite/review-ledger.ts` | SqliteReviewLedger |
 | `adapters` | `adapters/sqlite/rows.ts` | Rows |
 | `adapters` | `adapters/sqlite/run-table.ts` | RunTable |
 | `adapters` | `adapters/sqlite/schema.ts` | SqliteSchema |
@@ -539,6 +564,7 @@ classDiagram
 | `agent` | `agent/tools/factory.ts` | ToolsetOptions, ResearchToolset |
 | `agent` | `agent/tools/lanes.ts` | FetchRecord, PacketCheckOptions |
 | `agent` | `agent/tools/packet-check-tool.ts` | PacketCheckTool |
+| `agent` | `agent/tools/review-pull.ts` | ReviewPullOutcome, ReviewPull |
 | `agent` | `agent/tools/review-rendering.ts` | ReviewRendering |
 | `agent` | `agent/tools/review-tools.ts` | FindProductTool, AmazonReviewsTool, TrustpilotReviewsTool |
 | `agent` | `agent/tools/web-tools.ts` | WebSearchTool, WebFetchTool |
@@ -550,6 +576,7 @@ classDiagram
 | `domain` | `domain/ports.ts` | ResearchStore, GateVerdict, FetchGate |
 | `domain` | `domain/records.ts` | Clock, Ids, ResearchRun, RunSummary, Runs |
 | `domain` | `domain/reject-kinds.ts` | RejectKinds |
+| `domain` | `domain/review-ledger.ts` | LedgerExcerpt, ReviewLedger |
 | `extract` | `extract/blocks.ts` | JsonBlocks, PacketExtractor |
 | `extract` | `extract/brief-check.ts` | BriefCheck |
 | `extract` | `extract/check.ts` | PacketContext, PacketCheck |

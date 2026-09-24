@@ -371,6 +371,155 @@ describe("review tools", () => {
 });
 
 /**
+ * The review ledger.
+ *
+ * Review pulls cost money per row, and stage 2 of one brief used to pull the
+ * same reviews again every time it ran. The ledger remembers every excerpt by
+ * (source, band, listing) across runs, so a repeat asks Apify only for the
+ * delta — and asks for nothing at all once the pull is already covered.
+ */
+describe("the review ledger", () => {
+  const row = (locator: string, text: string) => ({
+    reviewDescription: text,
+    ratingScore: 3,
+    reviewUrl: locator,
+  });
+
+  const counting = (items: Array<Record<string, unknown>>) => {
+    const calls: Array<{ actorId: string; input: Record<string, any>; cap: number }> = [];
+    const actorRunner = {
+      async run(actorId: string, input: Record<string, unknown>, cap: number) {
+        calls.push({ actorId, input, cap });
+        const max = typeof input.maxReviews === "number" ? input.maxReviews : items.length;
+        return { status: "SUCCEEDED", items: items.slice(0, max) };
+      },
+    };
+    return { calls, actorRunner };
+  };
+
+  const ledger = () => {
+    const rows = new Map<string, { bandKey: string; excerpt: any }>();
+    return {
+      cached: (bandKey: string, limit: number) =>
+        [...rows.values()].filter((r) => r.bandKey === bandKey).slice(0, limit).map((r) => r.excerpt),
+      record: (bandKey: string, _runId: string, excerpts: readonly any[]) => {
+        for (const excerpt of excerpts) rows.set(`${bandKey}|${excerpt.locator}`, { bandKey, excerpt });
+      },
+      size: () => rows.size,
+    };
+  };
+
+  const mine = (actorRunner: any, reviewLedger: any) =>
+    new ResearchToolset({ settings, runId: "run-led", actorRunner, reviewLedger })
+      .build()
+      .find((t) => t.name === "amazon_reviews")!;
+
+  it("serves a repeat pull from the ledger without calling Apify at all", async () => {
+    const { calls, actorRunner } = counting([row("https://amazon.example/r/1", "first pull")]);
+    const reviewLedger = ledger();
+    const tool = mine(actorRunner, reviewLedger);
+    const params = { product_url: "https://www.amazon.com/dp/B0H2JVQ9GR", star: 3, max_reviews: 1 };
+
+    const first = await tool.execute("1", params);
+    expect(calls).toHaveLength(1);
+    expect((first.content[0] as any).text).not.toMatch(/review ledger/);
+
+    const second = await tool.execute("2", params);
+    expect(calls).toHaveLength(1);
+    expect((second.content[0] as any).text).toContain("served from this server's review ledger");
+    expect((second.content[0] as any).text).toContain("nothing was spent on this call");
+    expect((second.details as any).excerpts[0].text).toBe("first pull");
+  });
+
+  it("asks Apify only for the delta the ledger does not yet hold", async () => {
+    const items = [
+      row("https://amazon.example/r/1", "from pull one"),
+      row("https://amazon.example/r/2", "new review"),
+      row("https://amazon.example/r/3", "newer review"),
+    ];
+    const { calls, actorRunner } = counting(items);
+    const reviewLedger = ledger();
+    const tool = mine(actorRunner, reviewLedger);
+
+    await tool.execute("1", {
+      product_url: "https://www.amazon.com/dp/B0H2JVQ9GR",
+      star: 3,
+      max_reviews: 1,
+    });
+    const second = await tool.execute("2", {
+      product_url: "https://www.amazon.com/dp/B0H2JVQ9GR",
+      star: 3,
+      max_reviews: 4,
+    });
+
+    expect(calls.map((call) => call.input.maxReviews)).toEqual([1, 3]);
+    expect(calls[1]!.cap).toBe(Spend.capFor(AMAZON_REVIEWS_ACTOR, 3));
+    const text = (second.content[0] as any).text as string;
+    expect(text).toContain("1 review(s) come from this server's review ledger");
+    expect(text).toContain("asked for the remaining 3 only");
+    expect((second.details as any).excerpts).toHaveLength(3);
+    expect(reviewLedger.size()).toBe(3);
+  });
+
+  it("shows an already-known excerpt once, not twice, when a pull overlaps", async () => {
+    const { actorRunner } = counting([row("https://amazon.example/r/1", "from pull one")]);
+    const reviewLedger = ledger();
+    const tool = mine(actorRunner, reviewLedger);
+    const params = { product_url: "https://www.amazon.com/dp/B0H2JVQ9GR", star: 3, max_reviews: 1 };
+
+    await tool.execute("1", params);
+    const result = await tool.execute("2", params);
+    expect((result.details as any).excerpts).toHaveLength(1);
+  });
+
+  it("keeps bands and listings apart, and keeps working with no ledger", async () => {
+    const { calls, actorRunner } = counting([row("https://amazon.example/r/1", "text")]);
+    const reviewLedger = ledger();
+    const tool = mine(actorRunner, reviewLedger);
+    await tool.execute("1", {
+      product_url: "https://www.amazon.com/dp/B0H2JVQ9GR",
+      star: 3,
+      max_reviews: 1,
+    });
+    await tool.execute("2", {
+      product_url: "https://www.amazon.com/dp/B0H2JVQ9GR",
+      star: 4,
+      max_reviews: 1,
+    });
+    await tool.execute("3", {
+      product_url: "https://www.amazon.com/dp/B0OTHER",
+      star: 3,
+      max_reviews: 1,
+    });
+    expect(calls).toHaveLength(3);
+
+    const plain = mine(actorRunner, null);
+    await plain.execute("4", {
+      product_url: "https://www.amazon.com/dp/B0H2JVQ9GR",
+      star: 3,
+      max_reviews: 1,
+    });
+    expect(calls).toHaveLength(4);
+  });
+
+  it("never starts the Trustpilot actor when the ledger already covers the pull", async () => {
+    const reviewLedger = ledger();
+    reviewLedger.record("trustpilot|any|huel.com", "run-old", [
+      { text: "held", star: 4, date: null, locator: "https://trustpilot.example/r/9", title: "", verified: false },
+    ]);
+    const { calls, actorRunner } = counting([]);
+    const tool = new ResearchToolset({ settings, runId: "run-tp", actorRunner, reviewLedger })
+      .build()
+      .find((t) => t.name === "trustpilot_reviews")!;
+
+    const result = await tool.execute("1", { domain: "huel.com", max_reviews: 1 });
+    expect(calls).toHaveLength(0);
+    expect((result.content[0] as any).text).toContain("nothing was spent on this call");
+    expect((result.details as any).excerpts[0].source).toBe("trustpilot");
+  });
+});
+
+/**
  * `MRA_APIFY_MAX_REVIEWS` is the ceiling, not just the default.
  *
  * It used to be only the default: `max_reviews` from the model went straight to

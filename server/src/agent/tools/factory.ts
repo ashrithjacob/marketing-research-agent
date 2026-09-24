@@ -12,9 +12,11 @@ import { Firecrawl } from "../../adapters/firecrawl.js";
 import { OpenRouterGate } from "../../adapters/fetch-gate.js";
 import { Searxng } from "../../adapters/searxng.js";
 import type { Settings } from "../../config/index.js";
+import type { ReviewLedger } from "../../domain/index.js";
 
 import type { FetchRecord, PacketCheckOptions } from "./lanes.js";
 import { PacketCheckTool } from "./packet-check-tool.js";
+import { ReviewPull } from "./review-pull.js";
 import {
   AmazonReviewsTool,
   FindProductTool,
@@ -28,6 +30,7 @@ export interface ToolsetOptions {
   packetCheck?: PacketCheckOptions;
   onFetch?: (record: FetchRecord) => void;
   actorRunner?: ActorRunner | null;
+  reviewLedger?: ReviewLedger | null;
   reviewTools?: boolean;
   productSearch?: boolean;
   subject?: string;
@@ -69,11 +72,12 @@ export class ResearchToolset {
     const findProduct = new FindProductTool(new AmazonProducts(runner)).tool();
     if (!reviews) return [...web, findProduct, ...check];
 
+    const pull = new ReviewPull(this.options.reviewLedger ?? null);
     return [
       ...web,
       findProduct,
-      new AmazonReviewsTool(settings, new AmazonReviews(runner), runId, onFetch).tool(),
-      new TrustpilotReviewsTool(settings, new TrustpilotReviews(runner), runId, onFetch).tool(),
+      new AmazonReviewsTool(settings, new AmazonReviews(runner), pull, runId, onFetch).tool(),
+      new TrustpilotReviewsTool(settings, new TrustpilotReviews(runner), pull, runId, onFetch).tool(),
       ...check,
     ];
   }

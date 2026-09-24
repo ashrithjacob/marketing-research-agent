@@ -76,6 +76,41 @@ describe("events", () => {
   });
 });
 
+describe("the review ledger", () => {
+  const excerpt = (locator: string, text = "kept") => ({
+    text,
+    star: 3,
+    date: "2026-09-01",
+    locator,
+    title: "",
+    verified: false,
+  });
+
+  it("remembers excerpts across store instances, keyed by band and locator", () => {
+    const path = join(dir, "ledger.db");
+    const first = new SqliteResearchStore(path);
+    first.reviewLedger().record("amazon|3|https://amazon.example/dp/B1", "run-1", [excerpt("l1")]);
+    first.reviewLedger().record("amazon|3|https://amazon.example/dp/B1", "run-2", [excerpt("l1"), excerpt("l2")]);
+    first.close();
+
+    const second = new SqliteResearchStore(path);
+    try {
+      const rows = second.reviewLedger().cached("amazon|3|https://amazon.example/dp/B1", 10);
+      expect(rows.map((r) => r.locator)).toEqual(["l2", "l1"]);
+      expect(second.reviewLedger().cached("amazon|4|https://amazon.example/dp/B1", 10)).toEqual([]);
+      expect(second.reviewLedger().cached("amazon|3|https://amazon.example/dp/B2", 10)).toEqual([]);
+      expect(second.reviewLedger().cached("amazon|3|https://amazon.example/dp/B1", 1)).toHaveLength(1);
+    } finally {
+      second.close();
+    }
+  });
+
+  it("ignores excerpts without a locator rather than keying them all together", () => {
+    store.reviewLedger().record("trustpilot|any|huel.com", "run-1", [excerpt(""), excerpt("")]);
+    expect(store.reviewLedger().cached("trustpilot|any|huel.com", 10)).toEqual([]);
+  });
+});
+
 describe("judgements", () => {
   it("counts applications rather than claiming them", () => {
     const judgement = store.addJudgement({ kind: "source_rule", text: "no listicles", rejects_kinds: [] });
