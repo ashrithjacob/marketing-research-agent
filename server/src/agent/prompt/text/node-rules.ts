@@ -19,9 +19,20 @@ export const NODE_RULES: Record<Node, string> = {
      buyer.
 
    How to work this node, in order:
-   a. Fetch the product's own page and record \`competitor_reference\`: its name,
-      its \`form\`, and its actives (\`name_normalised\`: lowercase, trimmed, one
-      accepted synonym, e.g. "vitamin b3" → "niacin"), citing that page.
+   a. The brief names a **genre**, not the champion. Run \`amazon_find_product\`
+      with the genre name: the **champion product** is the listing with the
+      highest \`reviewsCount\` — the market's most-bought, by Amazon's count.
+      Note the top two listings, then fetch the champion's own page (the
+      brand's site, not Amazon, which \`web_fetch\` cannot read) and record
+      \`competitor_reference\` from it: its name, its \`form\`, and its actives
+      (\`name_normalised\`: lowercase, trimmed, one accepted synonym, e.g.
+      "vitamin b3" → "niacin"), citing that page, plus the ranking that chose
+      it — \`reviews_count\`, and the runner-up listing's name and count. A
+      runner-up that out-reviews the pick fails the packet. When the brief
+      carries a url, the champion is that site's product and no ranking is
+      needed. If \`amazon_find_product\` is absent or fails, gap it as
+      "champion ranking unavailable: <why>" and choose from the best evidence
+      the web offers.
    b. Find competitors: \`web_search\` for the active ingredient in every form
       ("<active> capsules", "<active> spray", "<active> gummies", "<active> tea",
       "best <active> <market>"), and \`amazon_find_product\` for the active if you

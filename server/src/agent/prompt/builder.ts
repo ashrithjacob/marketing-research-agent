@@ -95,7 +95,8 @@ export class PromptBuilder {
     const end = findEnd === -1 ? thisRun : findEnd;
     const tools = nodes.includes("competitors")
       ? "- `amazon_find_product` — search Amazon (amazon.com) by product name for asin, " +
-        "title, stars and `reviewsCount`: a way to find competitors, and to see which " +
+        "title, stars and `reviewsCount`, most-reviewed first: how the genre is ranked " +
+        "to pick the champion product, a way to find competitors, and to see which " +
         "sell. It may be absent."
       : "";
     return (

@@ -279,6 +279,16 @@ describe("the competitors node", () => {
     expect(text).toMatch(/same problem, different active/);
   });
 
+  it("sends the agent ranking the genre to pick the champion product", () => {
+    // The brief names a genre; "the first plausible match" is not the champion.
+    // The ranking must be recorded, because a runner-up that out-reviews the
+    // pick is exactly the champion check's reject.
+    const text = build({ nodes: ["competitors"] });
+    expect(text).toMatch(/\*\*champion product\*\* is the listing with the\s+highest `reviewsCount`/);
+    expect(text).toMatch(/`reviews_count`, and the runner-up listing's name and count/);
+    expect(text).toMatch(/champion ranking unavailable/);
+  });
+
   it("names every form the validator accepts", () => {
     const text = build();
     for (const form of FORMS) expect(text).toContain(`\`${form}\``);
@@ -288,6 +298,17 @@ describe("the competitors node", () => {
     const parsed = packets.parse(build());
     expect(parsed.competitors.map((c) => c.relation).sort()).toEqual(["direct", "indirect"]);
     expect(parsed.competitor_reference?.form).toBe("capsule");
+  });
+
+  it("shows the champion's ranking evidence in the example", () => {
+    // The example is parsed against a name-only brief, so the champion check
+    // applies to it: the evidence it shows must be a real ranking.
+    const parsed = packets.parse(build());
+    expect(parsed.competitor_reference?.reviews_count).toBeGreaterThan(0);
+    expect(parsed.competitor_reference?.runner_up_name).not.toBe("");
+    expect(parsed.competitor_reference?.runner_up_reviews ?? 0).toBeLessThanOrEqual(
+      parsed.competitor_reference?.reviews_count ?? 0,
+    );
   });
 });
 

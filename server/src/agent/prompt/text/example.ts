@@ -170,6 +170,9 @@ export const EXAMPLE = {
     form_as_printed: "90 vegan capsules",
     actives: ["magnesium glycinate"],
     source_id: "sha256:1c9d…",
+    reviews_count: 18453,
+    runner_up_name: "CalmWell Magnesium Glycinate 400mg",
+    runner_up_reviews: 9211,
   },
   competitors: [
     {

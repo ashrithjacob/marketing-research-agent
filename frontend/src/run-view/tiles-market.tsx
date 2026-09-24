@@ -102,9 +102,12 @@ export function CompetitorsTile({
   );
   const head = reference && (
     <p className="comp-ref">
-      Measured against <b>{reference.name}</b> — {reference.form}
+      Champion <b>{reference.name}</b> — {reference.form}
       {reference.form_as_printed ? ` (${reference.form_as_printed})` : ''} ·{' '}
       {reference.actives.join(', ')}
+      {reference.reviews_count
+        ? ` · ${reference.reviews_count.toLocaleString()} reviews`
+        : ''}
     </p>
   );
   return (
@@ -121,7 +124,7 @@ export function CompetitorsTile({
           </div>
           {reference && (
             <div className="tile-note">
-              measured against <b>{reference.name}</b>
+              champion: <b>{reference.name}</b>
             </div>
           )}
         </div>

@@ -10,6 +10,7 @@ import {
 
 import { PacketExtractor } from "./blocks.js";
 import { BriefCheck } from "./brief-check.js";
+import { ChampionCheck } from "./champion-check.js";
 import { CitationCheck } from "./citation-check.js";
 import { CompetitorCheck } from "./competitor-check.js";
 import { CompletenessCheck } from "./completeness-check.js";
@@ -50,6 +51,7 @@ export class PacketValidator {
     new CitationCheck(),
     new CompletenessCheck(),
     new CompetitorCheck(),
+    new ChampionCheck(),
   ];
 
   private readonly extractor = new PacketExtractor();

@@ -527,3 +527,86 @@ describe("validation: competitors, direct and indirect", () => {
     );
   });
 });
+
+describe("validation: the champion is the genre's most-bought", () => {
+  /** A name-only brief: the genre is open, so the champion must earn its place. */
+  const withGenreBrief = (): Record<string, any> => {
+    const data = minimalPacket();
+    data.saturation = [];
+    data.sources.push(
+      { id: "sha256:ref", url: "https://magnacalm.example/p", kind: "first_party", marketing: true, admitted: true, archived: true, node: "competitors" },
+      { id: "sha256:cw", url: "https://calmwell.example/p", kind: "competitor_marketing", marketing: true, admitted: true, archived: true, node: "competitors" },
+    );
+    const active = { name_as_printed: "Magnesium Bisglycinate", name_normalised: "magnesium glycinate", dose: "400", unit: "mg", per: "serving" };
+    data.brief = { product: "magnesium glycinate 400mg", url: "", market: "UK" };
+    data.competitor_reference = {
+      name: "MagnaCalm 400mg",
+      form: "capsule",
+      form_as_printed: "90 capsules",
+      actives: ["magnesium glycinate"],
+      source_id: "sha256:ref",
+      reviews_count: 18453,
+      runner_up_name: "CalmWell 400",
+      runner_up_reviews: 9211,
+    };
+    data.competitors = [
+      { id: "c1", name: "CalmWell 400", url: "https://calmwell.example/p", relation: "direct", form: "capsule", active_ingredients: [active], shared_actives: ["magnesium glycinate"], positioning_copy: "Sleep through.", source_id: "sha256:cw", ad_source_ids: [] },
+    ];
+    return data;
+  };
+
+  /** The brief rides along, the way a run hands it to the validator. */
+  const validate = (data: Record<string, any>) => packets.validate(data, STAGE1, data.brief);
+
+  it("accepts a champion that out-reviews its runner-up", () => {
+    expect(() => validate(withGenreBrief())).not.toThrow();
+  });
+
+  it("rejects a champion with no popularity evidence", () => {
+    const data = withGenreBrief();
+    data.competitor_reference.reviews_count = 0;
+    data.competitor_reference.runner_up_name = "";
+    data.competitor_reference.runner_up_reviews = 0;
+    expect(() => validate(data)).toThrow(/no popularity evidence/);
+  });
+
+  it("rejects a champion that names no runner-up", () => {
+    // A ranking of one listing is not a ranking: the second row is what makes
+    // "most-bought" a measurement instead of a shrug.
+    const data = withGenreBrief();
+    data.competitor_reference.runner_up_name = "";
+    expect(() => validate(data)).toThrow(/names no runner-up/);
+  });
+
+  it("rejects a champion its own runner-up out-reviews", () => {
+    const data = withGenreBrief();
+    data.competitor_reference.runner_up_reviews = 20000;
+    expect(() => validate(data)).toThrow(
+      /is not the most-bought listing in its genre/,
+    );
+  });
+
+  it("lets a failed ranking be gapped instead", () => {
+    // No Apify token, or out of credit: the run must not be unsalvageable.
+    const data = withGenreBrief();
+    data.competitor_reference.reviews_count = 0;
+    data.competitor_reference.runner_up_name = "";
+    data.competitor_reference.runner_up_reviews = 0;
+    data.gaps.push({
+      node: "competitors",
+      missing: "champion ranking unavailable: APIFY_TOKEN is not set",
+      would_need: "an Apify token",
+      blocking: false,
+    });
+    expect(() => validate(data)).not.toThrow();
+  });
+
+  it("spares a url brief, where the operator pinned the champion", () => {
+    const data = withGenreBrief();
+    data.brief.url = "https://magnacalm.example";
+    data.competitor_reference.reviews_count = 0;
+    data.competitor_reference.runner_up_name = "";
+    data.competitor_reference.runner_up_reviews = 0;
+    expect(() => validate(data)).not.toThrow();
+  });
+});

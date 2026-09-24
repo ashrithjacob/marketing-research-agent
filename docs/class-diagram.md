@@ -95,6 +95,9 @@ classDiagram
     class BriefCheck {
       problems()
     }
+    class ChampionCheck {
+      problems()
+    }
     class PacketContext {
       <<interface>>
     }
@@ -552,6 +555,7 @@ classDiagram
 | `domain` | `domain/reject-kinds.ts` | RejectKinds |
 | `extract` | `extract/blocks.ts` | JsonBlocks, PacketExtractor |
 | `extract` | `extract/brief-check.ts` | BriefCheck |
+| `extract` | `extract/champion-check.ts` | ChampionCheck |
 | `extract` | `extract/check.ts` | PacketContext, PacketCheck |
 | `extract` | `extract/citation-check.ts` | CitationCheck |
 | `extract` | `extract/competitor-check.ts` | CompetitorCheck |

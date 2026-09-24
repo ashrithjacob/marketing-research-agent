@@ -5,6 +5,7 @@ export * from "./names.js";
 export * from "./check.js";
 export * from "./scope-check.js";
 export * from "./brief-check.js";
+export * from "./champion-check.js";
 export * from "./citation-check.js";
 export * from "./completeness-check.js";
 export * from "./competitor-check.js";

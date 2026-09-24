@@ -77,10 +77,11 @@ export default function StageTwoPlan({
         {plan?.ready && plan.plan && (
           <>
             <p className="lede">
-              Stage 1 found <b>{plan.plan.subject.name}</b> ({plan.plan.subject.form};{' '}
-              {plan.plan.subject.actives.join(', ')}) and the brands that share its active
-              ingredient. Stage 2 mines verbatim customer language for the approved targets —
-              Amazon per star band, 3★ first, plus Trustpilot where a brand has a presence.
+              Stage 1 chose <b>{plan.plan.subject.name}</b> ({plan.plan.subject.form};{' '}
+              {plan.plan.subject.actives.join(', ')}) as the champion product — the genre's
+              most-bought — plus the brands that share its active ingredient. Stage 2 mines
+              verbatim customer language for the approved targets — Amazon per star band, 3★
+              first, plus Trustpilot where a brand has a presence.
             </p>
             <fieldset className="markets">
               <legend>Targets</legend>

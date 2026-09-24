@@ -102,9 +102,12 @@ anything else fails the whole packet.`;
       lines.push(`**Product URL:** ${brief.url}`);
     } else {
       lines.push(
-        "No product URL was supplied — finding it is part of the job. Use " +
-          "web search to locate the product's own site first, then the " +
-          "reviews, competitors, ad-library entries and category data the " +
+        "No product URL was supplied — finding it is part of the job. The name " +
+          "is a genre as much as a product: the **champion product** — the " +
+          "market's most-bought — is what the packet must land on, established " +
+          "by ranking the genre and picking the most-reviewed listing, never " +
+          "the first plausible match. Use web search to locate the reviews, " +
+          "competitors, ad-library entries and category data the " +
           `${NODES.length} nodes need.`,
       );
     }

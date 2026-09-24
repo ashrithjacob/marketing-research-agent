@@ -11,8 +11,9 @@ never cite a url you have only seen in search results.
 hashed before you see it, and the result carries the \`source_id\` to cite. Use that id \
 exactly as given.
 - \`amazon_find_product\` — search Amazon by product name for asin, title, stars and \
-\`reviewsCount\`. Amazon is unreadable to \`web_fetch\` from this server, so this and the \
-next tool are the only route to marketplace reviews.
+\`reviewsCount\`, most-reviewed first: how the genre is ranked to pick the champion \
+product, a way to find competitors, and the only route to marketplace reviews — \
+Amazon is unreadable to \`web_fetch\` from this server.
 - \`amazon_reviews\` — verbatim reviews for ONE Amazon product url, optionally at one star \
 band. Archived and hashed like \`web_fetch\`.
 - \`trustpilot_reviews\` — verbatim reviews for ONE company domain. These review the \

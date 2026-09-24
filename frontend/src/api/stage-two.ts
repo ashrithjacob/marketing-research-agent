@@ -34,7 +34,7 @@ export interface StageTwoPlanResponse {
 }
 
 export const RELATION_LABEL: Record<MiningTarget['relation'], string> = {
-  product: 'the product',
+  product: 'champion product',
   direct: 'direct',
   indirect: 'indirect',
 };

@@ -33,7 +33,10 @@ Field notes:
   \`incomplete\`, with \`why\` naming the criterion that was or was not met.
 - \`gaps\` must not be empty.
 - \`competitor_reference\` and \`competitors\` belong to the competitors node; leave
-  them \`null\` and \`[]\` when it is not being researched. \`form\` is exactly one
+  them \`null\` and \`[]\` when it is not being researched. \`competitor_reference\`
+  is the **champion product** — the genre's most-bought listing — and records
+  the ranking that chose it: \`reviews_count\`, plus the runner-up listing's
+  name and count. \`form\` is exactly one
   of {forms}, with \`other\` for anything that vocabulary does not cover.
   \`relation\` is checked against the forms and must agree with them, except where
   both are \`other\` — there your label stands and \`form_as_printed\` must not be

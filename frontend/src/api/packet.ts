@@ -84,13 +84,16 @@ export interface ActiveIngredient {
   standardisation?: string;
 }
 
-/** The product competitors are measured against, as read off its own page. */
+/** The champion product competitors are measured against — the genre's most-bought, as read off its own page. */
 export interface CompetitorReference {
   name: string;
   form: string;
   form_as_printed?: string;
   actives: string[];
   source_id: string;
+  reviews_count?: number;
+  runner_up_name?: string;
+  runner_up_reviews?: number;
 }
 
 /** Mirrors `competitorSchema` in `server/src/domain/packet.ts`. */

@@ -1,15 +1,16 @@
 import type { MiningTarget } from "../../../domain/index.js";
 
 export const RELATION_LABEL: Record<MiningTarget["relation"], string> = {
-  product: "the product itself",
+  product: "champion product",
   direct: "direct competitor",
   indirect: "indirect competitor",
 };
 
 export const ROSTER_LEAD =
-  "Stage 1 for this brief already named the product and found the brands that " +
-  "share its active ingredient. Mine **only** the targets below — a listing for " +
-  "anything else is out of scope, however similar it sounds.";
+  "Stage 1 for this brief already named the champion product — the genre's " +
+  "most-bought — and found the brands that share its active ingredient. " +
+  "Mine **only** the targets below — a listing for anything else is out of " +
+  "scope, however similar it sounds.";
 
 export const ROSTER_METHOD = [
   "For each in-scope target, in order:",
