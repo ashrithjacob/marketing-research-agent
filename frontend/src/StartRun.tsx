@@ -47,9 +47,7 @@ export default function StartRun({
   const [other, setOther] = useState(from?.other ?? '');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const stage = nodes.includes('review_mining') ? 2 : 1;
-  const partial = nodes.length > 0 && !(stage === 2 && nodes.length === 1);
-  const reviewsInScope = nodes.length === 0 ? false : nodes.includes('review_mining');
+  const partial = nodes.length > 0;
   const isUrl = looksLikeUrl(product);
   const market = [
     ...DEFAULT_MARKETS.filter((m) => ticked.includes(m)),
@@ -93,11 +91,9 @@ export default function StartRun({
       >
         <h2>{nodes.length === 0 ? 'Start run' : `Run ${scopeLabel(nodes)}`}</h2>
         <p className="lede">
-          {stage === 2
-            ? 'Stage 2 mines verbatim customer language — marketplace and Trustpilot reviews, forums — for the product stage 1 identified. It records nothing else.'
-            : partial
-              ? `Stage 1, ${scopeLabel(nodes)} only. The agent researches just this and records nothing for the rest of the stage.`
-              : 'Stage 1 gathers the product, its competitors and its category. Name the product and pick the markets — the agent finds the URLs itself, by search and page fetch. Review mining is stage 2, started from the rail once this finishes.'}
+          {partial
+            ? `Stage 1, ${scopeLabel(nodes)} only. The agent researches just this and records nothing for the rest of the stage.`
+            : 'Stage 1 gathers the product, its competitors and its category. Name the product and pick the markets — the agent finds the URLs itself, by search and page fetch. Review mining is stage 2, started from the rail once this finishes.'}
         </p>
         <input
           autoFocus
@@ -142,7 +138,7 @@ export default function StartRun({
             but nothing is archived and every source becomes a gap.
           </p>
         )}
-        {partial && !reviewsInScope && (
+        {partial && (
           <p className="muted small">
             {nodes.includes('competitors')
               ? 'Amazon product search is offered for finding competitors (Apify, about $0.012 a result). The paid review tools are not.'

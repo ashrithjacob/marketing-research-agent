@@ -11,6 +11,7 @@ import Login from './Login';
 import LogsPage from './LogsPage';
 import RunView from './RunView';
 import StartRun from './StartRun';
+import StageTwoPlan from './StageTwoPlan';
 import StepIn from './StepIn';
 
 /** `/runs/<id>/logs` — the LLM call log, opened in its own tab from a run. */
@@ -165,7 +166,19 @@ export default function App() {
         </div>
       )}
 
-      {startNodes && (
+      {startNodes && startNodes.includes('review_mining') && (
+        <StageTwoPlan
+          brief={activeRun?.brief ?? { product: '', url: '', market: '', notes: '' }}
+          onStarted={async (run) => {
+            setStartNodes(null);
+            await loadRuns();
+            setActiveId(run.id);
+          }}
+          onFailed={loadRuns}
+          onClose={() => setStartNodes(null)}
+        />
+      )}
+      {startNodes && !startNodes.includes('review_mining') && (
         <StartRun
           config={config}
           nodes={startNodes}

@@ -11,5 +11,7 @@ export * from "./run-settlement.js";
 export * from "./run-watch.js";
 export * from "./run-agent-factory.js";
 export * from "./run-supervisor.js";
+export * from "./stage-two-handoff.js";
+export * from "./stage-two-plan.js";
 export * from "./prompt/index.js";
 export * from "./tools/index.js";

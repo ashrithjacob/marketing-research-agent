@@ -47,6 +47,13 @@ classDiagram
       listJudgements()
       addJudgement()
     }
+    class GateVerdict {
+      <<interface>>
+    }
+    class FetchGate {
+      <<interface>>
+      admit()
+    }
     class Clock {
       nowIso()
     }
@@ -123,6 +130,10 @@ classDiagram
     class ScopeCheck {
       problems()
     }
+    class StageTwoRoster {
+      of()
+      select()
+    }
     class ZodProblems {
       readable()
     }
@@ -169,6 +180,10 @@ classDiagram
     }
     class Corpus {
       write()
+    }
+    class OpenRouterGate {
+      admit()
+      parse()
     }
     class Firecrawl {
       scrape()
@@ -308,6 +323,9 @@ classDiagram
       packetNudge()
       resume()
     }
+    class RosterBlock {
+      text()
+    }
     class RetryPolicy {
       <<interface>>
     }
@@ -333,6 +351,12 @@ classDiagram
     }
     class RunWatch {
       run()
+    }
+    class StageTwoHandoff {
+      forBrief()
+    }
+    class StageTwoPlanner {
+      plan()
     }
     class ToolsetOptions {
       <<interface>>
@@ -411,6 +435,9 @@ classDiagram
     class RunRoutes {
       register()
     }
+    class StageTwoRoutes {
+      register()
+    }
     class TokenService {
       issue()
       verify()
@@ -419,6 +446,7 @@ classDiagram
   AmazonReviews --> ActorRunner
   AmazonProducts --> ActorRunner
   TrustpilotReviews --> ActorRunner
+  OpenRouterGate --> Settings
   Firecrawl --> Settings
   RunBilling --> OpenRouterPrices
   Searxng --> Settings
@@ -435,6 +463,7 @@ classDiagram
   RunAgentFactory --> PromptBuilder
   RunSettlement --> ResearchStore
   RunSettlement --> LiveRuns
+  StageTwoHandoff --> ResearchStore
   ResearchToolset --> ToolsetOptions
   PacketCheckTool --> PacketCheckOptions
   FindProductTool --> AmazonProducts
@@ -446,6 +475,7 @@ classDiagram
   WebFetchTool --> Settings
   WebFetchTool --> Firecrawl
   WebFetchTool --> Corpus
+  WebFetchTool --> FetchGate
   AuthGate --> Settings
   ConfigRoute --> Settings
   CorpusRoute --> ResearchStore
@@ -455,6 +485,9 @@ classDiagram
   JudgementRoutes --> ResearchStore
   RunRoutes --> ResearchStore
   RunRoutes --> RunSupervisor
+  RunRoutes --> StageTwoHandoff
+  StageTwoRoutes --> StageTwoHandoff
+  StageTwoRoutes --> Settings
 ```
 
 ## Inventory
@@ -469,6 +502,7 @@ classDiagram
 | `adapters` | `adapters/apify/trustpilot-reviews.ts` | TrustpilotReviews |
 | `adapters` | `adapters/apify/types.ts` | ReviewExcerpt, ReviewResult, AmazonProduct |
 | `adapters` | `adapters/corpus.ts` | Corpus |
+| `adapters` | `adapters/fetch-gate.ts` | OpenRouterGate |
 | `adapters` | `adapters/firecrawl.ts` | Firecrawl |
 | `adapters` | `adapters/http.ts` | Http |
 | `adapters` | `adapters/openrouter-prices.ts` | OpenRouterPrices |
@@ -494,11 +528,14 @@ classDiagram
 | `agent` | `agent/prompt/builder.ts` | PromptBuilder |
 | `agent` | `agent/prompt/example-picker.ts` | WorkedExample |
 | `agent` | `agent/prompt/messages.ts` | AgentMessages |
+| `agent` | `agent/prompt/roster-block.ts` | RosterBlock |
 | `agent` | `agent/retry.ts` | RetryPolicy, Retries |
 | `agent` | `agent/run-agent-factory.ts` | RunAgentFactory |
 | `agent` | `agent/run-settlement.ts` | RunSettlement |
 | `agent` | `agent/run-supervisor.ts` | RunSupervisor |
 | `agent` | `agent/run-watch.ts` | RunWatch |
+| `agent` | `agent/stage-two-handoff.ts` | StageTwoHandoff |
+| `agent` | `agent/stage-two-plan.ts` | StageTwoPlanner |
 | `agent` | `agent/tools/factory.ts` | ToolsetOptions, ResearchToolset |
 | `agent` | `agent/tools/lanes.ts` | FetchRecord, PacketCheckOptions |
 | `agent` | `agent/tools/packet-check-tool.ts` | PacketCheckTool |
@@ -510,7 +547,7 @@ classDiagram
 | `domain` | `domain/brief.ts` | Briefs |
 | `domain` | `domain/logs.ts` | RunEvent, Judgement, PacketCheck, RunUpdate, LlmCallRecord, LlmCall |
 | `domain` | `domain/nodes.ts` | Stages |
-| `domain` | `domain/ports.ts` | ResearchStore |
+| `domain` | `domain/ports.ts` | ResearchStore, GateVerdict, FetchGate |
 | `domain` | `domain/records.ts` | Clock, Ids, ResearchRun, RunSummary, Runs |
 | `domain` | `domain/reject-kinds.ts` | RejectKinds |
 | `extract` | `extract/blocks.ts` | JsonBlocks, PacketExtractor |
@@ -523,6 +560,7 @@ classDiagram
 | `extract` | `extract/errors.ts` | PacketError |
 | `extract` | `extract/names.ts` | Names, BrandLabels, Relations |
 | `extract` | `extract/scope-check.ts` | ScopeCheck |
+| `extract` | `extract/stage-two-roster.ts` | StageTwoRoster |
 | `extract` | `extract/validator.ts` | ZodProblems, PacketValidator |
 | `http` | `http/app.ts` | App |
 | `http` | `http/auth-gate.ts` | AuthGate |
@@ -535,4 +573,5 @@ classDiagram
 | `http` | `http/passwords.ts` | Passwords |
 | `http` | `http/research-api.ts` | ResearchApi |
 | `http` | `http/run-routes.ts` | RunRoutes |
+| `http` | `http/stage-two-routes.ts` | StageTwoRoutes |
 | `http` | `http/token-service.ts` | TokenService |

@@ -93,6 +93,7 @@ export class RunSupervisor {
       judgements,
       model,
       pricing,
+      targets: request.targets,
     });
     this.store.updateRun(run.id, {
       agent_run_id: run.id,

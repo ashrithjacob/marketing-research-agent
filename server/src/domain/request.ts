@@ -19,6 +19,7 @@ export const runRequestSchema = z
     model: z.string().default(""),
     reject_kinds: z.array(sourceKindSchema).default([]),
     nodes: z.array(nodeSchema).default([]),
+    targets: z.array(z.string()).default([]),
   })
   .strict();
 export type RunRequest = z.infer<typeof runRequestSchema>;

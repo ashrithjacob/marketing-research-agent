@@ -104,7 +104,7 @@ const CLIENT_ONLY_FIELDS = new Set([
   // parsed from a server response. Add a name here only after checking the
   // server genuinely does not send it.
   "handlers", "onEnd", "onError", "onEvent", "startRun", "stopRun",
-  "logsUrl", "sourceUrl", "arguments", "toolCallId",
+  "logsUrl", "sourceUrl", "arguments", "toolCallId", "stageTwoPlan",
 ]);
 
 // The client's declared server surface: `frontend/src/api.ts`, or the

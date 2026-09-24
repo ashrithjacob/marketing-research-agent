@@ -7,11 +7,13 @@ import {
   Stages,
   type Brief,
   type Judgement,
+  type MiningTarget,
   type Node,
 } from "../../domain/index.js";
 
 import { PromptBlocks, STAGE_NAMES } from "./blocks.js";
 import { WorkedExample } from "./example-picker.js";
+import { RosterBlock } from "./roster-block.js";
 import { OUTPUT } from "./text/output.js";
 import { RULES } from "./text/rules.js";
 import { SYSTEM_PROMPT } from "./text/system.js";
@@ -36,6 +38,8 @@ export class PromptBuilder {
     rejectKinds: readonly string[];
     judgements: readonly Judgement[];
     nodes?: readonly Node[];
+    roster?: readonly MiningTarget[];
+    targets?: readonly string[];
   }): string {
     const { brief, rejectKinds, judgements } = options;
     const nodes = options.nodes ?? STAGE_NODES[1];
@@ -55,6 +59,9 @@ export class PromptBuilder {
         .replace("{gap_nodes}", PromptBlocks.gapNodes(nodes)),
     ];
     if (Stages.isPartial(nodes)) parts.push(PromptBlocks.scope(nodes));
+    if (options.roster && options.roster.length > 0) {
+      parts.push(RosterBlock.text(options.roster, options.targets ?? []));
+    }
     if (judgements.length > 0) parts.push(PromptBlocks.judgements(judgements));
     parts.push(PromptBlocks.brief(brief));
     parts.push(this.output(nodes, stage));

@@ -3,6 +3,7 @@ export * from "./vocabulary.js";
 export * from "./brief.js";
 export * from "./evidence.js";
 export * from "./packet.js";
+export * from "./stage-two.js";
 export * from "./request.js";
 export * from "./records.js";
 export * from "./logs.js";

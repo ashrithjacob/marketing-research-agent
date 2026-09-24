@@ -1,6 +1,6 @@
 import type { Context, Hono } from "hono";
 
-import { RunError, RunSupervisor } from "../agent/index.js";
+import { RunError, RunSupervisor, type StageTwoHandoff } from "../agent/index.js";
 import {
   Briefs,
   type ResearchStore,
@@ -17,6 +17,7 @@ export class RunRoutes {
   constructor(
     private readonly store: ResearchStore,
     private readonly supervisor: RunSupervisor,
+    private readonly handoff: StageTwoHandoff,
   ) {}
 
   register(api: Hono): void {
@@ -63,18 +64,14 @@ export class RunRoutes {
     }
     const nodes = Stages.expand(parsed.data.nodes);
     if ((Stages.covering(nodes) ?? 1) === 2) {
-      const key = Briefs.key(brief);
-      const done = this.store
-        .listRuns(200)
-        .some(
-          (r) => r.stage === 1 && r.status === "completed" && Briefs.key(r.brief as any) === key,
-        );
-      if (!done) {
+      const source = this.handoff.forBrief(brief);
+      if (!source) {
         return c.json(
           {
             detail:
               "review mining is stage 2: run stage 1 for this brief first, and let it " +
-              "complete. Stage 1 names the product and finds the listings stage 2 mines.",
+              "complete — its packet names the listings stage 2 mines. No stage-1 packet " +
+              "exists for this subject yet.",
           },
           409,
         );

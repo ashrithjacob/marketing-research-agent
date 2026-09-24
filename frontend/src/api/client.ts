@@ -2,6 +2,7 @@ import type { CallsResponse } from './calls';
 import type { Config } from './config';
 import type { Judgement } from './judgements';
 import type { Brief, ResearchNode, RunDetail, RunSummary } from './runs';
+import type { StageTwoPlanResponse } from './stage-two';
 
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, {
@@ -34,10 +35,15 @@ export const api = {
   config: () => request<Config>('/api/research/config'),
   runs: () => request<{ data: RunSummary[] }>('/api/research/runs'),
   run: (id: string) => request<RunDetail>(`/api/research/runs/${id}`),
-  startRun: (brief: Brief, nodes: ResearchNode[] = [], model = '') =>
+  startRun: (brief: Brief, nodes: ResearchNode[] = [], model = '', targets: string[] = []) =>
     request<RunSummary>('/api/research/runs', {
       method: 'POST',
-      body: JSON.stringify({ brief, model, nodes }),
+      body: JSON.stringify({ brief, model, nodes, targets }),
+    }),
+  stageTwoPlan: (brief: Brief, targets: string[] = []) =>
+    request<StageTwoPlanResponse>('/api/research/stage2/plan', {
+      method: 'POST',
+      body: JSON.stringify({ brief, targets }),
     }),
   /** Every LLM call, or only those after `after` (a seq), plus the run's totals. */
   calls: (id: string, after = 0) =>

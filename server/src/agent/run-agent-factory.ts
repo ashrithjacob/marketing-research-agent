@@ -3,7 +3,14 @@ import type { Api, Model, Models } from "@earendil-works/pi-ai";
 
 import { OpenRouterPrices, type Pricing } from "../adapters/index.js";
 import type { Settings } from "../config/index.js";
-import type { Brief, Judgement, Node, ResearchStore, SourceKind } from "../domain/index.js";
+import type {
+  Brief,
+  Judgement,
+  Node,
+  ResearchStore,
+  SourceKind,
+} from "../domain/index.js";
+import { Stages } from "../domain/index.js";
 
 import { BilledCosts } from "./billed-costs.js";
 import { LlmCallLog } from "./llm-call-log.js";
@@ -11,10 +18,14 @@ import type { LiveRuns } from "./live-runs.js";
 import type { PromptBuilder } from "./prompt/index.js";
 import type { RetryPolicy } from "./retry.js";
 import { RunWatch } from "./run-watch.js";
+import { StageTwoHandoff } from "./stage-two-handoff.js";
 import { ResearchToolset } from "./tools/index.js";
+import { StageTwoRoster } from "../extract/index.js";
 
 /** Builds one run's Agent — priced model, traced stream, the tools its nodes allow — and starts its watch. */
 export class RunAgentFactory {
+  private readonly handoff: StageTwoHandoff;
+
   constructor(
     private readonly settings: Settings,
     private readonly store: ResearchStore,
@@ -23,7 +34,9 @@ export class RunAgentFactory {
     private readonly costs: OpenRouterPrices,
     private readonly retry: RetryPolicy,
     private readonly prompts: PromptBuilder,
-  ) {}
+  ) {
+    this.handoff = new StageTwoHandoff(store);
+  }
 
   assemble<TApi extends Api>(
     runId: string,
@@ -34,9 +47,13 @@ export class RunAgentFactory {
       judgements: readonly Judgement[];
       model: Model<TApi>;
       pricing: Pricing;
+      targets?: readonly string[];
     },
   ): { agent: Agent; done: Promise<void> } {
     const { nodes, model, pricing } = options;
+    const stageTwo = Stages.covering(nodes) === 2;
+    const source = stageTwo ? this.handoff.forBrief(options.brief) : null;
+    const roster = source ? StageTwoRoster.of(source.packet) : [];
     const watch = new RunWatch({
       store: this.store,
       runs: this.runs,
@@ -82,6 +99,8 @@ export class RunAgentFactory {
       rejectKinds: options.rejectKinds,
       judgements: options.judgements,
       nodes,
+      roster,
+      targets: options.targets,
     });
     return { agent, done: watch.run(agent, instructions, billed.attach) };
   }
