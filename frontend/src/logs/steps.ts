@@ -90,11 +90,30 @@ function milestoneText(event: RunEvent): { text: string; cls: string } {
   }
 }
 
-/** Events → boxes. An `llm.call` opens a turn; its tools and reasoning hang under it. */
+/** Content events open a turn box on arrival; the `llm.call` event fills in seq and cost when the turn lands. */
 export function buildSteps(events: RunEvent[]): Step[] {
   const steps: Step[] = [];
   let turn: Step | null = null;
+  let turnCount = 0;
   const running = new Map<string, ToolRow[]>();
+
+  /** Keys are positional, so filling a box in later never remounts it. */
+  const openTurn = (at: string): Step => {
+    const step: Step = {
+      key: `turn-${turnCount++}`,
+      kind: 'turn',
+      seq: null,
+      startedAt: at,
+      tools: [],
+      reasoning: [],
+      message: '',
+      text: '',
+      cls: '',
+      error: '',
+    };
+    steps.push(step);
+    return step;
+  };
 
   const startRow = (tool: string, row: ToolRow) => {
     const queue = running.get(tool) ?? [];
@@ -117,22 +136,18 @@ export function buildSteps(events: RunEvent[]): Step[] {
   for (const event of events) {
     const p = event.payload as Record<string, unknown>;
     if (event.kind === 'llm.call') {
-      turn = {
-        key: `turn-${event.id}`,
-        kind: 'turn',
-        seq: Number(p.seq),
-        startedAt: event.created_at,
-        tools: [],
-        reasoning: [],
-        message: '',
-        text: '',
-        cls: '',
-        error: String(p.error ?? ''),
-      };
-      steps.push(turn);
+      if (turn && turn.seq === null) {
+        turn.seq = Number(p.seq);
+        turn.error = String(p.error ?? '');
+      } else {
+        turn = openTurn(event.created_at);
+        turn.seq = Number(p.seq);
+        turn.error = String(p.error ?? '');
+      }
       continue;
     }
     if (event.kind === 'tool.started') {
+      if (!turn) turn = openTurn(event.created_at);
       const row: ToolRow = {
         key: `${event.id}`,
         tool: String(p.tool ?? ''),
@@ -141,7 +156,7 @@ export function buildSteps(events: RunEvent[]): Step[] {
         state: 'running',
       };
       startRow(row.tool, row);
-      if (turn) turn.tools.push(row);
+      turn.tools.push(row);
       continue;
     }
     if (event.kind === 'tool.completed') {
@@ -149,11 +164,13 @@ export function buildSteps(events: RunEvent[]): Step[] {
       continue;
     }
     if (event.kind === 'reasoning.available') {
-      if (turn) turn.reasoning.push(String(p.text ?? ''));
+      if (!turn) turn = openTurn(event.created_at);
+      turn.reasoning.push(String(p.text ?? ''));
       continue;
     }
     if (event.kind === 'message.delta') {
-      if (turn) turn.message += String(p.delta ?? '');
+      if (!turn) turn = openTurn(event.created_at);
+      turn.message += String(p.delta ?? '');
       continue;
     }
     if (event.kind === 'run.billed' && turn && steps.length > 0) {
@@ -178,7 +195,11 @@ export function buildSteps(events: RunEvent[]): Step[] {
 
 export function turnSummary(step: Step): string {
   if (step.error) return `LLM call failed — ${step.error}`;
-  if (step.tools.length === 0) return 'Thought, then answered';
+  if (step.tools.length === 0) {
+    return step.seq === null
+      ? 'Thinking — the model is still answering'
+      : 'Thought, then answered';
+  }
   const counts = new Map<string, number>();
   for (const tool of step.tools) counts.set(tool.tool, (counts.get(tool.tool) ?? 0) + 1);
   return [...counts.entries()].map(([tool, count]) => toolLabel(tool, count)).join(' · ');

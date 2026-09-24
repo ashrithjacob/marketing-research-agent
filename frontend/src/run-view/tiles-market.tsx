@@ -1,4 +1,4 @@
-import { Fragment } from 'react';
+import { useState } from 'react';
 import type {
   Competitor,
   Excerpt,
@@ -9,23 +9,22 @@ import type {
 } from '../api';
 import { BarList } from './charts';
 import { Chip, Tile, TileGaps } from './tile';
+import { SourceRow } from './packet-sections';
 
-const AWARENESS = ['Unaware', 'Problem', 'Solution', 'Product', 'Most'];
+type Focus = 'direct' | 'indirect' | 'sources' | 'gaps' | null;
 
 function CompetitorRow({ competitor: c }: { competitor: Competitor }) {
   const ads = c.ad_source_ids?.length ?? 0;
   return (
     <div className="comp">
-      <div className="comp-top">
-        <a href={c.url} target="_blank" rel="noreferrer" className="comp-name">
-          {c.name}
-        </a>
+      <a href={c.url} target="_blank" rel="noreferrer" className="comp-name">
+        {c.name} <span className="comp-open">↗</span>
+      </a>
+      <div className="comp-facts">
         <span className="comp-form">
           {c.form}
           {c.form_as_printed ? ` · ${c.form_as_printed}` : ''}
         </span>
-      </div>
-      <div className="comp-facts">
         <span>shares {c.shared_actives.join(', ')}</span>
         {c.dose_per_serving && <span>{c.dose_per_serving}</span>}
         {c.price && (
@@ -66,35 +65,55 @@ function shortLabel(period: string): string {
 }
 
 export function CompetitorsTile({
+  runId,
   packet,
   measurements,
   excerpts,
   sources,
   gaps,
 }: {
+  runId: string;
   packet: StagePacket;
   measurements: Measurement[];
   excerpts: Excerpt[];
   sources: Source[];
   gaps: Gap[];
 }) {
+  const [focus, setFocus] = useState<Focus>(null);
+  const pick = (f: Focus) => setFocus(focus === f ? null : f);
   const reference = packet.competitor_reference ?? null;
   const rows = packet.competitors ?? [];
   const curves = packet.saturation.filter((s) => s.node === 'competitors');
   const direct = rows.filter((c) => c.relation === 'direct').length;
   const indirect = rows.filter((c) => c.relation === 'indirect').length;
+  const chips = (
+    <>
+      <Chip tone="accent" onClick={() => pick('direct')} active={focus === 'direct'}>{direct} direct</Chip>
+      <Chip tone="infer" onClick={() => pick('indirect')} active={focus === 'indirect'}>{indirect} indirect</Chip>
+      <Chip onClick={() => pick('sources')} active={focus === 'sources'}>
+        {sources.length} {sources.length === 1 ? 'source' : 'sources'}
+      </Chip>
+      {gaps.length > 0 && (
+        <Chip tone="warn" onClick={() => pick('gaps')} active={focus === 'gaps'}>
+          {gaps.length} gaps
+        </Chip>
+      )}
+    </>
+  );
+  const head = reference && (
+    <p className="comp-ref">
+      Measured against <b>{reference.name}</b> — {reference.form}
+      {reference.form_as_printed ? ` (${reference.form_as_printed})` : ''} ·{' '}
+      {reference.actives.join(', ')}
+    </p>
+  );
   return (
     <Tile
       label="Competitors"
       sub="direct = same form, indirect = different form"
-      chips={
-        <>
-          <Chip tone="accent">{direct} direct</Chip>
-          <Chip tone="infer">{indirect} indirect</Chip>
-          <Chip>{sources.length} {sources.length === 1 ? "source" : "sources"}</Chip>
-          {gaps.length > 0 && <Chip tone="warn">{gaps.length} gaps</Chip>}
-        </>
-      }
+      open={focus !== null ? true : undefined}
+      onToggle={focus !== null ? () => setFocus(null) : undefined}
+      chips={chips}
       preview={
         <div className="tile-headline">
           <div className="tile-big">
@@ -108,42 +127,54 @@ export function CompetitorsTile({
         </div>
       }
     >
-      {reference && (
-        <p className="comp-ref">
-          Measured against <b>{reference.name}</b> — {reference.form}
-          {reference.form_as_printed ? ` (${reference.form_as_printed})` : ''} ·{' '}
-          {reference.actives.join(', ')}
-        </p>
-      )}
-      <SocialProof measurements={measurements} />
-      {(['direct', 'indirect'] as const).map((relation) => {
-        const group = rows.filter((c) => c.relation === relation);
-        const curve = curves.find((s) => s.class === relation);
-        return (
-          <div key={relation} className="comp-group">
-            <div className="comp-head">
-              <span className={`comp-tag ${relation}`}>{relation}</span>
-              <span>
-                {group.length} found
-                {curve?.stopped_because ? ` · ${curve.stopped_because}` : ''}
-              </span>
-            </div>
-            {group.length === 0 && <p className="muted">None recorded.</p>}
-            {group.map((c) => (
-              <CompetitorRow key={c.id} competitor={c} />
-            ))}
-          </div>
-        );
-      })}
-      <TileGaps gaps={gaps} />
-      {excerpts.length > 0 && (
-        <>
-          <h3>Excerpts</h3>
-          {excerpts.slice(0, 8).map((excerpt) => (
-            <div key={excerpt.id} className="item">
-              <div className="q">“{excerpt.text}”</div>
-            </div>
+      {(focus === null || focus === 'direct' || focus === 'indirect') && head}
+      {focus === 'sources' && (
+        <div className="src-list">
+          {sources.map((source) => (
+            <SourceRow key={source.id} runId={runId} source={source} />
           ))}
+        </div>
+      )}
+      {focus === 'gaps' && <TileGaps gaps={gaps} force />}
+      {(focus === null || focus === 'direct' || focus === 'indirect') && (
+        <>
+          {focus === null && <SocialProof measurements={measurements} />}
+          {(['direct', 'indirect'] as const)
+            .filter((relation) => focus === null || focus === relation)
+            .map((relation) => {
+              const group = rows.filter((c) => c.relation === relation);
+              const curve = curves.find((s) => s.class === relation);
+              return (
+                <div key={relation} className="comp-group">
+                  <div className="comp-head">
+                    <span className={`comp-tag ${relation}`}>{relation}</span>
+                    <span>
+                      {group.length} found
+                      {curve?.stopped_because ? ` · ${curve.stopped_because}` : ''}
+                    </span>
+                  </div>
+                  {group.length === 0 && <p className="muted">None recorded.</p>}
+                  {group.map((c) => (
+                    <CompetitorRow key={c.id} competitor={c} />
+                  ))}
+                </div>
+              );
+            })}
+        </>
+      )}
+      {focus === null && (
+        <>
+          <TileGaps gaps={gaps} />
+          {excerpts.length > 0 && (
+            <>
+              <h3>Excerpts</h3>
+              {excerpts.slice(0, 8).map((excerpt) => (
+                <div key={excerpt.id} className="item">
+                  <div className="q">“{excerpt.text}”</div>
+                </div>
+              ))}
+            </>
+          )}
         </>
       )}
     </Tile>
@@ -151,11 +182,18 @@ export function CompetitorsTile({
 }
 
 export function VoiceTile({ voice }: { voice: Excerpt[] }) {
+  const [open, setOpen] = useState(false);
   return (
     <Tile
       label="Voice of customer"
       sub="verbatim, never paraphrased"
-      chips={<Chip>{voice.length} quotes</Chip>}
+      open={open}
+      onToggle={() => setOpen((o) => !o)}
+      chips={
+        <Chip onClick={() => setOpen((o) => !o)} active={open}>
+          {voice.length} quotes
+        </Chip>
+      }
       preview={
         voice[0] ? (
           <div className="tile-headline">
@@ -183,47 +221,3 @@ export function VoiceTile({ voice }: { voice: Excerpt[] }) {
   );
 }
 
-export function AngleMapTile() {
-  return (
-    <Tile
-      label="Angle map"
-      sub="avatar × awareness — stage 4"
-      chips={<Chip tone="dim">not built</Chip>}
-    >
-      <div className="grid">
-        <div />
-        {AWARENESS.map((a) => (
-          <div key={a} className="gh">
-            {a}
-          </div>
-        ))}
-        {[0, 1, 2, 3].map((row) => (
-          <Fragment key={row}>
-            <div className="rh">—</div>
-            {AWARENESS.map((_, col) => (
-              <div key={col} className="cell no" />
-            ))}
-          </Fragment>
-        ))}
-      </div>
-      <div className="legend">
-        <span>
-          <i className="sw" style={{ background: 'rgba(5, 150, 105, 0.4)' }} />
-          evidenced
-        </span>
-        <span>
-          <i className="sw" style={{ background: 'rgba(124, 58, 237, 0.4)' }} />
-          inferred
-        </span>
-        <span>
-          <i className="sw" style={{ background: 'var(--panel-2)' }} />
-          empty
-        </span>
-      </div>
-      <p className="muted">
-        Fills in when stage 4 is built — the same reason stages 2–5 sit greyed
-        out on the rail.
-      </p>
-    </Tile>
-  );
-}

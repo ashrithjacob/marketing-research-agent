@@ -12,9 +12,9 @@ import {
 } from './api';
 import { ChatText } from './FileBox';
 import { nowPanel } from './run-view/now';
-import { SourcesSection } from './run-view/packet-sections';
 import { RailColumn } from './run-view/rail';
-import { AngleMapTile, CompetitorsTile, VoiceTile } from './run-view/tiles-market';
+import { AngleMapTile } from './run-view/tiles-angle';
+import { CompetitorsTile, VoiceTile } from './run-view/tiles-market';
 import { CategoryTile, ProductTile } from './run-view/tiles-data';
 
 export default function RunView({
@@ -76,7 +76,6 @@ export default function RunView({
   const live = !!run && !TERMINAL_STATUSES.has(run.status);
   const sources = packet?.sources ?? [];
   const admitted = useMemo(() => sources.filter((s) => s.admitted), [sources]);
-  const rejected = useMemo(() => sources.filter((s) => !s.admitted), [sources]);
   const unarchived = useMemo(
     () => admitted.filter((s) => !s.archived).length,
     [admitted],
@@ -172,6 +171,7 @@ export default function RunView({
           <div className="tiles">
             {nodesInRun.has('product_data') && (
               <ProductTile
+                runId={runId}
                 packet={packet}
                 attributes={byNode.attributes.product_data ?? []}
                 measurements={byNode.measurements.product_data ?? []}
@@ -182,6 +182,7 @@ export default function RunView({
             )}
             {showCompetitors && (
               <CompetitorsTile
+                runId={runId}
                 packet={packet}
                 measurements={byNode.measurements.competitors ?? []}
                 excerpts={byNode.excerpts.competitors ?? []}
@@ -191,6 +192,7 @@ export default function RunView({
             )}
             {nodesInRun.has('category_data') && (
               <CategoryTile
+                runId={runId}
                 measurements={byNode.measurements.category_data ?? []}
                 sources={byNode.sources.category_data ?? []}
                 gaps={byNode.gaps.category_data ?? []}
@@ -201,15 +203,6 @@ export default function RunView({
             )}
             <AngleMapTile />
           </div>
-        )}
-
-        {packet && (
-          <SourcesSection
-            runId={runId}
-            sources={sources}
-            admitted={admitted}
-            rejected={rejected}
-          />
         )}
 
         {run.status === 'invalid' && (

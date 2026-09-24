@@ -1,6 +1,50 @@
+import { useState } from 'react';
 import type { AttributeRecord, Excerpt, Gap, Measurement, Source, StagePacket } from '../api';
 import { Chip, Tile, TileGaps } from './tile';
 import { MeasurementBars } from './charts';
+import { SourceRow } from './packet-sections';
+
+type Focus = 'facts' | 'sources' | 'gaps' | null;
+
+function FocusChips({
+  focus,
+  setFocus,
+  facts,
+  sources,
+  gaps,
+}: {
+  focus: Focus;
+  setFocus: (f: Focus) => void;
+  facts: string;
+  sources: Source[];
+  gaps: Gap[];
+}) {
+  const pick = (f: Focus) => setFocus(focus === f ? null : f);
+  return (
+    <>
+      <Chip onClick={() => pick('facts')} active={focus === 'facts'}>{facts}</Chip>
+      <Chip onClick={() => pick('sources')} active={focus === 'sources'}>
+        {sources.length} {sources.length === 1 ? 'source' : 'sources'}
+      </Chip>
+      {gaps.length > 0 && (
+        <Chip tone="warn" onClick={() => pick('gaps')} active={focus === 'gaps'}>
+          {gaps.length} gaps
+        </Chip>
+      )}
+    </>
+  );
+}
+
+function SourcesFocus({ runId, sources }: { runId: string; sources: Source[] }) {
+  if (sources.length === 0) return <p className="muted">No sources fed this tile.</p>;
+  return (
+    <div className="src-list">
+      {sources.map((source) => (
+        <SourceRow key={source.id} runId={runId} source={source} />
+      ))}
+    </div>
+  );
+}
 
 function ExcerptList({ excerpts }: { excerpts: Excerpt[] }) {
   if (excerpts.length === 0) return null;
@@ -22,6 +66,7 @@ function ExcerptList({ excerpts }: { excerpts: Excerpt[] }) {
 }
 
 export function ProductTile({
+  runId,
   packet,
   attributes,
   measurements,
@@ -29,6 +74,7 @@ export function ProductTile({
   sources,
   gaps,
 }: {
+  runId: string;
   packet: StagePacket;
   attributes: AttributeRecord[];
   measurements: Measurement[];
@@ -36,19 +82,17 @@ export function ProductTile({
   sources: Source[];
   gaps: Gap[];
 }) {
+  const [focus, setFocus] = useState<Focus>(null);
   const name = attributes.find((a) => a.key === 'name')?.value ?? packet.competitor_reference?.name;
   const form = packet.competitor_reference?.form;
+  const facts = `${attributes.length + measurements.length} facts`;
   return (
     <Tile
       label="Product data"
       sub="read off the product's own pages"
-      chips={
-        <>
-          <Chip>{attributes.length} facts</Chip>
-          <Chip>{sources.length} {sources.length === 1 ? "source" : "sources"}</Chip>
-          {gaps.length > 0 && <Chip tone="warn">{gaps.length} gaps</Chip>}
-        </>
-      }
+      open={focus !== null ? true : undefined}
+      onToggle={focus !== null ? () => setFocus(null) : undefined}
+      chips={<FocusChips focus={focus} setFocus={setFocus} facts={facts} sources={sources} gaps={gaps} />}
       preview={
         <div className="tile-headline">
           {name && <div className="tile-big">{name}</div>}
@@ -57,31 +101,43 @@ export function ProductTile({
       }
       defaultOpen
     >
-      <div className="kv">
-        {attributes.map((attribute) => (
-          <div key={attribute.id} className="kv-row">
-            <span className="k">{attribute.key.replace(/_/g, ' ')}</span>
-            <span className="v">{attribute.value}</span>
+      {(focus === null || focus === 'facts') && (
+        <>
+          <div className="kv">
+            {attributes.map((attribute) => (
+              <div key={attribute.id} className="kv-row">
+                <span className="k">{attribute.key.replace(/_/g, ' ')}</span>
+                <span className="v">{attribute.value}</span>
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
-      <MeasurementBars measurements={measurements} />
-      <h3>Excerpts</h3>
-      <ExcerptList excerpts={excerpts} />
-      <TileGaps gaps={gaps} />
+          <MeasurementBars measurements={measurements} />
+        </>
+      )}
+      {focus === null && (
+        <>
+          <h3>Excerpts</h3>
+          <ExcerptList excerpts={excerpts} />
+        </>
+      )}
+      {focus === 'sources' && <SourcesFocus runId={runId} sources={sources} />}
+      {(focus === 'gaps' || (focus === null && gaps.length > 0)) && <TileGaps gaps={gaps} />}
     </Tile>
   );
 }
 
 export function CategoryTile({
+  runId,
   measurements,
   sources,
   gaps,
 }: {
+  runId: string;
   measurements: Measurement[];
   sources: Source[];
   gaps: Gap[];
 }) {
+  const [focus, setFocus] = useState<Focus>(null);
   const marketSize = measurements.filter((m) => m.metric === 'market_size');
   const cagr = measurements.find((m) => m.metric === 'market_cagr');
   const search = measurements.find((m) => m.metric === 'search_volume');
@@ -97,13 +153,9 @@ export function CategoryTile({
     <Tile
       label="Category data"
       sub="market size, demand, trend"
-      chips={
-        <>
-          <Chip>{measurements.length} figures</Chip>
-          <Chip>{sources.length} {sources.length === 1 ? "source" : "sources"}</Chip>
-          {gaps.length > 0 && <Chip tone="warn">{gaps.length} gaps</Chip>}
-        </>
-      }
+      open={focus !== null ? true : undefined}
+      onToggle={focus !== null ? () => setFocus(null) : undefined}
+      chips={<FocusChips focus={focus} setFocus={setFocus} facts={`${measurements.length} figures`} sources={sources} gaps={gaps} />}
       preview={
         <div className="tile-headline">
           {marketSize.length > 0 && (
@@ -120,20 +172,25 @@ export function CategoryTile({
         </div>
       }
     >
-      <MeasurementBars measurements={measurements} />
-      <h3>Every figure, with its period</h3>
-      <div className="kv">
-        {measurements.map((m) => (
-          <div key={m.id} className="kv-row">
-            <span className="k">{m.metric.replace(/_/g, ' ')}</span>
-            <span className="v">
-              {m.value} {m.unit}
-              {m.period ? ` · ${m.period}` : ''}
-            </span>
+      {(focus === null || focus === 'facts') && (
+        <>
+          <MeasurementBars measurements={measurements} />
+          <h3>Every figure, with its period</h3>
+          <div className="kv">
+            {measurements.map((m) => (
+              <div key={m.id} className="kv-row">
+                <span className="k">{m.metric.replace(/_/g, ' ')}</span>
+                <span className="v">
+                  {m.value} {m.unit}
+                  {m.period ? ` · ${m.period}` : ''}
+                </span>
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
-      <TileGaps gaps={gaps} />
+        </>
+      )}
+      {focus === 'sources' && <SourcesFocus runId={runId} sources={sources} />}
+      {(focus === 'gaps' || (focus === null && gaps.length > 0)) && <TileGaps gaps={gaps} />}
     </Tile>
   );
 }
