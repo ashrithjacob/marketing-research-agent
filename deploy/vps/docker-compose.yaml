@@ -54,6 +54,10 @@ services:
       - MRA_MODEL=${MRA_MODEL:-z-ai/glm-5.3-flash}
       - SEARXNG_URL=http://searxng:8080
       - FIRECRAWL_API_KEY=${FIRECRAWL_API_KEY:?FIRECRAWL_API_KEY is not set}
+      # Cheap pre-read gate over every fetch; empty disables. Fails open.
+      - MRA_GATE_MODEL=${MRA_GATE_MODEL:-}
+      - MRA_GATE_CHAR_LIMIT=${MRA_GATE_CHAR_LIMIT:-4000}
+      - MRA_GATE_TIMEOUT_SECONDS=${MRA_GATE_TIMEOUT_SECONDS:-12}
       # Review mining only, and deliberately NOT `:?` like the two above. This
       # key spends against a card with no allowance rather than per-token
       # inference, so an absent one withholds the three review tools from the

@@ -98,6 +98,13 @@ services:
       # nothing but search snippets.
       - SEARXNG_URL=http://searxng:8080
       - FIRECRAWL_API_KEY=${FIRECRAWL_API_KEY}
+      # Cheap pre-read gate: every fetched page passes a small model before it
+      # reaches the researcher's context. Empty disables the gate (tools then
+      # behave as before). :free models cost nothing but can rate-limit; the
+      # gate fails open, so an outage degrades to no gate, never a dead run.
+      - MRA_GATE_MODEL=${MRA_GATE_MODEL:-}
+      - MRA_GATE_CHAR_LIMIT=${MRA_GATE_CHAR_LIMIT:-4000}
+      - MRA_GATE_TIMEOUT_SECONDS=${MRA_GATE_TIMEOUT_SECONDS:-12}
       # Review mining. Unset is fine and is the default: the three review tools
       # are then withheld from the agent entirely, rather than offered and
       # failing on call — stage 1 gaps `review_mining` and says why. Amazon is

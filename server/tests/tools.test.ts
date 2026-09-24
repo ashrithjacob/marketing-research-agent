@@ -8,8 +8,9 @@
  * the bytes written turns that audit into a permanent false negative.
  */
 
-import { readFileSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { Corpus } from "../src/adapters/corpus.js";
+import { Firecrawl } from "../src/adapters/firecrawl.js";
 import { createHash } from "node:crypto";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -25,6 +26,7 @@ import { Env, type Settings } from "../src/config/index.js";
 import {
   ResearchToolset,
   ReviewRendering,
+  WebFetchTool,
   type ToolsetOptions,
 } from "../src/agent/tools/index.js";
 import {
@@ -432,6 +434,61 @@ describe("review volume is bounded by the server, not the agent", () => {
     expect(ReviewRendering.limit(-5, 10)).toBe(1);
     expect(ReviewRendering.limit(7.9, 10)).toBe(7);
     expect(ReviewRendering.limit(Number.NaN, 10)).toBe(10);
+  });
+});
+
+describe("the fetch gate", () => {
+  const markdown = (body: string, title = "A page") =>
+    json({ success: true, data: { markdown: body, metadata: { title } } });
+  const gate = (admit: boolean, reason: string) => ({
+    admit: vi.fn(async () => ({ admit, reason, model: "test-gate", ms: 5 })),
+  });
+  const gated = (g: ReturnType<typeof gate>, onFetch?: (r: any) => void) =>
+    new WebFetchTool(
+      settings,
+      new Firecrawl(settings),
+      new Corpus(settings.corpusPath),
+      "run-gate",
+      onFetch,
+      g,
+      "Mullein leaf capsules",
+      "UK",
+    ).tool();
+
+  it("is absent when no gate model is configured, so tools behave as before", async () => {
+    expect(settings.gateModel).toBe("");
+    stubFetch(() => markdown("text"));
+    const result = await tools("run-g").fetch.execute("1", { url: "https://a.example" });
+    expect(result.details.source_id).toMatch(/^sha256:/);
+  });
+
+  it("hands the gate the page and the brief, and archives on admit", async () => {
+    const g = gate(true, "product page");
+    stubFetch(() => markdown("the readable text"));
+    const result = await gated(g).execute("1", { url: "https://a.example" });
+    expect(g.admit).toHaveBeenCalledWith(
+      expect.objectContaining({ subject: "Mullein leaf capsules", market: "UK" }),
+    );
+    expect(result.details.filtered).toBeUndefined();
+    expect(result.details.source_id).toMatch(/^sha256:/);
+  });
+
+  it("blocks without archiving, and tells the agent to move on", async () => {
+    const g = gate(false, "captcha wall");
+    stubFetch(() => markdown("verifying your connection"));
+    const onFetch = vi.fn();
+    const result = await gated(g, onFetch).execute("1", { url: "https://a.example" });
+    const text = (result.content[0] as any).text as string;
+    expect(text).toMatch(/^FILTERED/);
+    expect(text).toContain("captcha wall");
+    expect(text).toContain("Do not record it");
+    expect(result.details.filtered).toBe(true);
+    expect(result.details.source_id).toBe("");
+    expect(onFetch).toHaveBeenCalledWith(
+      expect.objectContaining({ filtered: true, gate_reason: expect.stringContaining("captcha") }),
+    );
+    const sourcesDir = join(settings.corpusPath, "runs", "run-gate", "sources");
+    expect(existsSync(sourcesDir) ? readdirSync(sourcesDir) : []).toEqual([]);
   });
 });
 

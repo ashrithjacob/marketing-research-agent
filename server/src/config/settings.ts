@@ -13,6 +13,9 @@ export interface Settings {
   firecrawlBaseUrl: string;
   webTimeoutSeconds: number;
   fetchCharLimit: number;
+  gateModel: string;
+  gateCharLimit: number;
+  gateTimeoutSeconds: number;
 
   apifyToken: string;
   apifyMaxReviews: number;
@@ -66,6 +69,9 @@ export class Env {
       firecrawlBaseUrl: Env.text("FIRECRAWL_BASE_URL", "https://api.firecrawl.dev"),
       webTimeoutSeconds: Env.number("MRA_WEB_TIMEOUT_SECONDS", 90),
       fetchCharLimit: Env.number("MRA_FETCH_CHAR_LIMIT", 25000),
+      gateModel: Env.text("MRA_GATE_MODEL", ""),
+      gateCharLimit: Env.number("MRA_GATE_CHAR_LIMIT", 4000),
+      gateTimeoutSeconds: Env.number("MRA_GATE_TIMEOUT_SECONDS", 12),
 
       apifyToken: Env.text("APIFY_TOKEN", ""),
       apifyMaxReviews: Env.number("MRA_APIFY_MAX_REVIEWS", 10),
