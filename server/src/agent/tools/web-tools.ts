@@ -4,6 +4,7 @@ import { Corpus } from "../../adapters/corpus.js";
 import { Firecrawl } from "../../adapters/firecrawl.js";
 import { Searxng } from "../../adapters/searxng.js";
 import type { Settings } from "../../config/index.js";
+import type { FetchGate } from "../../domain/index.js";
 
 import type { FetchRecord } from "./lanes.js";
 import { fetchParameters, searchParameters } from "./parameters.js";
@@ -49,10 +50,13 @@ export class WebFetchTool {
     private readonly corpus: Corpus,
     private readonly runId: string,
     private readonly onFetch?: (record: FetchRecord) => void,
+    private readonly gate?: FetchGate,
+    private readonly subject = "",
+    private readonly market = "",
   ) {}
 
   tool(): AgentTool<typeof fetchParameters> {
-    const { settings, firecrawl, corpus, runId, onFetch } = this;
+    const { settings, firecrawl, corpus, runId, onFetch, gate, subject, market } = this;
     return {
       name: "web_fetch",
       label: "Fetch page",
@@ -64,6 +68,42 @@ export class WebFetchTool {
       parameters: fetchParameters,
       async execute(_id, params, signal) {
         const { text, title } = await firecrawl.scrape(params.url, signal);
+
+        if (gate) {
+          const verdict = await gate.admit({
+            url: params.url,
+            title,
+            body: text,
+            subject,
+            market,
+          });
+          if (!verdict.admit) {
+            const filtered: FetchRecord = {
+              source_id: "",
+              url: params.url,
+              title,
+              archived: false,
+              chars: text.length,
+              truncated: false,
+              filtered: true,
+              gate_reason: `${verdict.reason} (${verdict.model}, ${verdict.ms}ms)`,
+            };
+            onFetch?.(filtered);
+            return {
+              content: [
+                {
+                  type: "text",
+                  text:
+                    `FILTERED — a relevance gate read this page before you and ` +
+                    `blocked it: ${verdict.reason}. Do not record it as a source ` +
+                    "and do not cite it; fetch a different url instead.",
+                },
+              ],
+              details: filtered,
+            };
+          }
+        }
+
         const { sourceId, archived } = await corpus.write(runId, text);
         const truncated = text.length > settings.fetchCharLimit;
         const shown = truncated ? text.slice(0, settings.fetchCharLimit) : text;

@@ -7,6 +7,8 @@ export interface FetchRecord {
   archived: boolean;
   chars: number;
   truncated: boolean;
+  filtered?: boolean;
+  gate_reason?: string;
 }
 
 export type ToolLane = "search" | "fetch" | "other";

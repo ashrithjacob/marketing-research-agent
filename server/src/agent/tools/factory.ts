@@ -9,6 +9,7 @@ import {
 } from "../../adapters/apify/index.js";
 import { Corpus } from "../../adapters/corpus.js";
 import { Firecrawl } from "../../adapters/firecrawl.js";
+import { OpenRouterGate } from "../../adapters/fetch-gate.js";
 import { Searxng } from "../../adapters/searxng.js";
 import type { Settings } from "../../config/index.js";
 
@@ -29,6 +30,8 @@ export interface ToolsetOptions {
   actorRunner?: ActorRunner | null;
   reviewTools?: boolean;
   productSearch?: boolean;
+  subject?: string;
+  market?: string;
 }
 
 /** The tools one run gets; without an Apify runner the review tools are withheld, not stubbed. */
@@ -42,6 +45,7 @@ export class ResearchToolset {
       reviews || this.options.productSearch
         ? (this.options.actorRunner ?? ActorRunners.forSettings(settings))
         : null;
+    const gate = settings.gateModel ? new OpenRouterGate(settings) : undefined;
 
     const web = [
       new WebSearchTool(new Searxng(settings)).tool(),
@@ -51,6 +55,9 @@ export class ResearchToolset {
         new Corpus(settings.corpusPath),
         runId,
         onFetch,
+        gate,
+        this.options.subject,
+        this.options.market,
       ).tool(),
     ];
     const check = this.options.packetCheck

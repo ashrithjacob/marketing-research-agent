@@ -74,7 +74,10 @@ points at nothing.
 
 If a fetch fails, or comes back with the body unarchived (the result says so),
 record the source with \`archived: false\` and add a gap entry saying what could
-not be retrieved — then carry on. The run is not blocked by it.
+not be retrieved — then carry on. The run is not blocked by it. A result that
+starts with \`FILTERED\` was blocked by a relevance gate before it reached you:
+that url is spent — do not record it, do not re-fetch it, move to the next
+candidate.
 
 ### The gap list is a required output
 

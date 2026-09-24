@@ -63,6 +63,8 @@ export class RunAgentFactory {
           runId,
           reviewTools: nodes.includes("review_mining"),
           productSearch: nodes.includes("competitors"),
+          subject: options.brief.product || options.brief.url,
+          market: options.brief.market,
           packetCheck: {
             nodes,
             brief: options.brief,

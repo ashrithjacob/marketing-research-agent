@@ -35,3 +35,21 @@ export interface ResearchStore {
 
   close(): void;
 }
+
+export interface GateVerdict {
+  admit: boolean;
+  reason: string;
+  model: string;
+  ms: number;
+}
+
+/** A cheap pre-read filter over fetched bodies; a failing gate admits. */
+export interface FetchGate {
+  admit(input: {
+    url: string;
+    title: string;
+    body: string;
+    subject: string;
+    market: string;
+  }): Promise<GateVerdict>;
+}
