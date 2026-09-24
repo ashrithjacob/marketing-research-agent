@@ -1,4 +1,4 @@
-import { api, briefLabel, type Brief, type ResearchNode, type RunDetail, type RunSummary, type StagePacket } from '../api';
+import { api, briefLabel, type Brief, type Judgement, type ResearchNode, type RunDetail, type RunSummary, type StagePacket } from '../api';
 import StageRail, { NODE_ORDER, scopeLabel } from '../StageRail';
 import { billedText, pricingNote } from './now';
 
@@ -18,6 +18,7 @@ export function RailColumn({
   runId,
   live,
   packet,
+  judgements,
   onSelectRun,
   onRunNode,
 }: {
@@ -26,6 +27,7 @@ export function RailColumn({
   runId: string;
   live: boolean;
   packet: StagePacket | null;
+  judgements: Judgement[];
   onSelectRun: (id: string) => void;
   onRunNode: (node: ResearchNode) => void;
 }) {
@@ -52,9 +54,9 @@ export function RailColumn({
         href={api.logsUrl(run.id)}
         target="_blank"
         rel="noreferrer"
-        title="Every LLM call this run made — prompt, answer, tokens, cost and time — in a new tab"
+        title="Everything this run did — every action, LLM call, prompt, answer, token and cost — in a new tab"
       >
-        Logs ↗
+        Activity ↗
       </a>
     </h3>
     <div className="runmeta">
@@ -65,13 +67,7 @@ export function RailColumn({
         Markets <span>{run.brief?.market || 'anywhere'}</span>
       </div>
       <div>
-        Harness <span>pi-agent-core</span>
-      </div>
-      <div>
         Model <span>{run.model || 'unrecorded'}</span>
-      </div>
-      <div>
-        Skill <span>research-compartment v1.0</span>
       </div>
       <div>
         Started <span>{new Date(run.created_at).toLocaleString()}</span>
@@ -96,6 +92,23 @@ export function RailColumn({
         <span>{billedText(run.usage?.billed, live)}</span>
       </div>
     </div>
+
+    <h3 style={{ marginTop: 18 }}>
+      Standing judgements <span className="n">{judgements.length}</span>
+    </h3>
+    {judgements.length === 0 && (
+      <p className="muted">None yet. “Step in” to correct the agent.</p>
+    )}
+    {judgements.map((judgement) => (
+      <div key={judgement.id} className="judge">
+        <div className="w">{judgement.kind.replace('_', ' ')}</div>
+        <div>{judgement.text}</div>
+        <div className="used">
+          applied {judgement.applied_count} time
+          {judgement.applied_count === 1 ? '' : 's'}
+        </div>
+      </div>
+    ))}
 
     <h3 style={{ marginTop: 18 }}>Runs</h3>
     <div className="runlist">

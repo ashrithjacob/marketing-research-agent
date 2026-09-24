@@ -25,7 +25,7 @@ Two routes exist, both served by the same SPA (`app.ts` `mountFrontend` sends
 `index.html` for anything that is not `/api/*`):
 
 - `/` — the cockpit
-- `/runs/:runId/logs` — the LLM call log for one run (`api.logsUrl`)
+- `/runs/:runId/logs` — the activity log for one run (`api.logsUrl`)
 
 ---
 
@@ -86,13 +86,31 @@ for a node that has not run.
 
 ### The run view — middle and right (`RunView.tsx`)
 
-The left rail carries the stage rail, the run meta and the run list; the middle
-column carries the run itself; the right rail its counts, voice of customer,
-gaps and standing judgements.
+Two columns. The left rail carries the stage rail, the run meta, standing
+judgements and the run list. The middle column is the insight dashboard: the
+Now panel (with the **Activity log ↗** link), then tiles, then the sources
+list. There is no right column any more.
 
-**Voice of customer** shows only `review_mining` excerpts. A competitors run
-also files brands' own taglines as verbatim excerpts, and under this heading
-they would read as customer words.
+The light "Minimalist Modern" theme lives entirely in `styles.css` tokens
+(accent `#0052FF`, gradient to `#4D7CFF`; fonts Calistoga / Inter /
+JetBrains Mono, loaded in `index.html`).
+
+**Tiles** (`run-view/tile.tsx`, `tiles-data.tsx`, `tiles-market.tsx`). Each
+tile shows headline figures collapsed and full values after a click, with that
+node's gaps at the bottom of the expanded body (`TileGaps`) — not a single
+generic gaps table:
+
+| Tile | Shows | Where its data comes from |
+|---|---|---|
+| Product data (open by default) | attributes, SVG bars for numeric measurements, excerpts, gaps | packet rows with `node: 'product_data'` |
+| Competitors | direct/indirect groups, social-proof review-count chart, excerpts, gaps | `packet.competitors`, `measurements` |
+| Category data | market-size/CAGR bar charts, every figure with its period, gaps | `measurements` with `node: 'category_data'` |
+| Voice of customer | verbatim `review_mining` excerpts | `packet.excerpts` |
+| Angle map | the avatar × awareness grid, empty until stage 4 | static |
+
+Charts are hand-rolled SVG (`run-view/charts.tsx` `BarList`) — no chart
+library. Packet rows are grouped per node in `RunView.tsx` (`byNode`); a
+Source also carries a `node`, so source counts are per tile.
 
 | Panel | Field | Source |
 |---|---|---|
@@ -116,7 +134,9 @@ A red `.error` block under a `failed` run shows `run.error`. A red block on an
 something the schema refused — the message names the offending field. `invalid`
 is kept distinct from `failed` on purpose.
 
-**Logs** (`.logs-link`) opens `/runs/:id/logs` in a new tab.
+**Activity** (`.logs-link`, labelled "Activity ↗") opens `/runs/:id/logs` in a
+new tab. The reasoning trace and the crawling lanes used to live on the
+cockpit's middle column; they are only on the activity log now.
 
 ### Step in (`StepIn.tsx`)
 
@@ -132,19 +152,32 @@ it was saved as a standing judgement because the run had already settled.
 
 ---
 
-## `/runs/:runId/logs` — the LLM call log (`LogsPage.tsx`)
+## `/runs/:runId/logs` — the activity log (`LogsPage.tsx`)
 
-Header `research cockpit · LLM call log`, the brief and `Stage N · <scope>` as
-chips, a row of stat cards, then one expandable block per call.
+Header `research cockpit · activity log`, the brief and `Stage N · <scope>` as
+chips, a row of stat cards, then a **vertical timeline** — one box per agent
+action, joined by a line, top to bottom.
 
-Polls `GET /api/research/runs/:id/calls?after=<seq>` — incrementally, by
-sequence number, so a long run does not re-send everything each tick.
+- **Boxes** (`logs/timeline.tsx`): an `llm.call` event opens a *turn* box whose
+  collapsed summary is what the agent did ("5 searches", "read 5 pages ·
+  2 searches", "Thought, then answered") plus time, tokens and cost.
+- **Progressive disclosure**: clicking a turn box expands to the reasoning
+  trace, the per-tool rows with the URLs fetched (searches, page reads, packet
+  checks), the model output, and the full LLM call (`logs/CallView.tsx` —
+  prompt, answer, tokens, cost).
+- **Milestones** (run started, packet checked/accepted/rejected, billed, run
+  completed) are separate flat boxes with hollow dots; failures red,
+  acceptance green.
+- The grouping lives in `logs/steps.ts` (`buildSteps`): no correlation id
+  upstream, so a `tool.completed` settles the oldest running row of that tool
+  name — parallel same-tool calls settle in start order.
 
-Each call shows `#seq`, its time, the model, `stop_reason` (or `error: …`), and
-expands to the system prompt, the messages and the answer.
+Data still comes from two streams: `GET /api/research/runs/:id/calls?after=<seq>`
+polled incrementally by sequence number, and the SSE event stream
+(`GET /api/research/runs/:id/events`) which feeds the timeline live.
 
 This page is the first place to look when a run "did nothing": an idle run with
-no calls is a start-up failure, while a run with forty calls and no packet is
+no boxes is a start-up failure, while a run with forty calls and no packet is
 the agent failing to emit the fenced JSON block.
 
 ---

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   api,
   streamRunEvents,
@@ -8,19 +8,14 @@ import {
   type RunDetail,
   type RunEvent,
   type RunSummary,
+  type Source,
 } from './api';
 import { ChatText } from './FileBox';
-import { LanesSection, applyToLanes, type Lane } from './run-view/lanes';
 import { nowPanel } from './run-view/now';
-import {
-  AttributesSection,
-  CompetitorsView,
-  MeasurementsSection,
-  SourcesSection,
-} from './run-view/packet-sections';
+import { SourcesSection } from './run-view/packet-sections';
 import { RailColumn } from './run-view/rail';
-import { RightRail } from './run-view/right-rail';
-import { TraceSection, groupEvents } from './run-view/trace';
+import { AngleMapTile, CompetitorsTile, VoiceTile } from './run-view/tiles-market';
+import { CategoryTile, ProductTile } from './run-view/tiles-data';
 
 export default function RunView({
   runId,
@@ -38,11 +33,9 @@ export default function RunView({
   onRunNode: (node: ResearchNode) => void;
 }) {
   const [run, setRun] = useState<RunDetail | null>(null);
-  const [events, setEvents] = useState<RunEvent[]>([]);
-  const [lanes, setLanes] = useState<Lane[]>([]);
   const [judgements, setJudgements] = useState<Judgement[]>([]);
   const [error, setError] = useState('');
-  const traceRef = useRef<HTMLDivElement>(null);
+  const [lastTool, setLastTool] = useState<RunEvent | undefined>(undefined);
 
   const reload = useCallback(async () => {
     try {
@@ -56,8 +49,7 @@ export default function RunView({
 
   useEffect(() => {
     setRun(null);
-    setEvents([]);
-    setLanes([]);
+    setLastTool(undefined);
     void reload();
   }, [runId, reload]);
 
@@ -68,8 +60,7 @@ export default function RunView({
   useEffect(() => {
     const stop = streamRunEvents(runId, 0, {
       onEvent: (event) => {
-        setEvents((current) => [...current, event]);
-        applyToLanes(event, setLanes);
+        if (event.kind === 'tool.started') setLastTool(event);
         if (event.kind.startsWith('run.') || event.kind.startsWith('packet.')) {
           void reload();
           onChanged();
@@ -81,10 +72,6 @@ export default function RunView({
     return () => stop();
   }, [runId, reload, onChanged]);
 
-  useEffect(() => {
-    traceRef.current?.scrollTo({ top: traceRef.current.scrollHeight });
-  }, [events.length]);
-
   const packet = run?.packet ?? null;
   const live = !!run && !TERMINAL_STATUSES.has(run.status);
   const sources = packet?.sources ?? [];
@@ -95,30 +82,51 @@ export default function RunView({
     [admitted],
   );
 
+  const byNode = useMemo(() => {
+    const empty = {
+      attributes: {} as Record<string, NonNullable<typeof packet>['attributes']>,
+      measurements: {} as Record<string, NonNullable<typeof packet>['measurements']>,
+      excerpts: {} as Record<string, NonNullable<typeof packet>['excerpts']>,
+      sources: {} as Record<string, Source[]>,
+      gaps: {} as Record<string, NonNullable<typeof packet>['gaps']>,
+    };
+    if (!packet) return empty;
+    const map = {
+      attributes: {} as Record<string, typeof packet.attributes>,
+      measurements: {} as Record<string, typeof packet.measurements>,
+      excerpts: {} as Record<string, typeof packet.excerpts>,
+      sources: {} as Record<string, Source[]>,
+      gaps: {} as Record<string, typeof packet.gaps>,
+    };
+    for (const a of packet.attributes) push(map.attributes, a.node, a);
+    for (const m of packet.measurements) push(map.measurements, m.node, m);
+    for (const e of packet.excerpts) push(map.excerpts, e.node, e);
+    for (const s of packet.sources) push(map.sources, s.node, s);
+    for (const g of packet.gaps) push(map.gaps, g.node, g);
+    return map;
+  }, [packet]);
+
   const voice = useMemo(
     () => (packet?.excerpts ?? []).filter((e) => e.node === 'review_mining'),
     [packet],
   );
 
-  const lastTool = useMemo(
-    () => [...events].reverse().find((e) => e.kind === 'tool.started'),
-    [events],
-  );
-
-  const traceRows = useMemo(() => groupEvents(events), [events]);
-
   if (!run) return <div className="empty">Loading run…</div>;
 
   const now = nowPanel(run, live, lastTool);
+  const showCompetitors =
+    packet && (packet.competitor_reference || (packet.competitors ?? []).length > 0);
+  const nodesInRun = new Set((run.nodes ?? packet?.nodes.map((n) => n.node) ?? []) as string[]);
 
   return (
-    <div className="cols">
+    <div className="cols two">
       <RailColumn
         run={run}
         runs={runs}
         runId={runId}
         live={live}
         packet={packet}
+        judgements={judgements}
         onSelectRun={onSelectRun}
         onRunNode={onRunNode}
       />
@@ -126,36 +134,75 @@ export default function RunView({
       <div className="mid">
         {error && <div className="error">{error}</div>}
 
-  {run.status === 'invalid' && (
-    <div className="error">
-      <b>Packet rejected.</b> {run.error}
-      <div className="error-note">
-        The agent finished and what it produced broke the stage-1 contract.
-        That is a more useful failure than a crash — the raw output is below.
-      </div>
-    </div>
-  )}
+        {run.status === 'invalid' && (
+          <div className="error">
+            <b>Packet rejected.</b> {run.error}
+            <div className="error-note">
+              The agent finished and what it produced broke the stage-1 contract.
+              That is a more useful failure than a crash — the raw output is below.
+            </div>
+          </div>
+        )}
         {run.status === 'failed' && <div className="error">{run.error}</div>}
 
-  <section>
-    <h3>
-      Now <span className="n">{live ? 'live' : 'finished'}</span>
-    </h3>
-    <div className="now">
-      <span className={`pulse ${live ? '' : 'off'}`} />
-      <div className="txt">
-        <b>{now.title}</b>
-        <div className="sub">{now.sub}</div>
-      </div>
-    </div>
-  </section>
+        <section>
+          <h3>
+            Now <span className="n">{live ? 'live' : 'finished'}</span>
+          </h3>
+          <div className="now">
+            <span className={`pulse ${live ? '' : 'off'}`} />
+            <div className="txt">
+              <b>{now.title}</b>
+              <div className="sub">{now.sub}</div>
+            </div>
+            <a className="ghost logs-back" href={api.logsUrl(run.id)} target="_blank" rel="noreferrer">
+              Activity log ↗
+            </a>
+          </div>
+        </section>
 
-        <LanesSection lanes={lanes} live={live} />
-        <TraceSection events={events} traceRows={traceRows} traceRef={traceRef} />
-
-        {packet && (packet.competitor_reference || (packet.competitors ?? []).length > 0) && (
-          <CompetitorsView packet={packet} />
+        {unarchived > 0 && (
+          <div className="warn">
+            {unarchived} admitted source{unarchived === 1 ? '' : 's'} not archived —
+            those spans cannot be checked against the page they came from.
+          </div>
         )}
+
+        {packet && (
+          <div className="tiles">
+            {nodesInRun.has('product_data') && (
+              <ProductTile
+                packet={packet}
+                attributes={byNode.attributes.product_data ?? []}
+                measurements={byNode.measurements.product_data ?? []}
+                excerpts={byNode.excerpts.product_data ?? []}
+                sources={byNode.sources.product_data ?? []}
+                gaps={byNode.gaps.product_data ?? []}
+              />
+            )}
+            {showCompetitors && (
+              <CompetitorsTile
+                packet={packet}
+                measurements={byNode.measurements.competitors ?? []}
+                excerpts={byNode.excerpts.competitors ?? []}
+                sources={byNode.sources.competitors ?? []}
+                gaps={byNode.gaps.competitors ?? []}
+              />
+            )}
+            {nodesInRun.has('category_data') && (
+              <CategoryTile
+                measurements={byNode.measurements.category_data ?? []}
+                sources={byNode.sources.category_data ?? []}
+                gaps={byNode.gaps.category_data ?? []}
+              />
+            )}
+            {(voice.length > 0 || nodesInRun.has('review_mining')) && (
+              <VoiceTile voice={voice} />
+            )}
+            <AngleMapTile />
+          </div>
+        )}
+
         {packet && (
           <SourcesSection
             runId={runId}
@@ -164,30 +211,24 @@ export default function RunView({
             rejected={rejected}
           />
         )}
-        {packet && packet.attributes.length > 0 && (
-          <AttributesSection attributes={packet.attributes} />
-        )}
-        {packet && packet.measurements.length > 0 && (
-          <MeasurementsSection measurements={packet.measurements} />
-        )}
 
-  {run.status === 'invalid' && (
-    <section>
-      <h3>Raw output</h3>
-      <div className="trace">
-        <ChatText text={run.output} />
+        {run.status === 'invalid' && (
+          <section>
+            <h3>Raw output</h3>
+            <div className="trace">
+              <ChatText text={run.output} />
+            </div>
+          </section>
+        )}
       </div>
-    </section>
-  )}
-      </div>
-
-      <RightRail
-        run={run}
-        packet={packet}
-        unarchived={unarchived}
-        voice={voice}
-        judgements={judgements}
-      />
     </div>
   );
+}
+
+function push<T extends { node: string }>(
+  map: Record<string, T[]>,
+  node: string,
+  item: T,
+) {
+  (map[node] ??= []).push(item);
 }

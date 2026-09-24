@@ -1,30 +1,35 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   api,
   briefLabel,
   streamRunEvents,
   type CallStats,
   type LlmCall,
+  type RunEvent,
   type RunSummary,
 } from './api';
 import { formatTokens } from './format';
 import { scopeLabel } from './StageRail';
-import { CallView } from './logs/CallView';
 import { Stat, duration } from './logs/parts';
+import { buildSteps } from './logs/steps';
+import { Timeline } from './logs/timeline';
 
-/** Every LLM call a run made: what was sent, what came back, and what it cost. */
+/** Every action a run took, one box at a time: what it did, then what it cost. */
 type RunInfo = RunSummary & { live: boolean };
 
 export default function LogsPage({ runId }: { runId: string }) {
   const [run, setRun] = useState<RunInfo | null>(null);
   const [stats, setStats] = useState<CallStats | null>(null);
   const [calls, setCalls] = useState<LlmCall[]>([]);
+  const [events, setEvents] = useState<RunEvent[]>([]);
   const [error, setError] = useState('');
   const [, setTick] = useState(0);
 
   const lastSeq = useRef(0);
   const inFlight = useRef(false);
   const queued = useRef<'none' | 'new' | 'full'>('none');
+  const timelineRef = useRef<HTMLOListElement>(null);
+  const liveRef = useRef(false);
 
   const refresh = useCallback(
     async (mode: 'new' | 'full') => {
@@ -42,6 +47,7 @@ export default function LogsPage({ runId }: { runId: string }) {
           const newest = res.calls.reduce((max, c) => Math.max(max, c.seq), 0);
           lastSeq.current = full ? newest : Math.max(lastSeq.current, newest);
           setRun(res.run);
+          liveRef.current = res.run.live;
           setStats(res.stats);
           setCalls((current) => {
             const merged = full ? [] : [...current];
@@ -65,6 +71,7 @@ export default function LogsPage({ runId }: { runId: string }) {
     void refresh('full');
     const stop = streamRunEvents(runId, 0, {
       onEvent: (event) => {
+        setEvents((current) => [...current, event]);
         if (event.kind === 'llm.call') void refresh('new');
         else if (event.kind === 'run.billed') void refresh('full');
         else if (event.kind.startsWith('run.') || event.kind.startsWith('packet.')) {
@@ -84,8 +91,20 @@ export default function LogsPage({ runId }: { runId: string }) {
   }, [run?.live]);
 
   useEffect(() => {
-    if (run) document.title = `Logs · ${briefLabel(run.brief)}`;
+    if (run) document.title = `Activity · ${briefLabel(run.brief)}`;
   }, [run]);
+
+  const live = !!run?.live;
+  useEffect(() => {
+    if (live) {
+      timelineRef.current?.scrollTo({
+        top: timelineRef.current.scrollHeight,
+        behavior: 'smooth',
+      });
+    }
+  }, [events.length, live]);
+
+  const steps = useMemo(() => buildSteps(events), [events]);
 
   const wallMs = run
     ? run.live
@@ -97,7 +116,7 @@ export default function LogsPage({ runId }: { runId: string }) {
     <div className="app logs">
       <header>
         <span className="brand">research cockpit</span>
-        <span className="brand-sub">LLM call log</span>
+        <span className="brand-sub">activity log</span>
         <div className="subject">
           {run && (
             <>
@@ -139,19 +158,17 @@ export default function LogsPage({ runId }: { runId: string }) {
           </div>
         )}
 
-        {run && calls.length === 0 && (
+        {run && steps.length === 0 && (
           <p className="muted">
             {run.live
-              ? 'No LLM call has finished yet.'
-              : 'No LLM calls were recorded for this run. Runs from before the call log existed have none.'}
+              ? 'No activity yet — the run is starting up.'
+              : 'No activity was recorded for this run.'}
           </p>
         )}
 
-        <div className="calls">
-          {calls.map((call, index) => (
-            <CallView key={call.seq} call={call} calls={calls} index={index} />
-          ))}
-        </div>
+        <ol className="timeline-scroll" ref={timelineRef}>
+          <Timeline steps={steps} calls={calls} />
+        </ol>
       </div>
     </div>
   );
