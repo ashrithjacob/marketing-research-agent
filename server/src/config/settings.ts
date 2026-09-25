@@ -74,7 +74,7 @@ export class Env {
       gateTimeoutSeconds: Env.number("MRA_GATE_TIMEOUT_SECONDS", 12),
 
       apifyToken: Env.text("APIFY_TOKEN", ""),
-      apifyMaxReviews: Env.number("MRA_APIFY_MAX_REVIEWS", 10),
+      apifyMaxReviews: Env.number("MRA_APIFY_MAX_REVIEWS", 100),
       apifyWaitSeconds: Env.number("MRA_APIFY_WAIT_SECONDS", 300),
 
       corpusPath: Env.text("MRA_CORPUS_PATH", "/corpus"),
