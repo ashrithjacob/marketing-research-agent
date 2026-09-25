@@ -208,7 +208,7 @@ code, worth knowing before changing them:
   cap — a $0.005 cap on the search actor is accepted and then kills the run with
   "Charge limit has already been reached", returning an empty dataset that reads
   as "no products found". That cost an afternoon; the test is in `apify.test.ts`.
-- `MRA_APIFY_MAX_REVIEWS` (default 10) bounds each call. On the FREE plan the
+- `MRA_APIFY_MAX_REVIEWS` (default 50) bounds each call. On the FREE plan the
   Amazon actor caps at **1 start URL and 10 reviews per run** anyway, says so
   only in its run log, and silently drops the extras.
 - Check spend with `client.user('me').limits()` — the FREE ceiling is $5/month.

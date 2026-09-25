@@ -19,11 +19,7 @@ export interface StreamHandlers {
 
 class FatalStreamError extends Error {}
 
-/**
- * Follow a run's SSE event stream, resuming from the last event seen after any drop.
- * Hand-parsed rather than EventSource: the abort handle comes free, and resuming by
- * event id needs no server change — `?after=` already replays what was missed.
- */
+/** Follow a run's SSE stream; after any drop, resume from the last event id — `?after=` replays the gap. */
 export function streamRunEvents(runId: string, after: number, handlers: StreamHandlers): () => void {
   const stopped = new AbortController();
   let last = after;

@@ -1,18 +1,17 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   api,
-  streamRunEvents,
   TERMINAL_STATUSES,
   type Judgement,
   type ResearchNode,
   type RunDetail,
-  type RunEvent,
   type RunSummary,
   type Source,
 } from './api';
 import { ChatText } from './FileBox';
 import { nowPanel, runStage } from './run-view/now';
 import { RailColumn, subjectProgress } from './run-view/rail';
+import { useRunStream } from './run-view/use-run-stream';
 import { AngleMapTile } from './run-view/tiles-angle';
 import { CompetitorsTile, VoiceTile } from './run-view/tiles-market';
 import { CategoryTile, ProductTile } from './run-view/tiles-data';
@@ -35,8 +34,6 @@ export default function RunView({
   const [run, setRun] = useState<RunDetail | null>(null);
   const [judgements, setJudgements] = useState<Judgement[]>([]);
   const [error, setError] = useState('');
-  const [reconnecting, setReconnecting] = useState('');
-  const [lastTool, setLastTool] = useState<RunEvent | undefined>(undefined);
 
   const reload = useCallback(async () => {
     try {
@@ -50,7 +47,6 @@ export default function RunView({
 
   useEffect(() => {
     setRun(null);
-    setLastTool(undefined);
     void reload();
   }, [runId, reload]);
 
@@ -58,25 +54,7 @@ export default function RunView({
     api.judgements().then(({ data }) => setJudgements(data)).catch(() => undefined);
   }, [judgementsRev]);
 
-  useEffect(() => {
-    const stop = streamRunEvents(runId, 0, {
-      onEvent: (event) => {
-        if (event.kind === 'tool.started') setLastTool(event);
-        if (event.kind.startsWith('run.') || event.kind.startsWith('packet.')) {
-          void reload();
-          onChanged();
-        }
-      },
-      onEnd: () => void reload(),
-      onError: (message) => setError(message),
-      onReconnecting: (attempt, reason) => setReconnecting(`${reason} — reconnecting (attempt ${attempt})`),
-      onConnected: () => {
-        setReconnecting('');
-        void reload();
-      },
-    });
-    return () => stop();
-  }, [runId, reload, onChanged]);
+  const { lastTool, reconnecting } = useRunStream(runId, reload, onChanged, setError);
 
   const packet = run?.packet ?? null;
   const live = !!run && !TERMINAL_STATUSES.has(run.status);

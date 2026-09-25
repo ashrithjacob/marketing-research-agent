@@ -68,7 +68,7 @@ services:
       # it at 10 per run anyway. Passed through explicitly — an .env line for a
       # variable the compose file does not forward is silently ignored, and the
       # code default would look like it had been honoured.
-      - MRA_APIFY_MAX_REVIEWS=${MRA_APIFY_MAX_REVIEWS:-10}
+      - MRA_APIFY_MAX_REVIEWS=${MRA_APIFY_MAX_REVIEWS:-50}
 
 networks:
   # Shared with Caddy and nothing else. Not `pa-compose_default`: that is the

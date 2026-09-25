@@ -146,6 +146,7 @@ h3 .n { color: var(--faint); text-transform: none; letter-spacing: 0.02em; font-
   color: var(--dim); margin-bottom: 12px;
 }
 .warn.small { margin: 4px 0 0; }
+.warn.banner { margin: 0; border-radius: 0; border-left: 0; border-right: 0; }
 
 /* ---------- run: the two columns ---------- */
 .cols {

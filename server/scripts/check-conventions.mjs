@@ -103,7 +103,8 @@ const CLIENT_ONLY_FIELDS = new Set([
   // Callback and option bags that live entirely in the browser and are never
   // parsed from a server response. Add a name here only after checking the
   // server genuinely does not send it.
-  "handlers", "onEnd", "onError", "onEvent", "startRun", "stopRun",
+  "handlers", "onEnd", "onError", "onEvent", "onReconnecting", "onConnected",
+  "startRun", "stopRun",
   "logsUrl", "sourceUrl", "arguments", "toolCallId", "stageTwoPlan",
 ]);
 
