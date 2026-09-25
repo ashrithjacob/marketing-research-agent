@@ -145,7 +145,7 @@ describe("the stage-2 estimate", () => {
     expect(plan.estimate.targets).toBe(3);
     expect(plan.estimate.reviews_per_target).toBe(50);
     expect(plan.estimate.reviews).toBe(150);
-    expect(plan.estimate.amazon_usd).toBeCloseTo(3 * 0.012 + 150 * 0.006, 4);
+    expect(plan.estimate.amazon_usd).toBeCloseTo(3 * 0.012 + 150 * 0.005, 4);
     expect(plan.estimate.trustpilot_usd).toBeCloseTo(0.05 + 150 * 0.00075, 4);
     expect(plan.estimate.cost_usd).toBeCloseTo(
       plan.estimate.amazon_usd + plan.estimate.trustpilot_usd,

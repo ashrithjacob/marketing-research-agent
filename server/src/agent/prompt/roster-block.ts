@@ -1,4 +1,5 @@
 import type { MiningTarget } from "../../domain/index.js";
+import { StageTwoRoster } from "../../extract/index.js";
 
 import { RELATION_LABEL, ROSTER_LEAD, ROSTER_METHOD } from "./text/roster.js";
 
@@ -8,7 +9,9 @@ export class RosterBlock {
     const chosen = new Set(selected);
     const lines = ["## Targets from stage 1", "", ROSTER_LEAD, ""];
     for (const target of targets) {
-      const state = selected.length === 0 || chosen.has(target.id) ? "" : " (out of scope this run)";
+      const inScope = selected.length === 0 || chosen.has(target.id);
+      const known = StageTwoRoster.amazonListing(target.url) ? " (Amazon listing known — skip the search)" : "";
+      const state = inScope ? known : " (out of scope this run)";
       lines.push(
         `- **${target.id}** — ${RELATION_LABEL[target.relation]}${state}: ${target.name} ` +
           `(${target.form}; shares ${target.actives.join(", ")})${target.url ? ` — ${target.url}` : ""}`,

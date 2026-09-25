@@ -9,7 +9,7 @@ export const MIN_CAP_USD = {
 } as const satisfies Record<string, number>;
 
 export const UNIT_PRICE_USD = {
-  [AMAZON_REVIEWS_ACTOR]: 0.006,
+  [AMAZON_REVIEWS_ACTOR]: 0.005,
   [TRUSTPILOT_ACTOR]: 0.00075,
   [AMAZON_SEARCH_ACTOR]: 0.012,
 } as const satisfies Record<string, number>;

@@ -20,6 +20,7 @@ export interface Settings {
   apifyToken: string;
   apifyMaxReviews: number;
   apifyWaitSeconds: number;
+  apifyConcurrency: number;
 
   corpusPath: string;
 
@@ -76,6 +77,7 @@ export class Env {
       apifyToken: Env.text("APIFY_TOKEN", ""),
       apifyMaxReviews: Env.number("MRA_APIFY_MAX_REVIEWS", 50),
       apifyWaitSeconds: Env.number("MRA_APIFY_WAIT_SECONDS", 300),
+      apifyConcurrency: Env.number("MRA_APIFY_CONCURRENCY", 16),
 
       corpusPath: Env.text("MRA_CORPUS_PATH", "/corpus"),
 

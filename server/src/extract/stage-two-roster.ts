@@ -24,6 +24,10 @@ export class StageTwoRoster {
     return [product, ...competitors];
   }
 
+  static amazonListing(url: string): boolean {
+    return /^https?:\/\/(www\.)?amazon\.[a-z.]+\/(.*\/)?(dp|gp\/product)\/[A-Z0-9]{10}/i.test(url);
+  }
+
   static select(targets: readonly MiningTarget[], ids: readonly string[]): MiningTarget[] {
     const wanted = new Set(ids);
     const chosen = targets.filter((target) => wanted.has(target.id));

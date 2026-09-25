@@ -19,6 +19,7 @@ export const TOOL_LANES: Record<string, ToolLane> = {
   amazon_find_product: "search",
   amazon_reviews: "fetch",
   trustpilot_reviews: "fetch",
+  mine_reviews: "fetch",
   validate_packet: "other",
 };
 

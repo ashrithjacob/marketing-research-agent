@@ -18,11 +18,13 @@ Amazon is unreadable to \`web_fetch\` from this server.
 band. Archived and hashed like \`web_fetch\`.
 - \`trustpilot_reviews\` — verbatim reviews for ONE company domain. These review the \
 **merchant**, not the product.
+- \`mine_reviews\` — every chosen Amazon listing at all five star bands, plus Trustpilot \
+merchants, fetched in one call. The way to mine more than one listing.
 - \`validate_packet\` — check a draft packet against the contract. It answers VALID, or \
 the exact problems to fix. Use it; a shape error costs one call here and the whole run \
 at the end.
 
-The last three may be absent. If they are, marketplace reviews cannot be reached at all \
+The Amazon and Trustpilot tools may be absent. If they are, marketplace reviews cannot be reached at all \
 and \`review_mining\` is incomplete with a gap saying so — do not substitute blog roundups.
 
 Work through this stage's nodes methodically. Fetch before you write anything down.`;

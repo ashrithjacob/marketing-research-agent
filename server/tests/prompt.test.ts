@@ -324,12 +324,13 @@ describe("the system prompt names only the tools a run is given", () => {
   it("gives a competitors run Amazon search as discovery, and no review tools", () => {
     const text = prompts.system(["competitors"]);
     expect(text).toMatch(/`amazon_find_product` — .*a way to find competitors/);
-    expect(text).not.toMatch(/amazon_reviews|trustpilot_reviews|The last three may be absent/);
+    expect(text).not.toMatch(/amazon_reviews|trustpilot_reviews|mine_reviews|may be absent. If they are/);
   });
 
   it("describes all five to a run that covers review mining", () => {
     const text = prompts.system(["review_mining"]);
     expect(text).toContain("amazon_reviews");
-    expect(text).toContain("The last three may be absent");
+    expect(text).toContain("mine_reviews");
+    expect(text).toContain("The Amazon and Trustpilot tools may be absent");
   });
 });

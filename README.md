@@ -285,7 +285,7 @@ matters. Two pieces, wired in as one container plus one API key:
   a bot page **at HTTP 200** to every other method tried (plain fetch, headless
   Chrome, Firecrawl in both proxy modes), because the block is on the address.
   Apify runs the scraper on its own addresses. Billed per event against a real
-  card with no allowance: ~$0.006 per Amazon review, and the FREE plan stops at
+  card with no allowance: ~$0.005 per Amazon review on the $19 plan ($0.006 on FREE), and the FREE plan stops at
   $5/month. Unset leaves `review_mining` gapped rather than faked. Full
   measurements in `spec-review-mining.md`.
 - **SearXNG** — a free, self-hosted metasearch engine, one container

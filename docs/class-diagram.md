@@ -135,6 +135,7 @@ classDiagram
     }
     class StageTwoRoster {
       of()
+      amazonListing()
       select()
     }
     class ZodProblems {
@@ -159,8 +160,17 @@ classDiagram
     class AmazonProducts {
       find()
     }
+    class ActorRun {
+      <<interface>>
+    }
+    class ActorCharge {
+      <<interface>>
+    }
     class ActorRunner {
       <<interface>>
+      run()
+    }
+    class MeteredActorRunner {
       run()
     }
     class ApifyActorRunner {
@@ -285,6 +295,7 @@ classDiagram
     }
     class Frames {
       toolPreview()
+      toolErrorText()
       callSummary()
     }
     class Live {
@@ -373,6 +384,12 @@ classDiagram
     class PacketCheckOptions {
       <<interface>>
     }
+    class MiningJob {
+      <<interface>>
+    }
+    class MineReviewsTool {
+      tool()
+    }
     class PacketCheckTool {
       tool()
     }
@@ -448,6 +465,7 @@ classDiagram
   }
   AmazonReviews --> ActorRunner
   AmazonProducts --> ActorRunner
+  MeteredActorRunner --> ActorRunner
   TrustpilotReviews --> ActorRunner
   OpenRouterGate --> Settings
   Firecrawl --> Settings
@@ -468,6 +486,9 @@ classDiagram
   RunSettlement --> LiveRuns
   StageTwoHandoff --> ResearchStore
   ResearchToolset --> ToolsetOptions
+  MineReviewsTool --> Settings
+  MineReviewsTool --> AmazonReviews
+  MineReviewsTool --> TrustpilotReviews
   PacketCheckTool --> PacketCheckOptions
   FindProductTool --> AmazonProducts
   AmazonReviewsTool --> Settings
@@ -501,7 +522,7 @@ classDiagram
 | `adapters` | `adapters/apify/amazon-reviews.ts` | AmazonReviews |
 | `adapters` | `adapters/apify/fields.ts` | Field |
 | `adapters` | `adapters/apify/products.ts` | AmazonProducts |
-| `adapters` | `adapters/apify/runner.ts` | ActorRunner, ApifyActorRunner, ActorRunners |
+| `adapters` | `adapters/apify/runner.ts` | ActorRun, ActorCharge, ActorRunner, MeteredActorRunner, ApifyActorRunner, ActorRunners |
 | `adapters` | `adapters/apify/trustpilot-reviews.ts` | TrustpilotReviews |
 | `adapters` | `adapters/apify/types.ts` | ReviewExcerpt, ReviewResult, AmazonProduct |
 | `adapters` | `adapters/corpus.ts` | Corpus |
@@ -541,6 +562,7 @@ classDiagram
 | `agent` | `agent/stage-two-plan.ts` | StageTwoPlanner |
 | `agent` | `agent/tools/factory.ts` | ToolsetOptions, ResearchToolset |
 | `agent` | `agent/tools/lanes.ts` | FetchRecord, PacketCheckOptions |
+| `agent` | `agent/tools/mine-reviews-tool.ts` | MiningJob, MineReviewsTool |
 | `agent` | `agent/tools/packet-check-tool.ts` | PacketCheckTool |
 | `agent` | `agent/tools/review-rendering.ts` | ReviewRendering |
 | `agent` | `agent/tools/review-tools.ts` | FindProductTool, AmazonReviewsTool, TrustpilotReviewsTool |

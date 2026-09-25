@@ -116,6 +116,8 @@ services:
       # Reviews requested per product per star band. The FREE plan's actor caps
       # this at 10 per run regardless, and drops the extras without erroring.
       - MRA_APIFY_MAX_REVIEWS=${MRA_APIFY_MAX_REVIEWS:-50}
+      # Apify actor runs mine_reviews keeps in flight at once.
+      - MRA_APIFY_CONCURRENCY=${MRA_APIFY_CONCURRENCY:-16}
 
 volumes:
   # Runs, events and packets. Losing this loses your research history.

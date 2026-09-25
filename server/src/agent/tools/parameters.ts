@@ -53,3 +53,20 @@ export const trustpilotReviewParameters = Type.Object({
         "request is cut to it.",
     })),
 });
+
+export const mineReviewsParameters = Type.Object({
+  listings: Type.Array(
+    Type.Object({
+      target_id: Type.String({ description: "The roster id this listing belongs to, e.g. product or c1." }),
+      product_url: Type.String({ description: "The Amazon product url chosen for that target." }),
+    }),
+    { description: "Every Amazon listing to mine. Each is fetched once per star band, 1-5, all at once." },
+  ),
+  trustpilot: Type.Optional(Type.Array(
+    Type.Object({
+      target_id: Type.String({ description: "The roster id this merchant belongs to." }),
+      domain: Type.String({ description: "Company domain, e.g. huel.com" }),
+    }),
+    { description: "Merchants with a Trustpilot presence worth mining; one mixed-star pull each." },
+  )),
+});

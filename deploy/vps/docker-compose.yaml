@@ -69,6 +69,8 @@ services:
       # variable the compose file does not forward is silently ignored, and the
       # code default would look like it had been honoured.
       - MRA_APIFY_MAX_REVIEWS=${MRA_APIFY_MAX_REVIEWS:-50}
+      # Apify actor runs mine_reviews keeps in flight at once.
+      - MRA_APIFY_CONCURRENCY=${MRA_APIFY_CONCURRENCY:-16}
 
 networks:
   # Shared with Caddy and nothing else. Not `pa-compose_default`: that is the

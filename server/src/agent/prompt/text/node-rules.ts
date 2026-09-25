@@ -76,9 +76,12 @@ export const NODE_RULES: Record<Node, string> = {
    a. \`amazon_find_product\` with the product name. **Choose by
       \`reviewsCount\`**, not by position — a listing with four reviews cannot
       support this node, and picking it wastes the whole budget below.
-   b. \`amazon_reviews\` on that url, **once per star band**, \`star: 3\` first.
-      One call per band is the only way the star spread can be trusted.
-   c. \`trustpilot_reviews\` on the brand's domain for merchant-side language.
+   b. \`mine_reviews\` **once**, with every chosen listing and every merchant
+      domain worth a Trustpilot pull. It fetches each listing once per star band,
+      1-5, all at the same time — one pull per band is the only way the star
+      spread can be trusted. Do not split it across turns.
+   c. \`amazon_reviews\` / \`trustpilot_reviews\` only to retry one pull that
+      \`mine_reviews\` reported as failed.
    Ratings vastly outnumber written reviews in most categories, so
    \`no 3-star reviews with text\` is a common and *correct* answer. When a tool
    reports a GAP, record it and move on. **Never fill a missing 3-star band with

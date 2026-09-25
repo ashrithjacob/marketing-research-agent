@@ -16,6 +16,7 @@ import { Searxng } from "../../adapters/searxng.js";
 import type { Settings } from "../../config/index.js";
 
 import type { FetchRecord, PacketCheckOptions } from "./lanes.js";
+import { MineReviewsTool } from "./mine-reviews-tool.js";
 import { PacketCheckTool } from "./packet-check-tool.js";
 import {
   AmazonReviewsTool,
@@ -74,11 +75,14 @@ export class ResearchToolset {
     const findProduct = new FindProductTool(new AmazonProducts(runner)).tool();
     if (!reviews) return [...web, findProduct, ...check];
 
+    const amazon = new AmazonReviews(runner);
+    const trustpilot = new TrustpilotReviews(runner);
     return [
       ...web,
       findProduct,
-      new AmazonReviewsTool(settings, new AmazonReviews(runner), runId, onFetch).tool(),
-      new TrustpilotReviewsTool(settings, new TrustpilotReviews(runner), runId, onFetch).tool(),
+      new MineReviewsTool(settings, amazon, trustpilot, runId, onFetch).tool(),
+      new AmazonReviewsTool(settings, amazon, runId, onFetch).tool(),
+      new TrustpilotReviewsTool(settings, trustpilot, runId, onFetch).tool(),
       ...check,
     ];
   }
