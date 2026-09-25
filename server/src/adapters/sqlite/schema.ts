@@ -91,5 +91,29 @@ CREATE TABLE IF NOT EXISTS research_judgements (
     applied_count INTEGER NOT NULL DEFAULT 0,
     created_at    TEXT NOT NULL
 );
-`;;
+CREATE TABLE IF NOT EXISTS research_reviews (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    platform      TEXT NOT NULL,
+    review_key    TEXT NOT NULL,
+    listing       TEXT NOT NULL DEFAULT '',
+    star          INTEGER,
+    title         TEXT NOT NULL DEFAULT '',
+    text          TEXT NOT NULL,
+    posted_at     TEXT NOT NULL DEFAULT '',
+    verified      INTEGER NOT NULL DEFAULT 0,
+    locator       TEXT NOT NULL DEFAULT '',
+    first_seen_at TEXT NOT NULL,
+    last_seen_at  TEXT NOT NULL,
+    UNIQUE(platform, review_key)
+);
+CREATE TABLE IF NOT EXISTS research_run_reviews (
+    run_id         TEXT NOT NULL REFERENCES research_runs(id) ON DELETE CASCADE,
+    review_id      INTEGER NOT NULL REFERENCES research_reviews(id),
+    ref            TEXT NOT NULL,
+    target_id      TEXT NOT NULL DEFAULT '',
+    source_id      TEXT NOT NULL DEFAULT '',
+    band_requested INTEGER,
+    PRIMARY KEY (run_id, review_id)
+);
+`;
 }

@@ -2,9 +2,9 @@ import {
   AMAZON_REVIEWS_ACTOR,
   STAR_BAND,
   Spend,
-  TRUSTPILOT_ACTOR,
 } from "./actors.js";
-import { Field } from "./fields.js";
+import { BandFiling } from "./band-filing.js";
+import { Field, ReviewKey } from "./fields.js";
 import type { ActorRunner } from "./runner.js";
 import type { ReviewExcerpt, ReviewResult } from "./types.js";
 
@@ -39,7 +39,7 @@ export class AmazonReviews {
         excerpts: [],
         gap: `Apify run finished ${status} with an empty dataset for ${productUrl} ` +
           `(${band}). That is not evidence the product has no reviews.`,
-        discarded: 0,
+        offBand: 0,
         totalReviews: null,
         totalRatings: null,
       };
@@ -54,39 +54,31 @@ export class AmazonReviews {
           ? `No ${band} reviews with text on ${productUrl}` +
             (totalRatings !== null ? ` (${totalRatings} ratings exist, none written at this band)` : "")
           : `Apify reported ${Field.text(first.error)} for ${productUrl}: ${Field.text(first.errorDescription)}`;
-      return { excerpts: [], gap: why, discarded: 0, totalReviews, totalRatings };
+      return { excerpts: [], gap: why, offBand: 0, totalReviews, totalRatings };
     }
 
-    const excerpts: ReviewExcerpt[] = [];
-    let discarded = 0;
+    const rows: ReviewExcerpt[] = [];
     for (const item of items) {
       const text = Field.text(item.reviewDescription).trim();
-      const starScore = Field.numberOrNull(item.ratingScore);
       if (!text) continue;
-      if (star !== null && starScore !== star) {
-        discarded += 1;
-        continue;
-      }
-      excerpts.push({
+      const date = Field.text(item.date) || null;
+      rows.push({
         text,
-        star: starScore,
-        date: Field.text(item.date) || null,
+        star: Field.numberOrNull(item.ratingScore),
+        date,
         locator: Field.text(item.reviewUrl) || Field.text(item.reviewId),
         title: Field.text(item.reviewTitle),
         verified: item.isVerified === true,
         source: "amazon",
+        reviewKey: ReviewKey.of(Field.text(item.reviewId), productUrl, date, text),
       });
     }
 
-    let gap: string | null = null;
-    if (discarded > 0) {
-      gap =
-        `Discarded ${discarded} of ${items.length} Amazon rows for ${productUrl}: ` +
-        `asked for ${band} and the actor returned other ratings. Star data from this ` +
-        "call is not trustworthy.";
-    } else if (excerpts.length === 0) {
-      gap = `Apify returned ${items.length} rows for ${productUrl} (${band}) but none carried review text.`;
-    }
-    return { excerpts, gap, discarded, totalReviews, totalRatings };
+    const filed = BandFiling.file(rows, star, productUrl);
+    const gap =
+      rows.length === 0
+        ? `Apify returned ${items.length} rows for ${productUrl} (${band}) but none carried review text.`
+        : filed.gap;
+    return { excerpts: filed.excerpts, gap, offBand: filed.offBand, totalReviews, totalRatings };
   }
 }

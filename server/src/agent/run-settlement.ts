@@ -5,6 +5,7 @@ import { Clock, type Node, type ResearchStore, type StagePacket } from "../domai
 import { PacketError, PacketValidator } from "../extract/index.js";
 
 import type { LiveRuns } from "./live-runs.js";
+import type { ReviewLedger } from "./review-ledger.js";
 
 /** Decides what a finished run is: completed, invalid, failed or cancelled. */
 export class RunSettlement {
@@ -14,6 +15,7 @@ export class RunSettlement {
     private readonly store: ResearchStore,
     private readonly runs: LiveRuns,
     private readonly runId: string,
+    private readonly ledger: ReviewLedger,
   ) {}
 
   keepValidated(packet: StagePacket): void {
@@ -65,7 +67,7 @@ export class RunSettlement {
 
     let parsed: StagePacket;
     try {
-      parsed = new PacketValidator().parse(output, nodes, run?.brief);
+      parsed = new PacketValidator(this.ledger.snapshot()).parse(output, nodes, run?.brief);
     } catch (error) {
       if (!(error instanceof PacketError)) throw error;
       this.store.updateRun(this.runId, { status: "invalid", error: error.message });

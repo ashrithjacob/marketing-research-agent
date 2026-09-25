@@ -65,8 +65,7 @@ export const NODE_RULES: Record<Node, string> = {
    that class it added that you had not seen. A class is done after three
    consecutive sources add no new brand of that class — one combined count lets
    a long direct list end the indirect search, which is the failure to avoid.`,
-  review_mining: `**review_mining** — verbatim customer language with star rating, date, and a
-   three-axis code (\`why_bought\` / \`why_stayed\` / \`why_quit\`). **You must
+  review_mining: `**review_mining** — verbatim customer language with star rating and date. **You must
    capture 3-star reviews specifically** — they are the most honest text in
    commerce. Never clean up, summarise or paraphrase a quote: "I wake up at 3am
    and can't get back to sleep" is usable and "sleep maintenance issues" is not,
@@ -82,6 +81,12 @@ export const NODE_RULES: Record<Node, string> = {
       spread can be trusted. Do not split it across turns.
    c. \`amazon_reviews\` / \`trustpilot_reviews\` only to retry one pull that
       \`mine_reviews\` reported as failed.
+   d. **You never copy a review into the packet.** The server adds every
+      fetched review, verbatim, with its source, star and date. Reviews are
+      stored raw at this stage: no axis, no themes.
+   e. Your packet's \`excerpts\` and \`sources\` hold only what you fetched with
+      \`web_fetch\`. Measurements and saturation points about a pull cite its
+      handle as \`source_id\`, e.g. \`"p3"\`; the server swaps in the hash.
    Ratings vastly outnumber written reviews in most categories, so
    \`no 3-star reviews with text\` is a common and *correct* answer. When a tool
    reports a GAP, record it and move on. **Never fill a missing 3-star band with
@@ -90,9 +95,10 @@ export const NODE_RULES: Record<Node, string> = {
    the product, and they are different evidence about different questions.
 
    A review can be verbatim, first-hand and still be about a *different
-   product*: recycled Amazon listings keep their old reviews. If an excerpt's
-   subject matter does not match the product, reject it and say so — an
-   unverified purchase on a listing with very few reviews is the warning sign.`,
+   product*: recycled Amazon listings keep their old reviews. You will not read
+   the reviews, so this is judged when you choose a listing: a title that does
+   not match the product, or a listing with very few reviews, is the warning
+   sign. Screening single reviews happens at a later stage.`,
   category_data: `**category_data** — search volume as a trend over at least three years (a
    single point estimate is a gap), category size figures, seasonality. Numbers
    with their source, never your reading of them.`,

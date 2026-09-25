@@ -1,10 +1,12 @@
 import type { z } from "zod";
 
 import {
+  EMPTY_LEDGER,
   STAGE_NODES,
   Stages,
   stagePacketSchema,
   type Node,
+  type ReviewLedgerSnapshot,
   type StagePacket,
 } from "../domain/index.js";
 
@@ -15,6 +17,7 @@ import { CitationCheck } from "./citation-check.js";
 import { CompetitorCheck } from "./competitor-check.js";
 import { CompletenessCheck } from "./completeness-check.js";
 import { PacketError } from "./errors.js";
+import { ReviewAssembly } from "./review-assembly.js";
 import { ScopeCheck } from "./scope-check.js";
 import type { PacketCheck, PacketContext } from "./check.js";
 
@@ -43,25 +46,38 @@ export class ZodProblems {
   }
 }
 
-/** Checks a packet against the contract, and reports every problem at once. */
+/** Checks a packet against the contract, with the run's reviews assembled in, and reports every problem at once. */
 export class PacketValidator {
-  private readonly checks: readonly PacketCheck[] = [
-    new ScopeCheck(),
-    new BriefCheck(),
-    new CitationCheck(),
-    new CompletenessCheck(),
-    new CompetitorCheck(),
-    new ChampionCheck(),
-  ];
-
+  private readonly checks: readonly PacketCheck[];
+  private readonly assembly: ReviewAssembly;
   private readonly extractor = new PacketExtractor();
+
+  constructor(ledger: ReviewLedgerSnapshot = EMPTY_LEDGER) {
+    this.assembly = new ReviewAssembly(ledger);
+    this.checks = [
+      new ScopeCheck(),
+      new BriefCheck(),
+      new CitationCheck(),
+      new CompletenessCheck(),
+      new CompetitorCheck(),
+      new ChampionCheck(),
+    ];
+  }
+
+  expand(draft: Record<string, unknown>): Record<string, unknown> {
+    return this.assembly.expand(draft);
+  }
 
   validate(
     data: unknown,
     scope: readonly Node[] = STAGE_NODES[1],
     brief?: { product?: unknown; url?: unknown },
   ): StagePacket {
-    const parsed = stagePacketSchema.safeParse(data);
+    const assembled =
+      data && typeof data === "object" && !Array.isArray(data)
+        ? this.assembly.expand(data as Record<string, unknown>)
+        : data;
+    const parsed = stagePacketSchema.safeParse(assembled);
     if (!parsed.success) throw new PacketError(ZodProblems.readable(parsed.error));
     const packet = parsed.data;
 

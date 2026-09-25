@@ -8,6 +8,7 @@ import type {
   RunUpdate,
 } from "./logs.js";
 import type { ResearchRun } from "./records.js";
+import type { ReviewLedgerSnapshot, StoredRunReview } from "./reviews.js";
 
 export interface ResearchStore {
   createRun(input: {
@@ -32,6 +33,8 @@ export interface ResearchStore {
   addLlmCall(call: LlmCallRecord): LlmCall;
   setLlmCallBilled(runId: string, responseId: string, cost: number): void;
   listLlmCalls(runId: string): LlmCall[];
+  saveRunReviews(runId: string, ledger: ReviewLedgerSnapshot): number;
+  listRunReviews(runId: string): StoredRunReview[];
 
   close(): void;
 }

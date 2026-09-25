@@ -17,7 +17,7 @@ import {
   STAGE_NODES,
   briefSchema,
 } from "../src/domain/index.js";
-import type { Judgement } from "../src/domain/index.js";
+import type { Judgement, ReviewLedgerSnapshot } from "../src/domain/index.js";
 import { AgentMessages, PromptBuilder } from "../src/agent/prompt/index.js";
 
 const prompts = new PromptBuilder();
@@ -52,11 +52,51 @@ describe("the worked example", () => {
     expect(stage1.excerpts).toHaveLength(0);
     expect(stage1.competitors.length).toBeGreaterThan(0);
 
-    const stage2 = packets.parse(build({ nodes: ["review_mining"] }), STAGE_NODES[2]);
+    // A stage-2 example carries no review the model copied: its reviews come
+    // from the ledger, and its pull handle "p1" becomes that pull's hash.
+    const ledger: ReviewLedgerSnapshot = {
+      pulls: [
+        {
+          handle: "p1",
+          source_id: `sha256:${"a".repeat(64)}`,
+          target_id: "product",
+          platform: "amazon",
+          listing: "https://www.amazon.co.uk/dp/B0C0000000",
+          band_requested: 3,
+          fetched_at: "2026-09-10T09:20:11Z",
+          archived: true,
+          total_reviews: 40,
+          total_ratings: 25331,
+          gap: null,
+        },
+      ],
+      reviews: [
+        {
+          ref: "r1.1",
+          pull: "p1",
+          platform: "amazon",
+          review_key: "R1",
+          listing: "https://www.amazon.co.uk/dp/B0C0000000",
+          star: 3,
+          title: "slow",
+          text: "Took it for a week, felt nothing, cancelled.",
+          posted_at: "2026-05-19",
+          verified: true,
+          locator: "https://www.amazon.co.uk/gp/customer-reviews/R1",
+        },
+      ],
+    };
+    const drafted = extractor.extract(build({ nodes: ["review_mining"] }));
+    expect(drafted.sources as unknown[]).not.toContainEqual(
+      expect.objectContaining({ kind: "marketplace_review" }),
+    );
+    const stage2 = new PacketValidator(ledger).validate(drafted, STAGE_NODES[2]);
     expect(stage2.stage).toBe(2);
     expect(stage2.competitors).toHaveLength(0);
-    // The 3★ coverage the validator demands, shown where it belongs.
     expect(stage2.excerpts.some((e) => e.star_rating === 3)).toBe(true);
+    expect(stage2.measurements.find((m) => m.node === "review_mining")?.source_id).toBe(
+      `sha256:${"a".repeat(64)}`,
+    );
   });
 });
 

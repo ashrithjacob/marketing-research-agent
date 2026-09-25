@@ -186,3 +186,60 @@ describe("llm calls", () => {
     expect(second!.billed_cost).toBeCloseTo(0.0042, 10);
   });
 });
+
+describe("the review corpus", () => {
+  const snapshot = (text: string) => ({
+    pulls: [
+      {
+        handle: "p1",
+        source_id: "sha256:abc",
+        target_id: "product",
+        platform: "amazon" as const,
+        listing: "https://www.amazon.com/dp/B0H2JVQ9GR",
+        band_requested: 3,
+        fetched_at: "2026-09-25T12:00:00Z",
+        archived: true,
+        total_reviews: null,
+        total_ratings: null,
+        gap: null,
+      },
+    ],
+    reviews: [
+      {
+        ref: "r1.1",
+        pull: "p1",
+        platform: "amazon" as const,
+        review_key: "R1",
+        listing: "https://www.amazon.com/dp/B0H2JVQ9GR",
+        star: 3,
+        title: "t",
+        text,
+        posted_at: "2026-08-01",
+        verified: true,
+        locator: "https://www.amazon.com/gp/customer-reviews/R1",
+      },
+    ],
+  });
+
+  it("keeps a review once however many runs fetch it, and links it to each run", () => {
+    const first = newRun();
+    const second = newRun();
+    store.saveRunReviews(first.id, snapshot("works"));
+    store.saveRunReviews(second.id, snapshot("works"));
+
+    const db = new Database(join(dir, "research.db"));
+    const count = (db.prepare("SELECT COUNT(*) AS n FROM research_reviews").get() as { n: number }).n;
+    db.close();
+    expect(count).toBe(1);
+
+    for (const run of [first, second]) {
+      expect(store.listRunReviews(run.id)[0]).toMatchObject({
+        ref: "r1.1",
+        source_id: "sha256:abc",
+        target_id: "product",
+        text: "works",
+        star: 3,
+      });
+    }
+  });
+});

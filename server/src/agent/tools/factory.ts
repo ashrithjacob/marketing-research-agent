@@ -16,6 +16,8 @@ import { Searxng } from "../../adapters/searxng.js";
 import type { Settings } from "../../config/index.js";
 
 import type { FetchRecord, PacketCheckOptions } from "./lanes.js";
+import { ReviewLedger } from "../review-ledger.js";
+
 import { MineReviewsTool } from "./mine-reviews-tool.js";
 import { PacketCheckTool } from "./packet-check-tool.js";
 import {
@@ -23,6 +25,7 @@ import {
   FindProductTool,
   TrustpilotReviewsTool,
 } from "./review-tools.js";
+import { ReviewRendering } from "./review-rendering.js";
 import { WebFetchTool, WebSearchTool } from "./web-tools.js";
 
 export interface ToolsetOptions {
@@ -30,6 +33,7 @@ export interface ToolsetOptions {
   runId: string;
   packetCheck?: PacketCheckOptions;
   onFetch?: (record: FetchRecord) => void;
+  ledger?: ReviewLedger;
   onApifyCharge?: (charge: ActorCharge) => void;
   actorRunner?: ActorRunner | null;
   reviewTools?: boolean;
@@ -77,12 +81,14 @@ export class ResearchToolset {
 
     const amazon = new AmazonReviews(runner);
     const trustpilot = new TrustpilotReviews(runner);
+    const ledger = this.options.ledger ?? new ReviewLedger();
+    const rendering = new ReviewRendering(settings, runId, ledger, onFetch);
     return [
       ...web,
       findProduct,
-      new MineReviewsTool(settings, amazon, trustpilot, runId, onFetch).tool(),
-      new AmazonReviewsTool(settings, amazon, runId, onFetch).tool(),
-      new TrustpilotReviewsTool(settings, trustpilot, runId, onFetch).tool(),
+      new MineReviewsTool(settings, amazon, trustpilot, rendering).tool(),
+      new AmazonReviewsTool(settings, amazon, rendering).tool(),
+      new TrustpilotReviewsTool(settings, trustpilot, rendering).tool(),
       ...check,
     ];
   }

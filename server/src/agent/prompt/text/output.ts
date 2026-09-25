@@ -26,9 +26,8 @@ Field notes:
   or "" when it does not. Never \`null\` — \`null\` fails validation.
 - \`locator\` is optional but strongly preferred: \`{"kind": "char_range",
   "start": N, "end": N}\` so a span can be checked against the archived body.
-  A review from \`amazon_reviews\` or \`trustpilot_reviews\` has no offsets: copy
-  the \`locator\` the tool printed under it, exactly as printed, e.g.
-  \`{"kind": "url", "url": "https://…"}\`.
+  Reviews from the review tools are never written here: the server adds
+  them, with their locators.
 - \`nodes\` must contain an entry for {nodes_note}, \`complete\` or
   \`incomplete\`, with \`why\` naming the criterion that was or was not met.
 - \`gaps\` must not be empty.

@@ -8,6 +8,7 @@ import { AgentEventRecorder } from "./event-recorder.js";
 import type { LiveRuns } from "./live-runs.js";
 import { AgentMessages } from "./prompt/index.js";
 import { Retries, type RetryPolicy } from "./retry.js";
+import type { ReviewLedger } from "./review-ledger.js";
 import { RunSettlement } from "./run-settlement.js";
 import { UsageTotals } from "./usage.js";
 
@@ -24,9 +25,10 @@ export class RunWatch {
       runId: string;
       nodes: readonly Node[];
       pricing: Pricing;
+      ledger: ReviewLedger;
     },
   ) {
-    this.settlement = new RunSettlement(options.store, options.runs, options.runId);
+    this.settlement = new RunSettlement(options.store, options.runs, options.runId, options.ledger);
   }
 
   async run(
@@ -86,6 +88,7 @@ export class RunWatch {
       runs.emit(runId, "run.failed", { error: message });
     } finally {
       unsubscribe();
+      this.keepReviews();
       await this.recordBilling(billing);
       runs.closeSubscribers(runId);
       runs.remove(runId);
@@ -108,6 +111,16 @@ export class RunWatch {
       return false;
     } catch {
       return true;
+    }
+  }
+
+  private keepReviews(): void {
+    const { store, runs, runId, ledger } = this.options;
+    try {
+      const saved = store.saveRunReviews(runId, ledger.snapshot());
+      if (saved > 0) runs.emit(runId, "reviews.saved", { reviews: saved });
+    } catch (error) {
+      console.error(`research run ${runId}: saving the reviews failed`, error);
     }
   }
 

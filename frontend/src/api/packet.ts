@@ -129,3 +129,28 @@ export interface StagePacket {
   nodes: NodeStatus[];
   gaps: Gap[];
 }
+
+export const VOICE_PER_STAR = 10;
+
+function stableRank(id: string): number {
+  let hash = 2166136261;
+  for (let i = 0; i < id.length; i++) {
+    hash = Math.imul(hash ^ id.charCodeAt(i), 16777619);
+  }
+  return hash >>> 0;
+}
+
+/** Up to `perStar` quotes from each star rating, 1★ to 5★ then unrated, picked at random but the same pick every render. */
+export function sampleVoice(excerpts: Excerpt[], perStar = VOICE_PER_STAR): Excerpt[] {
+  const groups = new Map<number | null, Excerpt[]>();
+  for (const excerpt of excerpts) {
+    const star = excerpt.star_rating ?? null;
+    groups.set(star, [...(groups.get(star) ?? []), excerpt]);
+  }
+  const order: Array<number | null> = [1, 2, 3, 4, 5, null];
+  return order.flatMap((star) =>
+    [...(groups.get(star) ?? [])]
+      .sort((a, b) => stableRank(a.id) - stableRank(b.id))
+      .slice(0, perStar),
+  );
+}

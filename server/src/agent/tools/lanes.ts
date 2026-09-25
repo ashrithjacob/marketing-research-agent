@@ -1,4 +1,4 @@
-import type { Node, StagePacket } from "../../domain/index.js";
+import type { Node, ReviewLedgerSnapshot, StagePacket } from "../../domain/index.js";
 
 export interface FetchRecord {
   source_id: string;
@@ -28,6 +28,7 @@ export const PACKET_CHECK_BUDGET = 5;
 export interface PacketCheckOptions {
   nodes: readonly Node[];
   brief: { product?: unknown; url?: unknown };
+  reviews?: () => ReviewLedgerSnapshot;
   onValid: (packet: StagePacket) => void;
   onChecked?: (valid: boolean, problems: readonly string[]) => void;
 }

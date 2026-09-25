@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import type {
   Competitor,
   Excerpt,
@@ -7,6 +7,7 @@ import type {
   Source,
   StagePacket,
 } from '../api';
+import { VOICE_PER_STAR, sampleVoice } from '../api';
 import { BarList } from './charts';
 import { Chip, Tile, TileGaps } from './tile';
 import { SourceRow } from './packet-sections';
@@ -186,10 +187,15 @@ export function CompetitorsTile({
 
 export function VoiceTile({ voice }: { voice: Excerpt[] }) {
   const [open, setOpen] = useState(false);
+  const shown = useMemo(() => sampleVoice(voice), [voice]);
   return (
     <Tile
       label="Voice of customer"
-      sub="verbatim, never paraphrased"
+      sub={
+        shown.length < voice.length
+          ? `verbatim · ${shown.length} of ${voice.length}, ${VOICE_PER_STAR} per star at random`
+          : 'verbatim, never paraphrased'
+      }
       open={open}
       onToggle={() => setOpen((o) => !o)}
       chips={
@@ -198,15 +204,15 @@ export function VoiceTile({ voice }: { voice: Excerpt[] }) {
         </Chip>
       }
       preview={
-        voice[0] ? (
+        shown[0] ? (
           <div className="tile-headline">
-            <div className="tile-quote">“{voice[0].text}”</div>
+            <div className="tile-quote">“{shown[0].text}”</div>
           </div>
         ) : undefined
       }
     >
       {voice.length === 0 && <p className="muted">Nothing yet.</p>}
-      {voice.map((excerpt) => (
+      {shown.map((excerpt) => (
         <div key={excerpt.id} className="item">
           <div className="q">
             “{excerpt.text}”
@@ -223,4 +229,3 @@ export function VoiceTile({ voice }: { voice: Excerpt[] }) {
     </Tile>
   );
 }
-

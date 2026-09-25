@@ -10,4 +10,5 @@ export * from "./citation-check.js";
 export * from "./completeness-check.js";
 export * from "./competitor-check.js";
 export * from "./stage-two-roster.js";
+export * from "./review-assembly.js";
 export * from "./validator.js";

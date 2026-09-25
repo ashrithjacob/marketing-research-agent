@@ -8,7 +8,6 @@ import {
 } from "../../adapters/apify/index.js";
 import type { Settings } from "../../config/index.js";
 
-import type { FetchRecord } from "./lanes.js";
 import {
   amazonReviewParameters,
   findProductParameters,
@@ -61,38 +60,39 @@ export class AmazonReviewsTool {
   constructor(
     private readonly settings: Settings,
     private readonly reviews: AmazonReviews,
-    private readonly runId: string,
-    private readonly onFetch?: (record: FetchRecord) => void,
+    private readonly rendering: ReviewRendering,
   ) {}
 
   tool(): AgentTool<typeof amazonReviewParameters> {
-    const { settings, reviews, runId, onFetch } = this;
+    const { settings, reviews, rendering } = this;
     return {
       name: "amazon_reviews",
       label: "Amazon reviews",
       description:
         "Fetch verbatim Amazon reviews for ONE product url, optionally at one " +
-        "star band. Returns text, star, date and a locator, archived and hashed " +
-        "like web_fetch. Call it once per star band to cover 1-5; 3 is " +
+        "star band — use it only to retry one pull mine_reviews reported as failed. " +
+        "Reviews go into the run's ledger like mine_reviews; 3 is " +
         "mandatory. If it reports a GAP, record the gap — never substitute " +
         "another band.",
       parameters: amazonReviewParameters,
       async execute(_id, params, signal) {
         const limit = ReviewRendering.limit(params.max_reviews, settings.apifyMaxReviews);
+        const star = ReviewRendering.starBand(params.star);
         const result = await reviews.fetch({
           productUrl: params.product_url,
-          star: ReviewRendering.starBand(params.star),
+          star,
           maxReviews: limit,
           signal,
         });
-        return ReviewRendering.render(
-          settings,
-          runId,
-          params.product_url,
+        const rendered = await rendering.render(
+          { target_id: params.target_id ?? "", platform: "amazon", listing: params.product_url, band: star },
           result,
-          onFetch,
           ReviewRendering.cappedNote(params.max_reviews, limit),
         );
+        return {
+          content: [{ type: "text", text: `${rendered.text}\n\n${rendering.footer()}` }],
+          details: rendered.details,
+        };
       },
     };
   }
@@ -102,12 +102,11 @@ export class TrustpilotReviewsTool {
   constructor(
     private readonly settings: Settings,
     private readonly reviews: TrustpilotReviews,
-    private readonly runId: string,
-    private readonly onFetch?: (record: FetchRecord) => void,
+    private readonly rendering: ReviewRendering,
   ) {}
 
   tool(): AgentTool<typeof trustpilotReviewParameters> {
-    const { settings, reviews, runId, onFetch } = this;
+    const { settings, reviews, rendering } = this;
     return {
       name: "trustpilot_reviews",
       label: "Trustpilot reviews",
@@ -120,20 +119,22 @@ export class TrustpilotReviewsTool {
       parameters: trustpilotReviewParameters,
       async execute(_id, params, signal) {
         const limit = ReviewRendering.limit(params.max_reviews, settings.apifyMaxReviews);
+        const star = ReviewRendering.starBand(params.star);
         const result = await reviews.fetch({
           domainOrUrl: params.domain,
-          star: ReviewRendering.starBand(params.star),
+          star,
           maxItems: limit,
           signal,
         });
-        return ReviewRendering.render(
-          settings,
-          runId,
-          params.domain,
+        const rendered = await rendering.render(
+          { target_id: params.target_id ?? "", platform: "trustpilot", listing: params.domain, band: star },
           result,
-          onFetch,
           ReviewRendering.cappedNote(params.max_reviews, limit),
         );
+        return {
+          content: [{ type: "text", text: `${rendered.text}\n\n${rendering.footer()}` }],
+          details: rendered.details,
+        };
       },
     };
   }

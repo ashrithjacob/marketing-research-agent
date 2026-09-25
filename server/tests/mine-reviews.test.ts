@@ -72,7 +72,7 @@ describe("mine_reviews", () => {
     expect(amazon.every((c) => c.input.maxReviews === 7)).toBe(true);
     expect(calls.filter((c) => c.actorId === TRUSTPILOT_ACTOR)).toHaveLength(1);
     expect((result.details as any).pulls).toBe(11);
-    expect((result.content[0] as any).text.match(/source_id: /g)).toHaveLength(11);
+    expect((result.content[0] as any).text.match(/pull: p\d+/g)).toHaveLength(11);
   });
 
   it("keeps at most apifyConcurrency actor runs in flight", async () => {
@@ -91,7 +91,7 @@ describe("mine_reviews", () => {
     const text = (result.content[0] as any).text as string;
 
     expect(text).toMatch(/Amazon 3-star[\s\S]*GAP: this pull failed — actor run timed out/);
-    expect(text.match(/source_id: /g)).toHaveLength(4);
+    expect(text.match(/pull: p\d+/g)).toHaveLength(4);
   });
 });
 

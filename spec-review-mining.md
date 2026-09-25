@@ -15,6 +15,8 @@ text, with a star rating, a date, a source and an axis, at least ten per product
 text has been**, and §2.5 recorded review mining as the one node that "cannot
 complete at all".
 
+> **Superseded 2026-09-25 (the axis part):** stage 2 stores reviews raw. The server writes every fetched review into the packet verbatim with star, date and source, and the model never reads them. Coding each review on the three axes cost one sequential model turn per 40 reviews (about 67 turns, averaging 28s, for run `5aa4d71e`'s 2,658 reviews), so it moves to a later stage. See `workings.md` §2d.
+
 This spec is about reach only. It does not restate §2.3's admission rules; it says,
 per source, what route exists from **the Hetzner VPS where this is deployed**, what
 it costs, what it returns, and what it refuses.
@@ -916,7 +918,7 @@ well-formed JSON, which is easier to mishandle, not harder:
 | **empty dataset, run status `SUCCEEDED`** | **the Apify-shaped version of "a wall fetches successfully"** — never record as "no reviews" |
 | run status `FAILED` / `ABORTED` / `TIMED-OUT` | retry once, then gap |
 | **HTTP 402** | out of credit — this will look like a data problem and is not |
-| returned star ≠ requested band | actor filter misbehaving — discard, §3.4's trap in a new costume |
+| returned star ≠ requested band | ~~actor filter misbehaving — discard~~ **Superseded 2026-09-25:** the row is kept under its own rating, because its star is its own and reviews are this node's whole product. The trap in §3.4 was mislabelled stars, and a row filed under its own rating cannot be mislabelled. A band with nothing at its own rating is still a gap. |
 | returned count < requested where budget was not the cap | partial result — gap it |
 
 And on the §2 fallback path, if it is ever used:

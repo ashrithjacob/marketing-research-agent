@@ -156,11 +156,11 @@ which is how the status chip and counters change.
 | `web_search` | SearXNG `GET /search?format=json` | numbered titles, urls, snippets (default 10, max 25) | none |
 | `web_fetch` | Firecrawl `POST /v2/scrape` (markdown, main content) | header (`source_id`, url, title, `archived`) + the page text, cut at `MRA_FETCH_CHAR_LIMIT` (25 000; was 60 000 until a run's context reached 208k tokens) | body written to `/corpus/runs/<runId>/sources/<sha256>` |
 | `amazon_find_product` | Apify `junglee/free-amazon-product-scraper` | asin, stars, `reviewsCount`, title, url — most-reviewed first | none |
-| `amazon_reviews` | Apify `junglee/amazon-reviews-scraper`, one star band per call | header (`source_id`, totals, any `GAP:`) + numbered verbatim reviews with star, date, verified flag, and a locator printed as packet JSON (`{"kind": "url", "url": …}`, or a `note` when there is only a review id) | the review JSON archived like a fetch |
-| `trustpilot_reviews` | Apify `memo23/trustpilot-scraper-ppe` | same shape as above | archived like a fetch |
+| `mine_reviews` | both actors, every chosen Amazon listing × five star bands plus one Trustpilot pull per merchant, fetched in parallel, filed in job order | per pull: its **handle** (`p1`, `p2`…), counts by star, totals, any `GAP:` — **no review text** | each pull archived like a fetch; every review filed in the run's **review ledger** |
+| `amazon_reviews` / `trustpilot_reviews` | one actor run, one listing or merchant | the same per-pull summary | same as `mine_reviews`; only for retrying one failed pull |
 | `validate_packet` | `extract/`'s `PacketValidator` — the same class `RunSettlement` runs | `VALID` + counts, or the numbered problems and `Checks used: N of 5` | on the first pass: the packet is written to the run row with `packet_source = "tool"` and `packet.ready` fires mid-run |
 
-The three Apify tools exist **only when `APIFY_TOKEN` is set and the run covers
+The Apify review tools exist **only when `APIFY_TOKEN` is set and the run covers
 `review_mining`**; otherwise they are not offered at all. Without the token the
 prompt tells the agent to gap `review_mining`; on a run that does not cover it they
 are simply not needed, and withholding them keeps a product-data run from spending
@@ -439,6 +439,46 @@ things it showed:
   run gapped "amazon_reviews and trustpilot_reviews were not available" — noise
   from tools it was never meant to have. It now describes only the tools the run
   is given (`systemPrompt(nodes)`).
+
+### §2d — the review ledger: why the model never copies a review
+
+Measured on run `1d2ad3f2` (2026-09-25): `mine_reviews` returned 216 reviews as
+text, and the model then spent **720s and 78,225 output tokens** (55,063 of them
+reasoning) in one call retyping them into the packet. It kept 81 of the 216,
+dropped 7 characters from one source hash, and wrote a `captured_at` a week before
+the run happened. The packet still failed with 9 problems.
+
+So the reviews never pass through the model at all:
+
+1. The review tools (`agent/tools/review-rendering.ts`) archive each pull, then
+   file every review in the run's `ReviewLedger` (`agent/review-ledger.ts`). The
+   ledger gives each pull a handle `pN`, and each review a ref `rN.M`,
+   deduplicated on (platform, platform review id). `mine_reviews` fetches in
+   parallel but files the pulls in the order it asked for them, so refs do not
+   depend on network timing. A review the actor returns off the band requested
+   is **kept under its own rating** (`adapters/apify/band-filing.ts`); only a
+   band with nothing at its own rating becomes a gap.
+2. The model sees counts per pull, handles and gaps, never review text. Its
+   packet holds no review sources and no review excerpts; its measurements and
+   saturation points cite pull handles.
+3. `PacketValidator` (`extract/validator.ts`) takes the ledger snapshot. Before
+   checking, `ReviewAssembly` (`extract/review-assembly.ts`) adds one source per
+   pull and one excerpt per review, verbatim, and swaps handles for hashes.
+   `validate_packet` and `RunSettlement` use the same class, so they cannot
+   disagree.
+4. Reviews are stored **raw**: `axis` null, `themes` empty. Coding them, and
+   screening reviews about a different product, belong to a later stage.
+5. When the run ends, however it ends, `RunWatch` saves the ledger to SQLite:
+   `research_reviews` (one row per real review across all runs) and
+   `research_run_reviews` (which run pulled it, under which ref and pull). A
+   process restart mid-run still loses that run's reviews, because nothing is
+   written before the end.
+
+**A wrong turn, recorded:** the first version kept three-axis coding and had the
+model code every review through `read_reviews` / `code_reviews`, 40 per page. On
+run `5aa4d71e` (12 listings × 5 bands + 11 Trustpilot merchants = 2,658 reviews)
+that was about 67 sequential turns at an average of 28s each. Copying had gone,
+but a serial per-review step had replaced it. Removed the same day.
 
 ### Step 7 — the screen fills in
 

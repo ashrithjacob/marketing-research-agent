@@ -4,13 +4,12 @@ import type { AmazonReviews, ReviewResult, TrustpilotReviews } from "../../adapt
 import { Http } from "../../adapters/http.js";
 import type { Settings } from "../../config/index.js";
 
-import type { FetchRecord } from "./lanes.js";
 import { mineReviewsParameters } from "./parameters.js";
-import { ReviewRendering } from "./review-rendering.js";
+import type { PullLabel, ReviewRendering } from "./review-rendering.js";
 
 interface MiningJob {
   heading: string;
-  source: string;
+  label: PullLabel;
   fetch: (signal?: AbortSignal) => Promise<ReviewResult>;
 }
 
@@ -22,8 +21,7 @@ export class MineReviewsTool {
     private readonly settings: Settings,
     private readonly amazon: AmazonReviews,
     private readonly trustpilot: TrustpilotReviews,
-    private readonly runId: string,
-    private readonly onFetch?: (record: FetchRecord) => void,
+    private readonly rendering: ReviewRendering,
   ) {}
 
   tool(): AgentTool<typeof mineReviewsParameters> {
@@ -33,16 +31,20 @@ export class MineReviewsTool {
       description:
         "Fetch verbatim reviews for every chosen listing at once: each Amazon url " +
         "at all five star bands, plus one Trustpilot pull per merchant domain. " +
-        "Call it ONCE with every listing, after amazon_find_product. Each section " +
-        "carries its own source_id and GAP lines, exactly like amazon_reviews.",
+        "Call it ONCE with every listing, after amazon_find_product. Every review " +
+        "goes into this run's ledger and from there into the packet; the result is " +
+        "a count per pull, its pull handle and any GAP lines — never the reviews.",
       parameters: mineReviewsParameters,
       execute: async (_id, params, signal) => {
         const jobs = this.jobs(params.listings, params.trustpilot ?? []);
-        const sections = await Http.pool(jobs, this.settings.apifyConcurrency, (job) =>
-          this.section(job, signal),
+        const fetched = await Http.pool(jobs, this.settings.apifyConcurrency, (job) =>
+          MineReviewsTool.attempt(job, signal),
         );
+        const sections: Array<{ text: string; details: unknown }> = [];
+        for (const [i, job] of jobs.entries()) sections.push(await this.section(job, fetched[i]!));
+        const text = [...sections.map((s) => s.text), this.rendering.footer()].join("\n\n=====\n\n");
         return {
-          content: [{ type: "text", text: sections.map((s) => s.text).join("\n\n=====\n\n") }],
+          content: [{ type: "text", text }],
           details: { pulls: jobs.length, sources: sections.map((s) => s.details) },
         };
       },
@@ -57,43 +59,56 @@ export class MineReviewsTool {
     const amazon = listings.flatMap((listing) =>
       MineReviewsTool.BANDS.map((star) => ({
         heading: `${listing.target_id} — Amazon ${star}-star — ${listing.product_url}`,
-        source: listing.product_url,
+        label: {
+          target_id: listing.target_id,
+          platform: "amazon" as const,
+          listing: listing.product_url,
+          band: star,
+        },
         fetch: (signal?: AbortSignal) =>
           this.amazon.fetch({ productUrl: listing.product_url, star, maxReviews: limit, signal }),
       })),
     );
     const trustpilot = merchants.map((merchant) => ({
       heading: `${merchant.target_id} — Trustpilot (merchant) — ${merchant.domain}`,
-      source: merchant.domain,
+      label: {
+        target_id: merchant.target_id,
+        platform: "trustpilot" as const,
+        listing: merchant.domain,
+        band: null,
+      },
       fetch: (signal?: AbortSignal) =>
         this.trustpilot.fetch({ domainOrUrl: merchant.domain, star: null, maxItems: limit, signal }),
     }));
     return [...amazon, ...trustpilot];
   }
 
-  private async section(
+  private static async attempt(
     job: MiningJob,
     signal?: AbortSignal,
-  ): Promise<{ text: string; details: unknown }> {
+  ): Promise<ReviewResult | { failed: string }> {
     try {
-      const result = await job.fetch(signal);
-      const rendered = await ReviewRendering.render(
-        this.settings,
-        this.runId,
-        job.source,
-        result,
-        this.onFetch,
-      );
-      return { text: `## ${job.heading}\n${rendered.content[0]!.text}`, details: rendered.details };
+      return await job.fetch(signal);
     } catch (error) {
-      const why = error instanceof Error ? error.message : String(error);
+      return { failed: error instanceof Error ? error.message : String(error) };
+    }
+  }
+
+  private async section(
+    job: MiningJob,
+    fetched: ReviewResult | { failed: string },
+  ): Promise<{ text: string; details: unknown }> {
+    if ("failed" in fetched) {
+      const why = fetched.failed;
       return {
         text:
           `## ${job.heading}\nGAP: this pull failed — ${why}\n` +
           "Record this as a gap entry. Retry it alone with amazon_reviews or " +
           "trustpilot_reviews only if the failure looks transient.",
-        details: { source: job.source, error: why },
+        details: { source: job.label.listing, error: why },
       };
     }
+    const rendered = await this.rendering.render(job.label, fetched);
+    return { text: `## ${job.heading}\n${rendered.text}`, details: rendered.details };
   }
 }

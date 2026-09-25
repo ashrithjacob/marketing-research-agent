@@ -134,14 +134,14 @@ describe("amazonReviews", () => {
     expect(result.totalRatings).toBe(61);
   });
 
-  it("discards rows whose star does not match the band requested", async () => {
-    // Amazon's own `filterByStar=one_star` returns the UNFILTERED sample, which
-    // would enter the corpus as 1-star reviews that are mostly 5-star. If the
-    // actor ever does the same, the rows are fabricated star data.
+  it("keeps rows whose star does not match the band requested, under their own rating", async () => {
+    // Reviews are what this node exists to collect. A row the actor returns off
+    // the band asked for is still a real review with a real rating, so it is
+    // filed under that rating rather than thrown away.
     const { runner } = stub([
       amazonRow(3, "a real three star"),
-      amazonRow(5, "not what was asked for"),
-      amazonRow(5, "nor this"),
+      amazonRow(5, "rated five"),
+      amazonRow(5, "also five"),
     ]);
 
     const result = await new AmazonReviews(runner).fetch( {
@@ -150,9 +150,22 @@ describe("amazonReviews", () => {
       maxReviews: 10,
     });
 
-    expect(result.excerpts).toHaveLength(1);
-    expect(result.discarded).toBe(2);
-    expect(result.gap).toContain("Star data from this call is not trustworthy");
+    expect(result.excerpts.map((e) => e.star)).toEqual([3, 5, 5]);
+    expect(result.offBand).toBe(2);
+    expect(result.gap).toBeNull();
+  });
+
+  it("gaps a band when every row came back at another rating, and still keeps the rows", async () => {
+    // Amazon's own `filterByStar=one_star` returns the UNFILTERED sample. The
+    // rows are kept under their own ratings; the band itself is still empty.
+    const { runner } = stub([amazonRow(5, "five"), amazonRow(4, "four")]);
+    const result = await new AmazonReviews(runner).fetch( {
+      productUrl: "https://www.amazon.com/dp/B0H2JVQ9GR",
+      star: 1,
+      maxReviews: 10,
+    });
+    expect(result.excerpts).toHaveLength(2);
+    expect(result.gap).toContain("none came back at that rating");
   });
 
   it("keeps a mixed spread when no band was requested", async () => {
@@ -165,7 +178,7 @@ describe("amazonReviews", () => {
 
     expect(calls[0]!.input.filterByRatings).toEqual(["allStars"]);
     expect(result.excerpts).toHaveLength(2);
-    expect(result.discarded).toBe(0);
+    expect(result.offBand).toBe(0);
   });
 
   it("gaps an empty dataset instead of reporting no reviews", async () => {
@@ -241,16 +254,15 @@ describe("trustpilotReviews", () => {
     expect(calls[0]!.input.reviewInsights).toBeUndefined();
   });
 
-  it("discards rows whose star does not match", async () => {
+  it("keeps rows whose star does not match, under their own rating", async () => {
     const { runner } = stub([row(3, "asked for this"), row(1, "did not ask for this")]);
     const result = await new TrustpilotReviews(runner).fetch( {
       domainOrUrl: "huel.com",
       star: 3,
       maxItems: 10,
     });
-    expect(result.excerpts).toHaveLength(1);
-    expect(result.discarded).toBe(1);
-    expect(result.gap).toContain("other ratings came back");
+    expect(result.excerpts.map((e) => e.star)).toEqual([3, 1]);
+    expect(result.offBand).toBe(1);
   });
 });
 

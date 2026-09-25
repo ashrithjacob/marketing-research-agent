@@ -12,7 +12,6 @@ import { ChatText } from './FileBox';
 import { nowPanel, runStage } from './run-view/now';
 import { RailColumn, subjectProgress } from './run-view/rail';
 import { useRunStream } from './run-view/use-run-stream';
-import { AngleMapTile } from './run-view/tiles-angle';
 import { CompetitorsTile, VoiceTile } from './run-view/tiles-market';
 import { CategoryTile, ProductTile } from './run-view/tiles-data';
 
@@ -206,7 +205,6 @@ export default function RunView({
             {(voice.length > 0 || nodesInRun.has('review_mining')) && (
               <VoiceTile voice={voice} />
             )}
-            <AngleMapTile />
           </div>
         )}
 

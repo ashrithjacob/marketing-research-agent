@@ -32,7 +32,12 @@ export const starParameter = Type.Optional(
   }),
 );
 
+const targetParameter = Type.Optional(
+  Type.String({ description: "The roster id this pull belongs to, e.g. product or c1." }),
+);
+
 export const amazonReviewParameters = Type.Object({
+  target_id: targetParameter,
   product_url: Type.String({ description: "An Amazon product url, e.g. https://www.amazon.com/dp/B0H2JVQ9GR" }),
   star: starParameter,
   max_reviews: Type.Optional(Type.Number({
@@ -43,6 +48,7 @@ export const amazonReviewParameters = Type.Object({
 });
 
 export const trustpilotReviewParameters = Type.Object({
+  target_id: targetParameter,
   domain: Type.String({
     description: "Company domain, slug, or Trustpilot /review/ url — e.g. huel.com",
   }),
@@ -70,3 +76,4 @@ export const mineReviewsParameters = Type.Object({
     { description: "Merchants with a Trustpilot presence worth mining; one mixed-star pull each." },
   )),
 });
+

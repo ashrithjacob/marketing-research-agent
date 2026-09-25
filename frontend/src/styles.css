@@ -327,23 +327,6 @@ h3 .n { color: var(--faint); text-transform: none; letter-spacing: 0.02em; font-
 }
 .card.gap .v { color: var(--warn); }
 
-/* ---------- angle map (stage-4 output; rendered empty until then) ---------- */
-.grid { display: grid; grid-template-columns: auto repeat(5, 1fr); gap: 3px; margin-bottom: 6px; }
-.grid .gh { color: var(--faint); text-align: center; padding: 2px 0; font-size: 9.5px; }
-.grid .rh {
-  color: var(--dim); padding-right: 6px; text-align: right; font-size: 10.5px;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 92px;
-  align-self: center;
-}
-.cell { height: 24px; border-radius: 5px; background: var(--panel-2); border: 1px solid var(--line); }
-.cell.ev { background: rgba(5, 150, 105, 0.15); border-color: rgba(5, 150, 105, 0.4); }
-.cell.inf { background: rgba(124, 58, 237, 0.12); border-color: rgba(124, 58, 237, 0.4); }
-.cell.no {
-  background: repeating-linear-gradient(45deg, var(--panel-2), var(--panel-2) 3px, #f8fafc 3px, #f8fafc 6px);
-}
-.legend { display: flex; gap: 12px; font-size: 11px; color: var(--faint); margin-bottom: 8px; }
-.sw { display: inline-block; width: 9px; height: 9px; border-radius: 3px; margin-right: 4px; vertical-align: -1px; }
-
 .item { border-top: 1px solid var(--line); padding: 9px 0; font-size: 12.5px; }
 .item:first-of-type { border-top: 0; }
 .item .q { color: var(--ink); }

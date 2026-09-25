@@ -1,6 +1,6 @@
 import type { AgentTool } from "@earendil-works/pi-agent-core";
 
-import type { StagePacket } from "../../domain/index.js";
+import { EMPTY_LEDGER, type StagePacket } from "../../domain/index.js";
 import { PacketDraft, PacketError, PacketValidator } from "../../extract/index.js";
 
 import { PACKET_CHECK_BUDGET, type PacketCheckOptions } from "./lanes.js";
@@ -21,7 +21,7 @@ export class PacketCheckTool {
         name: "validate_packet",
         label: "Check the packet",
         description:
-          "Check a draft stage-1 packet against the contract. Returns VALID, or the " +
+          "Check a draft packet against the contract. Returns VALID, or the " +
           "exact problems to fix. Call it as soon as you have a few sources, and " +
           "again after each fix — a problem costs one call here and the whole run at " +
           "the end. The first packet that passes is this run's result; emit that same " +
@@ -91,7 +91,8 @@ export class PacketCheckTool {
           let packet: StagePacket | null = null;
           let problems: string[] = [];
           try {
-            packet = new PacketValidator().validate(draft, check.nodes, check.brief);
+            const ledger = check.reviews?.() ?? EMPTY_LEDGER;
+            packet = new PacketValidator(ledger).validate(draft, check.nodes, check.brief);
           } catch (error) {
             problems =
               error instanceof PacketError

@@ -294,12 +294,14 @@ describe("review tools", () => {
     expect(JSON.parse(stored.toString())[0].text).toBe(
       "It works but you must reapply several times a day.",
     );
-    expect((result.content[0] as any).text).toContain("[3*]");
+    expect((result.content[0] as any).text).toContain("pull: p1");
   });
 
-  it("prints each review's locator as the packet JSON the contract accepts", async () => {
-    // Printed as a bare url, the model invented {"kind": "url", "value": …} for
-    // all 19 excerpts of a run, and the packet was rejected for it.
+  it("keeps review text out of what the model reads", async () => {
+    // Run 1d2ad3f2 (2026-09-25): shown every review in the pull result, the model
+    // spent 720s and 78,225 output tokens copying them into the packet, dropped
+    // 135 of 216, and mangled a source hash. The server now writes the excerpts,
+    // so the text never needs to reach the model at all.
     const list = reviewTools(
       runner([
         {
@@ -309,25 +311,14 @@ describe("review tools", () => {
         },
       ]),
     );
-    const tool = list.find((t) => t.name === "amazon_reviews")!;
-    const result = await tool.execute("1", {
+    const pull = await list.find((t) => t.name === "amazon_reviews")!.execute("1", {
       product_url: "https://www.amazon.com/dp/B0H2JVQ9GR",
       star: 4,
     });
-    const text: string = (result.content[0] as any).text;
-    const printed = text.match(/locator: (\{.*\})/)![1]!;
-    expect(JSON.parse(printed)).toEqual({
-      kind: "url",
-      url: "https://www.amazon.com/gp/customer-reviews/R83A6B2PFC42",
-    });
-    // Copied as printed, it validates.
-    expect(locatorSchema.safeParse(JSON.parse(printed)).success).toBe(true);
-  });
-
-  it("falls back to a note locator when the actor gives only a review id", () => {
-    const printed = JSON.parse(ReviewRendering.locator("R83A6B2PFC42"));
-    expect(printed).toEqual({ kind: "note", note: "review id R83A6B2PFC42" });
-    expect(locatorSchema.safeParse(printed).success).toBe(true);
+    const text = (pull.content[0] as any).text as string;
+    expect(text).not.toContain("Less swelling");
+    expect(text).toContain("reviews: 1 new (4* 1)");
+    expect(text).toContain("Never copy a review into the packet");
   });
 
   it("surfaces a gap in the text the model reads, not just in details", async () => {

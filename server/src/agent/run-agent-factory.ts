@@ -2,6 +2,7 @@ import { Agent } from "@earendil-works/pi-agent-core";
 import type { Api, Model, Models } from "@earendil-works/pi-ai";
 
 import { OpenRouterPrices, type Pricing } from "../adapters/index.js";
+import type { ActorRunner } from "../adapters/apify/index.js";
 import type { Settings } from "../config/index.js";
 import type {
   Brief,
@@ -17,6 +18,7 @@ import { LlmCallLog } from "./llm-call-log.js";
 import type { LiveRuns } from "./live-runs.js";
 import type { PromptBuilder } from "./prompt/index.js";
 import type { RetryPolicy } from "./retry.js";
+import { ReviewLedger } from "./review-ledger.js";
 import { RunWatch } from "./run-watch.js";
 import { StageTwoHandoff } from "./stage-two-handoff.js";
 import { ResearchToolset } from "./tools/index.js";
@@ -34,6 +36,7 @@ export class RunAgentFactory {
     private readonly costs: OpenRouterPrices,
     private readonly retry: RetryPolicy,
     private readonly prompts: PromptBuilder,
+    private readonly actorRunner?: ActorRunner | null,
   ) {
     this.handoff = new StageTwoHandoff(store);
   }
@@ -54,6 +57,7 @@ export class RunAgentFactory {
     const stageTwo = Stages.covering(nodes) === 2;
     const source = stageTwo ? this.handoff.forBrief(options.brief) : null;
     const roster = source ? StageTwoRoster.of(source.packet) : [];
+    const ledger = new ReviewLedger();
     const watch = new RunWatch({
       store: this.store,
       runs: this.runs,
@@ -62,6 +66,7 @@ export class RunAgentFactory {
       runId,
       nodes,
       pricing,
+      ledger,
     });
     const billed = new BilledCosts(this.store, this.runs, runId);
     const streamFn = new LlmCallLog({
@@ -79,6 +84,8 @@ export class RunAgentFactory {
           settings: this.settings,
           runId,
           reviewTools: nodes.includes("review_mining"),
+          ledger,
+          actorRunner: this.actorRunner,
           productSearch: nodes.includes("competitors"),
           subject: options.brief.product || options.brief.url,
           market: options.brief.market,
@@ -91,6 +98,7 @@ export class RunAgentFactory {
           packetCheck: {
             nodes,
             brief: options.brief,
+            reviews: () => ledger.snapshot(),
             onValid: (packet) => watch.settlement.keepValidated(packet),
             onChecked: (valid, problems) => {
               this.store.addPacketCheck(runId, valid, problems);

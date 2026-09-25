@@ -6,12 +6,13 @@ export interface ReviewExcerpt {
   title: string;
   verified: boolean;
   source: "amazon" | "trustpilot";
+  reviewKey: string;
 }
 
 export interface ReviewResult {
   excerpts: ReviewExcerpt[];
   gap: string | null;
-  discarded: number;
+  offBand: number;
   totalReviews: number | null;
   totalRatings: number | null;
 }

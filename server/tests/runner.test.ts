@@ -850,3 +850,56 @@ describe("a run that covers part of the stage", () => {
     expect(tools).toContain("amazon_reviews");
   });
 });
+
+describe("review mining through the ledger", () => {
+  const LISTING = "https://www.amazon.com/dp/B0H2JVQ9GR";
+  const BANDS = ["oneStar", "twoStar", "threeStar", "fourStar", "fiveStar"];
+  const actorRunner = {
+    async run(_actorId: string, input: Record<string, any>) {
+      const star = BANDS.indexOf(input.filterByRatings?.[0]) + 1;
+      return {
+        status: "SUCCEEDED",
+        items: [{ reviewDescription: `A ${star}-star review, verbatim.`, ratingScore: star, reviewId: `R${star}` }],
+      };
+    },
+  };
+  const mine = () =>
+    fauxAssistantMessage(
+      fauxToolCall("mine_reviews", { listings: [{ target_id: "product", product_url: LISTING }] }),
+      { stopReason: "toolUse" },
+    );
+
+  beforeEach(() => {
+    supervisor = new RunSupervisor({ store, settings, models, retry: FAST_RETRY, actorRunner });
+  });
+
+  it("puts every fetched review in the packet without the model copying any", async () => {
+    faux.setResponses([mine(), fauxAssistantMessage(fenced(reviewPacket()))]);
+    const runId = supervisor.start(request({ nodes: ["review_mining"] }));
+    await supervisor.waitFor(runId);
+
+    const run = store.getRun(runId)!;
+    expect(run.status).toBe("completed");
+    const excerpts = (run.packet as any).excerpts as Array<{ id: string; text: string; star_rating: number }>;
+    // mine_reviews files pulls in the order it asks for them — 3, 1, 2, 4, 5 —
+    // however the fetches finish, so r1.1 is the 3-star review.
+    expect(excerpts.find((e) => e.id === "r1.1")).toMatchObject({ text: "A 3-star review, verbatim.", star_rating: 3 });
+    expect(excerpts.filter((e) => /^r\d+\.\d+$/.test(e.id))).toHaveLength(5);
+    expect(store.listRunReviews(runId)).toHaveLength(5);
+  });
+
+  it("keeps every fetched review even when the run ends invalid", async () => {
+    faux.setResponses([
+      mine(),
+      fauxAssistantMessage("no packet, only prose"),
+      fauxAssistantMessage("still no packet"),
+    ]);
+    const runId = supervisor.start(request({ nodes: ["review_mining"] }));
+    await supervisor.waitFor(runId);
+
+    expect(store.getRun(runId)!.status).toBe("invalid");
+    const kept = store.listRunReviews(runId);
+    expect(kept).toHaveLength(5);
+    expect(store.listEvents(runId).map((e) => e.kind)).toContain("reviews.saved");
+  });
+});

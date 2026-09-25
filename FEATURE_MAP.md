@@ -106,7 +106,6 @@ generic gaps table:
 | Competitors | direct/indirect groups, social-proof review-count chart, excerpts, gaps | `packet.competitors`, `measurements` |
 | Category data | market-size/CAGR bar charts, every figure with its period, gaps | `measurements` with `node: 'category_data'` |
 | Voice of customer | verbatim `review_mining` excerpts | `packet.excerpts` |
-| Angle map | the avatar × awareness grid, empty until stage 4 | static |
 
 Charts are hand-rolled SVG (`run-view/charts.tsx` `BarList`) — no chart
 library. Packet rows are grouped per node in `RunView.tsx` (`byNode`); a

@@ -2,6 +2,7 @@ import { createModels, type Models } from "@earendil-works/pi-ai";
 import { openrouterProvider } from "@earendil-works/pi-ai/providers/openrouter";
 
 import { OpenRouterPrices } from "../adapters/index.js";
+import type { ActorRunner } from "../adapters/apify/index.js";
 import type { Settings } from "../config/index.js";
 import {
   Clock,
@@ -26,7 +27,6 @@ export class RunSupervisor {
   private readonly settings: Settings;
   private readonly models: Models;
   readonly costs: OpenRouterPrices;
-  private readonly retry: RetryPolicy;
   private readonly runs: LiveRuns;
   private readonly factory: RunAgentFactory;
 
@@ -36,11 +36,11 @@ export class RunSupervisor {
     models?: Models;
     costs?: OpenRouterPrices;
     retry?: RetryPolicy;
+    actorRunner?: ActorRunner | null;
   }) {
     this.store = options.store;
     this.runs = new LiveRuns(options.store);
     this.settings = options.settings;
-    this.retry = options.retry ?? DEFAULT_RETRY;
     this.costs =
       options.costs ?? new OpenRouterPrices({ apiKey: options.settings.openrouterApiKey });
     this.models = options.models ?? RunSupervisor.defaultModels();
@@ -50,8 +50,9 @@ export class RunSupervisor {
       this.runs,
       this.models,
       this.costs,
-      this.retry,
+      options.retry ?? DEFAULT_RETRY,
       new PromptBuilder(),
+      options.actorRunner,
     );
   }
 

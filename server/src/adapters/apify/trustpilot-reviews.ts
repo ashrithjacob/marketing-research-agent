@@ -1,10 +1,6 @@
-import {
-  AMAZON_REVIEWS_ACTOR,
-  STAR_BAND,
-  Spend,
-  TRUSTPILOT_ACTOR,
-} from "./actors.js";
-import { Field } from "./fields.js";
+import { Spend, TRUSTPILOT_ACTOR } from "./actors.js";
+import { BandFiling } from "./band-filing.js";
+import { Field, ReviewKey } from "./fields.js";
 import type { ActorRunner } from "./runner.js";
 import type { ReviewExcerpt, ReviewResult } from "./types.js";
 
@@ -38,41 +34,34 @@ export class TrustpilotReviews {
       return {
         excerpts: [],
         gap: `Apify run finished ${status} with an empty dataset for ${domainOrUrl} (${band}).`,
-        discarded: 0,
+        offBand: 0,
         totalReviews: null,
         totalRatings: null,
       };
     }
 
-    const excerpts: ReviewExcerpt[] = [];
-    let discarded = 0;
+    const rows: ReviewExcerpt[] = [];
     for (const item of items) {
       const text = Field.text(item.text).trim();
-      const starScore = Field.numberOrNull(item.rating);
       if (!text) continue;
-      if (star !== null && starScore !== star) {
-        discarded += 1;
-        continue;
-      }
-      excerpts.push({
+      const date = Field.text(item.experiencedDate) || Field.text(item.publishedDate) || null;
+      rows.push({
         text,
-        star: starScore,
-        date: Field.text(item.experiencedDate) || Field.text(item.publishedDate) || null,
+        star: Field.numberOrNull(item.rating),
+        date,
         locator: Field.text(item.url) || Field.text(item.id),
         title: Field.text(item.title),
         verified: item.isVerified === true,
         source: "trustpilot",
+        reviewKey: ReviewKey.of(Field.text(item.id), domainOrUrl, date, text),
       });
     }
 
-    let gap: string | null = null;
-    if (discarded > 0) {
-      gap =
-        `Discarded ${discarded} of ${items.length} Trustpilot rows for ${domainOrUrl}: ` +
-        `asked for ${band} and other ratings came back.`;
-    } else if (excerpts.length === 0) {
-      gap = `Apify returned ${items.length} rows for ${domainOrUrl} (${band}) but none carried text.`;
-    }
-    return { excerpts, gap, discarded, totalReviews: null, totalRatings: null };
+    const filed = BandFiling.file(rows, star, domainOrUrl);
+    const gap =
+      rows.length === 0
+        ? `Apify returned ${items.length} rows for ${domainOrUrl} (${band}) but none carried text.`
+        : filed.gap;
+    return { excerpts: filed.excerpts, gap, offBand: filed.offBand, totalReviews: null, totalRatings: null };
   }
 }

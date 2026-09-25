@@ -72,6 +72,18 @@ classDiagram
     class RejectKinds {
       effective()
     }
+    class LedgerPull {
+      <<interface>>
+    }
+    class LedgerReview {
+      <<interface>>
+    }
+    class ReviewLedgerSnapshot {
+      <<interface>>
+    }
+    class StoredRunReview {
+      <<interface>>
+    }
   }
   namespace config {
     class Settings {
@@ -130,6 +142,9 @@ classDiagram
     class Relations {
       expected()
     }
+    class ReviewAssembly {
+      expand()
+    }
     class ScopeCheck {
       problems()
     }
@@ -142,6 +157,7 @@ classDiagram
       readable()
     }
     class PacketValidator {
+      expand()
       validate()
       parse()
     }
@@ -153,9 +169,15 @@ classDiagram
     class AmazonReviews {
       fetch()
     }
+    class BandFiling {
+      file()
+    }
     class Field {
       text()
       numberOrNull()
+    }
+    class ReviewKey {
+      of()
     }
     class AmazonProducts {
       find()
@@ -254,6 +276,10 @@ classDiagram
       delete()
       bump()
     }
+    class ReviewTable {
+      save()
+      list()
+    }
     class Rows {
       json()
       run()
@@ -348,6 +374,11 @@ classDiagram
       backoffMs()
       sleep()
     }
+    class ReviewLedger {
+      record()
+      size()
+      snapshot()
+    }
     class RunAgentFactory {
       assemble()
     }
@@ -393,12 +424,15 @@ classDiagram
     class PacketCheckTool {
       tool()
     }
+    class PullLabel {
+      <<interface>>
+    }
     class ReviewRendering {
       limit()
       cappedNote()
       starBand()
-      locator()
       render()
+      footer()
     }
     class FindProductTool {
       tool()
@@ -482,24 +516,34 @@ classDiagram
   RunAgentFactory --> OpenRouterPrices
   RunAgentFactory --> RetryPolicy
   RunAgentFactory --> PromptBuilder
+  RunAgentFactory --> ActorRunner
   RunSettlement --> ResearchStore
   RunSettlement --> LiveRuns
+  RunSettlement --> ReviewLedger
+  RunSupervisor --> ActorRunner
   StageTwoHandoff --> ResearchStore
   ResearchToolset --> ToolsetOptions
   MineReviewsTool --> Settings
   MineReviewsTool --> AmazonReviews
   MineReviewsTool --> TrustpilotReviews
+  MineReviewsTool --> ReviewRendering
   PacketCheckTool --> PacketCheckOptions
+  ReviewRendering --> Settings
+  ReviewRendering --> ReviewLedger
   FindProductTool --> AmazonProducts
   AmazonReviewsTool --> Settings
   AmazonReviewsTool --> AmazonReviews
+  AmazonReviewsTool --> ReviewRendering
   TrustpilotReviewsTool --> Settings
   TrustpilotReviewsTool --> TrustpilotReviews
+  TrustpilotReviewsTool --> ReviewRendering
   WebSearchTool --> Searxng
   WebFetchTool --> Settings
   WebFetchTool --> Firecrawl
   WebFetchTool --> Corpus
   WebFetchTool --> FetchGate
+  ReviewAssembly --> ReviewLedgerSnapshot
+  PacketValidator --> ReviewLedgerSnapshot
   AuthGate --> Settings
   ConfigRoute --> Settings
   CorpusRoute --> ResearchStore
@@ -520,7 +564,8 @@ classDiagram
 |---|---|---|
 | `adapters` | `adapters/apify/actors.ts` | Spend |
 | `adapters` | `adapters/apify/amazon-reviews.ts` | AmazonReviews |
-| `adapters` | `adapters/apify/fields.ts` | Field |
+| `adapters` | `adapters/apify/band-filing.ts` | BandFiling |
+| `adapters` | `adapters/apify/fields.ts` | Field, ReviewKey |
 | `adapters` | `adapters/apify/products.ts` | AmazonProducts |
 | `adapters` | `adapters/apify/runner.ts` | ActorRun, ActorCharge, ActorRunner, MeteredActorRunner, ApifyActorRunner, ActorRunners |
 | `adapters` | `adapters/apify/trustpilot-reviews.ts` | TrustpilotReviews |
@@ -537,6 +582,7 @@ classDiagram
 | `adapters` | `adapters/sqlite/check-log.ts` | PacketCheckLog |
 | `adapters` | `adapters/sqlite/event-log.ts` | EventLog |
 | `adapters` | `adapters/sqlite/judgement-table.ts` | JudgementTable |
+| `adapters` | `adapters/sqlite/review-table.ts` | ReviewTable |
 | `adapters` | `adapters/sqlite/rows.ts` | Rows |
 | `adapters` | `adapters/sqlite/run-table.ts` | RunTable |
 | `adapters` | `adapters/sqlite/schema.ts` | SqliteSchema |
@@ -554,6 +600,7 @@ classDiagram
 | `agent` | `agent/prompt/messages.ts` | AgentMessages |
 | `agent` | `agent/prompt/roster-block.ts` | RosterBlock |
 | `agent` | `agent/retry.ts` | RetryPolicy, Retries |
+| `agent` | `agent/review-ledger.ts` | ReviewLedger |
 | `agent` | `agent/run-agent-factory.ts` | RunAgentFactory |
 | `agent` | `agent/run-settlement.ts` | RunSettlement |
 | `agent` | `agent/run-supervisor.ts` | RunSupervisor |
@@ -564,7 +611,7 @@ classDiagram
 | `agent` | `agent/tools/lanes.ts` | FetchRecord, PacketCheckOptions |
 | `agent` | `agent/tools/mine-reviews-tool.ts` | MiningJob, MineReviewsTool |
 | `agent` | `agent/tools/packet-check-tool.ts` | PacketCheckTool |
-| `agent` | `agent/tools/review-rendering.ts` | ReviewRendering |
+| `agent` | `agent/tools/review-rendering.ts` | PullLabel, ReviewRendering |
 | `agent` | `agent/tools/review-tools.ts` | FindProductTool, AmazonReviewsTool, TrustpilotReviewsTool |
 | `agent` | `agent/tools/web-tools.ts` | WebSearchTool, WebFetchTool |
 | `agent` | `agent/usage.ts` | UsageTotals |
@@ -575,6 +622,7 @@ classDiagram
 | `domain` | `domain/ports.ts` | ResearchStore, GateVerdict, FetchGate |
 | `domain` | `domain/records.ts` | Clock, Ids, ResearchRun, RunSummary, Runs |
 | `domain` | `domain/reject-kinds.ts` | RejectKinds |
+| `domain` | `domain/reviews.ts` | LedgerPull, LedgerReview, ReviewLedgerSnapshot, StoredRunReview |
 | `extract` | `extract/blocks.ts` | JsonBlocks, PacketExtractor |
 | `extract` | `extract/brief-check.ts` | BriefCheck |
 | `extract` | `extract/champion-check.ts` | ChampionCheck |
@@ -585,6 +633,7 @@ classDiagram
 | `extract` | `extract/draft.ts` | PacketDraft |
 | `extract` | `extract/errors.ts` | PacketError |
 | `extract` | `extract/names.ts` | Names, BrandLabels, Relations |
+| `extract` | `extract/review-assembly.ts` | ReviewAssembly |
 | `extract` | `extract/scope-check.ts` | ScopeCheck |
 | `extract` | `extract/stage-two-roster.ts` | StageTwoRoster |
 | `extract` | `extract/validator.ts` | ZodProblems, PacketValidator |
