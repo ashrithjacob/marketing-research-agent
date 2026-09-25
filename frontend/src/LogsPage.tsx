@@ -23,6 +23,7 @@ export default function LogsPage({ runId }: { runId: string }) {
   const [calls, setCalls] = useState<LlmCall[]>([]);
   const [events, setEvents] = useState<RunEvent[]>([]);
   const [error, setError] = useState('');
+  const [reconnecting, setReconnecting] = useState('');
   const [, setTick] = useState(0);
 
   const lastSeq = useRef(0);
@@ -74,12 +75,15 @@ export default function LogsPage({ runId }: { runId: string }) {
         setEvents((current) => [...current, event]);
         if (event.kind === 'llm.call') void refresh('new');
         else if (event.kind === 'run.billed') void refresh('full');
+        else if (event.kind === 'apify.charged') void refresh('new');
         else if (event.kind.startsWith('run.') || event.kind.startsWith('packet.')) {
           void refresh('new');
         }
       },
       onEnd: () => void refresh('full'),
       onError: (message) => setError(message),
+      onReconnecting: (attempt, reason) => setReconnecting(`${reason} — reconnecting (attempt ${attempt})`),
+      onConnected: () => setReconnecting(''),
     });
     return () => stop();
   }, [runId, refresh]);
@@ -135,6 +139,7 @@ export default function LogsPage({ runId }: { runId: string }) {
       </header>
 
       {error && <div className="error banner">{error}</div>}
+      {reconnecting && <div className="warn banner">Live updates paused: {reconnecting}</div>}
 
       <div className="logs-body">
         {!run && !error && <p className="muted">Loading…</p>}
@@ -146,8 +151,16 @@ export default function LogsPage({ runId }: { runId: string }) {
               sub={`${duration(stats.llm_time_ms)} waiting on the model`} />
             <Stat label="Tokens" value={formatTokens(stats.tokens.total)}
               sub={`${formatTokens(stats.tokens.input)} in · ${formatTokens(stats.tokens.cache_read)} cached · ${formatTokens(stats.tokens.output)} out`} />
-            <Stat label="Cost (calculated)" value={`$${stats.cost.toFixed(4)}`}
-              sub="token counts × the run's rates" />
+            {run.stage === 2 ? (
+              <Stat label="Apify crawler costs"
+                value={stats.apify?.runs ? `$${stats.apify.total.toFixed(4)}` : '—'}
+                sub={stats.apify?.runs
+                  ? `${stats.apify.runs} actor run${stats.apify.runs === 1 ? '' : 's'} charged`
+                  : run.live ? 'charged as each actor run ends' : 'no actor runs charged'} />
+            ) : (
+              <Stat label="Cost (calculated)" value={`$${stats.cost.toFixed(4)}`}
+                sub="token counts × the run's rates" />
+            )}
             <Stat label="Billed by OpenRouter"
               value={stats.billed.resolved ? `$${stats.billed.total.toFixed(4)}` : '—'}
               sub={stats.billed.resolved

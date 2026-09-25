@@ -15,7 +15,31 @@ export class Frames {
     const fields = (args ?? {}) as Record<string, unknown>;
     if (toolName === "web_search") return String(fields.query ?? "");
     if (toolName === "web_fetch") return String(fields.url ?? "");
+    if (toolName === "amazon_find_product") return String(fields.query ?? "");
+    if (toolName === "amazon_reviews") {
+      const star = fields.star != null ? ` · ${fields.star}★` : "";
+      return `${String(fields.product_url ?? "")}${star}`;
+    }
+    if (toolName === "trustpilot_reviews") {
+      const star = fields.star != null ? ` · ${fields.star}★` : "";
+      return `${String(fields.domain ?? "")}${star}`;
+    }
     return "";
+  }
+
+  /** The message a failed tool call handed back to the model, capped for the event stream. */
+  static toolErrorText(result: unknown): string {
+    const content = (result as { content?: Array<{ type?: string; text?: string }> } | null)
+      ?.content;
+    const text = Array.isArray(content)
+      ? content
+          .filter((part) => part?.type === "text")
+          .map((part) => part.text ?? "")
+          .join(" ")
+      : typeof result === "string"
+        ? result
+        : "";
+    return text.replace(/\s+/g, " ").trim().slice(0, 300);
   }
 
   static callSummary(call: LlmCall): Record<string, unknown> {

@@ -35,6 +35,7 @@ export default function RunView({
   const [run, setRun] = useState<RunDetail | null>(null);
   const [judgements, setJudgements] = useState<Judgement[]>([]);
   const [error, setError] = useState('');
+  const [reconnecting, setReconnecting] = useState('');
   const [lastTool, setLastTool] = useState<RunEvent | undefined>(undefined);
 
   const reload = useCallback(async () => {
@@ -68,6 +69,11 @@ export default function RunView({
       },
       onEnd: () => void reload(),
       onError: (message) => setError(message),
+      onReconnecting: (attempt, reason) => setReconnecting(`${reason} — reconnecting (attempt ${attempt})`),
+      onConnected: () => {
+        setReconnecting('');
+        void reload();
+      },
     });
     return () => stop();
   }, [runId, reload, onChanged]);
@@ -138,6 +144,7 @@ export default function RunView({
 
       <div className="mid">
         {error && <div className="error">{error}</div>}
+        {reconnecting && <div className="warn">Live updates paused: {reconnecting}</div>}
 
         {run.status === 'invalid' && (
           <div className="error">

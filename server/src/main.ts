@@ -1,6 +1,11 @@
+import { setDefaultAutoSelectFamilyAttemptTimeout } from "node:net";
+
 import { serve } from "@hono/node-server";
 
 import { App } from "./http/index.js";
+
+const CONNECT_MS_PER_ADDRESS_ON_A_SLOW_LINK_NOT_NODES_250 = 2500;
+setDefaultAutoSelectFamilyAttemptTimeout(CONNECT_MS_PER_ADDRESS_ON_A_SLOW_LINK_NOT_NODES_250);
 
 const app = new App();
 

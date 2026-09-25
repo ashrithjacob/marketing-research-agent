@@ -82,6 +82,12 @@ export class RunAgentFactory {
           productSearch: nodes.includes("competitors"),
           subject: options.brief.product || options.brief.url,
           market: options.brief.market,
+          onApifyCharge: (charge) =>
+            this.runs.emit(runId, "apify.charged", {
+              actor: charge.actor,
+              usd: charge.usd,
+              status: charge.status,
+            }),
           packetCheck: {
             nodes,
             brief: options.brief,

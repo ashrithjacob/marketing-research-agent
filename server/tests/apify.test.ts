@@ -18,8 +18,10 @@ import { describe, expect, it } from "vitest";
 import {
   AMAZON_REVIEWS_ACTOR,
   AMAZON_SEARCH_ACTOR,
+  type ActorCharge,
   type ActorRunner,
   AmazonProducts,
+  MeteredActorRunner,
   AmazonReviews,
   MIN_CAP_USD,
   Spend,
@@ -315,5 +317,29 @@ describe("findAmazonProducts failure handling", () => {
     await expect(
       new AmazonProducts(runner).find( { query: "intertrigo cream", maxResults: 5 }),
     ).rejects.toThrow(/failed lookup, not proof/);
+  });
+});
+
+describe("MeteredActorRunner", () => {
+  const charged = (usageUsd: number | null | undefined, items: Array<Record<string, unknown>> = []) => {
+    const charges: ActorCharge[] = [];
+    const inner: ActorRunner = { run: async () => ({ status: "SUCCEEDED", items, usageUsd }) };
+    return { runner: new MeteredActorRunner(inner, (c) => charges.push(c)), charges };
+  };
+
+  it("reports the charge even when the tool then fails on an empty dataset", async () => {
+    const { runner, charges } = charged(0.0465);
+    await expect(
+      new AmazonProducts(runner).find({ query: "vitamin d", maxResults: 5 }),
+    ).rejects.toThrow(/failed lookup/);
+    expect(charges).toEqual([{ actor: AMAZON_SEARCH_ACTOR, usd: 0.0465, status: "SUCCEEDED" }]);
+  });
+
+  it("reports nothing when Apify gave no usage figure, rather than a false $0", async () => {
+    for (const usage of [null, undefined]) {
+      const { runner, charges } = charged(usage, [{ asin: "B0", title: "x" }]);
+      await new AmazonProducts(runner).find({ query: "vitamin d", maxResults: 5 });
+      expect(charges).toEqual([]);
+    }
   });
 });

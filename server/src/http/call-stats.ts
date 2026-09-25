@@ -13,6 +13,7 @@ export class CallStats {
     const usage = (call: LlmCall) => call.usage as Record<string, any>;
     const billed = calls.filter((call) => call.billed_cost !== null);
     const toolEnds = events.filter((e) => e.kind === "tool.completed");
+    const apifyCharges = events.filter((e) => e.kind === "apify.charged");
     const start = Date.parse(run.created_at);
     const end = run.ended_at
       ? Date.parse(run.ended_at)
@@ -33,6 +34,10 @@ export class CallStats {
       billed: {
         total: billed.reduce((total, call) => total + (call.billed_cost ?? 0), 0),
         resolved: billed.length,
+      },
+      apify: {
+        total: apifyCharges.reduce((total, e) => total + (Number(e.payload.usd) || 0), 0),
+        runs: apifyCharges.length,
       },
       llm_time_ms: sum((call) => call.duration_ms),
       wall_time_ms: Number.isFinite(start) && Number.isFinite(end) ? Math.max(0, end - start) : 0,

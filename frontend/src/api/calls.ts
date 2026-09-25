@@ -60,6 +60,8 @@ export interface CallStats {
   tokens: { input: number; output: number; cache_read: number; cache_write: number; total: number };
   cost: number;
   billed: { total: number; resolved: number };
+  /** Apify actor charges (crawler usage + pay-per-event); absent from servers that predate it. */
+  apify?: { total: number; runs: number };
   llm_time_ms: number;
   wall_time_ms: number;
   tool_calls: number;

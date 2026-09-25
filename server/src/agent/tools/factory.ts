@@ -4,7 +4,9 @@ import {
   ActorRunners,
   AmazonProducts,
   AmazonReviews,
+  MeteredActorRunner,
   TrustpilotReviews,
+  type ActorCharge,
   type ActorRunner,
 } from "../../adapters/apify/index.js";
 import { Corpus } from "../../adapters/corpus.js";
@@ -27,6 +29,7 @@ export interface ToolsetOptions {
   runId: string;
   packetCheck?: PacketCheckOptions;
   onFetch?: (record: FetchRecord) => void;
+  onApifyCharge?: (charge: ActorCharge) => void;
   actorRunner?: ActorRunner | null;
   reviewTools?: boolean;
   productSearch?: boolean;
@@ -41,10 +44,12 @@ export class ResearchToolset {
   build(): AgentTool<any>[] {
     const { settings, runId, onFetch } = this.options;
     const reviews = this.options.reviewTools !== false;
-    const runner =
+    const bare =
       reviews || this.options.productSearch
         ? (this.options.actorRunner ?? ActorRunners.forSettings(settings))
         : null;
+    const onCharge = this.options.onApifyCharge;
+    const runner = bare && onCharge ? new MeteredActorRunner(bare, onCharge) : bare;
     const gate = settings.gateModel ? new OpenRouterGate(settings) : undefined;
 
     const web = [

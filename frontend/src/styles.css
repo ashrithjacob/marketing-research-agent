@@ -660,6 +660,7 @@ button.tile-chip.active {
 .tl-tool.running .tl-tool-state { color: var(--accent); }
 .tl-tool.error .tl-tool-state { color: var(--bad); }
 .tl-tool-what { flex: 1; min-width: 0; color: var(--dim); word-break: break-word; }
+.tl-tool-err { display: block; margin-top: 2px; color: var(--bad); font-size: 11.5px; font-family: var(--font-mono); }
 .tl-tool-dur { color: var(--faint); font-size: 11px; flex: 0 0 auto; }
 
 /* ---------- competitors (inside the competitors tile) ---------- */

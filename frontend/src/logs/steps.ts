@@ -7,6 +7,8 @@ export interface ToolRow {
   preview: string;
   state: 'running' | 'done' | 'error';
   duration?: number;
+  /** What the failed tool told the model, when the server recorded it. */
+  errorText?: string;
 }
 
 /** One box on the timeline: a turn of the agent loop, or a run milestone. */
@@ -45,8 +47,12 @@ function toolLabel(tool: string, count: number): string {
 function milestoneText(event: RunEvent): { text: string; cls: string } {
   const p = event.payload as Record<string, unknown>;
   switch (event.kind) {
-    case 'run.started':
-      return { text: 'Run started — stage 1, gather only', cls: '' };
+    case 'run.started': {
+      const nodes = (p.nodes as string[] | undefined) ?? [];
+      return nodes.includes('review_mining')
+        ? { text: 'Run started — stage 2, review mining', cls: '' }
+        : { text: 'Run started — stage 1, gather only', cls: '' };
+    }
     case 'run.steered':
       return { text: `Your correction landed mid-run — ${p.text ?? ''}`, cls: 'rule' };
     case 'run.nudged':
@@ -121,12 +127,13 @@ export function buildSteps(events: RunEvent[]): Step[] {
     running.set(tool, queue);
   };
   /** No correlation id upstream: a completion settles the oldest running call for that tool. */
-  const settleRow = (tool: string, error: unknown, duration: unknown) => {
+  const settleRow = (tool: string, error: unknown, duration: unknown, errorText: unknown) => {
     const queue = running.get(tool) ?? [];
     const row = queue.find((r) => r.state === 'running');
     if (!row) return;
     row.state = error ? 'error' : 'done';
     row.duration = Number(duration ?? 0);
+    if (error && errorText) row.errorText = String(errorText);
     running.set(
       tool,
       queue.filter((r) => r.state === 'running'),
@@ -160,7 +167,7 @@ export function buildSteps(events: RunEvent[]): Step[] {
       continue;
     }
     if (event.kind === 'tool.completed') {
-      settleRow(String(p.tool ?? ''), p.error, p.duration);
+      settleRow(String(p.tool ?? ''), p.error, p.duration, p.error_text);
       continue;
     }
     if (event.kind === 'reasoning.available') {
@@ -176,6 +183,7 @@ export function buildSteps(events: RunEvent[]): Step[] {
     if (event.kind === 'run.billed' && turn && steps.length > 0) {
       continue;
     }
+    if (event.kind === 'apify.charged') continue;
     const { text, cls } = milestoneText(event);
     steps.push({
       key: `ms-${event.id}`,

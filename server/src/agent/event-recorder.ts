@@ -63,6 +63,7 @@ export class AgentEventRecorder {
         this.runs.emit(this.runId, "tool.completed", {
           tool: event.toolName,
           error: Boolean(event.isError),
+          ...(event.isError ? { error_text: Frames.toolErrorText(event.result) } : {}),
           lane: TOOL_LANES[event.toolName] ?? "other",
         });
         return;

@@ -52,6 +52,7 @@ function TurnBox({
                   <span className="tl-tool-what">
                     {toolVerb(tool.tool)}
                     {tool.preview ? ` — ${tool.preview}` : ''}
+                    {tool.errorText && <span className="tl-tool-err">{tool.errorText}</span>}
                   </span>
                   {tool.duration ? <span className="tl-tool-dur">{tool.duration}s</span> : null}
                 </div>
