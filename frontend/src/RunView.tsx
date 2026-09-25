@@ -11,8 +11,8 @@ import {
   type Source,
 } from './api';
 import { ChatText } from './FileBox';
-import { nowPanel } from './run-view/now';
-import { RailColumn } from './run-view/rail';
+import { nowPanel, runStage } from './run-view/now';
+import { RailColumn, subjectProgress } from './run-view/rail';
 import { AngleMapTile } from './run-view/tiles-angle';
 import { CompetitorsTile, VoiceTile } from './run-view/tiles-market';
 import { CategoryTile, ProductTile } from './run-view/tiles-data';
@@ -113,6 +113,12 @@ export default function RunView({
   if (!run) return <div className="empty">Loading run…</div>;
 
   const now = nowPanel(run, live, lastTool);
+  const progress = subjectProgress(runs, run);
+  const nextStageTwo =
+    run.status === 'completed' &&
+    runStage(run) === 1 &&
+    !progress.stageTwoDone &&
+    !progress.stageTwoLive;
   const showCompetitors =
     packet && (packet.competitor_reference || (packet.competitors ?? []).length > 0);
   const nodesInRun = new Set((run.nodes ?? packet?.nodes.map((n) => n.node) ?? []) as string[]);
@@ -158,6 +164,20 @@ export default function RunView({
               Activity log ↗
             </a>
           </div>
+          {nextStageTwo && (
+            <div className="next-stage">
+              <div className="txt">
+                <b>Next: Stage 2 · Review mining</b>
+                <div className="sub">
+                  Stage 1 is in. Mine verbatim customer language from the reviews of the
+                  product it found — you approve the plan before anything runs.
+                </div>
+              </div>
+              <button className="primary" onClick={() => onRunNode('review_mining')}>
+                Start stage 2 →
+              </button>
+            </div>
+          )}
         </section>
 
         {unarchived > 0 && (

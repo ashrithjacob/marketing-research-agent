@@ -1,5 +1,11 @@
 import type { Billed, Pricing, RunDetail, RunEvent } from '../api';
-import { NODE_ORDER, scopeLabel } from '../StageRail';
+import { STAGE_NODES, scopeLabel } from '../StageRail';
+
+/** The stage a run collects: the server's record, else inferred from its nodes. */
+export function runStage(run: { stage?: number; nodes?: readonly string[] }): 1 | 2 {
+  if (run.stage === 1 || run.stage === 2) return run.stage;
+  return (run.nodes ?? []).includes('review_mining') ? 2 : 1;
+}
 
 /** The "Now" panel: one glance, what is the run doing. */
 export function nowPanel(
@@ -7,11 +13,13 @@ export function nowPanel(
   live: boolean,
   lastTool: RunEvent | undefined,
 ): { title: string; sub: string } {
+  const nodes = run.nodes ?? [];
+  const stage = runStage(run);
   if (!live) {
     switch (run.status) {
       case 'completed':
         return {
-          title: 'Run complete',
+          title: `Stage ${stage} complete`,
           sub: `packet accepted — ${run.counts.sources} sources, ${run.counts.excerpts} excerpts, ${run.counts.gaps} gaps`,
         };
       case 'invalid':
@@ -25,16 +33,20 @@ export function nowPanel(
     }
   }
   const where =
-    run.nodes && run.nodes.length < NODE_ORDER.length ? scopeLabel(run.nodes) : 'Raw material';
+    stage === 2
+      ? 'Review mining'
+      : nodes.length > 0 && nodes.length < STAGE_NODES[1].length
+        ? scopeLabel(nodes)
+        : 'Raw material';
   if (lastTool) {
     const p = lastTool.payload as Record<string, string>;
     return {
-      title: `Stage 1 · ${where} · ${p.tool ?? 'working'}`,
+      title: `Stage ${stage} · ${where} · ${p.tool ?? 'working'}`,
       sub: p.preview ?? '',
     };
   }
   return {
-    title: `Stage 1 · ${where}`,
+    title: `Stage ${stage} · ${where}`,
     sub: 'gathering only — no conclusions drawn here',
   };
 }

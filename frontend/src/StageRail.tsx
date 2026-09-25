@@ -67,13 +67,32 @@ export function scopeLabel(nodes: readonly ResearchNode[]): string {
   return nodes.map((n) => NODE_LABELS[n]).join(' + ');
 }
 
+/** A stage's standing when the shown run is not the one collecting it. */
+function standing(
+  collects: 1 | 2,
+  progress: StageProgress | undefined,
+): { cls: string; label: string } | null {
+  if (!progress) return null;
+  if (collects === 1) return progress.stageOneDone ? { cls: 'done', label: 'complete' } : null;
+  if (progress.stageTwoLive) return { cls: 'active', label: 'running in another run' };
+  if (progress.stageTwoDone) return { cls: 'done', label: 'complete' };
+  if (progress.stageOneDone) return { cls: 'ready', label: 'ready — stage 1 is complete' };
+  return { cls: 'unbuilt', label: 'needs a completed stage 1' };
+}
+
+export interface StageProgress {
+  stageOneDone: boolean;
+  stageTwoDone: boolean;
+  stageTwoLive: boolean;
+}
+
 export default function StageRail({
   status,
   nodes,
   saturation,
   scope,
   onRunNode,
-  stageTwoReady,
+  progress,
 }: {
   status: RunStatus | null;
   nodes: NodeStatus[];
@@ -82,12 +101,14 @@ export default function StageRail({
   scope: readonly ResearchNode[];
   /** Start a run on one node, or on a whole stage. */
   onRunNode?: (node: ResearchNode) => void;
-  stageTwoReady?: boolean;
+  /** Where this subject stands across all its runs. */
+  progress?: StageProgress;
 }) {
   const byNode = new Map(nodes.map((n) => [n.node, n]));
   const curves = new Map<ResearchNode, Saturation[]>();
   for (const entry of saturation) curves.set(entry.node, [...(curves.get(entry.node) ?? []), entry]);
   const inScope = new Set(scope);
+  const stageTwoBlocked = progress ? !progress.stageOneDone : false;
 
   return (
     <div className="rail">
@@ -95,25 +116,30 @@ export default function StageRail({
       {STAGES.map((stage) => {
         const collects = 'nodes' in stage ? (stage.nodes as 1 | 2) : null;
         const shown = collects !== null && scope.length > 0 && stageOfNode(scope[0]) === collects;
-        const state = shown && status ? runState(status) : null;
+        const state =
+          shown && status ? runState(status) : collects !== null ? standing(collects, progress) : null;
+        const ready = collects === 2 && state?.cls === 'ready';
         return (
           <div key={stage.id}>
-            <div className={`stage ${state?.cls ?? 'unbuilt'}`}>
+            <div className={`stage ${state?.cls || 'unbuilt'}`}>
               <span className="dot" />
-              <div>
+              <div className="stage-body">
                 <div className="stage-t">
                   {stage.id !== 'gate' ? `Stage ${stage.id} · ` : ''}
                   {stage.name}
                 </div>
                 <div className="stage-s">
-                  {state
-                    ? state.label
-                    : collects === 2 && stageTwoReady === false
-                      ? 'needs a completed stage 1'
-                      : collects !== null
-                        ? stage.note
-                        : 'not built'}
+                  {state ? state.label : collects !== null ? stage.note : 'not built'}
                 </div>
+                {ready && onRunNode && (
+                  <button
+                    className="primary stage-start"
+                    title="Mine reviews for the product stage 1 found — you approve the plan before it runs"
+                    onClick={() => onRunNode(STAGE_NODES[2][0])}
+                  >
+                    Start stage 2 →
+                  </button>
+                )}
               </div>
             </div>
             {collects !== null && (
@@ -144,9 +170,9 @@ export default function StageRail({
                       {onRunNode && (
                         <button
                           className="node-run"
-                          disabled={collects === 2 && stageTwoReady === false}
+                          disabled={collects === 2 && stageTwoBlocked}
                           title={
-                            collects === 2 && stageTwoReady === false
+                            collects === 2 && stageTwoBlocked
                               ? 'Stage 2 mines what stage 1 found — run stage 1 for this brief first'
                               : `Run ${NODE_LABELS[node]} on its own`
                           }

@@ -1,6 +1,6 @@
-import { api, briefLabel, type Brief, type Judgement, type ResearchNode, type RunDetail, type RunSummary, type StagePacket } from '../api';
+import { api, briefLabel, TERMINAL_STATUSES, type Brief, type Judgement, type ResearchNode, type RunDetail, type RunSummary, type StagePacket } from '../api';
 import StageRail, { NODE_ORDER, scopeLabel } from '../StageRail';
-import { billedText, pricingNote } from './now';
+import { billedText, pricingNote, runStage } from './now';
 
 /** Two briefs name the same subject. Mirrors `Briefs.key` in `server/src/domain/brief.ts`. */
 function sameSubject(a: Brief | undefined, b: Brief | undefined): boolean {
@@ -10,6 +10,25 @@ function sameSubject(a: Brief | undefined, b: Brief | undefined): boolean {
     return `product:${(brief?.product ?? '').toLowerCase().replace(/[^a-z0-9]/g, '')}`;
   };
   return key(a) === key(b);
+}
+
+export interface SubjectProgress {
+  /** A stage-1 run for this subject completed, so stage 2 can start. */
+  stageOneDone: boolean;
+  /** A stage-2 run for this subject completed. */
+  stageTwoDone: boolean;
+  /** A stage-2 run for this subject is queued or running right now. */
+  stageTwoLive: boolean;
+}
+
+/** Where the subject of `run` stands across every run of it, not just this one. */
+export function subjectProgress(runs: RunSummary[], run: RunSummary): SubjectProgress {
+  const mine = runs.filter((r) => sameSubject(r.brief, run.brief));
+  return {
+    stageOneDone: mine.some((r) => r.status === 'completed' && runStage(r) === 1),
+    stageTwoDone: mine.some((r) => r.status === 'completed' && runStage(r) === 2),
+    stageTwoLive: mine.some((r) => runStage(r) === 2 && !TERMINAL_STATUSES.has(r.status)),
+  };
 }
 
 export function RailColumn({
@@ -39,12 +58,7 @@ export function RailColumn({
       saturation={packet?.saturation ?? []}
       scope={run.nodes ?? []}
       onRunNode={onRunNode}
-      stageTwoReady={runs.some(
-        (r) =>
-          r.status === 'completed' &&
-          (r.stage ?? 1) === 1 &&
-          sameSubject(r.brief, run.brief),
-      )}
+      progress={subjectProgress(runs, run)}
     />
 
     <h3 style={{ marginTop: 18 }}>
