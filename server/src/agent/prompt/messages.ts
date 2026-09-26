@@ -1,8 +1,10 @@
 import type { Judgement, SourceKind } from "../../domain/index.js";
+import { Trace } from "../../trace/index.js";
 
 /** Single messages injected mid-run: a steer, a nudge, a resume after a drop. */
 export class AgentMessages {
   static steer(judgement: Judgement): string {
+    Trace.line(import.meta.url, "AgentMessages.steer", { judgement });
     let rejects = "";
     if (judgement.rejects_kinds.length > 0) {
       const kinds = judgement.rejects_kinds.map((kind: SourceKind) => `\`${kind}\``).join(", ");
@@ -17,6 +19,7 @@ export class AgentMessages {
   }
 
   static packetNudge(): string {
+    Trace.line(import.meta.url, "AgentMessages.packetNudge");
     return (
       "Your last reply ended without the stage-1 packet, so this run has no " +
       "result yet. Do not research further; tools are switched off. Write the " +
@@ -26,6 +29,7 @@ export class AgentMessages {
   }
 
   static resume(error: string): string {
+    Trace.line(import.meta.url, "AgentMessages.resume", { error });
     return (
       `The connection to the model dropped part-way through your last turn (${error || "no detail"}), ` +
       "so that turn was lost. Everything before it stands: the tool results above " +

@@ -1,4 +1,5 @@
 /** Products: which briefs share one, the run a product opens on, and the rows its runs found. */
+import { Scope } from "../src/domain/index.js";
 
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -99,7 +100,7 @@ describe("the product store", () => {
   let store: SqliteResearchStore;
   const path = () => join(dir, "research.db");
   const run = (product: string, stage = 1) =>
-    store.createRun({ brief: { product, url: "", market: "", notes: "" }, model: "m", rejectKinds: [], judgementIds: [], stage });
+    store.createRun({ workspaceId: "admin", brief: { product, url: "", market: "", notes: "" }, model: "m", rejectKinds: [], judgementIds: [], stage });
 
   beforeEach(() => {
     dir = mkdtempSync(join(tmpdir(), "mra-products-"));
@@ -114,15 +115,15 @@ describe("the product store", () => {
   it("files every spelling of a name under one stored product", () => {
     const ids = ["Vitamin D", "vitamin_d", "VITAMIND"].map((name) => run(name).product_id);
     expect(new Set(ids).size).toBe(1);
-    expect(store.products.list()).toHaveLength(1);
-    expect(store.products.get(ids[0]!)?.label).toBe("VITAMIND");
+    expect(store.products.list(Scope.everything)).toHaveLength(1);
+    expect(store.products.get(ids[0]!, Scope.everything)?.label).toBe("VITAMIND");
   });
 
   it("stores a packet's facts as rows tagged with run and product, replacing them on rewrite", () => {
     const first = run("MagnaCalm");
     store.updateRun(first.id, { packet: minimalPacket() });
     store.updateRun(first.id, { packet: minimalPacket() });
-    const rows = store.products.packetRows(first.product_id);
+    const rows = store.products.packetRows(first.product_id, Scope.everything);
     expect(rows.attributes).toEqual([expect.objectContaining({ key: "dose_per_serving", value: "400 mg", run_id: first.id })]);
     expect(rows.sources).toHaveLength(1);
     expect(rows.gaps).toHaveLength(1);
@@ -133,7 +134,7 @@ describe("the product store", () => {
     const review = { ref: "r1", pull: "p1", platform: "amazon" as const, review_key: "R1", listing: "L", star: 3, title: "t", text: "works", posted_at: "", verified: true, locator: "" };
     const [a, b] = [run("Vitamin D", 2), run("vitamin-d", 2)];
     for (const r of [a!, b!]) store.saveRunReviews(r.id, { pulls: [pull], reviews: [review] });
-    expect(store.products.get(a!.product_id)?.review_count).toBe(1);
+    expect(store.products.get(a!.product_id, Scope.everything)?.review_count).toBe(1);
   });
 
   it("gives runs from before products existed their product, rows and review links", () => {
@@ -147,8 +148,8 @@ describe("the product store", () => {
     store = new SqliteResearchStore(path());
     const again = store.getRun(legacy.id)!;
     expect(again.product_id).not.toBe("");
-    expect(store.products.get(again.product_id)?.key).toBe("product:vitamind");
-    expect(store.products.packetRows(again.product_id).attributes).toHaveLength(1);
+    expect(store.products.get(again.product_id, Scope.everything)?.key).toBe("product:vitamind");
+    expect(store.products.packetRows(again.product_id, Scope.everything).attributes).toHaveLength(1);
   });
 });
 
@@ -172,7 +173,7 @@ describe("products cover every run, not the newest page", () => {
   function seed(newer: number): { id: string; product_id: string } {
     const db = new Database(join(dir, "research.db"));
     const make = (product: string, i: number) => {
-      const created = store.createRun({ brief: { product, url: "", market: "", notes: "" }, model: "m", rejectKinds: [], judgementIds: [], stage: 1 });
+      const created = store.createRun({ workspaceId: "admin", brief: { product, url: "", market: "", notes: "" }, model: "m", rejectKinds: [], judgementIds: [], stage: 1 });
       const at = new Date(Date.UTC(2026, 0, 1) + i * 60_000).toISOString();
       db.prepare("UPDATE research_runs SET created_at = ? WHERE id = ?").run(at, created.id);
       return created;
@@ -198,7 +199,7 @@ describe("products cover every run, not the newest page", () => {
   it("hands stage 2 a stage-1 run older than the newest 200", () => {
     const oldest = seed(210);
     store.updateRun(oldest.id, { status: "completed", packet: minimalPacket() });
-    const found = new StageTwoHandoff(store).forBrief({ product: "VITAMIN-D", url: "", market: "", notes: "" });
+    const found = new StageTwoHandoff(store).forBrief({ product: "VITAMIN-D", url: "", market: "", notes: "" }, Scope.everything);
     expect(found?.run.id).toBe(oldest.id);
   });
 });

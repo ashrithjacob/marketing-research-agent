@@ -1,6 +1,8 @@
 import type Database from "better-sqlite3";
 
+import { AccountTable } from "./account-table.js";
 import { PacketRowTable } from "./packet-row-table.js";
+import { Trace } from "../../trace/index.js";
 
 const MIGRATIONS: ReadonlyArray<readonly [string, string, string]> = [
   ["research_runs", "output", "ALTER TABLE research_runs ADD COLUMN output TEXT NOT NULL DEFAULT ''"],
@@ -11,12 +13,16 @@ const MIGRATIONS: ReadonlyArray<readonly [string, string, string]> = [
   ["research_runs", "packet_source", "ALTER TABLE research_runs ADD COLUMN packet_source TEXT NOT NULL DEFAULT ''"],
   ["research_runs", "product_id", "ALTER TABLE research_runs ADD COLUMN product_id TEXT NOT NULL DEFAULT ''"],
   ["research_run_reviews", "product_id", "ALTER TABLE research_run_reviews ADD COLUMN product_id TEXT NOT NULL DEFAULT ''"],
+  ["research_runs", "workspace_id", "ALTER TABLE research_runs ADD COLUMN workspace_id TEXT NOT NULL DEFAULT 'admin'"],
+  ["research_judgements", "workspace_id", "ALTER TABLE research_judgements ADD COLUMN workspace_id TEXT NOT NULL DEFAULT 'admin'"],
 ];
 
 /** CREATE TABLE IF NOT EXISTS never alters an existing table, so columns migrate here. */
 export class SqliteSchema {
   static apply(db: Database.Database): void {
+    Trace.line(import.meta.url, "SqliteSchema.apply", { db });
     db.exec(SqliteSchema.DDL);
+    db.exec(AccountTable.DDL);
     for (const [table, column, ddl] of MIGRATIONS) {
       const have = (db.pragma(`table_info(${table})`) as Array<{ name: string }>).map((row) => row.name);
       if (!have.includes(column)) db.exec(ddl);
@@ -28,6 +34,8 @@ export class SqliteSchema {
   static readonly INDEXES = `
 CREATE INDEX IF NOT EXISTS research_runs_product ON research_runs(product_id);
 CREATE INDEX IF NOT EXISTS research_run_reviews_product ON research_run_reviews(product_id);
+CREATE INDEX IF NOT EXISTS research_runs_workspace ON research_runs(workspace_id, created_at);
+CREATE INDEX IF NOT EXISTS research_judgements_workspace ON research_judgements(workspace_id);
 `;
 
   static readonly DDL = `

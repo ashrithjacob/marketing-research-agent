@@ -1,21 +1,25 @@
 import { randomUUID } from "node:crypto";
 
 import { Stages } from "./nodes.js";
+import { Trace } from "../trace/index.js";
 
 export class Clock {
   static nowIso(): string {
+    Trace.tick(import.meta.url, "Clock.nowIso");
     return new Date().toISOString();
   }
 }
 
 export class Ids {
   static next(): string {
+    Trace.line(import.meta.url, "Ids.next");
     return randomUUID().replace(/-/g, "");
   }
 }
 
 export interface ResearchRun {
   id: string;
+  workspace_id: string;
   product_id: string;
   agent_run_id: string;
   session_id: string;
@@ -38,6 +42,7 @@ export interface ResearchRun {
 
 export interface RunSummary {
   id: string;
+  workspace_id: string;
   product_id: string;
   status: string;
   stage: number;
@@ -63,10 +68,12 @@ export interface RunSummary {
 /** The shape the cockpit lists runs in: status plus what the packet holds. */
 export class Runs {
   static summary(run: ResearchRun): RunSummary {
+    Trace.line(import.meta.url, "Runs.summary", { run });
     const packet = (run.packet ?? {}) as Record<string, any>;
     const sources: any[] = packet.sources ?? [];
     return {
       id: run.id,
+      workspace_id: run.workspace_id,
       product_id: run.product_id,
       status: run.status,
       stage: run.stage,

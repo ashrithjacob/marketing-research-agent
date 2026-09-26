@@ -3,11 +3,13 @@ import type Database from "better-sqlite3";
 import { Clock, type PacketCheck } from "../../domain/index.js";
 
 import { Rows } from "./rows.js";
+import { Trace } from "../../trace/index.js";
 
 export class PacketCheckLog {
   constructor(private readonly db: Database.Database) {}
 
   add(runId: string, valid: boolean, problems: readonly string[]): PacketCheck {
+    Trace.line(import.meta.url, "PacketCheckLog.add", { runId, valid, problems });
     const created = Clock.nowIso();
     const seq = this.nextSeq(runId);
     const info = this.db
@@ -27,6 +29,7 @@ export class PacketCheckLog {
   }
 
   list(runId: string): PacketCheck[] {
+    Trace.line(import.meta.url, "PacketCheckLog.list", { runId });
     const rows = this.db
       .prepare("SELECT * FROM research_packet_checks WHERE run_id = ? ORDER BY seq")
       .all(runId) as Array<Record<string, any>>;
@@ -41,6 +44,7 @@ export class PacketCheckLog {
   }
 
   private nextSeq(runId: string): number {
+    Trace.line(import.meta.url, "PacketCheckLog.nextSeq", { runId });
     const row = this.db
       .prepare("SELECT MAX(seq) AS seq FROM research_packet_checks WHERE run_id = ?")
       .get(runId) as { seq: number | null };

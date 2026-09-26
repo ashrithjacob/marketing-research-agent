@@ -88,7 +88,7 @@ server/src/
 server/tests/     vitest; most of it is about what the validator refuses
 frontend/src/     React 18 + Vite, no UI framework
 deploy/           Caddy snippet for marketing.vanis.ai; vps/ holds the
-                  production compose, deploy.sh, change-password.sh and
+                  production compose, deploy.sh, mra-users.sh and
                   mra-snapshot.sh
 ```
 
@@ -326,7 +326,7 @@ nothing with it but Caddy. `../setup.md` §5a is the full account.
 
 ```bash
 bash deploy/vps/deploy.sh                          # from the laptop
-ssh -t owui bash ~/mra-compose/change-password.sh  # set or change the login
+ssh -t owui bash ~/mra-compose/mra-users.sh list  # logins and workspaces (setup.md §5a)
 ```
 
 `deploy.sh` runs the tests, builds the image **here**, preflights it, and ships
@@ -353,8 +353,12 @@ Two decisions worth knowing before you change them:
   its container for a consistent copy; doing that here would kill a research
   run every night. `VACUUM INTO` copies the live database consistently instead.
 
-**The deploy starts locked** — the stored hash is of a random password nobody
-knows. Nothing works until you run `change-password.sh`.
+**Logins are per person, grouped into workspaces.** A login sees its own
+workspace's runs, products and judgements; the admin sees every workspace's runs.
+There is no signup page — `mra-users.sh add-workspace` / `add-user` make accounts.
+The first admin is seeded from `MRA_APP_USER` / `MRA_APP_PASSWORD_HASH` on the
+first boot with an empty accounts table. `../setup.md` §5a has the whole runbook,
+including the password reset that must follow the first deploy.
 
 ## What is not built
 

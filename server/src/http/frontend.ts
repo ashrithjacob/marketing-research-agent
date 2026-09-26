@@ -3,6 +3,9 @@ import { join, resolve, sep } from "node:path";
 
 import type { Hono } from "hono";
 
+import type { ApiEnv } from "./api-env.js";
+import { Trace } from "../trace/index.js";
+
 /** The built SPA: assets by content type, a shell that is never cached, clean 404s under api/. */
 export class Frontend {
   private static readonly NON_SPA_PREFIXES = ["api/", "assets/"];
@@ -20,7 +23,8 @@ export class Frontend {
 
   constructor(private readonly staticDir: string) {}
 
-  mount(app: Hono): void {
+  mount(app: Hono<ApiEnv>): void {
+    Trace.line(import.meta.url, "Frontend.mount");
     const root = resolve(this.staticDir);
 
     app.get("/*", async (c) => {
@@ -57,6 +61,7 @@ export class Frontend {
   }
 
   private static contentType(path: string): string {
+    Trace.line(import.meta.url, "Frontend.contentType", { path });
     const dot = path.lastIndexOf(".");
     return (
       (dot === -1 ? undefined : Frontend.CONTENT_TYPES[path.slice(dot)]) ??

@@ -1,6 +1,7 @@
 import type { Settings } from "../config/index.js";
 
 import { Http } from "./http.js";
+import { Trace } from "../trace/index.js";
 
 export interface SearchHit {
   title: string;
@@ -17,6 +18,7 @@ export class Searxng {
     maxResults: number,
     signal?: AbortSignal,
   ): Promise<SearchHit[]> {
+    Trace.line(import.meta.url, "Searxng.find", { query, maxResults });
     const url = new URL("/search", this.settings.searxngUrl);
     url.searchParams.set("q", query);
     url.searchParams.set("format", "json");

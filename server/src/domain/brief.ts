@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { Trace } from "../trace/index.js";
 
 export const briefSchema = z
   .object({
@@ -15,10 +16,12 @@ const URL_LIKE = /^(https?:\/\/\S+|(?!.*\s)[a-z0-9-]+(\.[a-z0-9-]+)+(\/\S*)?)$/i
 /** Keeps a url out of `product`, and decides when two briefs name one subject. */
 export class Briefs {
   static looksLikeUrl(value: string): boolean {
+    Trace.line(import.meta.url, "Briefs.looksLikeUrl", { value });
     return URL_LIKE.test(value.trim());
   }
 
   static normalise(brief: Brief): Brief {
+    Trace.line(import.meta.url, "Briefs.normalise", { brief });
     const product = brief.product.trim();
     if (!Briefs.looksLikeUrl(product)) {
       return { ...brief, product, url: brief.url.trim() };
@@ -29,6 +32,7 @@ export class Briefs {
   }
 
   static label(brief: { product?: unknown; url?: unknown }): string {
+    Trace.line(import.meta.url, "Briefs.label", { brief });
     for (const value of [brief.product, brief.url]) {
       if (typeof value === "string" && value.trim()) return value.trim();
     }
@@ -36,6 +40,7 @@ export class Briefs {
   }
 
   static key(brief: { product?: unknown; url?: unknown }): string {
+    Trace.line(import.meta.url, "Briefs.key", { brief });
     const product = typeof brief.product === "string" ? brief.product.trim() : "";
     const given = typeof brief.url === "string" ? brief.url.trim() : "";
     const url = given || (Briefs.looksLikeUrl(product) ? product : "");
@@ -46,6 +51,7 @@ export class Briefs {
   }
 
   private static page(url: string): string {
+    Trace.line(import.meta.url, "Briefs.page", { url });
     try {
       const withScheme = /^[a-z][a-z0-9+.-]*:\/\//i.test(url) ? url : `https://${url}`;
       const parsed = new URL(withScheme);

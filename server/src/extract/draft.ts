@@ -1,9 +1,12 @@
+import { Trace } from "../trace/index.js";
+
 /** Turns a validate_packet argument into a draft packet, or says it cannot. */
 export class PacketDraft {
   /** The packet arrives as an object or as its JSON in one string; either is the packet. */
   static coerce(
     raw: unknown,
   ): { draft: Record<string, unknown> } | { unparseable: true } {
+    Trace.line(import.meta.url, "PacketDraft.coerce", { raw });
     if (raw && typeof raw === "object" && !Array.isArray(raw)) {
       return { draft: raw as Record<string, unknown> };
     }

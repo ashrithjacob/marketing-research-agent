@@ -33,7 +33,7 @@ it failing gets sent back.
 from two sessions a week apart is comparable. `mra help`, or the `mra-control`
 skill.
 
-## Four rules that are not about code
+## Five rules that are not about code
 
 These are the corrections that have had to be given most often here. They are
 in this file because no lint rule can catch them.
@@ -62,6 +62,15 @@ is not the feature working: run it (`mra run`, `mra watch`), read the outcome,
 quote it. A healthy `/api/health` on the live site means the container is up —
 it does not mean your change is on it. Only `deploy/vps/deploy.sh` does that.
 
+**5. Never start a run that spends Apify money without asking first.** Apify is
+billed to the user per run. That covers any stage-2 run, and any stage-1 run with
+the `review_mining` or `competitors` node, whose tools call Apify
+(`amazon_find_product`, `mine_reviews`, `amazon_reviews`, `trustpilot_reviews`).
+To see a change work, run `product_data` alone (`mra run "<brief>" product_data`),
+which only uses web search and page fetches. If the change can only be seen
+through an Apify tool, ask first and say what the run will cost. One run is
+enough to verify something; don't rerun to polish.
+
 ## Architecture
 
 `server/tests/architecture.test.ts` is the rulebook. If a rule below and that
@@ -74,11 +83,12 @@ every rule in that file at once.
 
 | Layer | Holds | May import |
 |---|---|---|
-| `domain` | Types, zod schemas, `interface` ports. No I/O. | nothing (owns `zod`) |
-| `config` | `Settings`, the only reader of `process.env` | nothing |
-| `extract` | Packet parsing and validation. Pure. | `domain` |
-| `adapters` | Apify, Firecrawl, SearXNG, OpenRouter prices, SQLite, corpus | `domain`, `config` |
-| `agent` | Prompt building, tools, the run loop | `domain`, `config`, `extract`, `adapters` |
+| `trace` | The run trace: `Trace`, its file sink, the wire tap | nothing |
+| `domain` | Types, zod schemas, `interface` ports. No I/O. | `trace` (owns `zod`) |
+| `config` | `Settings`, the only reader of `process.env` | `trace` |
+| `extract` | Packet parsing and validation. Pure. | `trace`, `domain` |
+| `adapters` | Apify, Firecrawl, SearXNG, OpenRouter prices, SQLite, corpus | `trace`, `domain`, `config` |
+| `agent` | Prompt building, tools, the run loop | `trace`, `domain`, `config`, `extract`, `adapters` |
 | `http` | Routes, auth, app wiring | everything above |
 | `main.ts` | Entry point. Wiring only. | everything |
 
@@ -104,6 +114,17 @@ The class diagram lives in `docs/class-diagram.md`. Regenerate it with
 - **No workarounds.** A hack, with or without a comment explaining it, spreads.
   Fix the cause or record it as a gap and stop.
 - Every behavioural fix gets a regression test next to the thing it fixes.
+- **Every function starts with its trace line**, and has only that one:
+  `Trace.line(import.meta.url, "Class.method", { …fields })`. For something
+  called per streamed token or per row in a loop, use `Trace.tick`, which is
+  counted rather than written, and pass only low-cardinality fields such as a
+  kind, never a value. Enforced by `tests/trace-coverage.ts`. `trace/` is exempt
+  because a logger that logs itself recurses.
+- **`Trace` is the one ambient object**: static, with the run it belongs to
+  taken from `AsyncLocalStorage` rather than the constructor. The exception is
+  deliberate. Threading a logger through ~100 constructors, including static-only
+  classes, would change every call site and add nothing. The architecture test
+  refuses mutable static state everywhere else.
 
 The frontend is exempt from the class rule — React function components are its
 paved path. It keeps: no comments, components under 250 lines, fetching and

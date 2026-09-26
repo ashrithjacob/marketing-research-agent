@@ -14,6 +14,7 @@
     "typecheck": "tsc -p tsconfig.test.json --noEmit",
     "test": "vitest run",
     "hashpw": "tsx src/hashpw.ts",
+    "accounts": "tsx src/accounts.ts",
     "conventions": "node scripts/check-conventions.mjs"
   },
   "dependencies": {

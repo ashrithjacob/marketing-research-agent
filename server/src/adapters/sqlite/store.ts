@@ -1,16 +1,13 @@
-import { mkdirSync } from "node:fs";
-import { dirname } from "node:path";
-
-import Database from "better-sqlite3";
-
 import {
   Briefs,
+  type AccountDirectory,
   type Judgement,
   type LlmCall,
   type LlmCallRecord,
   type PacketCheck,
   type ResearchRun,
   type ResearchStore,
+  type Scope,
   type ReviewLedgerSnapshot,
   type ProductCatalog,
   type RunEvent,
@@ -18,127 +15,118 @@ import {
   type SourceKind,
   type StoredRunReview,
 } from "../../domain/index.js";
+import { Trace } from "../../trace/index.js";
 
-import { CallLog } from "./call-log.js";
-import { EventLog } from "./event-log.js";
-import { JudgementTable } from "./judgement-table.js";
-import { PacketCheckLog } from "./check-log.js";
-import { PacketRowTable } from "./packet-row-table.js";
-import { ProductBackfill } from "./product-backfill.js";
-import { SqliteProductCatalog } from "./product-catalog.js";
-import { ProductTable } from "./product-table.js";
-import { ReviewTable } from "./review-table.js";
-import { RunTable } from "./run-table.js";
-import { SqliteSchema } from "./schema.js";
+import { SqliteTables } from "./tables.js";
 
 export class SqliteResearchStore implements ResearchStore {
-  private readonly db: Database.Database;
-  private readonly runs: RunTable;
-  private readonly events: EventLog;
-  private readonly judgements: JudgementTable;
-  private readonly checks: PacketCheckLog;
-  private readonly calls: CallLog;
-  private readonly reviews: ReviewTable;
-  private readonly productTable: ProductTable;
-  private readonly packetRows: PacketRowTable;
+  private readonly tables: SqliteTables;
   readonly products: ProductCatalog;
+  readonly accounts: AccountDirectory;
 
   constructor(path: string) {
-    if (path !== ":memory:") mkdirSync(dirname(path), { recursive: true });
-    this.db = new Database(path, { timeout: 15000 });
-    this.db.pragma("journal_mode = WAL");
-    this.db.pragma("busy_timeout = 15000");
-    this.db.pragma("foreign_keys = ON");
-    SqliteSchema.apply(this.db);
-    this.runs = new RunTable(this.db);
-    this.events = new EventLog(this.db);
-    this.judgements = new JudgementTable(this.db);
-    this.checks = new PacketCheckLog(this.db);
-    this.calls = new CallLog(this.db);
-    this.reviews = new ReviewTable(this.db);
-    this.productTable = new ProductTable(this.db);
-    this.packetRows = new PacketRowTable(this.db);
-    this.products = new SqliteProductCatalog(this.productTable, this.runs, this.packetRows);
-    new ProductBackfill(this.db, this.productTable, this.packetRows).apply();
+    Trace.line(import.meta.url, "SqliteResearchStore.constructor", { path });
+    this.tables = SqliteTables.open(path);
+    this.products = this.tables.catalog;
+    this.accounts = this.tables.accounts;
   }
 
   createRun(input: Parameters<ResearchStore["createRun"]>[0]): ResearchRun {
-    const productId = this.productTable.ensure(Briefs.key(input.brief), Briefs.label(input.brief));
-    return this.runs.create({ ...input, productId });
+    Trace.line(import.meta.url, "SqliteResearchStore.createRun", { input });
+    const productId = this.tables.products.ensure(Briefs.key(input.brief), Briefs.label(input.brief));
+    return this.tables.runs.create({ ...input, productId });
   }
 
   getRun(runId: string): ResearchRun | null {
-    return this.runs.get(runId);
+    Trace.line(import.meta.url, "SqliteResearchStore.getRun", { runId });
+    return this.tables.runs.get(runId);
   }
 
-  listRuns(limit = 50): ResearchRun[] {
-    return this.runs.list(limit);
+  listRuns(scope: Scope, limit = 50): ResearchRun[] {
+    Trace.line(import.meta.url, "SqliteResearchStore.listRuns", { scope, limit });
+    return this.tables.runs.list(scope, limit);
   }
 
   updateRun(runId: string, fields: RunUpdate): void {
-    this.runs.update(runId, fields);
+    Trace.line(import.meta.url, "SqliteResearchStore.updateRun", { runId, fields });
+    this.tables.runs.update(runId, fields);
     if (fields.packet !== undefined) {
-      this.packetRows.replace(runId, this.productOf(runId), fields.packet);
+      this.tables.packetRows.replace(runId, this.productOf(runId), fields.packet);
     }
   }
 
   addEvent(runId: string, kind: string, payload: Record<string, unknown>): RunEvent {
-    return this.events.add(runId, kind, payload);
+    Trace.tick(import.meta.url, "SqliteResearchStore.addEvent", { kind });
+    return this.tables.events.add(runId, kind, payload);
   }
 
   listEvents(runId: string, afterId = 0): RunEvent[] {
-    return this.events.list(runId, afterId);
+    Trace.line(import.meta.url, "SqliteResearchStore.listEvents", { runId, afterId });
+    return this.tables.events.list(runId, afterId);
   }
 
-  listJudgements(activeOnly = false): Judgement[] {
-    return this.judgements.list(activeOnly);
+  listJudgements(scope: Scope, activeOnly = false): Judgement[] {
+    Trace.line(import.meta.url, "SqliteResearchStore.listJudgements", { scope, activeOnly });
+    return this.tables.judgements.list(scope, activeOnly);
   }
 
-  addJudgement(input: { kind: string; text: string; rejects_kinds: SourceKind[] }): Judgement {
-    return this.judgements.add(input);
+  addJudgement(workspaceId: string, input: { kind: string; text: string; rejects_kinds: SourceKind[] }): Judgement {
+    Trace.line(import.meta.url, "SqliteResearchStore.addJudgement", { workspaceId, input });
+    return this.tables.judgements.add(workspaceId, input);
   }
 
-  deleteJudgement(judgementId: string): void {
-    this.judgements.delete(judgementId);
+  deleteJudgement(scope: Scope, judgementId: string): boolean {
+    Trace.line(import.meta.url, "SqliteResearchStore.deleteJudgement", { scope, judgementId });
+    return this.tables.judgements.delete(scope, judgementId);
   }
 
   bumpJudgement(judgementId: string, by = 1): void {
-    this.judgements.bump(judgementId, by);
+    Trace.line(import.meta.url, "SqliteResearchStore.bumpJudgement", { judgementId, by });
+    this.tables.judgements.bump(judgementId, by);
   }
 
   addPacketCheck(runId: string, valid: boolean, problems: readonly string[]): PacketCheck {
-    return this.checks.add(runId, valid, problems);
+    Trace.line(import.meta.url, "SqliteResearchStore.addPacketCheck", { runId, valid, problems });
+    return this.tables.checks.add(runId, valid, problems);
   }
 
   listPacketChecks(runId: string): PacketCheck[] {
-    return this.checks.list(runId);
+    Trace.line(import.meta.url, "SqliteResearchStore.listPacketChecks", { runId });
+    return this.tables.checks.list(runId);
   }
 
   addLlmCall(call: LlmCallRecord): LlmCall {
-    return this.calls.add(call);
+    Trace.line(import.meta.url, "SqliteResearchStore.addLlmCall", { call });
+    return this.tables.calls.add(call);
   }
 
   setLlmCallBilled(runId: string, responseId: string, cost: number): void {
-    this.calls.setBilled(runId, responseId, cost);
+    Trace.line(import.meta.url, "SqliteResearchStore.setLlmCallBilled", { runId, responseId, cost });
+    this.tables.calls.setBilled(runId, responseId, cost);
   }
 
   listLlmCalls(runId: string): LlmCall[] {
-    return this.calls.list(runId);
+    Trace.line(import.meta.url, "SqliteResearchStore.listLlmCalls", { runId });
+    return this.tables.calls.list(runId);
   }
 
   saveRunReviews(runId: string, ledger: ReviewLedgerSnapshot): number {
-    return this.reviews.save(runId, this.productOf(runId), ledger);
+    Trace.line(import.meta.url, "SqliteResearchStore.saveRunReviews", { runId, ledger });
+    return this.tables.reviews.save(runId, this.productOf(runId), ledger);
   }
 
   listRunReviews(runId: string): StoredRunReview[] {
-    return this.reviews.list(runId);
+    Trace.line(import.meta.url, "SqliteResearchStore.listRunReviews", { runId });
+    return this.tables.reviews.list(runId);
   }
 
   private productOf(runId: string): string {
-    return this.runs.get(runId)?.product_id ?? "";
+    Trace.line(import.meta.url, "SqliteResearchStore.productOf", { runId });
+    return this.tables.runs.get(runId)?.product_id ?? "";
   }
 
   close(): void {
-    this.db.close();
+    Trace.line(import.meta.url, "SqliteResearchStore.close");
+    this.tables.db.close();
   }
 }

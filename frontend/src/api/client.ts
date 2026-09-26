@@ -20,11 +20,16 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
   return response.json() as Promise<T>;
 }
 
+export interface Session {
+  authenticated: boolean;
+  user: string | null;
+  workspace?: string;
+  is_admin?: boolean;
+  auth_required: boolean;
+}
+
 export const api = {
-  session: () =>
-    request<{ authenticated: boolean; user: string | null; auth_required: boolean }>(
-      '/api/auth/session',
-    ),
+  session: () => request<Session>('/api/auth/session'),
   login: (username: string, password: string) =>
     request<{ user: string }>('/api/auth/login', {
       method: 'POST',
@@ -52,6 +57,7 @@ export const api = {
   calls: (id: string, after = 0) =>
     request<CallsResponse>(`/api/research/runs/${id}/calls${after > 0 ? `?after=${after}` : ''}`),
   logsUrl: (id: string) => `/runs/${id}/logs`,
+  traceUrl: (id: string) => `/api/research/runs/${id}/trace`,
   stopRun: (id: string) =>
     request<{ ok: boolean }>(`/api/research/runs/${id}/stop`, { method: 'POST' }),
   steer: (id: string, judgement: { kind: string; text: string; rejects_kinds: string[] }) =>

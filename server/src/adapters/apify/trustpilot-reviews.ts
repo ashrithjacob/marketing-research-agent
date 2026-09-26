@@ -3,6 +3,7 @@ import { BandFiling } from "./band-filing.js";
 import { Field, ReviewKey } from "./fields.js";
 import type { ActorRunner } from "./runner.js";
 import type { ReviewExcerpt, ReviewResult } from "./types.js";
+import { Trace } from "../../trace/index.js";
 
 /** Reviews for one company. These review the merchant, never the product. */
 export class TrustpilotReviews {
@@ -14,6 +15,7 @@ export class TrustpilotReviews {
       maxItems: number;
       signal?: AbortSignal;
   }): Promise<ReviewResult> {
+    Trace.line(import.meta.url, "TrustpilotReviews.fetch");
     const { domainOrUrl, star, maxItems, signal } = options;
     const { status, items } = await this.runner.run(
       TRUSTPILOT_ACTOR,

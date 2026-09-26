@@ -2,10 +2,12 @@ import type { Competitor, CompetitorReference, StagePacket } from "../domain/ind
 
 import type { PacketCheck, PacketContext } from "./check.js";
 import { Names, Relations } from "./names.js";
+import { Trace } from "../trace/index.js";
 
 /** Direct and indirect are measured against the product's own form and actives. */
 export class CompetitorCheck implements PacketCheck {
   problems(packet: StagePacket, { sourceIds }: PacketContext): string[] {
+    Trace.line(import.meta.url, "CompetitorCheck.problems", { packet });
     const reference = packet.competitor_reference;
     const problems: string[] = [];
 
@@ -45,6 +47,7 @@ export class CompetitorCheck implements PacketCheck {
     sourceIds: ReadonlySet<string>,
     kinds: ReadonlyMap<string, string>,
   ): string[] {
+    Trace.line(import.meta.url, "CompetitorCheck.adProblems", { row, label, sourceIds, kinds });
     return row.ad_source_ids.flatMap((adId) => {
       if (!sourceIds.has(adId)) {
         return [`${label} links ad source '${adId}', which is not in the packet`];
@@ -62,6 +65,7 @@ export class CompetitorCheck implements PacketCheck {
     reference: CompetitorReference | null,
     referenceActives: ReadonlySet<string>,
   ): string[] {
+    Trace.line(import.meta.url, "CompetitorCheck.activeProblems", { row, label, reference, referenceActives });
     const ownActives = new Set(
       row.active_ingredients.map((active) => Names.normalise(active.name_normalised)),
     );
@@ -85,6 +89,7 @@ export class CompetitorCheck implements PacketCheck {
     label: string,
     reference: CompetitorReference,
   ): string[] {
+    Trace.line(import.meta.url, "CompetitorCheck.relationProblems", { row, label, reference });
     const expected = Relations.expected(row.form, reference.form);
     if (expected === null) {
       const missing = !row.form_as_printed.trim()

@@ -1,3 +1,5 @@
+import { Trace } from "../trace/index.js";
+
 export interface RetryPolicy {
   attempts: number;
   baseMs: number;
@@ -12,15 +14,18 @@ const TERMINAL_ERROR =
 /** Retrying a terminal error just spends the same money again, so it is named. */
 export class Retries {
   static isRetryable(errorMessage: string): boolean {
+    Trace.line(import.meta.url, "Retries.isRetryable", { errorMessage });
     return errorMessage.trim() !== "" && !TERMINAL_ERROR.test(errorMessage);
   }
 
   static backoffMs(attempt: number, policy: RetryPolicy = DEFAULT_RETRY): number {
+    Trace.line(import.meta.url, "Retries.backoffMs", { attempt, policy });
     const window = Math.min(policy.capMs, policy.baseMs * 2 ** (attempt - 1));
     return Math.round(window / 2 + Math.random() * (window / 2));
   }
 
   static sleep(ms: number): Promise<void> {
+    Trace.line(import.meta.url, "Retries.sleep", { ms });
     return ms > 0 ? new Promise((resolve) => setTimeout(resolve, ms)) : Promise.resolve();
   }
 }

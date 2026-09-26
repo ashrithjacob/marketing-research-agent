@@ -1,3 +1,5 @@
+import { Trace } from "../trace/index.js";
+
 export interface Rates {
   input?: number;
   output?: number;
@@ -20,12 +22,14 @@ export interface Billed {
 /** OpenRouter quotes per token; everything downstream works per million. */
 export class Money {
   static perMillion(value: unknown): number | undefined {
+    Trace.tick(import.meta.url, "Money.perMillion");
     if (typeof value !== "string" && typeof value !== "number") return undefined;
     const parsed = Number(value);
     return Number.isFinite(parsed) && parsed >= 0 ? parsed * 1_000_000 : undefined;
   }
 
   static rates(pricing: Record<string, unknown> | undefined): Rates | undefined {
+    Trace.tick(import.meta.url, "Money.rates");
     if (!pricing) return undefined;
     const rates: Rates = {
       input: Money.perMillion(pricing.prompt),

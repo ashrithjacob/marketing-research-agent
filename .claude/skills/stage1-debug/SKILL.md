@@ -26,7 +26,7 @@ them cache reads), $0.0405 billed** — a normal, healthy run.
 
 ## What happens when Start run is clicked
 
-Before the HTTP response even returns (`RunSupervisor.start()`):
+Before the HTTP response even returns (`RunSupervisor.start()`, which hands off to `RunLauncher.launch()`):
 
 1. Standing judgements and reject-kinds are loaded (defaults:
    `seo_listicle`, `review_roundup`, `ai_generated`).

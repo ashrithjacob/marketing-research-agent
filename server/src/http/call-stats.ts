@@ -1,4 +1,5 @@
 import type { LlmCall, ResearchRun, RunEvent } from "../domain/index.js";
+import { Trace } from "../trace/index.js";
 
 /** The log page's header, summed from recorded rows so it can only undercount a run. */
 export class CallStats {
@@ -8,6 +9,7 @@ export class CallStats {
     events: readonly RunEvent[],
     live: boolean,
   ): Record<string, unknown> {
+    Trace.line(import.meta.url, "CallStats.of", { run, calls, events, live });
     const sum = (pick: (call: LlmCall) => number | undefined) =>
       calls.reduce((total, call) => total + (pick(call) ?? 0), 0);
     const usage = (call: LlmCall) => call.usage as Record<string, any>;

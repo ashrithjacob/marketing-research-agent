@@ -11,7 +11,7 @@ import type {
   ResearchStore,
   SourceKind,
 } from "../domain/index.js";
-import { Stages } from "../domain/index.js";
+import { Scope, Stages } from "../domain/index.js";
 
 import { BilledCosts } from "./billed-costs.js";
 import { LlmCallLog } from "./llm-call-log.js";
@@ -23,6 +23,7 @@ import { RunWatch } from "./run-watch.js";
 import { StageTwoHandoff } from "./stage-two-handoff.js";
 import { ResearchToolset } from "./tools/index.js";
 import { StageTwoRoster } from "../extract/index.js";
+import { Trace } from "../trace/index.js";
 
 /** Builds one run's Agent — priced model, traced stream, the tools its nodes allow — and starts its watch. */
 export class RunAgentFactory {
@@ -38,12 +39,14 @@ export class RunAgentFactory {
     private readonly prompts: PromptBuilder,
     private readonly actorRunner?: ActorRunner | null,
   ) {
+    Trace.line(import.meta.url, "RunAgentFactory.constructor");
     this.handoff = new StageTwoHandoff(store);
   }
 
   assemble<TApi extends Api>(
     runId: string,
     options: {
+      workspaceId: string;
       brief: Brief;
       nodes: readonly Node[];
       rejectKinds: SourceKind[];
@@ -53,9 +56,10 @@ export class RunAgentFactory {
       targets?: readonly string[];
     },
   ): { agent: Agent; done: Promise<void> } {
+    Trace.line(import.meta.url, "RunAgentFactory.assemble", { runId, options });
     const { nodes, model, pricing } = options;
     const stageTwo = Stages.covering(nodes) === 2;
-    const source = stageTwo ? this.handoff.forBrief(options.brief) : null;
+    const source = stageTwo ? this.handoff.forBrief(options.brief, Scope.of(options.workspaceId)) : null;
     const roster = source ? StageTwoRoster.of(source.packet) : [];
     const ledger = new ReviewLedger();
     const watch = new RunWatch({
@@ -101,6 +105,7 @@ export class RunAgentFactory {
             reviews: () => ledger.snapshot(),
             onValid: (packet) => watch.settlement.keepValidated(packet),
             onChecked: (valid, problems) => {
+              Trace.line(import.meta.url, "RunAgentFactory.assemble.onChecked", { valid, problems });
               this.store.addPacketCheck(runId, valid, problems);
               this.runs.emit(runId, "packet.checked", { valid, problems: [...problems] });
             },

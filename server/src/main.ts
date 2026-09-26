@@ -2,12 +2,19 @@ import { setDefaultAutoSelectFamilyAttemptTimeout } from "node:net";
 
 import { serve } from "@hono/node-server";
 
+import { Env } from "./config/index.js";
 import { App } from "./http/index.js";
+import { Trace, WireTap } from "./trace/index.js";
 
 const CONNECT_MS_PER_ADDRESS_ON_A_SLOW_LINK_NOT_NODES_250 = 2500;
 setDefaultAutoSelectFamilyAttemptTimeout(CONNECT_MS_PER_ADDRESS_ON_A_SLOW_LINK_NOT_NODES_250);
 
-const app = new App();
+const settings = Env.settings();
+const traces = App.traceFile(settings);
+Trace.install(traces);
+new WireTap().attach();
+traces.prune();
+const app = new App({ settings, traces });
 
 app.supervisor.recoverRunsKilledByRestart();
 app.supervisor.costs.start();

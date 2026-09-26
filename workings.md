@@ -108,13 +108,18 @@ run on screen filled in. See §2b for what changes when a run covers part of the
 
 ### Step 2 — the request is checked
 
-- `http/auth-gate.ts`: every `/api/research/*` request passes the session check. With
-  `MRA_APP_PASSWORD_HASH` empty (the local default) auth is off and every request is
-  user `MRA_APP_USER`.
+- `http/auth-gate.ts`: every `/api/research/*` request passes the session check, which
+  resolves the cookie to a **principal** — account, workspace, admin or not — and
+  leaves it on the request context. With `MRA_APP_PASSWORD_HASH` empty (the local
+  default) auth is off and every request is `MRA_APP_USER` as an admin.
+- `http/scope-guard.ts`: any `/runs/:runId…` or `/products/:productId…` path outside
+  the principal's workspace is a 404 before a route sees it. The admin's scope is
+  every workspace. A new run is created in the principal's workspace, and picks up
+  only that workspace's judgements.
 - `http/run-routes.ts`: the body is parsed with `runRequestSchema` (`domain/request.ts`). The schema is
   `.strict()`, so an unknown key is a 400. A blank product is a 400.
 
-### Step 3 — `RunSupervisor.start()` (`agent/run-supervisor.ts`)
+### Step 3 — `RunSupervisor.start()` → `RunLauncher.launch()` (`agent/run-launcher.ts`)
 
 All of this happens **before the HTTP response is sent**:
 
@@ -489,6 +494,78 @@ run `5aa4d71e` (12 listings × 5 bands + 11 Trustpilot merchants = 2,658 reviews
 that was about 67 sequential turns at an average of 28s each. Copying had gone,
 but a serial per-review step had replaced it. Removed the same day.
 
+### §2e — the run trace: watching the code instead of reading it
+
+Every server function writes one line when it is called, and every outbound HTTP
+request writes two: `→` when it leaves and `←` when the response headers come
+back. The lines go to `/data/traces/<runId>.log`, one file per run; anything
+outside a run (startup, the browser polling, the six-hourly price refresh) goes
+to `process.log`. Download it with **Download trace** on the activity page, or
+`mra trace <id>`.
+
+A web search, from a real run on 2026-09-27 (lines cut at the right):
+
+```
+22:47:14.723 +00:07.936 [agent/tools/web-search-tool.ts] WebSearchTool.tool.execute params={max_results,query}
+22:47:14.724 +00:07.937 [adapters/searxng.ts] Searxng.find query="Pure Encapsulations Magnesium Glycinate 90 capsules product page" maxResults=10
+22:47:14.724 +00:07.937 [adapters/http.ts] Http.withTimeout url="http://searxng:8080/search?q=…&format=json" …
+22:47:14.725 +00:07.938 [trace/wire-tap.ts] → GET searxng:8080/search?q=Pure+Encapsulations+…&format=json
+```
+
+Read each line as: clock time, time since the run started, the file (relative to
+`server/src`), `Class.method`, then the arguments as `name=value`. Strings are cut
+at 120 characters with the full length in brackets. A small flat object shows its
+values (`{url:https://…}`); a larger one shows only its keys (`{method,headers,body}`);
+an array shows its length (`[3]`); a class instance shows its class name. Any name
+matching `key|token|secret|password|authorization|cookie` is written `***`, in fields
+and in URL query strings alike.
+
+**How it works.** `Trace` (`trace/trace.ts`) is static. It knows which run a
+line belongs to from Node's `AsyncLocalStorage`: `RunLauncher.launch` wraps the
+agent's assembly in `Trace.within(runId, …)`, and every promise, timer and tool
+call started inside inherits that run. The first line of each run file is that
+call's header: run id, product, url, model, nodes. The wire lines need no code at
+the call sites. `trace/wire-tap.ts` subscribes to Node's own `diagnostics_channel`
+events: undici's for `fetch` (OpenRouter through pi-ai, Firecrawl, SearXNG) and
+`http.client.*` for the `http` module (Apify, whose client uses axios). The
+response event fires in the socket's context, not the caller's, so the tap
+captures the run context when the request starts and writes the `←` line inside
+it.
+
+**`×N` lines are counts, not calls.** Functions that run once per streamed chunk
+of model output, or once per row in a loop, use `Trace.tick`. That is counted
+rather than written, and the count is written as one line, e.g.
+`AgentEventRecorder.record type=message_update ×412`, either before the next
+ordinary line or once it is five seconds old. A long model turn therefore shows
+as a `×N` line every five seconds. Before ticks, a 14-minute one-node run wrote
+11,575 lines, 8,025 of them `AgentEventRecorder.record`.
+
+**`ms` on a `←` line is time to headers, not to the end of the body.** For a
+streamed model call the stream continues after that line. The turn really ends
+at the next non-tick line.
+
+**What it showed on its first real run.** Run `3e2751cc…` failed with only
+`Connection error.` The trace's last 30 seconds:
+
+```
+23:00:24.833 +13:18.046 [trace/wire-tap.ts] ← POST openrouter.ai/api/v1/chat/completions status="error getaddrinfo EAI_AGAIN openrouter.ai" ms=5006
+```
+
+This line appears four times, 5 seconds apart. That is pi-ai's retry budget
+spent on a DNS lookup that was failing inside the container, not a bug in the
+run. The same file showed that the last successful model call's headers arrived
+at `+04:27` and its chunks were still streaming at `+11:17`: one turn of
+`z-ai/glm-5.3-flash` took about seven minutes.
+
+**The rule that keeps it complete.** `tests/trace-coverage.ts` is run by the
+architecture test. It requires every class method, constructor with a body,
+accessor, arrow-function field, and object-literal method (such as each tool's
+`execute`) to start with exactly one `Trace.line` or `Trace.tick`, naming itself
+as `Class.method`. Nested object-literal methods are named after their owner, e.g.
+`WebFetchTool.tool.execute`. Callbacks passed inline (`.map((r) => …)`) are not
+covered, and neither are route handlers. `App.request` writes one line per HTTP
+request in their place.
+
 ### Step 7 — the screen fills in
 
 The `packet.ready` event triggers a re-fetch of `GET /runs/:id`, which now carries the
@@ -536,20 +613,26 @@ All bodies are JSON unless stated. Every error is `{"detail": "<message>"}` with
 #### `GET /api/auth/session`
 
 - **In:** the `mra_session` cookie, if any.
-- **Out:** `{"authenticated": bool, "user": string|null, "auth_required": bool}`.
-  With auth disabled: `{"authenticated": true, "user": "ash", "auth_required": false}`.
+- **Out:** `{"authenticated": bool, "user": string|null, "workspace": string, "is_admin": bool, "auth_required": bool}`
+  (`workspace` and `is_admin` only when authenticated).
+  With auth disabled: `{"authenticated": true, "user": "ash", "workspace": "admin", "is_admin": true, "auth_required": false}`.
 
 #### `POST /api/auth/login`
 
 - **In:** `{"username": string, "password": string}`.
 - **Out:** `200 {"user": "<name>"}` and sets `mra_session` — an httpOnly, SameSite=Lax
   JWT valid for `MRA_SESSION_HOURS` (720), `Secure` unless `MRA_COOKIE_SECURE=false`.
-  Wrong credentials, or auth disabled: `401 {"detail": "invalid credentials"}`.
+  The JWT holds the account id and its `token_version`; a request whose version no
+  longer matches the account is unauthenticated.
+  Wrong credentials or a disabled account: `401 {"detail": "invalid credentials"}`.
+  Auth disabled: `400`. Five failures from one address (rightmost
+  `X-Forwarded-For`) inside 15 minutes: `429` with `Retry-After`, whatever the password.
 
 #### `POST /api/auth/logout`
 
 - **In:** nothing.
-- **Out:** `{"ok": true}`, cookie cleared.
+- **Out:** `{"ok": true}`, cookie cleared, and the account's `token_version` bumped —
+  every copy of that user's cookie, on every device, stops working.
 
 #### `GET /api/health`
 
@@ -557,6 +640,10 @@ All bodies are JSON unless stated. Every error is `{"detail": "<message>"}` with
 - **Out:** `{"status": "ok"}`. The Docker healthcheck calls this.
 
 ### Research — `http/research-api.ts`, all behind the session check (`401 {"detail": "not authenticated"}`)
+
+Everything below is scoped to the caller's workspace: lists hold only its runs and
+products (every workspace's, for the admin), a run or product outside it is `404`,
+and `/judgements` is always the caller's own workspace's, the admin's included.
 
 #### `GET /api/research/config`
 
@@ -751,6 +838,14 @@ What the start modal needs to warn you before you pay for a run.
   - `Content-Security-Policy: default-src 'none'` and `X-Content-Type-Options: nosniff`,
     so a scraped page can never run as a script on this origin.
 - **Errors:** `404 {"detail": "not archived"}` when there is no file.
+
+#### `GET /api/research/runs/:runId/trace` — the run trace
+
+- **Out:** `200 text/plain` with `Content-Disposition: attachment;
+  filename="run-<id>-trace.log"`: the file described in §2e, as written so far,
+  so it works mid-run. `404 {"detail": "no trace for this run"}` when there is no
+  file (a run from before traces, or one pruned after `MRA_TRACE_KEEP_DAYS`).
+  Scoped to the caller's workspace by `ScopeGuard`, like every `/runs/:runId/*` path.
 
 #### `GET /api/research/judgements`
 

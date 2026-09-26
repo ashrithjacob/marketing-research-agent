@@ -6,7 +6,67 @@ Arrows are constructor dependencies: `A --> B` means A is given a B.
 
 ```mermaid
 classDiagram
+  namespace trace {
+    class TraceLimits {
+      <<interface>>
+    }
+    class TraceFile {
+      write()
+      read()
+      prune()
+    }
+    class TraceFormat {
+      file()
+      line()
+      elapsed()
+      fields()
+      value()
+      url()
+    }
+    class TraceSink {
+      <<interface>>
+      write()
+    }
+    class TraceScope {
+      <<interface>>
+    }
+    class Trace {
+      install()
+      within()
+      line()
+      tick()
+    }
+    class Pending {
+      <<interface>>
+    }
+    class UndiciRequest {
+      <<interface>>
+    }
+    class NodeRequest {
+      <<interface>>
+    }
+    class WireTap {
+      attach()
+    }
+  }
   namespace domain {
+    class Workspace {
+      <<interface>>
+    }
+    class Account {
+      <<interface>>
+    }
+    class AccountListing {
+      <<interface>>
+    }
+    class Principal {
+      <<interface>>
+    }
+    class Scope {
+      of()
+      forViewer()
+      admits()
+    }
     class Briefs {
       looksLikeUrl()
       normalise()
@@ -50,6 +110,17 @@ classDiagram
       byKey()
       runHeads()
       packetRows()
+    }
+    class AccountDirectory {
+      <<interface>>
+      addWorkspace()
+      workspace()
+      workspaceNamed()
+      addAccount()
+      get()
+      byUsername()
+      list()
+      setPassword()
     }
     class ResearchStore {
       <<interface>>
@@ -285,6 +356,16 @@ classDiagram
     class Searxng {
       find()
     }
+    class AccountTable {
+      addWorkspace()
+      workspace()
+      workspaceNamed()
+      addAccount()
+      get()
+      byUsername()
+      list()
+      setPassword()
+    }
     class CallLog {
       add()
       setBilled()
@@ -343,6 +424,10 @@ classDiagram
     class SqliteSchema {
       apply()
     }
+    class ScopeFilter {
+      sql()
+      args()
+    }
     class SqliteResearchStore {
       createRun()
       getRun()
@@ -352,6 +437,9 @@ classDiagram
       listEvents()
       listJudgements()
       addJudgement()
+    }
+    class SqliteTables {
+      open()
     }
   }
   namespace agent {
@@ -432,6 +520,9 @@ classDiagram
     class RunAgentFactory {
       assemble()
     }
+    class RunLauncher {
+      launch()
+    }
     class RunSettlement {
       keepValidated()
       hasValidated()
@@ -493,10 +584,10 @@ classDiagram
     class TrustpilotReviewsTool {
       tool()
     }
-    class WebSearchTool {
+    class WebFetchTool {
       tool()
     }
-    class WebFetchTool {
+    class WebSearchTool {
       tool()
     }
     class UsageTotals {
@@ -505,7 +596,11 @@ classDiagram
     }
   }
   namespace http {
+    class AccountCommands {
+      run()
+    }
     class App {
+      traceFile()
       close()
     }
     class AuthGate {
@@ -529,6 +624,12 @@ classDiagram
     class JudgementRoutes {
       register()
     }
+    class LoginThrottle {
+      retryAfterSeconds()
+      fail()
+      clear()
+      clientOf()
+    }
     class Passwords {
       hash()
       verify()
@@ -542,12 +643,27 @@ classDiagram
     class RunRoutes {
       register()
     }
+    class ScopeGuard {
+      register()
+    }
+    class SecretPrompt {
+      newPassword()
+    }
+    class Sessions {
+      login()
+      resolve()
+      revoke()
+      local()
+    }
     class StageTwoRoutes {
       register()
     }
     class TokenService {
       issue()
       verify()
+    }
+    class TraceRoute {
+      register()
     }
   }
   AmazonReviews --> ActorRunner
@@ -575,6 +691,11 @@ classDiagram
   RunAgentFactory --> RetryPolicy
   RunAgentFactory --> PromptBuilder
   RunAgentFactory --> ActorRunner
+  RunLauncher --> ResearchStore
+  RunLauncher --> Settings
+  RunLauncher --> OpenRouterPrices
+  RunLauncher --> LiveRuns
+  RunLauncher --> RunAgentFactory
   RunSettlement --> ResearchStore
   RunSettlement --> LiveRuns
   RunSettlement --> ReviewLedger
@@ -595,14 +716,16 @@ classDiagram
   TrustpilotReviewsTool --> Settings
   TrustpilotReviewsTool --> TrustpilotReviews
   TrustpilotReviewsTool --> ReviewRendering
-  WebSearchTool --> Searxng
   WebFetchTool --> Settings
   WebFetchTool --> Firecrawl
   WebFetchTool --> Corpus
   WebFetchTool --> FetchGate
+  WebSearchTool --> Searxng
   ReviewAssembly --> ReviewLedgerSnapshot
   PacketValidator --> ReviewLedgerSnapshot
+  AccountCommands --> AccountDirectory
   AuthGate --> Settings
+  AuthGate --> AccountDirectory
   ConfigRoute --> Settings
   CorpusRoute --> ResearchStore
   CorpusRoute --> Settings
@@ -613,8 +736,13 @@ classDiagram
   RunRoutes --> ResearchStore
   RunRoutes --> RunSupervisor
   RunRoutes --> StageTwoHandoff
+  ScopeGuard --> ResearchStore
+  Sessions --> AccountDirectory
+  Sessions --> Settings
   StageTwoRoutes --> StageTwoHandoff
   StageTwoRoutes --> Settings
+  TraceRoute --> TraceFile
+  TraceFile --> TraceLimits
 ```
 
 ## Inventory
@@ -637,6 +765,7 @@ classDiagram
 | `adapters` | `adapters/rates.ts` | Rates, Pricing, Billed, Money |
 | `adapters` | `adapters/run-billing.ts` | RunBilling |
 | `adapters` | `adapters/searxng.ts` | SearchHit, Searxng |
+| `adapters` | `adapters/sqlite/account-table.ts` | AccountTable |
 | `adapters` | `adapters/sqlite/call-log.ts` | CallLog |
 | `adapters` | `adapters/sqlite/check-log.ts` | PacketCheckLog |
 | `adapters` | `adapters/sqlite/event-log.ts` | EventLog |
@@ -649,7 +778,9 @@ classDiagram
 | `adapters` | `adapters/sqlite/rows.ts` | Rows |
 | `adapters` | `adapters/sqlite/run-table.ts` | RunTable |
 | `adapters` | `adapters/sqlite/schema.ts` | SqliteSchema |
+| `adapters` | `adapters/sqlite/scope-filter.ts` | ScopeFilter |
 | `adapters` | `adapters/sqlite/store.ts` | SqliteResearchStore |
+| `adapters` | `adapters/sqlite/tables.ts` | SqliteTables |
 | `agent` | `agent/billed-costs.ts` | BilledCosts |
 | `agent` | `agent/errors.ts` | RunError |
 | `agent` | `agent/event-recorder.ts` | TurnEnd, AgentEventRecorder |
@@ -665,6 +796,7 @@ classDiagram
 | `agent` | `agent/retry.ts` | RetryPolicy, Retries |
 | `agent` | `agent/review-ledger.ts` | ReviewLedger |
 | `agent` | `agent/run-agent-factory.ts` | RunAgentFactory |
+| `agent` | `agent/run-launcher.ts` | RunLauncher |
 | `agent` | `agent/run-settlement.ts` | RunSettlement |
 | `agent` | `agent/run-supervisor.ts` | RunSupervisor |
 | `agent` | `agent/run-watch.ts` | RunWatch |
@@ -676,14 +808,16 @@ classDiagram
 | `agent` | `agent/tools/packet-check-tool.ts` | PacketCheckTool |
 | `agent` | `agent/tools/review-rendering.ts` | PullLabel, ReviewRendering |
 | `agent` | `agent/tools/review-tools.ts` | FindProductTool, AmazonReviewsTool, TrustpilotReviewsTool |
-| `agent` | `agent/tools/web-tools.ts` | WebSearchTool, WebFetchTool |
+| `agent` | `agent/tools/web-fetch-tool.ts` | WebFetchTool |
+| `agent` | `agent/tools/web-search-tool.ts` | WebSearchTool |
 | `agent` | `agent/usage.ts` | UsageTotals |
 | `config` | `config/settings.ts` | Settings, Env |
+| `domain` | `domain/accounts.ts` | Workspace, Account, AccountListing, Principal, Scope |
 | `domain` | `domain/brief.ts` | Briefs |
 | `domain` | `domain/logs.ts` | RunEvent, Judgement, PacketCheck, RunUpdate, LlmCallRecord, LlmCall |
 | `domain` | `domain/nodes.ts` | Stages |
 | `domain` | `domain/packet-rows.ts` | PacketRowSet, PacketRows |
-| `domain` | `domain/ports.ts` | ProductCatalog, ResearchStore, GateVerdict, FetchGate |
+| `domain` | `domain/ports.ts` | ProductCatalog, AccountDirectory, ResearchStore, GateVerdict, FetchGate |
 | `domain` | `domain/products.ts` | RunHead, Product, ProductSummary, ProductFolders |
 | `domain` | `domain/records.ts` | Clock, Ids, ResearchRun, RunSummary, Runs |
 | `domain` | `domain/reject-kinds.ts` | RejectKinds |
@@ -702,6 +836,7 @@ classDiagram
 | `extract` | `extract/scope-check.ts` | ScopeCheck |
 | `extract` | `extract/stage-two-roster.ts` | StageTwoRoster |
 | `extract` | `extract/validator.ts` | ZodProblems, PacketValidator |
+| `http` | `http/account-commands.ts` | AccountCommands |
 | `http` | `http/app.ts` | App |
 | `http` | `http/auth-gate.ts` | AuthGate |
 | `http` | `http/call-stats.ts` | CallStats |
@@ -710,9 +845,18 @@ classDiagram
 | `http` | `http/event-stream.ts` | EventStream |
 | `http` | `http/frontend.ts` | Frontend |
 | `http` | `http/judgement-routes.ts` | JudgementRoutes |
+| `http` | `http/login-throttle.ts` | LoginThrottle |
 | `http` | `http/passwords.ts` | Passwords |
 | `http` | `http/product-routes.ts` | ProductRoutes |
 | `http` | `http/research-api.ts` | ResearchApi |
 | `http` | `http/run-routes.ts` | RunRoutes |
+| `http` | `http/scope-guard.ts` | ScopeGuard |
+| `http` | `http/secret-prompt.ts` | SecretPrompt |
+| `http` | `http/sessions.ts` | Sessions |
 | `http` | `http/stage-two-routes.ts` | StageTwoRoutes |
 | `http` | `http/token-service.ts` | TokenService |
+| `http` | `http/trace-route.ts` | TraceRoute |
+| `trace` | `trace/trace-file.ts` | TraceLimits, TraceFile |
+| `trace` | `trace/trace-format.ts` | TraceFormat |
+| `trace` | `trace/trace.ts` | TraceSink, TraceScope, Trace |
+| `trace` | `trace/wire-tap.ts` | Pending, UndiciRequest, NodeRequest, WireTap |

@@ -4,6 +4,8 @@ import type { SSEStreamingApi } from "hono/streaming";
 
 import type { EventFrame, RunSupervisor } from "../agent/index.js";
 import type { ResearchStore } from "../domain/index.js";
+import type { ApiEnv } from "./api-env.js";
+import { Trace } from "../trace/index.js";
 
 /** Replay from `after`, then follow live; subscribing before replaying closes the gap. */
 export class EventStream {
@@ -12,7 +14,8 @@ export class EventStream {
     private readonly supervisor: RunSupervisor,
   ) {}
 
-  register(api: Hono): void {
+  register(api: Hono<ApiEnv>): void {
+    Trace.line(import.meta.url, "EventStream.register");
     api.get("/runs/:runId/events", (c) => {
       const runId = c.req.param("runId");
       if (!this.store.getRun(runId)) return c.json({ detail: "no such run" }, 404);
@@ -23,6 +26,7 @@ export class EventStream {
   }
 
   private async follow(stream: SSEStreamingApi, runId: string, from: number): Promise<void> {
+    Trace.line(import.meta.url, "EventStream.follow", { stream, runId, from });
     const pending: Array<EventFrame | null> = [];
     let wake: (() => void) | null = null;
     const unsubscribe = this.supervisor.subscribe(runId, (frame) => {

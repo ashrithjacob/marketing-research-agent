@@ -2,12 +2,14 @@ import type { Api, Model } from "@earendil-works/pi-ai";
 
 import type { OpenRouterPrices } from "../adapters/openrouter-prices.js";
 import type { Pricing } from "../adapters/rates.js";
+import { Trace } from "../trace/index.js";
 
 /** Writes OpenRouter's live rates onto the pi-ai model a run is started with. */
 export class ModelPricing {
   constructor(private readonly prices: OpenRouterPrices) {}
 
   apply<TApi extends Api>(model: Model<TApi>): { model: Model<TApi>; pricing: Pricing } {
+    Trace.line(import.meta.url, "ModelPricing.apply", { model });
     const { rates: live, fetchedAt } = this.prices.ratesFor(model.id);
     if (!live) {
       const { input, output, cacheRead, cacheWrite } = model.cost;

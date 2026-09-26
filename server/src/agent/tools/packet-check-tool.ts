@@ -5,12 +5,14 @@ import { PacketDraft, PacketError, PacketValidator } from "../../extract/index.j
 
 import { PACKET_CHECK_BUDGET, type PacketCheckOptions } from "./lanes.js";
 import { packetParameters } from "./parameters.js";
+import { Trace } from "../../trace/index.js";
 
 /** The contract as a tool: a shape error becomes a tool result, not a dead run. */
 export class PacketCheckTool {
   constructor(private readonly check: PacketCheckOptions) {}
 
   tool(): AgentTool<typeof packetParameters> {
+    Trace.line(import.meta.url, "PacketCheckTool.tool");
     const check = this.check;
 
       const most = { sources: 0, excerpts: 0, measurements: 0, competitors: 0 };
@@ -28,6 +30,7 @@ export class PacketCheckTool {
           `packet as your final answer. ${PACKET_CHECK_BUDGET} checks per run.`,
         parameters: packetParameters,
         async execute(_id, params) {
+          Trace.line(import.meta.url, "PacketCheckTool.tool.execute", { params });
           const coerced = PacketDraft.coerce(params.packet);
           if ("unparseable" in coerced) {
             return {

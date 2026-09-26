@@ -6,12 +6,14 @@ import {
   type ReviewLedgerSnapshot,
   type StoredRunReview,
 } from "../../domain/index.js";
+import { Trace } from "../../trace/index.js";
 
 /** The review corpus: each real review stored once, linked to every run that pulled it. */
 export class ReviewTable {
   constructor(private readonly db: Database.Database) {}
 
   save(runId: string, productId: string, ledger: ReviewLedgerSnapshot): number {
+    Trace.line(import.meta.url, "ReviewTable.save", { runId, productId, ledger });
     const pulls = new Map<string, LedgerPull>(ledger.pulls.map((pull) => [pull.handle, pull]));
     const now = Clock.nowIso();
     const upsert = this.db.prepare(
@@ -56,6 +58,7 @@ export class ReviewTable {
   }
 
   list(runId: string): StoredRunReview[] {
+    Trace.line(import.meta.url, "ReviewTable.list", { runId });
     const rows = this.db
       .prepare(
         "SELECT l.*, r.platform, r.review_key, r.listing, r.star, r.title, r.text, r.posted_at," +

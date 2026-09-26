@@ -14,11 +14,13 @@ import {
   trustpilotReviewParameters,
 } from "./parameters.js";
 import { ReviewRendering } from "./review-rendering.js";
+import { Trace } from "../../trace/index.js";
 
 export class FindProductTool {
   constructor(private readonly products: AmazonProducts) {}
 
   tool(): AgentTool<typeof findProductParameters> {
+    Trace.line(import.meta.url, "FindProductTool.tool");
     const products = this.products;
     return {
       name: "amazon_find_product",
@@ -30,6 +32,7 @@ export class FindProductTool {
         "with four reviews cannot support a review-mining node.",
       parameters: findProductParameters,
       async execute(_id, params, signal) {
+        Trace.line(import.meta.url, "FindProductTool.tool.execute", { params });
         const max = Math.min(Math.max(Math.trunc(params.max_results ?? 5), 1), 20);
         const found = await products.find({ query: params.query, maxResults: max, signal });
         if (found.length === 0) {
@@ -64,6 +67,7 @@ export class AmazonReviewsTool {
   ) {}
 
   tool(): AgentTool<typeof amazonReviewParameters> {
+    Trace.line(import.meta.url, "AmazonReviewsTool.tool");
     const { settings, reviews, rendering } = this;
     return {
       name: "amazon_reviews",
@@ -76,6 +80,7 @@ export class AmazonReviewsTool {
         "another band.",
       parameters: amazonReviewParameters,
       async execute(_id, params, signal) {
+        Trace.line(import.meta.url, "AmazonReviewsTool.tool.execute", { params });
         const limit = ReviewRendering.limit(params.max_reviews, settings.apifyMaxReviews);
         const star = ReviewRendering.starBand(params.star);
         const result = await reviews.fetch({
@@ -106,6 +111,7 @@ export class TrustpilotReviewsTool {
   ) {}
 
   tool(): AgentTool<typeof trustpilotReviewParameters> {
+    Trace.line(import.meta.url, "TrustpilotReviewsTool.tool");
     const { settings, reviews, rendering } = this;
     return {
       name: "trustpilot_reviews",
@@ -118,6 +124,7 @@ export class TrustpilotReviewsTool {
         "marketplace-review floor.",
       parameters: trustpilotReviewParameters,
       async execute(_id, params, signal) {
+        Trace.line(import.meta.url, "TrustpilotReviewsTool.tool.execute", { params });
         const limit = ReviewRendering.limit(params.max_reviews, settings.apifyMaxReviews);
         const star = ReviewRendering.starBand(params.star);
         const result = await reviews.fetch({

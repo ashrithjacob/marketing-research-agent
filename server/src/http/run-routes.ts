@@ -5,12 +5,15 @@ import {
   Briefs,
   type ResearchStore,
   Runs,
+  Scope,
   Stages,
   judgementInSchema,
   runRequestSchema,
 } from "../domain/index.js";
 
 import { CallStats } from "./call-stats.js";
+import type { ApiEnv } from "./api-env.js";
+import { Trace } from "../trace/index.js";
 
 /** The run lifecycle endpoints: create, list, read, steer, stop, and the call log. */
 export class RunRoutes {
@@ -20,11 +23,13 @@ export class RunRoutes {
     private readonly handoff: StageTwoHandoff,
   ) {}
 
-  register(api: Hono): void {
+  register(api: Hono<ApiEnv>): void {
+    Trace.line(import.meta.url, "RunRoutes.register");
     api.get("/runs", (c) => {
       const limit = Number(c.req.query("limit") ?? 50);
       const safeLimit = Number.isFinite(limit) ? Math.min(Math.max(limit, 1), 200) : 50;
-      return c.json({ data: this.store.listRuns(safeLimit).map(Runs.summary) });
+      const scope = Scope.forViewer(c.get("principal"));
+      return c.json({ data: this.store.listRuns(scope, safeLimit).map(Runs.summary) });
     });
     api.post("/runs", async (c) => this.create(c));
     api.get("/runs/:runId", (c) => {
@@ -53,7 +58,9 @@ export class RunRoutes {
     });
   }
 
-  private async create(c: Context) {
+  private async create(c: Context<ApiEnv>) {
+    Trace.line(import.meta.url, "RunRoutes.create");
+    const { workspaceId } = c.get("principal");
     const parsed = runRequestSchema.safeParse(await c.req.json().catch(() => null));
     if (!parsed.success) {
       return c.json({ detail: parsed.error.issues.map((i) => i.message).join("; ") }, 400);
@@ -64,7 +71,7 @@ export class RunRoutes {
     }
     const nodes = Stages.expand(parsed.data.nodes);
     if ((Stages.covering(nodes) ?? 1) === 2) {
-      const source = this.handoff.forBrief(brief);
+      const source = this.handoff.forBrief(brief, Scope.of(workspaceId));
       if (!source) {
         return c.json(
           {
@@ -80,7 +87,7 @@ export class RunRoutes {
 
     let runId: string;
     try {
-      runId = this.supervisor.start({ ...parsed.data, brief });
+      runId = this.supervisor.start({ ...parsed.data, brief }, workspaceId);
     } catch (error) {
       if (!(error instanceof RunError)) throw error;
       return c.json({ detail: error.message }, 502);
@@ -89,7 +96,8 @@ export class RunRoutes {
     return c.json(run ? Runs.summary(run) : { detail: "run vanished" }, run ? 200 : 500);
   }
 
-  private calls(c: Context, runId: string) {
+  private calls(c: Context<ApiEnv>, runId: string) {
+    Trace.line(import.meta.url, "RunRoutes.calls", { runId });
     const run = this.store.getRun(runId);
     if (!run) return c.json({ detail: "no such run" }, 404);
     const after = Number(c.req.query("after") ?? 0);
@@ -103,13 +111,15 @@ export class RunRoutes {
     });
   }
 
-  private async steer(c: Context, runId: string) {
-    if (!this.store.getRun(runId)) return c.json({ detail: "no such run" }, 404);
+  private async steer(c: Context<ApiEnv>, runId: string) {
+    Trace.line(import.meta.url, "RunRoutes.steer", { runId });
+    const run = this.store.getRun(runId);
+    if (!run) return c.json({ detail: "no such run" }, 404);
     const parsed = judgementInSchema.safeParse(await c.req.json().catch(() => null));
     if (!parsed.success || !parsed.data.text.trim()) {
       return c.json({ detail: "judgement text is required" }, 400);
     }
-    const judgement = this.store.addJudgement({
+    const judgement = this.store.addJudgement(run.workspace_id, {
       kind: parsed.data.kind,
       text: parsed.data.text.trim(),
       rejects_kinds: parsed.data.rejects_kinds,

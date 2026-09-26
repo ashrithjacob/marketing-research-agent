@@ -29,6 +29,7 @@ export interface RunEvent {
 
 export interface Judgement {
   id: string;
+  workspace_id: string;
   kind: string;
   text: string;
   rejects_kinds: SourceKind[];

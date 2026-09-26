@@ -6,10 +6,12 @@ export default function ProductRuns({
   product,
   runs,
   activeId,
+  showWorkspace,
 }: {
   product: ProductSummary;
   runs: RunSummary[];
   activeId: string;
+  showWorkspace: boolean;
 }) {
   return (
     <>
@@ -35,6 +37,7 @@ export default function ProductRuns({
             <div className="runrow-sub">
               {new Date(r.created_at).toLocaleString()}
               {r.brief.market ? ` · ${r.brief.market}` : ''}
+              {showWorkspace ? ` · ${r.workspace_id}` : ''}
             </div>
             <div className="runrow-sub">
               {r.counts.competitors &&

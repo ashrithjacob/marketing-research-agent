@@ -17,10 +17,12 @@ import { RosterBlock } from "./roster-block.js";
 import { OUTPUT } from "./text/output.js";
 import { RULES } from "./text/rules.js";
 import { SYSTEM_PROMPT } from "./text/system.js";
+import { Trace } from "../../trace/index.js";
 
 /** Assembles the system prompt and the run instructions from the text modules. */
 export class PromptBuilder {
   system(nodes: readonly Node[] = STAGE_NODES[1]): string {
+    Trace.line(import.meta.url, "PromptBuilder.system", { nodes });
     const stage = Stages.covering(nodes) ?? 1;
     const base = SYSTEM_PROMPT.replace("{stage}", String(stage));
     if (!Stages.isPartial(nodes)) return base;
@@ -41,6 +43,7 @@ export class PromptBuilder {
     roster?: readonly MiningTarget[];
     targets?: readonly string[];
   }): string {
+    Trace.line(import.meta.url, "PromptBuilder.instructions", { options });
     const { brief, rejectKinds, judgements } = options;
     const nodes = options.nodes ?? STAGE_NODES[1];
     const stage = Stages.covering(nodes) ?? 1;
@@ -69,6 +72,7 @@ export class PromptBuilder {
   }
 
   private output(nodes: readonly Node[], stage: number): string {
+    Trace.line(import.meta.url, "PromptBuilder.output", { nodes, stage });
     const listed = PromptBlocks.code(nodes);
     let output = OUTPUT.replace(
       "{example}",
@@ -89,6 +93,7 @@ export class PromptBuilder {
   }
 
   private static withoutReviewTools(text: string, nodes: readonly Node[]): string {
+    Trace.line(import.meta.url, "PromptBuilder.withoutReviewTools", { text, nodes });
     const findStart = text.indexOf("- `amazon_find_product`");
     const findEnd = text.indexOf("\n\nWork through");
     const thisRun = text.indexOf("\n\nThis run covers only");

@@ -1,23 +1,28 @@
 import type { CompetitorRelation } from "../domain/index.js";
+import { Trace } from "../trace/index.js";
 
 const NON_BRAND = new Set(["www", "co", "com", "net", "org", "gov", "edu", "ac", "shop", "store"]);
 
 /** Loose string matching, so an echoed brief need not be character-perfect. */
 export class Names {
   static normalise(value: string): string {
+    Trace.line(import.meta.url, "Names.normalise", { value });
     return value.toLowerCase().replace(/\s+/g, " ").trim();
   }
 
   static squash(value: string): string {
+    Trace.line(import.meta.url, "Names.squash", { value });
     return value.toLowerCase().replace(/[^a-z0-9]/g, "");
   }
 
   static sameHost(a: string, b: string): boolean {
+    Trace.line(import.meta.url, "Names.sameHost", { a, b });
     const left = Names.hostOf(a);
     return left !== "" && left === Names.hostOf(b);
   }
 
   private static hostOf(value: string): string {
+    Trace.line(import.meta.url, "Names.hostOf", { value });
     try {
       const raw = value.trim();
       if (!raw) return "";
@@ -32,6 +37,7 @@ export class Names {
 /** The brand-ish labels in a bare domain, for matching a packet against a site brief. */
 export class BrandLabels {
   static of(brief: string): string[] | null {
+    Trace.line(import.meta.url, "BrandLabels.of", { brief });
     if (/\s/.test(brief)) return null;
     let host: string;
     try {
@@ -49,6 +55,7 @@ export class BrandLabels {
 /** Same form is direct, different form is indirect; two `other`s cannot be told apart. */
 export class Relations {
   static expected(competitorForm: string, referenceForm: string): CompetitorRelation | null {
+    Trace.line(import.meta.url, "Relations.expected", { competitorForm, referenceForm });
     if (competitorForm === "other" && referenceForm === "other") return null;
     return competitorForm === referenceForm ? "direct" : "indirect";
   }

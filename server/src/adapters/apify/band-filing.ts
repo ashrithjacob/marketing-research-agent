@@ -1,4 +1,5 @@
 import type { ReviewExcerpt } from "./types.js";
+import { Trace } from "../../trace/index.js";
 
 /** Files every written review under its own rating; a row off the band asked for is kept, and counted. */
 export class BandFiling {
@@ -7,6 +8,7 @@ export class BandFiling {
     star: 1 | 2 | 3 | 4 | 5 | null,
     label: string,
   ): { excerpts: ReviewExcerpt[]; offBand: number; gap: string | null } {
+    Trace.line(import.meta.url, "BandFiling.file", { rows, star, label });
     const offBand = star === null ? 0 : rows.filter((row) => row.star !== star).length;
     const bandEmpty = star !== null && rows.length > 0 && offBand === rows.length;
     return {

@@ -824,7 +824,7 @@ marketing-research-agent/
                          it on, which is the one override SearXNG needs
   deploy/
     Caddyfile.snippet   marketing.vanis.ai (was research.vanis.ai — renamed at deploy)
-    vps/                production compose, deploy.sh, change-password.sh,
+    vps/                production compose, deploy.sh, mra-users.sh,
                          mra-snapshot.sh — see ../setup.md §5a
 ```
 

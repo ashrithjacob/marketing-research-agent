@@ -44,8 +44,9 @@ services:
       - MRA_APP_USER=${MRA_APP_USER:-ash}
       # `:?` is the guard: compose refuses to start this stack at all with an
       # empty hash, so an unauthenticated agent with paid API keys cannot end
-      # up on a public hostname by accident. Set it with change-password.sh.
-      - MRA_APP_PASSWORD_HASH=${MRA_APP_PASSWORD_HASH:?run change-password.sh}
+      # up on a public hostname by accident. Set it once with `npm run hashpw`;
+      # after the first boot logins live in research.db (mra-users.sh).
+      - MRA_APP_PASSWORD_HASH=${MRA_APP_PASSWORD_HASH:?must be set: it turns login on and seeds the first admin (setup.md 5a)}
       - MRA_JWT_SECRET=${MRA_JWT_SECRET:?MRA_JWT_SECRET is not set}
       - MRA_COOKIE_SECURE=true
       - MRA_DATABASE_PATH=/data/research.db

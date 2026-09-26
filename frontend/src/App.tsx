@@ -6,6 +6,7 @@ import {
   type Config,
   type ResearchNode,
   type RunSummary,
+  type Session,
 } from './api';
 import Login from './Login';
 import LogsPage from './LogsPage';
@@ -20,6 +21,7 @@ import { useProduct, useProducts } from './use-products';
 
 export default function App() {
   const [authed, setAuthed] = useState<boolean | null>(null);
+  const [who, setWho] = useState<Session | null>(null);
   const [config, setConfig] = useState<Config | null>(null);
   /** The Start run modal: null when closed, the nodes to run when open ([] = whole stage). */
   const [startNodes, setStartNodes] = useState<ResearchNode[] | null>(null);
@@ -28,12 +30,17 @@ export default function App() {
   const [judgementsRev, setJudgementsRev] = useState(0);
   const route = useRoute();
 
-  useEffect(() => {
+  const loadSession = useCallback(() => {
     api
       .session()
-      .then((s) => setAuthed(s.authenticated))
+      .then((s) => {
+        setWho(s);
+        setAuthed(s.authenticated);
+      })
       .catch(() => setAuthed(false));
   }, []);
+
+  useEffect(loadSession, [loadSession]);
 
   const signedIn = !!authed && route.page !== 'logs';
   const productId = signedIn && route.page === 'product' ? route.productId : null;
@@ -87,7 +94,7 @@ export default function App() {
   }
 
   if (authed === null) return <div className="boot">Loading…</div>;
-  if (!authed) return <Login onSuccess={() => setAuthed(true)} />;
+  if (!authed) return <Login onSuccess={loadSession} />;
   if (route.page === 'logs') return <LogsPage runId={route.runId} />;
 
   return (
@@ -124,6 +131,11 @@ export default function App() {
           <button className="primary" onClick={() => setStartNodes([])}>
             Start run
           </button>
+          {who?.auth_required && (
+            <span className="chip" title="Signed in as, in workspace">
+              {who.user} · {who.workspace}
+            </span>
+          )}
           <button
             className="ghost"
             title="Sign out"
@@ -156,7 +168,7 @@ export default function App() {
         <RunView
           runId={activeId}
           runs={runs}
-          nav={<ProductRuns product={product} runs={runs} activeId={activeId} />}
+          nav={<ProductRuns product={product} runs={runs} activeId={activeId} showWorkspace={!!who?.is_admin} />}
           judgementsRev={judgementsRev}
           onSelectRun={(id) => navigate(paths.run(product.id, id))}
           onChanged={reload}

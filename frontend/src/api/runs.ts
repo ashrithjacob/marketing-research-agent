@@ -73,6 +73,7 @@ export interface Usage {
 
 export interface RunSummary {
   id: string;
+  workspace_id: string;
   product_id: string;
   status: RunStatus;
   /** 1 collects the product, its competitors and its category; 2 is review mining. */

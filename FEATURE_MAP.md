@@ -49,13 +49,16 @@ under a `no such product` banner.
 
 **Header.** `research cockpit` (a link to `/`), then the active run's brief as a chip and a
 clock chip, then the buttons: **Step in** (ghost), **Stop** (ghost, only while a
-run is live), **Start run** (primary), **Sign out** (ghost).
+run is live), **Start run** (primary), a `user · workspace` chip (only when login
+is on), **Sign out** (ghost). Signed in as the admin, each run row in a product
+folder also names its workspace.
 
 | Control | Calls | Broken looks like |
 |---|---|---|
 | Start run | opens the modal; no request yet | — |
 | Stop | `POST /api/research/runs/:id/stop` | button does nothing, run stays `running` |
 | Sign out | `POST /api/auth/logout` | stays logged in, or bounces to login and back |
+| `user · workspace` chip | `GET /api/auth/session` | missing while logged in: the session answer lacks `workspace` |
 | (on `/`) | `GET /api/research/products`, `GET /api/research/config` | `Loading products…` that never ends |
 | (on a product) | `GET /api/research/products/:id` and `…/:id/runs` | `Loading product…` that never ends |
 
@@ -224,6 +227,14 @@ action, joined by a line, top to bottom.
 Data still comes from two streams: `GET /api/research/runs/:id/calls?after=<seq>`
 polled incrementally by sequence number, and the SSE event stream
 (`GET /api/research/runs/:id/events`) which feeds the timeline live.
+
+**Download trace** (header, `.logs-back`, an `<a download>` to
+`api.traceUrl` → `GET /api/research/runs/:id/trace`) saves the run's trace: a
+plain-text file with one line per server function called and per outbound HTTP
+request, each tagged with its source file (`workings.md` §2e). It works mid-run,
+returning what has been written so far. A 404 (`no trace for this run`) means
+the run started before traces existed, or its file was pruned after 30 days.
+The same file from a terminal: `mra trace <id>`.
 
 This page is the first place to look when a run "did nothing": an idle run with
 no boxes is a start-up failure, while a run with forty calls and no packet is

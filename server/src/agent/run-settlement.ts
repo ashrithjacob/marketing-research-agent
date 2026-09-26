@@ -1,11 +1,12 @@
 import type { Usage } from "@earendil-works/pi-ai";
 
 import type { Pricing } from "../adapters/index.js";
-import { Clock, type Node, type ResearchStore, type StagePacket } from "../domain/index.js";
+import { Clock, Scope, type Node, type ResearchStore, type StagePacket } from "../domain/index.js";
 import { PacketError, PacketValidator } from "../extract/index.js";
 
 import type { LiveRuns } from "./live-runs.js";
 import type { ReviewLedger } from "./review-ledger.js";
+import { Trace } from "../trace/index.js";
 
 /** Decides what a finished run is: completed, invalid, failed or cancelled. */
 export class RunSettlement {
@@ -19,6 +20,7 @@ export class RunSettlement {
   ) {}
 
   keepValidated(packet: StagePacket): void {
+    Trace.line(import.meta.url, "RunSettlement.keepValidated", { packet });
     if (this.validated) return;
     this.validated = packet;
     this.store.updateRun(this.runId, { packet, packet_source: "tool", error: "" });
@@ -31,6 +33,7 @@ export class RunSettlement {
   }
 
   hasValidated(): boolean {
+    Trace.line(import.meta.url, "RunSettlement.hasValidated");
     return this.validated !== null;
   }
 
@@ -40,6 +43,7 @@ export class RunSettlement {
     nodes: readonly Node[],
     errorMessage?: string,
   ): void {
+    Trace.line(import.meta.url, "RunSettlement.settle", { output, usage, nodes, errorMessage });
     const run = this.store.getRun(this.runId);
     const stopping = run?.status === "stopping";
 
@@ -90,9 +94,10 @@ export class RunSettlement {
   }
 
   private countJudgementApplications(parsed: StagePacket): void {
+    Trace.line(import.meta.url, "RunSettlement.countJudgementApplications", { parsed });
     const run = this.store.getRun(this.runId);
     if (!run) return;
-    const byId = new Map(this.store.listJudgements().map((j) => [j.id, j]));
+    const byId = new Map(this.store.listJudgements(Scope.of(run.workspace_id)).map((j) => [j.id, j]));
     for (const judgementId of run.judgement_ids) {
       const judgement = byId.get(judgementId);
       if (!judgement || judgement.rejects_kinds.length === 0) continue;

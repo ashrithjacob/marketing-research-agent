@@ -1,6 +1,7 @@
 import type { Settings } from "../config/index.js";
 
 import { Http } from "./http.js";
+import { Trace } from "../trace/index.js";
 
 /** Reads one page as markdown. Throws rather than returning an empty body. */
 export class Firecrawl {
@@ -10,6 +11,7 @@ export class Firecrawl {
     url: string,
     signal?: AbortSignal,
   ): Promise<{ text: string; title: string }> {
+    Trace.line(import.meta.url, "Firecrawl.scrape", { url });
     if (!this.settings.firecrawlApiKey) {
       throw new Error("FIRECRAWL_API_KEY is not set — web_fetch cannot read pages");
     }

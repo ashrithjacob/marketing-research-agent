@@ -1,4 +1,5 @@
 /** Persistence: the run row, the replayable event log, and the migration. */
+import { Scope } from "../src/domain/index.js";
 
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -27,7 +28,7 @@ afterEach(() => {
 });
 
 const newRun = () =>
-  store.createRun({ brief: { product: "x" }, model: "m", rejectKinds: [], judgementIds: [] });
+  store.createRun({ workspaceId: "admin", brief: { product: "x" }, model: "m", rejectKinds: [], judgementIds: [] });
 
 describe("runs", () => {
   it("moves through its lifecycle", () => {
@@ -78,15 +79,15 @@ describe("events", () => {
 
 describe("judgements", () => {
   it("counts applications rather than claiming them", () => {
-    const judgement = store.addJudgement({ kind: "source_rule", text: "no listicles", rejects_kinds: [] });
+    const judgement = store.addJudgement("admin", { kind: "source_rule", text: "no listicles", rejects_kinds: [] });
     expect(judgement.applied_count).toBe(0);
     store.bumpJudgement(judgement.id, 3);
-    expect(store.listJudgements()[0]!.applied_count).toBe(3);
+    expect(store.listJudgements(Scope.everything)[0]!.applied_count).toBe(3);
   });
 
   it("lists only active judgements when asked", () => {
-    store.addJudgement({ kind: "custom", text: "one", rejects_kinds: [] });
-    expect(store.listJudgements(true)).toHaveLength(1);
+    store.addJudgement("admin", { kind: "custom", text: "one", rejects_kinds: [] });
+    expect(store.listJudgements(Scope.everything, true)).toHaveLength(1);
   });
 });
 
@@ -113,6 +114,7 @@ describe("migration", () => {
     const migrated = new SqliteResearchStore(path);
     try {
       const run = migrated.createRun({
+        workspaceId: "admin",
         brief: { product: "x" },
         model: "m",
         rejectKinds: [],

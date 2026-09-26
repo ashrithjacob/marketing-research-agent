@@ -7,6 +7,7 @@ import {
   START_FEE_USD,
   UNIT_PRICE_USD,
 } from "../adapters/apify/actors.js";
+import { Trace } from "../trace/index.js";
 
 /** The stage-2 go-ahead a human approves: which targets, how many reviews, what it costs. */
 export class StageTwoPlanner {
@@ -15,6 +16,7 @@ export class StageTwoPlanner {
   constructor(private readonly reviewsPerBand: number) {}
 
   plan(targets: readonly MiningTarget[], sourceRunId: string): StageTwoPlan | null {
+    Trace.line(import.meta.url, "StageTwoPlanner.plan", { targets, sourceRunId });
     if (targets.length === 0) return null;
     const perTargetReviews = StageTwoPlanner.BANDS * this.reviewsPerBand;
     const reviews = targets.length * perTargetReviews;

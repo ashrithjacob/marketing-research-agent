@@ -20,10 +20,12 @@ import { PacketError } from "./errors.js";
 import { ReviewAssembly } from "./review-assembly.js";
 import { ScopeCheck } from "./scope-check.js";
 import type { PacketCheck, PacketContext } from "./check.js";
+import { Trace } from "../trace/index.js";
 
 /** Turns a zod failure into something an agent can act on in one read. */
 export class ZodProblems {
   static readable(error: z.ZodError): string {
+    Trace.line(import.meta.url, "ZodProblems.readable", { error });
     const all: string[] = [];
     for (const issue of error.issues) {
       const where = issue.path.join(".") || "(root)";
@@ -53,6 +55,7 @@ export class PacketValidator {
   private readonly extractor = new PacketExtractor();
 
   constructor(ledger: ReviewLedgerSnapshot = EMPTY_LEDGER) {
+    Trace.line(import.meta.url, "PacketValidator.constructor");
     this.assembly = new ReviewAssembly(ledger);
     this.checks = [
       new ScopeCheck(),
@@ -65,6 +68,7 @@ export class PacketValidator {
   }
 
   expand(draft: Record<string, unknown>): Record<string, unknown> {
+    Trace.line(import.meta.url, "PacketValidator.expand", { draft });
     return this.assembly.expand(draft);
   }
 
@@ -73,6 +77,7 @@ export class PacketValidator {
     scope: readonly Node[] = STAGE_NODES[1],
     brief?: { product?: unknown; url?: unknown },
   ): StagePacket {
+    Trace.line(import.meta.url, "PacketValidator.validate", { data, scope, brief });
     const assembled =
       data && typeof data === "object" && !Array.isArray(data)
         ? this.assembly.expand(data as Record<string, unknown>)
@@ -97,6 +102,7 @@ export class PacketValidator {
     scope: readonly Node[] = STAGE_NODES[1],
     brief?: { product?: unknown; url?: unknown },
   ): StagePacket {
+    Trace.line(import.meta.url, "PacketValidator.parse", { output, scope, brief });
     return this.validate(this.extractor.extract(output), scope, brief);
   }
 }

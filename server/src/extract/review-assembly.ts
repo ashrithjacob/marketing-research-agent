@@ -5,6 +5,7 @@ import type {
   ReviewLedgerSnapshot,
   Source,
 } from "../domain/index.js";
+import { Trace } from "../trace/index.js";
 
 type Draft = Record<string, unknown>;
 type Row = Record<string, unknown>;
@@ -14,10 +15,12 @@ export class ReviewAssembly {
   private readonly pulls: ReadonlyMap<string, LedgerPull>;
 
   constructor(private readonly ledger: ReviewLedgerSnapshot) {
+    Trace.line(import.meta.url, "ReviewAssembly.constructor");
     this.pulls = new Map(ledger.pulls.map((pull) => [pull.handle, pull]));
   }
 
   expand(draft: Draft): Draft {
+    Trace.line(import.meta.url, "ReviewAssembly.expand", { draft });
     if (this.ledger.pulls.length === 0) return draft;
     return {
       ...draft,
@@ -34,21 +37,25 @@ export class ReviewAssembly {
   }
 
   private resolveAll(value: unknown): unknown {
+    Trace.line(import.meta.url, "ReviewAssembly.resolveAll", { value });
     if (!Array.isArray(value)) return value;
     return value.map((item) => (ReviewAssembly.isRow(item) ? this.resolve(item) : item));
   }
 
   private static isRow(value: unknown): value is Row {
+    Trace.line(import.meta.url, "ReviewAssembly.isRow", { value });
     return value !== null && typeof value === "object" && !Array.isArray(value);
   }
 
   private resolve(row: Row): Row {
+    Trace.line(import.meta.url, "ReviewAssembly.resolve", { row });
     const handle = row.source_id;
     const pull = typeof handle === "string" ? this.pulls.get(handle) : undefined;
     return pull ? { ...row, source_id: pull.source_id } : row;
   }
 
   private sources(): Source[] {
+    Trace.line(import.meta.url, "ReviewAssembly.sources");
     return this.ledger.pulls.map((pull) => ({
       id: pull.source_id,
       url: pull.listing,
@@ -66,6 +73,7 @@ export class ReviewAssembly {
   }
 
   private excerpts(): Excerpt[] {
+    Trace.line(import.meta.url, "ReviewAssembly.excerpts");
     return this.ledger.reviews.flatMap((review) => {
       const pull = this.pulls.get(review.pull);
       if (!pull) return [];
@@ -87,6 +95,7 @@ export class ReviewAssembly {
   }
 
   private static merge(drafted: unknown, built: ReadonlyArray<Source | Excerpt>): unknown {
+    Trace.line(import.meta.url, "ReviewAssembly.merge", { drafted, built });
     if (!Array.isArray(drafted)) return drafted;
     const ids = new Set(built.map((item) => item.id));
     const kept = drafted.filter((row) => !(ReviewAssembly.isRow(row) && ids.has(row.id as string)));
@@ -95,11 +104,13 @@ export class ReviewAssembly {
   }
 
   private static title(pull: LedgerPull): string {
+    Trace.line(import.meta.url, "ReviewAssembly.title", { pull });
     const band = pull.band_requested === null ? "all ratings" : `${pull.band_requested}-star pull`;
     return `${pull.target_id} — ${pull.platform} reviews, ${band} — ${pull.listing}`;
   }
 
   private static publisher(pull: LedgerPull): string {
+    Trace.line(import.meta.url, "ReviewAssembly.publisher", { pull });
     if (pull.platform === "trustpilot") return "trustpilot.com";
     try {
       return new URL(pull.listing).hostname.replace(/^www\./, "");
@@ -109,12 +120,14 @@ export class ReviewAssembly {
   }
 
   private static locator(review: LedgerReview): Excerpt["locator"] {
+    Trace.line(import.meta.url, "ReviewAssembly.locator", { review });
     const base = { start: null, end: null, url: "", selector: "", note: "" };
     if (/^https?:\/\//.test(review.locator)) return { ...base, kind: "url", url: review.locator };
     return { ...base, kind: "note", note: `review id ${review.locator || review.review_key}` };
   }
 
   private static star(star: number | null): number | null {
+    Trace.line(import.meta.url, "ReviewAssembly.star", { star });
     return star !== null && Number.isInteger(star) && star >= 1 && star <= 5 ? star : null;
   }
 }

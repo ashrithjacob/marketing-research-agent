@@ -2,6 +2,7 @@ import type { z } from "zod";
 
 import { attributeSchema, excerptSchema, measurementSchema, sourceSchema } from "./evidence.js";
 import { competitorSchema, gapSchema } from "./packet.js";
+import { Trace } from "../trace/index.js";
 
 export interface PacketRowSet {
   sources: z.infer<typeof sourceSchema>[];
@@ -19,6 +20,7 @@ export type StoredPacketRows = {
 /** Splits a packet into its rows, keeping each row that passes its own schema. */
 export class PacketRows {
   static of(packet: unknown): PacketRowSet {
+    Trace.line(import.meta.url, "PacketRows.of", { packet });
     const body = (packet && typeof packet === "object" ? packet : {}) as Record<string, unknown>;
     return {
       sources: PacketRows.valid(body.sources, sourceSchema),
@@ -31,6 +33,7 @@ export class PacketRows {
   }
 
   private static valid<S extends z.ZodTypeAny>(rows: unknown, schema: S): z.infer<S>[] {
+    Trace.line(import.meta.url, "PacketRows.valid", { rows, schema });
     if (!Array.isArray(rows)) return [];
     return rows.flatMap((row) => {
       const parsed = schema.safeParse(row);

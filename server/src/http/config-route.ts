@@ -4,12 +4,15 @@ import type { Hono } from "hono";
 
 import type { Settings } from "../config/index.js";
 import { DEFAULT_REJECTED_KINDS } from "../domain/index.js";
+import type { ApiEnv } from "./api-env.js";
+import { Trace } from "../trace/index.js";
 
 /** What the cockpit needs to render the run form honestly. */
 export class ConfigRoute {
   constructor(private readonly settings: Settings) {}
 
-  register(api: Hono): void {
+  register(api: Hono<ApiEnv>): void {
+    Trace.line(import.meta.url, "ConfigRoute.register");
     api.get("/config", async (c) => {
       let corpusMounted = false;
       try {

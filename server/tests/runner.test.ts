@@ -5,6 +5,7 @@
  * what the supervisor does with what comes back, and a real model would make
  * that non-deterministic and slow.
  */
+import { Scope } from "../src/domain/index.js";
 
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -62,7 +63,7 @@ function request(overrides: Partial<RunRequest> = {}): RunRequest {
 /** Start a run whose single assistant turn is `text`, and wait for it to settle. */
 async function runWith(text: string, req: RunRequest = request()): Promise<string> {
   faux.setResponses([fauxAssistantMessage(text)]);
-  const runId = supervisor.start(req);
+  const runId = supervisor.start(req, "admin");
   await supervisor.waitFor(runId);
   return runId;
 }
@@ -95,7 +96,7 @@ describe("settling a run", () => {
       fauxAssistantMessage("I looked into it and I think the market is crowded."),
       fauxAssistantMessage("Still no packet, just my view that it is crowded."),
     ]);
-    const runId = supervisor.start(request());
+    const runId = supervisor.start(request(), "admin");
     await supervisor.waitFor(runId);
     const run = store.getRun(runId)!;
     expect(run.status).toBe("invalid");
@@ -109,7 +110,7 @@ describe("settling a run", () => {
       fauxAssistantMessage("I have enough. Let me finalize and write the JSON now."),
       fauxAssistantMessage(fenced(minimalPacket())),
     ]);
-    const runId = supervisor.start(request());
+    const runId = supervisor.start(request(), "admin");
     await supervisor.waitFor(runId);
 
     expect(store.getRun(runId)!.status).toBe("completed");
@@ -155,7 +156,7 @@ describe("settling a run", () => {
       fauxAssistantMessage("still going"),
       fauxAssistantMessage(packet),
     ]);
-    const runId = supervisor.start(request());
+    const runId = supervisor.start(request(), "admin");
     // Two nudges, so the agent takes three turns instead of stopping at one.
     await supervisor.waitFor(runId);
     const usage = store.getRun(runId)!.usage as any;
@@ -163,8 +164,8 @@ describe("settling a run", () => {
   });
 
   it("fails the run when the model is not one the provider has", async () => {
-    expect(() => supervisor.start(request({ model: "no-such-model" }))).toThrow(/unknown model/);
-    const run = store.listRuns()[0]!;
+    expect(() => supervisor.start(request({ model: "no-such-model" }), "admin")).toThrow(/unknown model/);
+    const run = store.listRuns(Scope.everything)[0]!;
     expect(run.status).toBe("failed");
     expect(run.error).toMatch(/unknown model/);
   });
@@ -189,7 +190,7 @@ describe("the packet check tool", () => {
         return fauxAssistantMessage(fenced(minimalPacket()));
       },
     ]);
-    const runId = supervisor.start(request());
+    const runId = supervisor.start(request(), "admin");
     await supervisor.waitFor(runId);
 
     expect(atToolTime).not.toBeNull();
@@ -212,7 +213,7 @@ describe("the packet check tool", () => {
         fauxAssistantMessage("", { stopReason: "error", errorMessage: "terminated" }),
       ),
     ]);
-    const runId = supervisor.start(request());
+    const runId = supervisor.start(request(), "admin");
     await supervisor.waitFor(runId);
 
     const run = store.getRun(runId)!;
@@ -225,7 +226,7 @@ describe("the packet check tool", () => {
   it("does not ask for a packet it already has", async () => {
     // The final turn is prose, which would normally earn a nudge.
     faux.setResponses(checkThen(minimalPacket(), "Done — the packet is the one I validated."));
-    const runId = supervisor.start(request());
+    const runId = supervisor.start(request(), "admin");
     await supervisor.waitFor(runId);
 
     expect(store.getRun(runId)!.status).toBe("completed");
@@ -244,7 +245,7 @@ describe("the packet check tool", () => {
       }),
       fauxAssistantMessage(fenced(minimalPacket())),
     ]);
-    const runId = supervisor.start(request());
+    const runId = supervisor.start(request(), "admin");
     await supervisor.waitFor(runId);
 
     const checks = store.listPacketChecks(runId);
@@ -284,7 +285,7 @@ describe("cost", () => {
         return fauxAssistantMessage(fenced(minimalPacket()));
       },
     ]);
-    const runId = supervisor.start(request());
+    const runId = supervisor.start(request(), "admin");
     await supervisor.waitFor(runId);
     expect(seen.input).toBeCloseTo(1, 10);
     expect(seen.output).toBeCloseTo(2, 10);
@@ -308,7 +309,7 @@ describe("cost", () => {
       }),
       fauxAssistantMessage(fenced(minimalPacket()), { responseId: "gen-2" }),
     ]);
-    const runId = supervisor.start(request());
+    const runId = supervisor.start(request(), "admin");
     await supervisor.waitFor(runId);
     const run = store.getRun(runId)!;
     expect(run.status).toBe("completed");
@@ -348,7 +349,7 @@ describe("cost", () => {
       const { costs, release } = heldBilling();
       supervisor = new RunSupervisor({ store, settings, models, costs });
       faux.setResponses([fauxAssistantMessage(fenced(minimalPacket()), { responseId: "gen-1" })]);
-      const runId = supervisor.start(request());
+      const runId = supervisor.start(request(), "admin");
       while (store.getRun(runId)!.status === "running") await new Promise((r) => setTimeout(r, 5));
       expect(store.getRun(runId)!.status).toBe("completed");
       expect(supervisor.isLive(runId)).toBe(true); // the window this is about
@@ -369,7 +370,7 @@ describe("cost", () => {
 
     it("refuses a steer rather than reporting it applied mid-run", async () => {
       const { runId, release } = await settledButLive();
-      const judgement = store.addJudgement({ kind: "custom", text: "prefer UK", rejects_kinds: [] });
+      const judgement = store.addJudgement("admin", { kind: "custom", text: "prefer UK", rejects_kinds: [] });
       expect(() => supervisor.steer(runId, judgement)).toThrow(/already finished/);
       release();
       await supervisor.waitFor(runId);
@@ -417,6 +418,7 @@ describe("judgements", () => {
     // A standing rule must never quietly make the corpus wider (spec.md §6.2-4).
     const judgement: Judgement = {
       id: "j1",
+      workspace_id: "admin",
       kind: "source_rule",
       text: "no competitor marketing",
       rejects_kinds: ["competitor_marketing"],
@@ -437,7 +439,7 @@ describe("judgements", () => {
   });
 
   it("counts applications from the packet, not from the prompt", async () => {
-    const judgement = store.addJudgement({
+    const judgement = store.addJudgement("admin", {
       kind: "source_rule",
       text: "no listicles",
       rejects_kinds: ["seo_listicle"],
@@ -452,11 +454,11 @@ describe("judgements", () => {
       node: "competitors",
     });
     await runWith(fenced(packet));
-    expect(store.listJudgements().find((j) => j.id === judgement.id)!.applied_count).toBe(1);
+    expect(store.listJudgements(Scope.everything).find((j) => j.id === judgement.id)!.applied_count).toBe(1);
   });
 
   it("reaches the instructions of a run started after it", async () => {
-    store.addJudgement({ kind: "custom", text: "prefer UK sources", rejects_kinds: [] });
+    store.addJudgement("admin", { kind: "custom", text: "prefer UK sources", rejects_kinds: [] });
     faux.setResponses([
       (context) => {
         const turn = JSON.stringify(context.messages);
@@ -464,7 +466,7 @@ describe("judgements", () => {
         return fauxAssistantMessage(fenced(minimalPacket()));
       },
     ]);
-    const runId = supervisor.start(request());
+    const runId = supervisor.start(request(), "admin");
     await supervisor.waitFor(runId);
     expect(store.getRun(runId)!.status).toBe("completed");
   });
@@ -475,6 +477,7 @@ describe("recovery", () => {
     // The agent lives in this process now, so a run that was `running` at
     // shutdown is dead, not resumable. Saying so beats a row stuck on `running`.
     const run = store.createRun({
+      workspaceId: "admin",
       brief: { product: "x" },
       model: MODEL_ID,
       rejectKinds: [],
@@ -510,7 +513,7 @@ describe("stopping a run", () => {
         return fauxAssistantMessage("interrupted");
       },
     ]);
-    const runId = supervisor.start(request());
+    const runId = supervisor.start(request(), "admin");
     await started;
 
     supervisor.stop(runId);
@@ -538,7 +541,7 @@ describe("the LLM call trace", () => {
 
   it("records every call, storing only what is new since the previous one", async () => {
     twoTurns();
-    const runId = supervisor.start(request());
+    const runId = supervisor.start(request(), "admin");
     await supervisor.waitFor(runId);
 
     const calls = store.listLlmCalls(runId);
@@ -575,7 +578,7 @@ describe("the LLM call trace", () => {
 
   it("leaves a tool result's details out, because the model never sees them", async () => {
     twoTurns();
-    const runId = supervisor.start(request());
+    const runId = supervisor.start(request(), "admin");
     await supervisor.waitFor(runId);
     const toolResult = (store.listLlmCalls(runId)[1]!.input as any[]).find(
       (m) => m.role === "toolResult",
@@ -594,7 +597,7 @@ describe("the LLM call trace", () => {
     const costs = new OpenRouterPrices({ apiKey: "k", fetch, lookupDelaysMs: [] });
     supervisor = new RunSupervisor({ store, settings, models, costs });
     twoTurns();
-    const runId = supervisor.start(request());
+    const runId = supervisor.start(request(), "admin");
     await supervisor.waitFor(runId);
     expect(store.listLlmCalls(runId).map((c) => c.billed_cost)).toEqual([0.01, 0.02]);
   });
@@ -606,7 +609,7 @@ describe("the LLM call trace", () => {
         fauxAssistantMessage("", { stopReason: "error", errorMessage: "upstream 502" }),
       ),
     );
-    const runId = supervisor.start(request());
+    const runId = supervisor.start(request(), "admin");
     await supervisor.waitFor(runId);
     const [call] = store.listLlmCalls(runId);
     expect(call!.stop_reason).toBe("error");
@@ -639,7 +642,7 @@ describe("a stream that drops mid-run", () => {
       fauxAssistantMessage("", { stopReason: "error", errorMessage: "terminated" }),
       fauxAssistantMessage(fenced(minimalPacket())),
     ]);
-    const runId = supervisor.start(request());
+    const runId = supervisor.start(request(), "admin");
     await supervisor.waitFor(runId);
 
     const run = store.getRun(runId)!;
@@ -659,7 +662,7 @@ describe("a stream that drops mid-run", () => {
       fauxAssistantMessage("", { stopReason: "error", errorMessage: "terminated, again" }),
       fauxAssistantMessage(fenced(minimalPacket())), // never reached: budget is 3
     ]);
-    const runId = supervisor.start(request());
+    const runId = supervisor.start(request(), "admin");
     await supervisor.waitFor(runId);
 
     const run = store.getRun(runId)!;
@@ -676,7 +679,7 @@ describe("a stream that drops mid-run", () => {
       fauxAssistantMessage("", { stopReason: "error", errorMessage: "503 service unavailable" }),
       fauxAssistantMessage(fenced(minimalPacket())),
     ]);
-    const runId = supervisor.start(request());
+    const runId = supervisor.start(request(), "admin");
     await supervisor.waitFor(runId);
 
     expect(store.getRun(runId)!.status).toBe("completed");
@@ -730,7 +733,7 @@ describe("a stream that drops mid-run", () => {
       // The tools-off ask that follows still lands.
       fauxAssistantMessage(fenced(minimalPacket())),
     ]);
-    const runId = supervisor.start(request());
+    const runId = supervisor.start(request(), "admin");
     await supervisor.waitFor(runId);
 
     const kinds = store.listEvents(runId).map((e) => e.kind);
@@ -749,7 +752,7 @@ describe("a stream that drops mid-run", () => {
       }),
       fauxAssistantMessage(fenced(minimalPacket())),
     ]);
-    const runId = supervisor.start(request());
+    const runId = supervisor.start(request(), "admin");
     await supervisor.waitFor(runId);
 
     expect(store.getRun(runId)!.status).toBe("failed");
@@ -765,7 +768,7 @@ describe("a stream that drops mid-run", () => {
       },
       fauxAssistantMessage(fenced(minimalPacket())),
     ]);
-    const runId = supervisor.start(request());
+    const runId = supervisor.start(request(), "admin");
     await supervisor.waitFor(runId);
 
     expect(store.getRun(runId)!.status).toBe("cancelled");
@@ -788,7 +791,7 @@ describe("a run that covers part of the stage", () => {
     ]);
     // The token is set, so without the scope the review tools would be offered.
     supervisor = new RunSupervisor({ store, settings: { ...settings, apifyToken: "t" }, models });
-    const runId = supervisor.start(request({ nodes: ["product_data"] }));
+    const runId = supervisor.start(request({ nodes: ["product_data"] }), "admin");
     await supervisor.waitFor(runId);
 
     expect(store.getRun(runId)!.nodes).toEqual(["product_data"]);
@@ -804,7 +807,7 @@ describe("a run that covers part of the stage", () => {
     const packet = minimalPacket();
     packet.gaps.push({ node: "category_data", missing: "no three-year trend" });
     faux.setResponses([fauxAssistantMessage(fenced(packet))]);
-    const runId = supervisor.start(request({ nodes: ["product_data"] }));
+    const runId = supervisor.start(request({ nodes: ["product_data"] }), "admin");
     await supervisor.waitFor(runId);
     const run = store.getRun(runId)!;
     expect(run.status).toBe("invalid");
@@ -815,7 +818,7 @@ describe("a run that covers part of the stage", () => {
     // Review mining is stage 2 (2026-09-21). A stage-1 run that returns review
     // excerpts has done a different run's work.
     faux.setResponses([fauxAssistantMessage(fenced(reviewPacket()))]);
-    const runId = supervisor.start(request());
+    const runId = supervisor.start(request(), "admin");
     await supervisor.waitFor(runId);
     const run = store.getRun(runId)!;
     expect(run.status).toBe("invalid");
@@ -831,7 +834,7 @@ describe("a run that covers part of the stage", () => {
       },
     ]);
     supervisor = new RunSupervisor({ store, settings: { ...settings, apifyToken: "t" }, models });
-    const runId = supervisor.start(request({ nodes: ["competitors"] }));
+    const runId = supervisor.start(request({ nodes: ["competitors"] }), "admin");
     await supervisor.waitFor(runId);
     expect(tools).toEqual(["web_search", "web_fetch", "amazon_find_product", "validate_packet"]);
   });
@@ -845,7 +848,7 @@ describe("a run that covers part of the stage", () => {
       },
     ]);
     supervisor = new RunSupervisor({ store, settings: { ...settings, apifyToken: "t" }, models });
-    const runId = supervisor.start(request({ nodes: ["review_mining"] }));
+    const runId = supervisor.start(request({ nodes: ["review_mining"] }), "admin");
     await supervisor.waitFor(runId);
     expect(tools).toContain("amazon_reviews");
   });
@@ -875,7 +878,7 @@ describe("review mining through the ledger", () => {
 
   it("puts every fetched review in the packet without the model copying any", async () => {
     faux.setResponses([mine(), fauxAssistantMessage(fenced(reviewPacket()))]);
-    const runId = supervisor.start(request({ nodes: ["review_mining"] }));
+    const runId = supervisor.start(request({ nodes: ["review_mining"] }), "admin");
     await supervisor.waitFor(runId);
 
     const run = store.getRun(runId)!;
@@ -894,7 +897,7 @@ describe("review mining through the ledger", () => {
       fauxAssistantMessage("no packet, only prose"),
       fauxAssistantMessage("still no packet"),
     ]);
-    const runId = supervisor.start(request({ nodes: ["review_mining"] }));
+    const runId = supervisor.start(request({ nodes: ["review_mining"] }), "admin");
     await supervisor.waitFor(runId);
 
     expect(store.getRun(runId)!.status).toBe("invalid");

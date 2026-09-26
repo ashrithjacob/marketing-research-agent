@@ -1,5 +1,6 @@
 import { randomBytes, scrypt, timingSafeEqual } from "node:crypto";
 import { promisify } from "node:util";
+import { Trace } from "../trace/index.js";
 
 /** scrypt password hashing; the ":" separator survives docker compose's .env interpolation. */
 export class Passwords {
@@ -14,6 +15,7 @@ export class Passwords {
   ) => Promise<Buffer>;
 
   static async hash(password: string): Promise<string> {
+    Trace.line(import.meta.url, "Passwords.hash", { password });
     const salt = randomBytes(16);
     const digest = await Passwords.scryptAsync(password, salt, Passwords.KEYLEN, Passwords.SCRYPT);
     return ["scrypt", salt.toString("base64"), digest.toString("base64")].join(
@@ -22,6 +24,7 @@ export class Passwords {
   }
 
   static async verify(password: string, encoded: string): Promise<boolean> {
+    Trace.line(import.meta.url, "Passwords.verify", { password, encoded });
     const parts = encoded.split(Passwords.SEPARATOR);
     if (parts.length !== 3) return false;
     const [scheme, saltB64, digestB64] = parts as [string, string, string];

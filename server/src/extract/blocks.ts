@@ -1,8 +1,10 @@
 import { PacketError } from "./errors.js";
+import { Trace } from "../trace/index.js";
 
 /** Finds candidate JSON in a model's prose: fenced blocks and balanced braces. */
 export class JsonBlocks {
   static fenced(text: string): string[] {
+    Trace.line(import.meta.url, "JsonBlocks.fenced", { text });
     const blocks: string[] = [];
     let body: string[] | null = null;
     for (const line of text.split("\n")) {
@@ -22,6 +24,7 @@ export class JsonBlocks {
   }
 
   static balanced(text: string): string[] {
+    Trace.line(import.meta.url, "JsonBlocks.balanced", { text });
     const found: string[] = [];
     let depth = 0;
     let start = -1;
@@ -56,6 +59,7 @@ export class JsonBlocks {
 /** Pulls the last decodable stage packet out of a run's output. */
 export class PacketExtractor {
   extract(output: string): Record<string, unknown> {
+    Trace.line(import.meta.url, "PacketExtractor.extract", { output });
     if (!output || !output.trim()) {
       throw new PacketError("run produced no output to read a packet from");
     }

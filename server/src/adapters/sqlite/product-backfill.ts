@@ -5,6 +5,7 @@ import { Briefs } from "../../domain/index.js";
 import type { PacketRowTable } from "./packet-row-table.js";
 import type { ProductTable } from "./product-table.js";
 import { Rows } from "./rows.js";
+import { Trace } from "../../trace/index.js";
 
 /** Gives every run from before products were stored its product, its packet rows and its review links. */
 export class ProductBackfill {
@@ -15,6 +16,7 @@ export class ProductBackfill {
   ) {}
 
   apply(): number {
+    Trace.line(import.meta.url, "ProductBackfill.apply");
     const legacy = this.db
       .prepare("SELECT id, brief, packet FROM research_runs WHERE product_id = '' ORDER BY created_at")
       .all() as Array<{ id: string; brief: string; packet: string }>;

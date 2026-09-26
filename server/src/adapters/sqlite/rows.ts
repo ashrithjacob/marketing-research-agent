@@ -1,8 +1,10 @@
 import type { ResearchRun, RunHead } from "../../domain/index.js";
+import { Trace } from "../../trace/index.js";
 
 /** Reads SQLite rows back into domain records; a bad JSON column becomes a default. */
 export class Rows {
   static json(raw: string, fallback: unknown): unknown {
+    Trace.tick(import.meta.url, "Rows.json");
     if (!raw) return fallback;
     try {
       return JSON.parse(raw);
@@ -12,6 +14,7 @@ export class Rows {
   }
 
   static head(row: Record<string, any>): RunHead {
+    Trace.line(import.meta.url, "Rows.head", { row });
     return {
       id: row.id,
       product_id: row.product_id,
@@ -22,8 +25,10 @@ export class Rows {
   }
 
   static run(row: Record<string, any>): ResearchRun {
+    Trace.tick(import.meta.url, "Rows.run");
     return {
       id: row.id,
+      workspace_id: row.workspace_id,
       product_id: row.product_id ?? "",
       agent_run_id: row.agent_run_id ?? "",
       session_id: row.session_id,

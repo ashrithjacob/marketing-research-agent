@@ -225,6 +225,7 @@ describe("the brief block", () => {
 describe("standing judgements", () => {
   const judgement: Judgement = {
     id: "j1",
+    workspace_id: "admin",
     kind: "source_rule",
     text: "reject anything from top10supplementpicks",
     rejects_kinds: ["seo_listicle"],

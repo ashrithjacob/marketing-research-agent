@@ -1,10 +1,12 @@
 import { STAGE_NODES, Stages, type Node, type Stage } from "../../domain/index.js";
 
 import { EXAMPLE } from "./text/example.js";
+import { Trace } from "../../trace/index.js";
 
 /** The worked example, cut down to the one stage the run covers. */
 export class WorkedExample {
   static forStage(stage: Stage): Record<string, unknown> {
+    Trace.line(import.meta.url, "WorkedExample.forStage", { stage });
     const mine = <T extends { node: string }>(items: readonly T[]): T[] =>
       items.filter((item) => Stages.of(item.node as Node) === stage);
     const hasCompetitors = STAGE_NODES[stage].includes("competitors");

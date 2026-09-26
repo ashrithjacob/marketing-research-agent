@@ -1,5 +1,6 @@
 import type { FetchGate, GateVerdict } from "../domain/ports.js";
 import type { Settings } from "../config/index.js";
+import { Trace } from "../trace/index.js";
 
 const GATE_INSTRUCTION =
   "You gate web fetches for a product-research agent. Decide in one step whether " +
@@ -22,6 +23,7 @@ export class OpenRouterGate implements FetchGate {
     subject: string;
     market: string;
   }): Promise<GateVerdict> {
+    Trace.line(import.meta.url, "OpenRouterGate.admit", { input });
     const started = Date.now();
     const model = this.settings.gateModel;
     try {
@@ -56,6 +58,7 @@ export class OpenRouterGate implements FetchGate {
     model: string,
     input: { url: string; title: string; body: string; subject: string; market: string },
   ): Promise<string> {
+    Trace.line(import.meta.url, "OpenRouterGate.ask", { model, input });
     const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -114,6 +117,7 @@ export class OpenRouterGate implements FetchGate {
 
   /** Anything that is not exactly admit:false is an admit — the gate never eats a source. */
   static parse(answer: string): { admit: boolean; reason: string } {
+    Trace.line(import.meta.url, "OpenRouterGate.parse", { answer });
     const match = answer.match(/\{[\s\S]*\}/);
     if (!match) return { admit: true, reason: "gate answer had no JSON" };
     try {

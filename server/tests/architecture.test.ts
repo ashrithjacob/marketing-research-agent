@@ -14,18 +14,28 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative, sep } from "node:path";
 import ts from "typescript";
 
+import { TraceCoverage } from "./trace-coverage.js";
+
 const SRC = new URL("../src", import.meta.url).pathname;
 const MAX_MODULE_LINES = 150;
 
 /** Layer → the layers it may import. A layer absent here may not be imported. */
 const LAYERS: Record<string, readonly string[]> = {
-  domain: [],
-  config: [],
-  extract: ["domain"],
-  adapters: ["domain", "config"],
-  agent: ["domain", "config", "extract", "adapters"],
-  http: ["domain", "config", "extract", "adapters", "agent"],
+  trace: [],
+  domain: ["trace"],
+  config: ["trace"],
+  extract: ["trace", "domain"],
+  adapters: ["trace", "domain", "config"],
+  agent: ["trace", "domain", "config", "extract", "adapters"],
+  http: ["trace", "domain", "config", "extract", "adapters", "agent"],
 };
+
+/**
+ * The logger. It is the one place allowed static mutable state (the run context
+ * and the installed sink), and the one place exempt from writing a trace line
+ * per function, because a logger that logs itself recurses.
+ */
+const TRACE_LAYER = "trace";
 
 /** A package may only be imported inside the layer that owns it. */
 const PACKAGE_OWNERS: Record<string, string> = {
@@ -48,7 +58,7 @@ const PACKAGE_OWNERS: Record<string, string> = {
 const TEXT_MODULE = /(^|[\\/])text[\\/]/;
 
 /** Entry points, which exist to wire concrete things together. */
-const WIRING = new Set(["main.ts", "hashpw.ts"]);
+const WIRING = new Set(["main.ts", "hashpw.ts", "accounts.ts"]);
 
 /**
  * Modules written before the conversion were exempt while it was staged. The
@@ -155,6 +165,22 @@ function topLevelFunctions(file: ts.SourceFile): string[] {
   return out;
 }
 
+function mutableStatics(file: ts.SourceFile): string[] {
+  const out: string[] = [];
+  const visit = (node: ts.Node): void => {
+    if (
+      ts.isPropertyDeclaration(node) &&
+      node.modifiers?.some((m) => m.kind === ts.SyntaxKind.StaticKeyword) &&
+      !node.modifiers.some((m) => m.kind === ts.SyntaxKind.ReadonlyKeyword)
+    ) {
+      out.push(node.name.getText(file));
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(file);
+  return out;
+}
+
 /** Every rule, as one function, so the ratchet can ask "is this file clean?". */
 function violations(rel: string): string[] {
   const file = parse(rel);
@@ -181,6 +207,13 @@ function violations(rel: string): string[] {
 
   for (const line of commentLines(rel, file)) {
     found.push(`has a comment at line ${line}; names should carry the meaning`);
+  }
+
+  if (layer !== TRACE_LAYER) {
+    for (const name of mutableStatics(file)) {
+      found.push(`has mutable static '${name}'; only trace/ holds process-wide state`);
+    }
+    found.push(...TraceCoverage.problems(file));
   }
 
   if (!WIRING.has(rel)) {

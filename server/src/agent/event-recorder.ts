@@ -4,6 +4,7 @@ import type { Usage } from "@earendil-works/pi-ai";
 import { Frames } from "./frames.js";
 import type { LiveRuns } from "./live-runs.js";
 import { TOOL_LANES } from "./tools/index.js";
+import { Trace } from "../trace/index.js";
 
 interface TurnEnd {
   usage?: Usage;
@@ -22,6 +23,7 @@ export class AgentEventRecorder {
   ) {}
 
   record(event: AgentEvent): void {
+    Trace.tick(import.meta.url, "AgentEventRecorder.record", { type: event.type });
     switch (event.type) {
       case "message_update":
       case "message_end": {
@@ -73,6 +75,7 @@ export class AgentEventRecorder {
   }
 
   text(): string {
+    Trace.line(import.meta.url, "AgentEventRecorder.text");
     return this.output.join("");
   }
 }

@@ -1,5 +1,6 @@
 import type { ReviewExcerpt } from "../adapters/apify/index.js";
 import type { LedgerPull, LedgerReview, ReviewLedgerSnapshot } from "../domain/index.js";
+import { Trace } from "../trace/index.js";
 
 /** Every review this run has fetched, under a short ref, so the packet and the database get them without the model copying any. */
 export class ReviewLedger {
@@ -11,6 +12,7 @@ export class ReviewLedger {
     pull: Omit<LedgerPull, "handle">,
     excerpts: readonly ReviewExcerpt[],
   ): { handle: string; added: LedgerReview[]; repeats: number } {
+    Trace.line(import.meta.url, "ReviewLedger.record", { pull, excerpts });
     const handle = `p${this.pulls.length + 1}`;
     this.pulls.push({ ...pull, handle });
     const added: LedgerReview[] = [];
@@ -42,10 +44,12 @@ export class ReviewLedger {
   }
 
   size(): number {
+    Trace.line(import.meta.url, "ReviewLedger.size");
     return this.reviews.length;
   }
 
   snapshot(): ReviewLedgerSnapshot {
+    Trace.line(import.meta.url, "ReviewLedger.snapshot");
     return {
       pulls: this.pulls.map((pull) => ({ ...pull })),
       reviews: this.reviews.map((review) => ({ ...review })),

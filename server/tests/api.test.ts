@@ -6,6 +6,7 @@
  * browser on our own origin, and it is the one place where getting a header
  * wrong turns a scraped page into a script.
  */
+import { Scope } from "../src/domain/index.js";
 
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { createHash } from "node:crypto";
@@ -156,7 +157,7 @@ describe("the corpus route", () => {
   };
 
   const runId = async () =>
-    store.createRun({ brief: {}, model: MODEL_ID, rejectKinds: [], judgementIds: [] }).id;
+    store.createRun({ workspaceId: "admin", brief: {}, model: MODEL_ID, rejectKinds: [], judgementIds: [] }).id;
 
   it("rejects anything that is not a bare hash", async () => {
     const id = await runId();
@@ -229,6 +230,7 @@ describe("judgements", () => {
 
   it("409s a steer at a run that is not running here", async () => {
     const id = store.createRun({
+      workspaceId: "admin",
       brief: {},
       model: MODEL_ID,
       rejectKinds: [],
@@ -237,7 +239,7 @@ describe("judgements", () => {
     const response = await post(`/api/research/runs/${id}/steer`, { text: "prefer UK" });
     expect(response.status).toBe(409);
     // Stored anyway: a correction is worth keeping even if its run has ended.
-    expect(store.listJudgements()).toHaveLength(1);
+    expect(store.listJudgements(Scope.everything)).toHaveLength(1);
   });
 });
 

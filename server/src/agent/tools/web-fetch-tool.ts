@@ -2,46 +2,12 @@ import type { AgentTool } from "@earendil-works/pi-agent-core";
 
 import { Corpus } from "../../adapters/corpus.js";
 import { Firecrawl } from "../../adapters/firecrawl.js";
-import { Searxng } from "../../adapters/searxng.js";
 import type { Settings } from "../../config/index.js";
 import type { FetchGate } from "../../domain/index.js";
 
 import type { FetchRecord } from "./lanes.js";
-import { fetchParameters, searchParameters } from "./parameters.js";
-
-export class WebSearchTool {
-  constructor(private readonly search: Searxng) {}
-
-  tool(): AgentTool<typeof searchParameters> {
-    const search = this.search;
-    return {
-      name: "web_search",
-      label: "Web search",
-      description:
-        "Search the web and return titles, urls and snippets. Snippets are for " +
-        "choosing what to fetch — they are not sources. Never quote a snippet and " +
-        "never record a source you have not fetched with web_fetch.",
-      parameters: searchParameters,
-      async execute(_id, params, signal) {
-        const max = Math.min(Math.max(Math.trunc(params.max_results ?? 10), 1), 25);
-        const hits = await search.find(params.query, max, signal);
-        if (hits.length === 0) {
-          return {
-            content: [{ type: "text", text: `No results for ${JSON.stringify(params.query)}.` }],
-            details: { query: params.query, hits: [] },
-          };
-        }
-        const rendered = hits
-          .map((hit, index) => `${index + 1}. ${hit.title}\n   ${hit.url}\n   ${hit.snippet}`)
-          .join("\n\n");
-        return {
-          content: [{ type: "text", text: rendered }],
-          details: { query: params.query, hits },
-        };
-      },
-    };
-  }
-}
+import { fetchParameters } from "./parameters.js";
+import { Trace } from "../../trace/index.js";
 
 export class WebFetchTool {
   constructor(
@@ -56,6 +22,7 @@ export class WebFetchTool {
   ) {}
 
   tool(): AgentTool<typeof fetchParameters> {
+    Trace.line(import.meta.url, "WebFetchTool.tool");
     const { settings, firecrawl, corpus, runId, onFetch, gate, subject, market } = this;
     return {
       name: "web_fetch",
@@ -67,6 +34,7 @@ export class WebFetchTool {
         "result reports.",
       parameters: fetchParameters,
       async execute(_id, params, signal) {
+        Trace.line(import.meta.url, "WebFetchTool.tool.execute", { params });
         const { text, title } = await firecrawl.scrape(params.url, signal);
 
         if (gate) {

@@ -9,6 +9,7 @@ import {
 } from "../../domain/index.js";
 
 import { NODE_RULES } from "./text/node-rules.js";
+import { Trace } from "../../trace/index.js";
 
 export const STAGE_NAMES: Record<Stage, string> = {
   1: "the product and its market",
@@ -18,10 +19,12 @@ export const STAGE_NAMES: Record<Stage, string> = {
 /** The parts of the instructions that depend on this run's scope and brief. */
 export class PromptBlocks {
   static code(names: readonly string[]): string {
+    Trace.line(import.meta.url, "PromptBlocks.code", { names });
     return names.map((name) => `\`${name}\``).join(", ");
   }
 
   static nodes(nodes: readonly Node[]): string {
+    Trace.line(import.meta.url, "PromptBlocks.nodes", { nodes });
     const stage = Stages.covering(nodes) ?? 1;
     const heading = Stages.isPartial(nodes)
       ? `### This run's ${nodes.length === 1 ? "node" : "nodes"}`
@@ -31,6 +34,7 @@ export class PromptBlocks {
   }
 
   static gapNodes(nodes: readonly Node[]): string {
+    Trace.line(import.meta.url, "PromptBlocks.gapNodes", { nodes });
     const listed = PromptBlocks.code(nodes);
     const verb = nodes.length === 1 ? "is" : "are";
     if (!Stages.isPartial(nodes)) {
@@ -50,6 +54,7 @@ anything else fails the whole packet.`;
   }
 
   static scope(nodes: readonly Node[]): string {
+    Trace.line(import.meta.url, "PromptBlocks.scope", { nodes });
     const listed = PromptBlocks.code(nodes);
     return [
       "## Scope of this run",
@@ -63,6 +68,7 @@ anything else fails the whole packet.`;
   }
 
   static judgements(judgements: readonly Judgement[]): string {
+    Trace.line(import.meta.url, "PromptBlocks.judgements", { judgements });
     const lines = [
       "## Standing judgements",
       "",
@@ -77,6 +83,7 @@ anything else fails the whole packet.`;
   }
 
   static brief(brief: Brief): string {
+    Trace.line(import.meta.url, "PromptBlocks.brief", { brief });
     const lines = ["## The brief", ""];
     lines.push(...PromptBlocks.subject(brief));
     if (brief.market) lines.push(...PromptBlocks.market(brief.market));
@@ -85,6 +92,7 @@ anything else fails the whole packet.`;
   }
 
   private static subject(brief: Brief): string[] {
+    Trace.line(import.meta.url, "PromptBlocks.subject", { brief });
     if (!brief.product && brief.url) {
       return [
         `**Site:** ${brief.url}`,
@@ -115,6 +123,7 @@ anything else fails the whole packet.`;
   }
 
   private static market(market: string): string[] {
+    Trace.line(import.meta.url, "PromptBlocks.market", { market });
     const plural = market.includes(",");
     return [
       `**Market${plural ? "s" : ""}:** ${market}`,

@@ -1,3 +1,5 @@
+import { Trace } from "../trace/index.js";
+
 export interface Settings {
   appUser: string;
   appPasswordHash: string;
@@ -25,6 +27,9 @@ export interface Settings {
   corpusPath: string;
 
   databasePath: string;
+  traceDir: string;
+  traceKeepDays: number;
+  traceMaxMb: number;
   staticDir: string;
   host: string;
   port: number;
@@ -33,11 +38,13 @@ export interface Settings {
 /** The only reader of process.env. Everything else is handed a Settings. */
 export class Env {
   static text(name: string, fallback: string): string {
+    Trace.line(import.meta.url, "Env.text", { name, fallback });
     const value = process.env[name];
     return value === undefined || value === "" ? fallback : value;
   }
 
   static number(name: string, fallback: number): number {
+    Trace.line(import.meta.url, "Env.number", { name, fallback });
     const raw = process.env[name];
     if (raw === undefined || raw === "") return fallback;
     const parsed = Number(raw);
@@ -48,12 +55,14 @@ export class Env {
   }
 
   static flag(name: string, fallback: boolean): boolean {
+    Trace.line(import.meta.url, "Env.flag", { name, fallback });
     const raw = process.env[name];
     if (raw === undefined || raw === "") return fallback;
     return ["1", "true", "yes", "on"].includes(raw.toLowerCase());
   }
 
   static settings(): Settings {
+    Trace.line(import.meta.url, "Env.settings");
     return {
 
       appUser: Env.text("MRA_APP_USER", "ash"),
@@ -82,6 +91,9 @@ export class Env {
       corpusPath: Env.text("MRA_CORPUS_PATH", "/corpus"),
 
       databasePath: Env.text("MRA_DATABASE_PATH", "/data/research.db"),
+      traceDir: Env.text("MRA_TRACE_DIR", "/data/traces"),
+      traceKeepDays: Env.number("MRA_TRACE_KEEP_DAYS", 30),
+      traceMaxMb: Env.number("MRA_TRACE_MAX_MB", 20),
       staticDir: Env.text("MRA_STATIC_DIR", "/app/static"),
       host: Env.text("MRA_HOST", "0.0.0.0"),
       port: Env.number("MRA_PORT", 8000),

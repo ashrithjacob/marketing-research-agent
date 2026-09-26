@@ -3,6 +3,7 @@
  * approves, and the gate that unlocks stage 2 — all without running the agent
  * loop for more than the gate itself needs.
  */
+import { Scope } from "../src/domain/index.js";
 
 import { fauxAssistantMessage, fauxProvider } from "@earendil-works/pi-ai/providers/faux";
 import { createModels, type MutableModels } from "@earendil-works/pi-ai";
@@ -106,6 +107,7 @@ function rosterPacket(): Record<string, any> {
 
 async function seedStageOne(briefProduct = "MagnaCalm 400mg"): Promise<string> {
   const run = store.createRun({
+    workspaceId: "admin",
     brief: { product: briefProduct, url: "", market: "UK", notes: "" },
     model: "faux-model",
     rejectKinds: [],
@@ -235,6 +237,7 @@ describe("the stage-2 gate", () => {
 
   it("stays shut for a stage-1 run whose packet is absent", async () => {
     const run = store.createRun({
+      workspaceId: "admin",
       brief: { product: "EmptyPacket", url: "", market: "", notes: "" },
       model: "faux-model",
       rejectKinds: [],
@@ -285,11 +288,12 @@ describe("the stage-2 instructions", () => {
 describe("the hand-off", () => {
   it("returns null for a subject stage 1 never ran", () => {
     const handoff = new StageTwoHandoff(store);
-    expect(handoff.forBrief({ product: "Nobody", url: "", market: "", notes: "" })).toBeNull();
+    expect(handoff.forBrief({ product: "Nobody", url: "", market: "", notes: "" }, Scope.everything)).toBeNull();
   });
 
   it("refuses a stage-2 packet posing as stage 1", async () => {
     const run = store.createRun({
+      workspaceId: "admin",
       brief: { product: "WrongStage", url: "", market: "", notes: "" },
       model: "faux-model",
       rejectKinds: [],
@@ -299,6 +303,6 @@ describe("the hand-off", () => {
     });
     store.updateRun(run.id, { status: "completed", packet: rosterPacket() });
     const handoff = new StageTwoHandoff(store);
-    expect(handoff.forBrief({ product: "WrongStage", url: "", market: "", notes: "" })).toBeNull();
+    expect(handoff.forBrief({ product: "WrongStage", url: "", market: "", notes: "" }, Scope.everything)).toBeNull();
   });
 });

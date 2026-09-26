@@ -2,6 +2,7 @@ import { AMAZON_SEARCH_ACTOR, Spend } from "./actors.js";
 import { Field } from "./fields.js";
 import type { ActorRunner } from "./runner.js";
 import type { AmazonProduct } from "./types.js";
+import { Trace } from "../../trace/index.js";
 
 /** A brief names a product; the reviews actor takes a url. This is the link. */
 export class AmazonProducts {
@@ -9,6 +10,7 @@ export class AmazonProducts {
 
   async find(options: { query: string; maxResults: number; marketplace?: string; signal?: AbortSignal },
   ): Promise<AmazonProduct[]> {
+    Trace.line(import.meta.url, "AmazonProducts.find");
     const host = options.marketplace ?? "www.amazon.com";
     const searchUrl = `https://${host}/s?k=${encodeURIComponent(options.query)}`;
     const { status, items } = await this.runner.run(

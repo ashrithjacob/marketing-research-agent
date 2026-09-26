@@ -2,10 +2,12 @@ import { Briefs, type StagePacket } from "../domain/index.js";
 
 import type { PacketCheck, PacketContext } from "./check.js";
 import { BrandLabels, Names } from "./names.js";
+import { Trace } from "../trace/index.js";
 
 /** The worked example is not the assignment: the packet must be about this brief. */
 export class BriefCheck implements PacketCheck {
   problems(packet: StagePacket, { brief }: PacketContext): string[] {
+    Trace.line(import.meta.url, "BriefCheck.problems", { packet });
     const wanted = typeof brief?.product === "string" ? Names.normalise(brief.product) : "";
     const site = typeof brief?.url === "string" ? brief.url.trim() : "";
     const got = Names.normalise(packet.brief.product);
@@ -22,6 +24,7 @@ export class BriefCheck implements PacketCheck {
   }
 
   private siteProblems(packet: StagePacket, site: string, got: string): string[] {
+    Trace.line(import.meta.url, "BriefCheck.siteProblems", { packet, site, got });
     const matches =
       Names.sameHost(site, packet.brief.url) ||
       (BrandLabels.of(site) ?? []).some((label) =>
@@ -40,6 +43,7 @@ export class BriefCheck implements PacketCheck {
     wanted: string,
     got: string,
   ): string[] {
+    Trace.line(import.meta.url, "BriefCheck.productProblems", { packet, wanted, got });
     const labels = BrandLabels.of(wanted);
     const matches = labels
       ? labels.some((label) => Names.squash(got).includes(Names.squash(label)))

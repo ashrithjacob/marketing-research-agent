@@ -1,8 +1,10 @@
 import type Database from "better-sqlite3";
 
-import { PacketRows, type PacketRowSet, type StoredPacketRows } from "../../domain/index.js";
+import { PacketRows, type PacketRowSet, type Scope, type StoredPacketRows } from "../../domain/index.js";
 
 import { Rows } from "./rows.js";
+import { ScopeFilter } from "./scope-filter.js";
+import { Trace } from "../../trace/index.js";
 
 type Value = string | number | null;
 type Column<R> = readonly [name: string, type: string, read: (row: R) => Value];
@@ -102,18 +104,23 @@ CREATE INDEX IF NOT EXISTS ${table}_product ON ${table}(product_id);`;
   constructor(private readonly db: Database.Database) {}
 
   replace(runId: string, productId: string, packet: unknown): void {
+    Trace.line(import.meta.url, "PacketRowTable.replace", { runId, productId, packet });
     const rows = PacketRows.of(typeof packet === "string" ? Rows.json(packet, null) : packet);
     this.db.transaction(() => {
       for (const kind of KINDS) this.write(kind, runId, productId, rows[kind]);
     })();
   }
 
-  list(productId: string): StoredPacketRows {
+  list(productId: string, scope: Scope): StoredPacketRows {
+    Trace.line(import.meta.url, "PacketRowTable.list", { productId, scope });
     const read = (kind: keyof PacketRowSet) =>
       (
         this.db
-          .prepare(`SELECT run_id, data FROM ${SPECS[kind].table} WHERE product_id = ? ORDER BY rowid`)
-          .all(productId) as Array<{ run_id: string; data: string }>
+          .prepare(
+            `SELECT t.run_id, t.data FROM ${SPECS[kind].table} t JOIN research_runs r ON r.id = t.run_id` +
+              ` WHERE t.product_id = ? AND ${ScopeFilter.sql("r.workspace_id")} ORDER BY t.rowid`,
+          )
+          .all(productId, ...ScopeFilter.args(scope)) as Array<{ run_id: string; data: string }>
       ).map((row) => ({ ...(Rows.json(row.data, {}) as object), run_id: row.run_id }));
     return Object.fromEntries(KINDS.map((kind) => [kind, read(kind)])) as StoredPacketRows;
   }
@@ -124,6 +131,7 @@ CREATE INDEX IF NOT EXISTS ${table}_product ON ${table}(product_id);`;
     productId: string,
     rows: PacketRowSet[K],
   ): void {
+    Trace.line(import.meta.url, "PacketRowTable.write", { kind, runId, productId, rows });
     const { table, columns } = SPECS[kind] as Spec<K>;
     this.db.prepare(`DELETE FROM ${table} WHERE run_id = ?`).run(runId);
     const names = ["run_id", "product_id", "seq", ...columns.map(([name]) => name), "data"];

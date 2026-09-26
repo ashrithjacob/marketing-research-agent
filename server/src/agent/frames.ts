@@ -1,6 +1,7 @@
 import type { Usage } from "@earendil-works/pi-ai";
 
 import type { LlmCall } from "../domain/index.js";
+import { Trace } from "../trace/index.js";
 
 export interface EventFrame {
   id: number;
@@ -12,6 +13,7 @@ export interface EventFrame {
 /** What the cockpit is told about a tool call and an LLM turn. */
 export class Frames {
   static toolPreview(toolName: string, args: unknown): string {
+    Trace.line(import.meta.url, "Frames.toolPreview", { toolName, args });
     const fields = (args ?? {}) as Record<string, unknown>;
     if (toolName === "web_search") return String(fields.query ?? "");
     if (toolName === "web_fetch") return String(fields.url ?? "");
@@ -29,6 +31,7 @@ export class Frames {
 
   /** The message a failed tool call handed back to the model, capped for the event stream. */
   static toolErrorText(result: unknown): string {
+    Trace.line(import.meta.url, "Frames.toolErrorText", { result });
     const content = (result as { content?: Array<{ type?: string; text?: string }> } | null)
       ?.content;
     const text = Array.isArray(content)
@@ -43,6 +46,7 @@ export class Frames {
   }
 
   static callSummary(call: LlmCall): Record<string, unknown> {
+    Trace.line(import.meta.url, "Frames.callSummary", { call });
     const usage = call.usage as Partial<Usage>;
     const content = (call.output as { content?: Array<{ type?: string }> }).content ?? [];
     return {

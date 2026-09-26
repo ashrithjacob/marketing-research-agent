@@ -132,6 +132,9 @@ export default function LogsPage({ runId }: { runId: string }) {
               <span className={`status ${run.status}`}>{run.status}</span>
             </>
           )}
+          <a className="ghost logs-back" href={api.traceUrl(runId)} download>
+            Download trace
+          </a>
           <a className="ghost logs-back" href="/">
             ← Cockpit
           </a>

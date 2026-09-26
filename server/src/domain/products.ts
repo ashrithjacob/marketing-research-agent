@@ -1,3 +1,5 @@
+import { Trace } from "../trace/index.js";
+
 export interface RunHead {
   id: string;
   product_id: string;
@@ -24,6 +26,7 @@ export interface ProductSummary extends Product {
 /** One folder per stored product: its runs, and the run it opens on. */
 export class ProductFolders {
   static summaries(products: readonly Product[], heads: readonly RunHead[]): ProductSummary[] {
+    Trace.line(import.meta.url, "ProductFolders.summaries", { products, heads });
     return products
       .flatMap((product) => {
         const runs = ProductFolders.runsOf(heads, product.id);
@@ -43,10 +46,12 @@ export class ProductFolders {
   }
 
   static runIds(heads: readonly RunHead[], productId: string): string[] {
+    Trace.line(import.meta.url, "ProductFolders.runIds", { heads, productId });
     return ProductFolders.runsOf(heads, productId).map((head) => head.id);
   }
 
   private static runsOf(heads: readonly RunHead[], productId: string): RunHead[] {
+    Trace.line(import.meta.url, "ProductFolders.runsOf", { heads, productId });
     return heads
       .filter((head) => head.product_id === productId)
       .sort((a, b) => b.created_at.localeCompare(a.created_at));

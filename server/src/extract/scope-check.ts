@@ -1,10 +1,12 @@
 import { NODES, Stages, type Node, type StagePacket } from "../domain/index.js";
 
 import type { PacketCheck, PacketContext } from "./check.js";
+import { Trace } from "../trace/index.js";
 
 /** A run covers one stage, and a partial run covers only the nodes it names. */
 export class ScopeCheck implements PacketCheck {
   private static noded(packet: StagePacket): ReadonlyArray<ReadonlyArray<{ node: string }>> {
+    Trace.line(import.meta.url, "ScopeCheck.noded", { packet });
     return [
       packet.sources,
       packet.excerpts,
@@ -17,6 +19,7 @@ export class ScopeCheck implements PacketCheck {
   }
 
   problems(packet: StagePacket, context: PacketContext): string[] {
+    Trace.line(import.meta.url, "ScopeCheck.problems", { packet });
     return [
       ...this.stageProblems(packet, context),
       ...this.foreignNodeProblems(packet, context),
@@ -25,6 +28,7 @@ export class ScopeCheck implements PacketCheck {
   }
 
   private stageProblems(packet: StagePacket, { scope, stage }: PacketContext): string[] {
+    Trace.line(import.meta.url, "ScopeCheck.stageProblems", { packet });
     if (packet.stage === stage) return [];
     return [
       `packet says stage ${packet.stage}, but this run collects ${scope.join(", ")}, ` +
@@ -33,6 +37,7 @@ export class ScopeCheck implements PacketCheck {
   }
 
   private foreignNodeProblems(packet: StagePacket, { stage }: PacketContext): string[] {
+    Trace.line(import.meta.url, "ScopeCheck.foreignNodeProblems", { packet });
     const foreign = new Set<string>();
     for (const items of ScopeCheck.noded(packet)) {
       for (const { node } of items) {
@@ -47,6 +52,7 @@ export class ScopeCheck implements PacketCheck {
   }
 
   private outsideScopeProblems(packet: StagePacket, { scope }: PacketContext): string[] {
+    Trace.line(import.meta.url, "ScopeCheck.outsideScopeProblems", { packet });
     if (!Stages.isPartial(scope)) return [];
     const allowed = new Set<string>(scope);
     const outside = new Map<string, number>();

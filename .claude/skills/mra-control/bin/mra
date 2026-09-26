@@ -171,6 +171,16 @@ cmd_calls() {
 }
 
 # --- the deploy ------------------------------------------------------------
+cmd_trace() {
+  need curl "mra trace"
+  local id="${1:-$(cat "${TMPDIR:-/tmp}/mra-last-run" 2>/dev/null || true)}"
+  [ -n "$id" ] || die "usage: mra trace <runId> [file]"
+  local out="${2:-run-$id-trace.log}" code
+  code=$(curl -s -b "$JAR" -c "$JAR" -o "$out" -w '%{http_code}' "${BASE:-$LOCAL_URL}/api/research/runs/$id/trace")
+  [ "$code" = "200" ] || { rm -f "$out"; die "no trace for $id (HTTP $code)"; }
+  note "$(wc -l < "$out") lines, $(du -h "$out" | cut -f1) → $out"
+}
+
 cmd_deployed() {
   need curl "mra deployed"
   cmd_health live || true
@@ -205,6 +215,8 @@ mra — drive and inspect the research cockpit
                            nodes: product_data,competitors,review_mining,category_data
   watch [runId]            poll until the run settles, then print the totals
   calls [runId]            the LLM call log, one line per turn
+  trace [runId] [file]     download the run's trace: one line per function
+                           and per HTTP request, each tagged with its file
 
   deployed                 what is actually live, and what is not yet shipped
 
@@ -222,6 +234,7 @@ case "${1:-help}" in
   run)      shift; cmd_run "$@" ;;
   watch)    shift; cmd_watch "$@" ;;
   calls)    shift; cmd_calls "$@" ;;
+  trace)    shift; cmd_trace "$@" ;;
   deployed) shift; cmd_deployed "$@" ;;
   help|-h|--help) cmd_help ;;
   *) die "unknown command '$1'. Try: mra help" ;;

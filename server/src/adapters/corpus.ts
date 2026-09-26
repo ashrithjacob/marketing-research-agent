@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { Trace } from "../trace/index.js";
 
 /** Writes a fetched body under its own sha256, so a quote can be re-read later. */
 export class Corpus {
@@ -10,6 +11,7 @@ export class Corpus {
     runId: string,
     text: string,
   ): Promise<{ sourceId: string; archived: boolean }> {
+    Trace.line(import.meta.url, "Corpus.write", { runId, text });
     const body = Buffer.from(text, "utf-8");
     const digest = createHash("sha256").update(body).digest("hex");
     const sourceId = `sha256:${digest}`;

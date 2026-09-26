@@ -1,8 +1,10 @@
 import type { Usage } from "@earendil-works/pi-ai";
+import { Trace } from "../trace/index.js";
 
 /** Per-turn usage summed across a run; pi-ai reports each turn separately. */
 export class UsageTotals {
   static empty(): Usage {
+    Trace.line(import.meta.url, "UsageTotals.empty");
     return {
       input: 0,
       output: 0,
@@ -15,6 +17,7 @@ export class UsageTotals {
   }
 
   static add(total: Usage, next: Usage | undefined): Usage {
+    Trace.line(import.meta.url, "UsageTotals.add", { total, next });
     if (!next) return total;
     return {
       input: total.input + (next.input ?? 0),

@@ -2,6 +2,7 @@ import type { StreamFn } from "@earendil-works/pi-agent-core";
 import type { AssistantMessage, Message } from "@earendil-works/pi-ai";
 
 import type { LlmCall, ResearchStore } from "../domain/index.js";
+import { Trace } from "../trace/index.js";
 
 /** Wraps a run's streamFn so every LLM call is stored as sent and as answered. */
 export class LlmCallLog {
@@ -19,6 +20,7 @@ export class LlmCallLog {
   ) {}
 
   wrap(inner: StreamFn): StreamFn {
+    Trace.line(import.meta.url, "LlmCallLog.wrap", { inner });
     return async (model, context, streamOptions) => {
       const n = ++this.seq;
       const started = Date.now();
@@ -104,6 +106,7 @@ export class LlmCallLog {
   }
 
   private static asSent(message: Message): unknown {
+    Trace.line(import.meta.url, "LlmCallLog.asSent", { message });
     if (message.role !== "toolResult") return message;
     const { details: _details, usage: _usage, ...sent } = message;
     return sent;

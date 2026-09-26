@@ -1,10 +1,12 @@
 import { COMPETITOR_RELATIONS, type Node, type StagePacket } from "../domain/index.js";
 
 import type { PacketCheck } from "./check.js";
+import { Trace } from "../trace/index.js";
 
 /** "Done" has to be a measurement, and real research always has holes. */
 export class CompletenessCheck implements PacketCheck {
   problems(packet: StagePacket): string[] {
+    Trace.line(import.meta.url, "CompletenessCheck.problems", { packet });
     const complete = new Set(
       packet.nodes.filter((entry) => entry.status === "complete").map((entry) => entry.node),
     );
@@ -22,6 +24,7 @@ export class CompletenessCheck implements PacketCheck {
   }
 
   private saturationProblems(packet: StagePacket, complete: ReadonlySet<Node>): string[] {
+    Trace.line(import.meta.url, "CompletenessCheck.saturationProblems", { packet, complete });
     const curves = new Set(
       packet.saturation.filter((entry) => entry.curve.length > 0).map((entry) => entry.node),
     );

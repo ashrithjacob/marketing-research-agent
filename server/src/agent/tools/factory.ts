@@ -26,7 +26,9 @@ import {
   TrustpilotReviewsTool,
 } from "./review-tools.js";
 import { ReviewRendering } from "./review-rendering.js";
-import { WebFetchTool, WebSearchTool } from "./web-tools.js";
+import { WebFetchTool } from "./web-fetch-tool.js";
+import { WebSearchTool } from "./web-search-tool.js";
+import { Trace } from "../../trace/index.js";
 
 export interface ToolsetOptions {
   settings: Settings;
@@ -47,6 +49,7 @@ export class ResearchToolset {
   constructor(private readonly options: ToolsetOptions) {}
 
   build(): AgentTool<any>[] {
+    Trace.line(import.meta.url, "ResearchToolset.build");
     const { settings, runId, onFetch } = this.options;
     const reviews = this.options.reviewTools !== false;
     const bare =

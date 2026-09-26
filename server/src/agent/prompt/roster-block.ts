@@ -2,10 +2,12 @@ import type { MiningTarget } from "../../domain/index.js";
 import { StageTwoRoster } from "../../extract/index.js";
 
 import { RELATION_LABEL, ROSTER_LEAD, ROSTER_METHOD } from "./text/roster.js";
+import { Trace } from "../../trace/index.js";
 
 /** The roster stage 1 handed over, rendered as the run's scope and its work order. */
 export class RosterBlock {
   static text(targets: readonly MiningTarget[], selected: readonly string[]): string {
+    Trace.line(import.meta.url, "RosterBlock.text", { targets, selected });
     const chosen = new Set(selected);
     const lines = ["## Targets from stage 1", "", ROSTER_LEAD, ""];
     for (const target of targets) {

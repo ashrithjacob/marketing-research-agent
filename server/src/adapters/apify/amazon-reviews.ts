@@ -7,6 +7,7 @@ import { BandFiling } from "./band-filing.js";
 import { Field, ReviewKey } from "./fields.js";
 import type { ActorRunner } from "./runner.js";
 import type { ReviewExcerpt, ReviewResult } from "./types.js";
+import { Trace } from "../../trace/index.js";
 
 /** Reviews for one product at one star band; one band per call, so the spread can be checked. */
 export class AmazonReviews {
@@ -18,6 +19,7 @@ export class AmazonReviews {
       maxReviews: number;
       signal?: AbortSignal;
   }): Promise<ReviewResult> {
+    Trace.line(import.meta.url, "AmazonReviews.fetch");
     const { productUrl, star, maxReviews, signal } = options;
     const { status, items } = await this.runner.run(
       AMAZON_REVIEWS_ACTOR,

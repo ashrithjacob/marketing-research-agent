@@ -1,4 +1,5 @@
 import type { Settings } from "../../config/index.js";
+import { Trace } from "../../trace/index.js";
 
 export interface ActorRun {
   status: string;
@@ -35,6 +36,7 @@ export class MeteredActorRunner implements ActorRunner {
     maxTotalChargeUsd: number,
     signal?: AbortSignal,
   ): Promise<ActorRun> {
+    Trace.line(import.meta.url, "MeteredActorRunner.run", { actorId, input, maxTotalChargeUsd });
     const result = await this.inner.run(actorId, input, maxTotalChargeUsd, signal);
     if (typeof result.usageUsd === "number" && Number.isFinite(result.usageUsd)) {
       this.onCharge({ actor: actorId, usd: result.usageUsd, status: result.status });
@@ -55,6 +57,7 @@ export class ApifyActorRunner implements ActorRunner {
     maxTotalChargeUsd: number,
     signal?: AbortSignal,
   ): Promise<ActorRun> {
+    Trace.line(import.meta.url, "ApifyActorRunner.run", { actorId, input, maxTotalChargeUsd });
     if (!this.token) {
       throw new Error("APIFY_TOKEN is not set — review mining cannot reach Amazon or Trustpilot");
     }
@@ -90,6 +93,7 @@ export class ApifyActorRunner implements ActorRunner {
 /** No token means no review route at all, so the tools are withheld rather than stubbed. */
 export class ActorRunners {
   static forSettings(settings: Settings): ActorRunner | null {
+    Trace.line(import.meta.url, "ActorRunners.forSettings", { settings });
     if (!settings.apifyToken) return null;
     return new ApifyActorRunner(settings.apifyToken, settings.apifyWaitSeconds);
   }

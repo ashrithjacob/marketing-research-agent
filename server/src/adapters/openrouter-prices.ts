@@ -1,5 +1,6 @@
 import type { Rates } from "./rates.js";
 import { Money } from "./rates.js";
+import { Trace } from "../trace/index.js";
 
 type FetchLike = typeof fetch;
 
@@ -24,6 +25,7 @@ export class OpenRouterPrices {
     fetch?: FetchLike;
     lookupDelaysMs?: readonly number[];
   }) {
+    Trace.line(import.meta.url, "OpenRouterPrices.constructor");
     this.apiKey = options.apiKey;
     this.baseUrl = options.baseUrl ?? OPENROUTER_API;
     this.fetch = options.fetch ?? fetch;
@@ -31,12 +33,14 @@ export class OpenRouterPrices {
   }
 
   start(): void {
+    Trace.line(import.meta.url, "OpenRouterPrices.start");
     void this.refreshPrices();
     this.timer = setInterval(() => void this.refreshPrices(), PRICE_REFRESH_MS);
     this.timer.unref?.();
   }
 
   async refreshPrices(): Promise<void> {
+    Trace.line(import.meta.url, "OpenRouterPrices.refreshPrices");
     try {
       const response = await this.fetch(`${this.baseUrl}/models`, {
         signal: this.controller.signal,
@@ -58,14 +62,17 @@ export class OpenRouterPrices {
   }
 
   ratesFor(modelId: string): { rates: Rates | undefined; fetchedAt: string } {
+    Trace.line(import.meta.url, "OpenRouterPrices.ratesFor", { modelId });
     return { rates: this.rates.get(modelId), fetchedAt: this.fetchedAt };
   }
 
   get billable(): boolean {
+    Trace.line(import.meta.url, "OpenRouterPrices.billable");
     return this.apiKey !== "";
   }
 
   async generationCost(id: string): Promise<number | null> {
+    Trace.line(import.meta.url, "OpenRouterPrices.generationCost", { id });
     const url = `${this.baseUrl}/generation?id=${encodeURIComponent(id)}`;
     for (let attempt = 0; ; attempt++) {
       try {
@@ -92,6 +99,7 @@ export class OpenRouterPrices {
   }
 
   private sleep(ms: number): Promise<boolean> {
+    Trace.line(import.meta.url, "OpenRouterPrices.sleep", { ms });
     const signal = this.controller.signal;
     if (signal.aborted) return Promise.resolve(false);
     return new Promise((resolve) => {
@@ -108,6 +116,7 @@ export class OpenRouterPrices {
   }
 
   stop(): void {
+    Trace.line(import.meta.url, "OpenRouterPrices.stop");
     if (this.timer) clearInterval(this.timer);
     this.controller.abort();
   }

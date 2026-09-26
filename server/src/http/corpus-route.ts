@@ -6,6 +6,8 @@ import type { Hono } from "hono";
 
 import type { Settings } from "../config/index.js";
 import type { ResearchStore } from "../domain/index.js";
+import type { ApiEnv } from "./api-env.js";
+import { Trace } from "../trace/index.js";
 
 /** The archived raw body, served as text/plain so a scraped page never renders as this origin. */
 export class CorpusRoute {
@@ -16,7 +18,8 @@ export class CorpusRoute {
     private readonly settings: Settings,
   ) {}
 
-  register(api: Hono): void {
+  register(api: Hono<ApiEnv>): void {
+    Trace.line(import.meta.url, "CorpusRoute.register");
     api.get("/runs/:runId/sources/:sha", async (c) => {
       const runId = c.req.param("runId");
       const sha = c.req.param("sha");

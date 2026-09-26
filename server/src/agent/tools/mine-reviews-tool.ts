@@ -6,6 +6,7 @@ import type { Settings } from "../../config/index.js";
 
 import { mineReviewsParameters } from "./parameters.js";
 import type { PullLabel, ReviewRendering } from "./review-rendering.js";
+import { Trace } from "../../trace/index.js";
 
 interface MiningJob {
   heading: string;
@@ -25,6 +26,7 @@ export class MineReviewsTool {
   ) {}
 
   tool(): AgentTool<typeof mineReviewsParameters> {
+    Trace.line(import.meta.url, "MineReviewsTool.tool");
     return {
       name: "mine_reviews",
       label: "Mine reviews",
@@ -36,6 +38,7 @@ export class MineReviewsTool {
         "a count per pull, its pull handle and any GAP lines — never the reviews.",
       parameters: mineReviewsParameters,
       execute: async (_id, params, signal) => {
+        Trace.line(import.meta.url, "MineReviewsTool.tool.execute", { params });
         const jobs = this.jobs(params.listings, params.trustpilot ?? []);
         const fetched = await Http.pool(jobs, this.settings.apifyConcurrency, (job) =>
           MineReviewsTool.attempt(job, signal),
@@ -55,6 +58,7 @@ export class MineReviewsTool {
     listings: ReadonlyArray<{ target_id: string; product_url: string }>,
     merchants: ReadonlyArray<{ target_id: string; domain: string }>,
   ): MiningJob[] {
+    Trace.line(import.meta.url, "MineReviewsTool.jobs", { listings, merchants });
     const limit = this.settings.apifyMaxReviews;
     const amazon = listings.flatMap((listing) =>
       MineReviewsTool.BANDS.map((star) => ({
@@ -87,6 +91,7 @@ export class MineReviewsTool {
     job: MiningJob,
     signal?: AbortSignal,
   ): Promise<ReviewResult | { failed: string }> {
+    Trace.line(import.meta.url, "MineReviewsTool.attempt", { job });
     try {
       return await job.fetch(signal);
     } catch (error) {
@@ -98,6 +103,7 @@ export class MineReviewsTool {
     job: MiningJob,
     fetched: ReviewResult | { failed: string },
   ): Promise<{ text: string; details: unknown }> {
+    Trace.line(import.meta.url, "MineReviewsTool.section", { job, fetched });
     if ("failed" in fetched) {
       const why = fetched.failed;
       return {

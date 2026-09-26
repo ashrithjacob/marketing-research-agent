@@ -1,12 +1,14 @@
 import { Briefs, type StagePacket } from "../domain/index.js";
 
 import type { PacketCheck, PacketContext } from "./check.js";
+import { Trace } from "../trace/index.js";
 
 /** The champion must be the genre's most-bought listing, with the ranking that proves it. */
 export class ChampionCheck implements PacketCheck {
-  private static RANKING_GAP = /champion ranking unavailable/i;
+  private static readonly RANKING_GAP = /champion ranking unavailable/i;
 
   problems(packet: StagePacket, { brief }: PacketContext): string[] {
+    Trace.line(import.meta.url, "ChampionCheck.problems", { packet });
     const reference = packet.competitor_reference;
     if (!reference || !ChampionCheck.isGenreBrief(brief)) return [];
     if (
@@ -47,6 +49,7 @@ export class ChampionCheck implements PacketCheck {
 
   /** A url brief pins the champion to the operator's own site; only a name leaves it open. */
   private static isGenreBrief(brief: PacketContext["brief"]): boolean {
+    Trace.line(import.meta.url, "ChampionCheck.isGenreBrief");
     const url = typeof brief?.url === "string" ? brief.url.trim() : "";
     const product = typeof brief?.product === "string" ? brief.product.trim() : "";
     return url === "" && product !== "" && !Briefs.looksLikeUrl(product);

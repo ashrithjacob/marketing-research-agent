@@ -1,3 +1,5 @@
+import { Trace } from "../../trace/index.js";
+
 export const AMAZON_REVIEWS_ACTOR = "junglee/amazon-reviews-scraper";
 export const TRUSTPILOT_ACTOR = "memo23/trustpilot-scraper-ppe";
 export const AMAZON_SEARCH_ACTOR = "junglee/free-amazon-product-scraper";
@@ -19,6 +21,7 @@ export const START_FEE_USD = { [TRUSTPILOT_ACTOR]: 0.05 } as const;
 /** Apify rejects a cap below the actor's floor, so this sizes from volume and floors it. */
 export class Spend {
   static capFor(actorId: keyof typeof UNIT_PRICE_USD, items: number): number {
+    Trace.line(import.meta.url, "Spend.capFor", { actorId, items });
     const start = (START_FEE_USD as Record<string, number>)[actorId] ?? 0;
     const need = start + Math.max(items, 1) * UNIT_PRICE_USD[actorId] * 2;
     return Math.max(MIN_CAP_USD[actorId], Number(need.toFixed(4)));

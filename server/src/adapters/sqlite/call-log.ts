@@ -3,11 +3,13 @@ import type Database from "better-sqlite3";
 import type { LlmCall, LlmCallRecord } from "../../domain/index.js";
 
 import { Rows } from "./rows.js";
+import { Trace } from "../../trace/index.js";
 
 export class CallLog {
   constructor(private readonly db: Database.Database) {}
 
   add(call: LlmCallRecord): LlmCall {
+    Trace.line(import.meta.url, "CallLog.add", { call });
     const info = this.db
       .prepare(
         "INSERT INTO research_llm_calls (run_id, seq, started_at, ended_at, duration_ms," +
@@ -36,12 +38,14 @@ export class CallLog {
   }
 
   setBilled(runId: string, responseId: string, cost: number): void {
+    Trace.line(import.meta.url, "CallLog.setBilled", { runId, responseId, cost });
     this.db
       .prepare("UPDATE research_llm_calls SET billed_cost = ? WHERE run_id = ? AND response_id = ?")
       .run(cost, runId, responseId);
   }
 
   list(runId: string): LlmCall[] {
+    Trace.line(import.meta.url, "CallLog.list", { runId });
     const rows = this.db
       .prepare("SELECT * FROM research_llm_calls WHERE run_id = ? ORDER BY seq")
       .all(runId) as Array<Record<string, any>>;

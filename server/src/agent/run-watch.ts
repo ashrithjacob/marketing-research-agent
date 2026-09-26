@@ -11,6 +11,7 @@ import { Retries, type RetryPolicy } from "./retry.js";
 import type { ReviewLedger } from "./review-ledger.js";
 import { RunSettlement } from "./run-settlement.js";
 import { UsageTotals } from "./usage.js";
+import { Trace } from "../trace/index.js";
 
 /** Drives one run's agent to the end: retries, one packet nudge, settlement, billing. */
 export class RunWatch {
@@ -28,6 +29,7 @@ export class RunWatch {
       ledger: ReviewLedger;
     },
   ) {
+    Trace.line(import.meta.url, "RunWatch.constructor");
     this.settlement = new RunSettlement(options.store, options.runs, options.runId, options.ledger);
   }
 
@@ -36,6 +38,7 @@ export class RunWatch {
     instructions: string,
     onBilled: (responseId: string, cost: number) => void,
   ): Promise<void> {
+    Trace.line(import.meta.url, "RunWatch.run", { agent, instructions, onBilled });
     const { store, runs, costs, retry, runId, nodes, pricing } = this.options;
     let usage = UsageTotals.empty();
     const billing = new RunBilling(costs);
@@ -96,11 +99,13 @@ export class RunWatch {
   }
 
   private shouldRetry(errorMessage: string): boolean {
+    Trace.line(import.meta.url, "RunWatch.shouldRetry", { errorMessage });
     if (!Retries.isRetryable(errorMessage)) return false;
     return this.options.store.getRun(this.options.runId)?.status !== "stopping";
   }
 
   private lacksPacket(output: string, agent: Agent): boolean {
+    Trace.line(import.meta.url, "RunWatch.lacksPacket", { output, agent });
     if (this.settlement.hasValidated()) return false;
     if (agent.state.errorMessage && !agent.state.messages.some((m) => m.role === "toolResult")) {
       return false;
@@ -115,6 +120,7 @@ export class RunWatch {
   }
 
   private keepReviews(): void {
+    Trace.line(import.meta.url, "RunWatch.keepReviews");
     const { store, runs, runId, ledger } = this.options;
     try {
       const saved = store.saveRunReviews(runId, ledger.snapshot());
@@ -125,6 +131,7 @@ export class RunWatch {
   }
 
   private async recordBilling(billing: RunBilling): Promise<void> {
+    Trace.line(import.meta.url, "RunWatch.recordBilling", { billing });
     const { store, runs, runId } = this.options;
     try {
       const billed = await billing.settle();

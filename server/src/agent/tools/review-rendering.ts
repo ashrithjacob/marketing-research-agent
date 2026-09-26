@@ -7,6 +7,7 @@ import type { ReviewResult } from "../../adapters/apify/index.js";
 import type { ReviewLedger } from "../review-ledger.js";
 
 import type { FetchRecord } from "./lanes.js";
+import { Trace } from "../../trace/index.js";
 
 export interface PullLabel {
   target_id: string;
@@ -25,11 +26,13 @@ export class ReviewRendering {
   ) {}
 
   static limit(requested: number | undefined, max: number): number {
+    Trace.line(import.meta.url, "ReviewRendering.limit", { requested, max });
     if (requested === undefined || !Number.isFinite(requested)) return max;
     return Math.min(Math.max(Math.trunc(requested), 1), max);
   }
 
   static cappedNote(requested: number | undefined, limit: number): string {
+    Trace.line(import.meta.url, "ReviewRendering.cappedNote", { requested, limit });
     if (requested === undefined || Math.trunc(requested) <= limit) return "";
     return (
       `NOTE: asked for ${Math.trunc(requested)} reviews; this server caps each call at ${limit}. ` +
@@ -38,6 +41,7 @@ export class ReviewRendering {
   }
 
   static starBand(value: number | undefined): 1 | 2 | 3 | 4 | 5 | null {
+    Trace.line(import.meta.url, "ReviewRendering.starBand", { value });
     if (value === undefined) return null;
     const n = Math.trunc(value);
     if (n < 1 || n > 5) throw new Error(`star must be between 1 and 5, got ${value}`);
@@ -49,6 +53,7 @@ export class ReviewRendering {
     result: ReviewResult,
     note = "",
   ): Promise<{ text: string; details: unknown }> {
+    Trace.line(import.meta.url, "ReviewRendering.render", { label, result, note });
     const body = JSON.stringify(result.excerpts, null, 2);
     const { sourceId, archived } = await new Corpus(this.settings.corpusPath).write(this.runId, body);
     this.onFetch?.({
@@ -103,6 +108,7 @@ export class ReviewRendering {
   }
 
   footer(): string {
+    Trace.line(import.meta.url, "ReviewRendering.footer");
     return (
       `LEDGER: ${this.ledger.size()} reviews held for this run. The server adds every one to ` +
       "the packet, verbatim, with its pull as the source. Never copy a review into the packet, " +
@@ -111,6 +117,7 @@ export class ReviewRendering {
   }
 
   private static spread(stars: ReadonlyArray<number | null>): string {
+    Trace.line(import.meta.url, "ReviewRendering.spread", { stars });
     if (stars.length === 0) return "";
     const counts = new Map<string, number>();
     for (const star of stars) {

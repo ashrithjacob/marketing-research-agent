@@ -1,10 +1,12 @@
 import type { StagePacket } from "../domain/index.js";
 
 import type { PacketCheck, PacketContext } from "./check.js";
+import { Trace } from "../trace/index.js";
 
 /** Everything recorded must cite a source the packet actually carries. */
 export class CitationCheck implements PacketCheck {
   problems(packet: StagePacket, { sourceIds }: PacketContext): string[] {
+    Trace.line(import.meta.url, "CitationCheck.problems", { packet });
     const problems: string[] = [];
 
     for (const excerpt of packet.excerpts) {
@@ -43,6 +45,7 @@ export class CitationCheck implements PacketCheck {
   }
 
   private adLibraryProblems(packet: StagePacket): string[] {
+    Trace.line(import.meta.url, "CitationCheck.adLibraryProblems", { packet });
     const gappedNodes = new Set(packet.gaps.map((gap) => gap.node));
     for (const source of packet.sources) {
       if (source.kind !== "ad_library" || !source.admitted || source.first_seen) continue;

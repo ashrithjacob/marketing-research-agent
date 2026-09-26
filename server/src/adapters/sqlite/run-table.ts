@@ -1,8 +1,10 @@
 import type Database from "better-sqlite3";
 
-import { Clock, Ids, type ResearchRun, type RunHead, type RunUpdate } from "../../domain/index.js";
+import { Clock, Ids, type ResearchRun, type RunHead, type RunUpdate, type Scope } from "../../domain/index.js";
 
 import { Rows } from "./rows.js";
+import { ScopeFilter } from "./scope-filter.js";
+import { Trace } from "../../trace/index.js";
 
 const COLUMNS = new Set([
   "agent_run_id",
@@ -27,6 +29,7 @@ export class RunTable {
   constructor(private readonly db: Database.Database) {}
 
   create(input: {
+    workspaceId: string;
     brief: Record<string, unknown>;
     model: string;
     rejectKinds: string[];
@@ -35,15 +38,17 @@ export class RunTable {
     stage?: number;
     productId: string;
   }): ResearchRun {
+    Trace.line(import.meta.url, "RunTable.create", { input });
     const now = Clock.nowIso();
     const runId = Ids.next();
     this.db
       .prepare(
-        "INSERT INTO research_runs (id, product_id, status, stage, model, brief, reject_kinds," +
-          " judgement_ids, nodes, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+        "INSERT INTO research_runs (id, workspace_id, product_id, status, stage, model, brief, reject_kinds," +
+          " judgement_ids, nodes, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
       )
       .run(
         runId,
+        input.workspaceId,
         input.productId,
         "queued",
         input.stage ?? 1,
@@ -61,25 +66,34 @@ export class RunTable {
   }
 
   get(runId: string): ResearchRun | null {
+    Trace.line(import.meta.url, "RunTable.get", { runId });
     const row = this.db.prepare("SELECT * FROM research_runs WHERE id = ?").get(runId);
     return row ? Rows.run(row as Record<string, any>) : null;
   }
 
-  list(limit = 50): ResearchRun[] {
+  list(scope: Scope, limit = 50): ResearchRun[] {
+    Trace.line(import.meta.url, "RunTable.list", { scope, limit });
     const rows = this.db
-      .prepare("SELECT * FROM research_runs ORDER BY created_at DESC LIMIT ?")
-      .all(limit) as Array<Record<string, any>>;
+      .prepare(
+        `SELECT * FROM research_runs WHERE ${ScopeFilter.sql("workspace_id")} ORDER BY created_at DESC LIMIT ?`,
+      )
+      .all(...ScopeFilter.args(scope), limit) as Array<Record<string, any>>;
     return rows.map(Rows.run);
   }
 
-  heads(): RunHead[] {
+  heads(scope: Scope): RunHead[] {
+    Trace.line(import.meta.url, "RunTable.heads", { scope });
     const rows = this.db
-      .prepare("SELECT id, product_id, stage, status, created_at FROM research_runs ORDER BY created_at DESC")
-      .all() as Array<Record<string, any>>;
+      .prepare(
+        "SELECT id, product_id, stage, status, created_at FROM research_runs" +
+          ` WHERE ${ScopeFilter.sql("workspace_id")} ORDER BY created_at DESC`,
+      )
+      .all(...ScopeFilter.args(scope)) as Array<Record<string, any>>;
     return rows.map(Rows.head);
   }
 
   update(runId: string, fields: RunUpdate): void {
+    Trace.line(import.meta.url, "RunTable.update", { runId, fields });
     const keys = Object.keys(fields) as Array<keyof RunUpdate>;
     const unknown = keys.filter((key) => !COLUMNS.has(key as string));
     if (unknown.length > 0) {

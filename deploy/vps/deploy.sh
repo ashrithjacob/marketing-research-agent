@@ -36,8 +36,9 @@ docker save mra:latest | gzip -1 | ssh "$REMOTE" 'gunzip | docker load'
 
 echo "==> sync compose files"
 ssh "$REMOTE" "mkdir -p ~/$REMOTE_DIR/searxng"
-rsync -az deploy/vps/docker-compose.yaml deploy/vps/change-password.sh deploy/vps/mra-snapshot.sh \
+rsync -az deploy/vps/docker-compose.yaml deploy/vps/mra-users.sh deploy/vps/mra-snapshot.sh \
   "$REMOTE:$REMOTE_DIR/"
+ssh "$REMOTE" "rm -f ~/$REMOTE_DIR/change-password.sh"
 rsync -az searxng/settings.yml "$REMOTE:$REMOTE_DIR/searxng/settings.yml"
 
 echo "==> up"
