@@ -81,9 +81,14 @@ function standing(
 }
 
 export interface StageProgress {
+  /** A stage-1 run for this subject completed, so stage 2 can start. */
   stageOneDone: boolean;
+  /** A stage-2 run for this subject completed. */
   stageTwoDone: boolean;
+  /** A stage-2 run for this subject is queued or running right now. */
   stageTwoLive: boolean;
+  /** The run each collecting stage opens when its header is clicked. */
+  runIds?: Partial<Record<1 | 2, string>>;
 }
 
 export default function StageRail({
@@ -93,6 +98,7 @@ export default function StageRail({
   scope,
   onRunNode,
   progress,
+  onSelectRun,
 }: {
   status: RunStatus | null;
   nodes: NodeStatus[];
@@ -103,6 +109,8 @@ export default function StageRail({
   onRunNode?: (node: ResearchNode) => void;
   /** Where this subject stands across all its runs. */
   progress?: StageProgress;
+  /** Open the run that collected a stage. */
+  onSelectRun?: (id: string) => void;
 }) {
   const byNode = new Map(nodes.map((n) => [n.node, n]));
   const curves = new Map<ResearchNode, Saturation[]>();
@@ -119,9 +127,18 @@ export default function StageRail({
         const state =
           shown && status ? runState(status) : collects !== null ? standing(collects, progress) : null;
         const ready = collects === 2 && state?.cls === 'ready';
+        const target = collects !== null && !shown ? progress?.runIds?.[collects] : undefined;
+        const open = target && onSelectRun ? () => onSelectRun(target) : undefined;
         return (
           <div key={stage.id}>
-            <div className={`stage ${state?.cls || 'unbuilt'}`}>
+            <div
+              className={`stage ${state?.cls || 'unbuilt'}${open ? ' linked' : ''}`}
+              role={open ? 'link' : undefined}
+              tabIndex={open ? 0 : undefined}
+              title={open ? `Open the stage ${collects} run` : undefined}
+              onClick={open}
+              onKeyDown={open ? (e) => e.key === 'Enter' && open() : undefined}
+            >
               <span className="dot" />
               <div className="stage-body">
                 <div className="stage-t">
@@ -135,7 +152,10 @@ export default function StageRail({
                   <button
                     className="primary stage-start"
                     title="Mine reviews for the product stage 1 found — you approve the plan before it runs"
-                    onClick={() => onRunNode(STAGE_NODES[2][0])}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onRunNode(STAGE_NODES[2][0]);
+                    }}
                   >
                     Start stage 2 →
                   </button>

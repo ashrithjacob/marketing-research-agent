@@ -1,7 +1,7 @@
 import type { CallsResponse } from './calls';
 import type { Config } from './config';
 import type { Judgement } from './judgements';
-import type { Brief, ResearchNode, RunDetail, RunSummary } from './runs';
+import type { Brief, ProductSummary, ResearchNode, RunDetail, RunSummary } from './runs';
 import type { StageTwoPlanResponse } from './stage-two';
 
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
@@ -33,7 +33,10 @@ export const api = {
   logout: () => request<{ ok: boolean }>('/api/auth/logout', { method: 'POST' }),
 
   config: () => request<Config>('/api/research/config'),
-  runs: () => request<{ data: RunSummary[] }>('/api/research/runs'),
+  products: () => request<{ data: ProductSummary[] }>('/api/research/products'),
+  product: (id: string) => request<ProductSummary>(`/api/research/products/${id}`),
+  productRuns: (id: string) =>
+    request<{ data: RunSummary[] }>(`/api/research/products/${id}/runs`),
   run: (id: string) => request<RunDetail>(`/api/research/runs/${id}`),
   startRun: (brief: Brief, nodes: ResearchNode[] = [], model = '', targets: string[] = []) =>
     request<RunSummary>('/api/research/runs', {

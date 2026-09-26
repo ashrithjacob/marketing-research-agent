@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import {
   api,
   TERMINAL_STATUSES,
@@ -6,18 +6,18 @@ import {
   type ResearchNode,
   type RunDetail,
   type RunSummary,
-  type Source,
 } from './api';
 import { ChatText } from './FileBox';
 import { nowPanel, runStage } from './run-view/now';
 import { RailColumn, subjectProgress } from './run-view/rail';
+import { StageOneTiles } from './run-view/stage-one-tiles';
 import { useRunStream } from './run-view/use-run-stream';
-import { CompetitorsTile, VoiceTile } from './run-view/tiles-market';
-import { CategoryTile, ProductTile } from './run-view/tiles-data';
+import { VoiceTile } from './run-view/tiles-market';
 
 export default function RunView({
   runId,
   runs,
+  nav,
   judgementsRev,
   onSelectRun,
   onChanged,
@@ -25,19 +25,20 @@ export default function RunView({
 }: {
   runId: string;
   runs: RunSummary[];
+  nav: ReactNode;
   judgementsRev: number;
   onSelectRun: (id: string) => void;
   onChanged: () => void;
   onRunNode: (node: ResearchNode) => void;
 }) {
-  const [run, setRun] = useState<RunDetail | null>(null);
+  const [loaded, setLoaded] = useState<RunDetail | null>(null);
   const [judgements, setJudgements] = useState<Judgement[]>([]);
   const [error, setError] = useState('');
 
   const reload = useCallback(async () => {
     try {
       const [detail, { data }] = await Promise.all([api.run(runId), api.judgements()]);
-      setRun(detail);
+      setLoaded(detail);
       setJudgements(data);
     } catch (e) {
       setError((e as Error).message);
@@ -45,14 +46,14 @@ export default function RunView({
   }, [runId]);
 
   useEffect(() => {
-    setRun(null);
     void reload();
-  }, [runId, reload]);
+  }, [reload]);
 
   useEffect(() => {
     api.judgements().then(({ data }) => setJudgements(data)).catch(() => undefined);
   }, [judgementsRev]);
 
+  const run = loaded && loaded.id === runId ? loaded : null;
   const { lastTool, reconnecting } = useRunStream(runId, reload, onChanged, setError);
 
   const packet = run?.packet ?? null;
@@ -63,30 +64,6 @@ export default function RunView({
     () => admitted.filter((s) => !s.archived).length,
     [admitted],
   );
-
-  const byNode = useMemo(() => {
-    const empty = {
-      attributes: {} as Record<string, NonNullable<typeof packet>['attributes']>,
-      measurements: {} as Record<string, NonNullable<typeof packet>['measurements']>,
-      excerpts: {} as Record<string, NonNullable<typeof packet>['excerpts']>,
-      sources: {} as Record<string, Source[]>,
-      gaps: {} as Record<string, NonNullable<typeof packet>['gaps']>,
-    };
-    if (!packet) return empty;
-    const map = {
-      attributes: {} as Record<string, typeof packet.attributes>,
-      measurements: {} as Record<string, typeof packet.measurements>,
-      excerpts: {} as Record<string, typeof packet.excerpts>,
-      sources: {} as Record<string, Source[]>,
-      gaps: {} as Record<string, typeof packet.gaps>,
-    };
-    for (const a of packet.attributes) push(map.attributes, a.node, a);
-    for (const m of packet.measurements) push(map.measurements, m.node, m);
-    for (const e of packet.excerpts) push(map.excerpts, e.node, e);
-    for (const s of packet.sources) push(map.sources, s.node, s);
-    for (const g of packet.gaps) push(map.gaps, g.node, g);
-    return map;
-  }, [packet]);
 
   const voice = useMemo(
     () => (packet?.excerpts ?? []).filter((e) => e.node === 'review_mining'),
@@ -102,8 +79,6 @@ export default function RunView({
     runStage(run) === 1 &&
     !progress.stageTwoDone &&
     !progress.stageTwoLive;
-  const showCompetitors =
-    packet && (packet.competitor_reference || (packet.competitors ?? []).length > 0);
   const nodesInRun = new Set((run.nodes ?? packet?.nodes.map((n) => n.node) ?? []) as string[]);
 
   return (
@@ -111,7 +86,7 @@ export default function RunView({
       <RailColumn
         run={run}
         runs={runs}
-        runId={runId}
+        nav={nav}
         live={live}
         packet={packet}
         judgements={judgements}
@@ -173,34 +148,8 @@ export default function RunView({
 
         {packet && (
           <div className="tiles">
-            {nodesInRun.has('product_data') && (
-              <ProductTile
-                runId={runId}
-                packet={packet}
-                attributes={byNode.attributes.product_data ?? []}
-                measurements={byNode.measurements.product_data ?? []}
-                excerpts={byNode.excerpts.product_data ?? []}
-                sources={byNode.sources.product_data ?? []}
-                gaps={byNode.gaps.product_data ?? []}
-              />
-            )}
-            {showCompetitors && (
-              <CompetitorsTile
-                runId={runId}
-                packet={packet}
-                measurements={byNode.measurements.competitors ?? []}
-                excerpts={byNode.excerpts.competitors ?? []}
-                sources={byNode.sources.competitors ?? []}
-                gaps={byNode.gaps.competitors ?? []}
-              />
-            )}
-            {nodesInRun.has('category_data') && (
-              <CategoryTile
-                runId={runId}
-                measurements={byNode.measurements.category_data ?? []}
-                sources={byNode.sources.category_data ?? []}
-                gaps={byNode.gaps.category_data ?? []}
-              />
+            {runStage(run) === 1 && (
+              <StageOneTiles runId={runId} packet={packet} nodes={nodesInRun} />
             )}
             {(voice.length > 0 || nodesInRun.has('review_mining')) && (
               <VoiceTile voice={voice} />
@@ -219,12 +168,4 @@ export default function RunView({
       </div>
     </div>
   );
-}
-
-function push<T extends { node: string }>(
-  map: Record<string, T[]>,
-  node: string,
-  item: T,
-) {
-  (map[node] ??= []).push(item);
 }

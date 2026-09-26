@@ -73,6 +73,7 @@ export interface Usage {
 
 export interface RunSummary {
   id: string;
+  product_id: string;
   status: RunStatus;
   /** 1 collects the product, its competitors and its category; 2 is review mining. */
   stage: number;
@@ -85,6 +86,20 @@ export interface RunSummary {
   ended_at: string;
   usage: Usage;
   counts: RunCounts;
+}
+
+/** A stored product: every run whose brief reduces to the same `Briefs.key`. */
+export interface ProductSummary {
+  id: string;
+  key: string;
+  label: string;
+  review_count: number;
+  created_at: string;
+  run_count: number;
+  latest_at: string;
+  latest_status: RunStatus;
+  /** The newest completed run, else the newest run. */
+  default_run_id: string;
 }
 
 export interface RunDetail extends RunSummary {

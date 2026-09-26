@@ -1,25 +1,34 @@
 import type Database from "better-sqlite3";
 
-const MIGRATIONS: ReadonlyArray<readonly [string, string]> = [
-  ["output", "ALTER TABLE research_runs ADD COLUMN output TEXT NOT NULL DEFAULT ''"],
-  ["judgement_ids", "ALTER TABLE research_runs ADD COLUMN judgement_ids TEXT NOT NULL DEFAULT '[]'"],
-  ["usage", "ALTER TABLE research_runs ADD COLUMN usage TEXT NOT NULL DEFAULT '{}'"],
-  ["agent_run_id", "ALTER TABLE research_runs ADD COLUMN agent_run_id TEXT NOT NULL DEFAULT ''"],
-  ["nodes", "ALTER TABLE research_runs ADD COLUMN nodes TEXT NOT NULL DEFAULT '[]'"],
-  ["packet_source", "ALTER TABLE research_runs ADD COLUMN packet_source TEXT NOT NULL DEFAULT ''"],
+import { PacketRowTable } from "./packet-row-table.js";
+
+const MIGRATIONS: ReadonlyArray<readonly [string, string, string]> = [
+  ["research_runs", "output", "ALTER TABLE research_runs ADD COLUMN output TEXT NOT NULL DEFAULT ''"],
+  ["research_runs", "judgement_ids", "ALTER TABLE research_runs ADD COLUMN judgement_ids TEXT NOT NULL DEFAULT '[]'"],
+  ["research_runs", "usage", "ALTER TABLE research_runs ADD COLUMN usage TEXT NOT NULL DEFAULT '{}'"],
+  ["research_runs", "agent_run_id", "ALTER TABLE research_runs ADD COLUMN agent_run_id TEXT NOT NULL DEFAULT ''"],
+  ["research_runs", "nodes", "ALTER TABLE research_runs ADD COLUMN nodes TEXT NOT NULL DEFAULT '[]'"],
+  ["research_runs", "packet_source", "ALTER TABLE research_runs ADD COLUMN packet_source TEXT NOT NULL DEFAULT ''"],
+  ["research_runs", "product_id", "ALTER TABLE research_runs ADD COLUMN product_id TEXT NOT NULL DEFAULT ''"],
+  ["research_run_reviews", "product_id", "ALTER TABLE research_run_reviews ADD COLUMN product_id TEXT NOT NULL DEFAULT ''"],
 ];
 
 /** CREATE TABLE IF NOT EXISTS never alters an existing table, so columns migrate here. */
 export class SqliteSchema {
   static apply(db: Database.Database): void {
     db.exec(SqliteSchema.DDL);
-    const have = new Set(
-      (db.pragma("table_info(research_runs)") as Array<{ name: string }>).map((row) => row.name),
-    );
-    for (const [column, ddl] of MIGRATIONS) {
-      if (!have.has(column)) db.exec(ddl);
+    for (const [table, column, ddl] of MIGRATIONS) {
+      const have = (db.pragma(`table_info(${table})`) as Array<{ name: string }>).map((row) => row.name);
+      if (!have.includes(column)) db.exec(ddl);
     }
+    db.exec(SqliteSchema.INDEXES);
+    db.exec(PacketRowTable.DDL);
   }
+
+  static readonly INDEXES = `
+CREATE INDEX IF NOT EXISTS research_runs_product ON research_runs(product_id);
+CREATE INDEX IF NOT EXISTS research_run_reviews_product ON research_run_reviews(product_id);
+`;
 
   static readonly DDL = `
 CREATE TABLE IF NOT EXISTS research_runs (
@@ -114,6 +123,13 @@ CREATE TABLE IF NOT EXISTS research_run_reviews (
     source_id      TEXT NOT NULL DEFAULT '',
     band_requested INTEGER,
     PRIMARY KEY (run_id, review_id)
+);
+CREATE TABLE IF NOT EXISTS research_products (
+    id         TEXT PRIMARY KEY,
+    key        TEXT NOT NULL UNIQUE,
+    label      TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
 );
 `;
 }

@@ -11,7 +11,7 @@ import {
 export class ReviewTable {
   constructor(private readonly db: Database.Database) {}
 
-  save(runId: string, ledger: ReviewLedgerSnapshot): number {
+  save(runId: string, productId: string, ledger: ReviewLedgerSnapshot): number {
     const pulls = new Map<string, LedgerPull>(ledger.pulls.map((pull) => [pull.handle, pull]));
     const now = Clock.nowIso();
     const upsert = this.db.prepare(
@@ -21,8 +21,8 @@ export class ReviewTable {
         " RETURNING id",
     );
     const link = this.db.prepare(
-      "INSERT OR REPLACE INTO research_run_reviews (run_id, review_id, ref, target_id, source_id," +
-        " band_requested) VALUES (?,?,?,?,?,?)",
+      "INSERT OR REPLACE INTO research_run_reviews (run_id, product_id, review_id, ref, target_id," +
+        " source_id, band_requested) VALUES (?,?,?,?,?,?,?)",
     );
     const write = this.db.transaction(() => {
       for (const review of ledger.reviews) {
@@ -42,6 +42,7 @@ export class ReviewTable {
         ) as { id: number };
         link.run(
           runId,
+          productId,
           id,
           review.ref,
           pull?.target_id ?? "",

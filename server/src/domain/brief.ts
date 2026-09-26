@@ -28,19 +28,29 @@ export class Briefs {
     return { ...brief, product: "", url };
   }
 
-  static key(brief: { product?: unknown; url?: unknown }): string {
-    const url = typeof brief.url === "string" ? brief.url.trim() : "";
-    if (url) {
-      return `site:${Briefs.hostname(url)}`;
+  static label(brief: { product?: unknown; url?: unknown }): string {
+    for (const value of [brief.product, brief.url]) {
+      if (typeof value === "string" && value.trim()) return value.trim();
     }
-    const product = typeof brief.product === "string" ? brief.product : "";
+    return "untitled run";
+  }
+
+  static key(brief: { product?: unknown; url?: unknown }): string {
+    const product = typeof brief.product === "string" ? brief.product.trim() : "";
+    const given = typeof brief.url === "string" ? brief.url.trim() : "";
+    const url = given || (Briefs.looksLikeUrl(product) ? product : "");
+    if (url) {
+      return `page:${Briefs.page(url)}`;
+    }
     return `product:${product.toLowerCase().replace(/[^a-z0-9]/g, "")}`;
   }
 
-  private static hostname(url: string): string {
+  private static page(url: string): string {
     try {
       const withScheme = /^[a-z][a-z0-9+.-]*:\/\//i.test(url) ? url : `https://${url}`;
-      return new URL(withScheme).hostname.replace(/^www\./, "").toLowerCase();
+      const parsed = new URL(withScheme);
+      const host = parsed.hostname.toLowerCase().replace(/^www\./, "");
+      return `${host}${parsed.pathname.toLowerCase().replace(/\/+$/, "")}`;
     } catch {
       return url.toLowerCase();
     }

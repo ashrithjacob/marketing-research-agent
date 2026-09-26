@@ -8,9 +8,21 @@ import type {
   RunUpdate,
 } from "./logs.js";
 import type { ResearchRun } from "./records.js";
+import type { Product, RunHead } from "./products.js";
+import type { StoredPacketRows } from "./packet-rows.js";
 import type { ReviewLedgerSnapshot, StoredRunReview } from "./reviews.js";
 
+/** Products and what their runs found, read across every run. */
+export interface ProductCatalog {
+  list(): Product[];
+  get(productId: string): Product | null;
+  byKey(key: string): Product | null;
+  runHeads(): RunHead[];
+  packetRows(productId: string): StoredPacketRows;
+}
+
 export interface ResearchStore {
+  readonly products: ProductCatalog;
   createRun(input: {
     brief: Record<string, unknown>;
     model: string;

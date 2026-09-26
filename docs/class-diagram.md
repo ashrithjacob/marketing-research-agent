@@ -10,6 +10,7 @@ classDiagram
     class Briefs {
       looksLikeUrl()
       normalise()
+      label()
       key()
     }
     class RunEvent {
@@ -36,6 +37,20 @@ classDiagram
       expand()
       isPartial()
     }
+    class PacketRowSet {
+      <<interface>>
+    }
+    class PacketRows {
+      of()
+    }
+    class ProductCatalog {
+      <<interface>>
+      list()
+      get()
+      byKey()
+      runHeads()
+      packetRows()
+    }
     class ResearchStore {
       <<interface>>
       createRun()
@@ -53,6 +68,19 @@ classDiagram
     class FetchGate {
       <<interface>>
       admit()
+    }
+    class RunHead {
+      <<interface>>
+    }
+    class Product {
+      <<interface>>
+    }
+    class ProductSummary {
+      <<interface>>
+    }
+    class ProductFolders {
+      summaries()
+      runIds()
     }
     class Clock {
       nowIso()
@@ -276,18 +304,40 @@ classDiagram
       delete()
       bump()
     }
+    class PacketRowTable {
+      replace()
+      list()
+    }
+    class ProductBackfill {
+      apply()
+    }
+    class SqliteProductCatalog {
+      list()
+      get()
+      byKey()
+      runHeads()
+      packetRows()
+    }
+    class ProductTable {
+      ensure()
+      get()
+      byKey()
+      list()
+    }
     class ReviewTable {
       save()
       list()
     }
     class Rows {
       json()
+      head()
       run()
     }
     class RunTable {
       create()
       get()
       list()
+      heads()
       update()
     }
     class SqliteSchema {
@@ -483,6 +533,9 @@ classDiagram
       hash()
       verify()
     }
+    class ProductRoutes {
+      register()
+    }
     class ResearchApi {
       router()
     }
@@ -505,6 +558,11 @@ classDiagram
   Firecrawl --> Settings
   RunBilling --> OpenRouterPrices
   Searxng --> Settings
+  ProductBackfill --> ProductTable
+  ProductBackfill --> PacketRowTable
+  SqliteProductCatalog --> ProductTable
+  SqliteProductCatalog --> RunTable
+  SqliteProductCatalog --> PacketRowTable
   BilledCosts --> ResearchStore
   BilledCosts --> LiveRuns
   AgentEventRecorder --> LiveRuns
@@ -551,6 +609,7 @@ classDiagram
   EventStream --> ResearchStore
   EventStream --> RunSupervisor
   JudgementRoutes --> ResearchStore
+  ProductRoutes --> ResearchStore
   RunRoutes --> ResearchStore
   RunRoutes --> RunSupervisor
   RunRoutes --> StageTwoHandoff
@@ -582,6 +641,10 @@ classDiagram
 | `adapters` | `adapters/sqlite/check-log.ts` | PacketCheckLog |
 | `adapters` | `adapters/sqlite/event-log.ts` | EventLog |
 | `adapters` | `adapters/sqlite/judgement-table.ts` | JudgementTable |
+| `adapters` | `adapters/sqlite/packet-row-table.ts` | PacketRowTable |
+| `adapters` | `adapters/sqlite/product-backfill.ts` | ProductBackfill |
+| `adapters` | `adapters/sqlite/product-catalog.ts` | SqliteProductCatalog |
+| `adapters` | `adapters/sqlite/product-table.ts` | ProductTable |
 | `adapters` | `adapters/sqlite/review-table.ts` | ReviewTable |
 | `adapters` | `adapters/sqlite/rows.ts` | Rows |
 | `adapters` | `adapters/sqlite/run-table.ts` | RunTable |
@@ -619,7 +682,9 @@ classDiagram
 | `domain` | `domain/brief.ts` | Briefs |
 | `domain` | `domain/logs.ts` | RunEvent, Judgement, PacketCheck, RunUpdate, LlmCallRecord, LlmCall |
 | `domain` | `domain/nodes.ts` | Stages |
-| `domain` | `domain/ports.ts` | ResearchStore, GateVerdict, FetchGate |
+| `domain` | `domain/packet-rows.ts` | PacketRowSet, PacketRows |
+| `domain` | `domain/ports.ts` | ProductCatalog, ResearchStore, GateVerdict, FetchGate |
+| `domain` | `domain/products.ts` | RunHead, Product, ProductSummary, ProductFolders |
 | `domain` | `domain/records.ts` | Clock, Ids, ResearchRun, RunSummary, Runs |
 | `domain` | `domain/reject-kinds.ts` | RejectKinds |
 | `domain` | `domain/reviews.ts` | LedgerPull, LedgerReview, ReviewLedgerSnapshot, StoredRunReview |
@@ -646,6 +711,7 @@ classDiagram
 | `http` | `http/frontend.ts` | Frontend |
 | `http` | `http/judgement-routes.ts` | JudgementRoutes |
 | `http` | `http/passwords.ts` | Passwords |
+| `http` | `http/product-routes.ts` | ProductRoutes |
 | `http` | `http/research-api.ts` | ResearchApi |
 | `http` | `http/run-routes.ts` | RunRoutes |
 | `http` | `http/stage-two-routes.ts` | StageTwoRoutes |

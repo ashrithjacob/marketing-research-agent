@@ -16,6 +16,7 @@ export class Ids {
 
 export interface ResearchRun {
   id: string;
+  product_id: string;
   agent_run_id: string;
   session_id: string;
   stage: number;
@@ -37,6 +38,7 @@ export interface ResearchRun {
 
 export interface RunSummary {
   id: string;
+  product_id: string;
   status: string;
   stage: number;
   model: string;
@@ -65,6 +67,7 @@ export class Runs {
     const sources: any[] = packet.sources ?? [];
     return {
       id: run.id,
+      product_id: run.product_id,
       status: run.status,
       stage: run.stage,
       model: run.model,

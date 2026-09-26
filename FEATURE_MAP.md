@@ -29,11 +29,25 @@ Two routes exist, both served by the same SPA (`app.ts` `mountFrontend` sends
 
 ---
 
-## `/` — the cockpit shell (`App.tsx`)
+## URLs
 
-Three columns under one header bar.
+Real URLs over one React app (`route.tsx`, the History API; no router library).
+The server returns `index.html` for any path that is not a file or `api/`, so
+every URL survives a reload, a bookmark and the back button.
 
-**Header.** `research cockpit`, then the active run's brief as a chip and a
+| URL | Page |
+|---|---|
+| `/` | Products: one card per product (`ProductsPage.tsx`) |
+| `/products/:productId` | That product's dashboard, on its default run |
+| `/products/:productId/runs/:runId` | That product's dashboard, on that run |
+| `/runs/:runId/logs` | The activity log (below) |
+
+Anything else renders *No page here*; an unknown product id renders the same,
+under a `no such product` banner.
+
+## The cockpit shell (`App.tsx`)
+
+**Header.** `research cockpit` (a link to `/`), then the active run's brief as a chip and a
 clock chip, then the buttons: **Step in** (ghost), **Stop** (ghost, only while a
 run is live), **Start run** (primary), **Sign out** (ghost).
 
@@ -42,7 +56,8 @@ run is live), **Start run** (primary), **Sign out** (ghost).
 | Start run | opens the modal; no request yet | — |
 | Stop | `POST /api/research/runs/:id/stop` | button does nothing, run stays `running` |
 | Sign out | `POST /api/auth/logout` | stays logged in, or bounces to login and back |
-| (on load) | `GET /api/research/runs`, `GET /api/research/config` | empty run list, or the whole shell stuck on `Loading…` |
+| (on `/`) | `GET /api/research/products`, `GET /api/research/config` | `Loading products…` that never ends |
+| (on a product) | `GET /api/research/products/:id` and `…/:id/runs` | `Loading product…` that never ends |
 
 `Loading…` in a bare `.boot` div means `GET /api/auth/session` has not
 answered — the server is down or the cookie is being rejected, not a UI bug.
@@ -80,9 +95,40 @@ a sparkline (`Curve`), and a **▶** button.
 stage 1 found — run stage 1 for this brief first"*; that is the intended state,
 not a broken button.
 
+A stage header (**Stage 1 · Raw material**, **Stage 2 · Review mining**) opens
+that stage's run for the same subject, via `onSelectRun`. The header of the
+stage the shown run collects is not clickable. Stage 1 opens the run a stage-2
+run mined from (`stageOneRunFor` in `run-view/rail.tsx`: the newest completed
+stage-1 run for the subject that started before it). Stage 2 opens the live
+stage-2 run, else the newest completed one, else the newest. The ▶ buttons
+start runs; the headers only navigate.
+
 A node greyed with the tooltip `not in this run` was simply not in the run's
 `nodes`. `—` where a sparkline should be means no curve data, which is normal
 for a node that has not run.
+
+### Products — `/` (`ProductsPage.tsx`) and the run list (`ProductRuns.tsx`)
+
+Every run belongs to a stored product (`research_products`). A new run's brief
+is reduced by `Briefs.key` and filed under the product with that key, created if
+new: a typed name ignores case and punctuation (`vitamin D` = `vitamin_d` =
+`VITAMIND`); a URL matches per page, and a URL typed into the product field counts
+as that URL. Market is not part of the key, so Vitamin D US and UK share a product.
+
+- **`/`** lists products, newest activity first: label, newest run's status, run
+  count, review count (distinct reviews over all its runs). No dashboard here.
+- **A product** opens on its `default_run_id`: the newest **completed** run of
+  either stage, even when a newer run is running or failed; the newest run when none
+  completed. The left column ends with `← All products` and every run of the
+  product — completed, failed, cancelled, invalid, running — newest first. Each run
+  row, and each stage header in the rail, is a link to that run's URL.
+
+The rail's stage status and headers are computed from the product's runs, all of
+them. `GET /api/research/runs` (newest 50, at most 200) still exists, but the
+cockpit no longer lists from it.
+
+`GET /api/research/products/:id/rows` returns every fact the product's runs found,
+from the packet-row tables, each row tagged with its `run_id`.
 
 ### The run view — middle and right (`RunView.tsx`)
 
@@ -107,8 +153,11 @@ generic gaps table:
 | Category data | market-size/CAGR bar charts, every figure with its period, gaps | `measurements` with `node: 'category_data'` |
 | Voice of customer | verbatim `review_mining` excerpts | `packet.excerpts` |
 
+A run's view shows only its own packet. A stage-2 run shows Voice of customer
+alone; its stage-1 tiles are one click away on the rail's stage-1 header.
+
 Charts are hand-rolled SVG (`run-view/charts.tsx` `BarList`) — no chart
-library. Packet rows are grouped per node in `RunView.tsx` (`byNode`); a
+library. Stage-1 packet rows are grouped per node in `run-view/stage-one-tiles.tsx` (`byNode`); a
 Source also carries a `node`, so source counts are per tile.
 
 | Panel | Field | Source |
@@ -116,7 +165,8 @@ Source also carries a `node`, so source counts are per tile.
 | runmeta | tokens | `usage.totalTokens` |
 | runmeta | calculated cost | `usage.cost.total`, priced by `usage.pricing` |
 | runmeta | billed cost | `usage.billed.total` — what OpenRouter actually charged |
-| runlist | one row per run | `GET /api/research/runs` |
+| products page | one card per product | `GET /api/research/products` |
+| run list | one row per run of the product | `GET /api/research/products/:id/runs` |
 
 > **`Tokens —` is a wiring bug, not an empty run.** The server sends
 > `usage.totalTokens`; a client that reads `usage.total_tokens` gets
@@ -200,7 +250,14 @@ In order, because this order has been wrong before:
 2. **Which request failed?** The network tab, or `mra logs`. A blank page after
    a route renders is nearly always a component throwing on a field the server
    did not send — see the parity rule above.
-3. **Is the thing you are looking at even deployed?** `mra deployed`. A healthy
+3. **Is the page fetching in a loop?** Count requests on an idle page (network
+   tab). A callback App hands to `RunView` as `onChanged` is a dependency of the
+   run's event-stream effect; if it is recreated on every render, the stream reopens
+   and replays every render. That happened once: 143 run fetches and 56 streams in
+   8 s, and the view showed the *previous* run because a late response for it
+   landed last. `reload` in `App.tsx` is a `useCallback` for this reason, and
+   `RunView` only shows a response whose id matches the run on screen.
+4. **Is the thing you are looking at even deployed?** `mra deployed`. A healthy
    live site says the container is up, not that your change is on it. Only
    `deploy/vps/deploy.sh` puts it there, and the frontend ships as
    `frontend/dist` — a source change without a rebuilt `dist` deploys the old

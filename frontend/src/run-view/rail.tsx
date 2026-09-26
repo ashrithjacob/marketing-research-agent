@@ -1,40 +1,44 @@
-import { api, briefLabel, TERMINAL_STATUSES, type Brief, type Judgement, type ResearchNode, type RunDetail, type RunSummary, type StagePacket } from '../api';
-import StageRail, { NODE_ORDER, scopeLabel } from '../StageRail';
+import type { ReactNode } from 'react';
+import { api, TERMINAL_STATUSES, type Judgement, type ResearchNode, type RunDetail, type RunSummary, type StagePacket } from '../api';
+import StageRail, { scopeLabel, type StageProgress } from '../StageRail';
 import { billedText, pricingNote, runStage } from './now';
 
-/** Two briefs name the same subject. Mirrors `Briefs.key` in `server/src/domain/brief.ts`. */
-function sameSubject(a: Brief | undefined, b: Brief | undefined): boolean {
-  const key = (brief: Brief | undefined): string => {
-    const url = brief?.url?.trim();
-    if (url) return `site:${url.replace(/^https?:\/\//i, '').replace(/^www\./, '').split('/')[0].toLowerCase()}`;
-    return `product:${(brief?.product ?? '').toLowerCase().replace(/[^a-z0-9]/g, '')}`;
-  };
-  return key(a) === key(b);
-}
-
-export interface SubjectProgress {
-  /** A stage-1 run for this subject completed, so stage 2 can start. */
-  stageOneDone: boolean;
-  /** A stage-2 run for this subject completed. */
-  stageTwoDone: boolean;
-  /** A stage-2 run for this subject is queued or running right now. */
-  stageTwoLive: boolean;
-}
-
-/** Where the subject of `run` stands across every run of it, not just this one. */
-export function subjectProgress(runs: RunSummary[], run: RunSummary): SubjectProgress {
-  const mine = runs.filter((r) => sameSubject(r.brief, run.brief));
+/** Where `run`'s product stands across `runs`, every run of that product. */
+export function subjectProgress(runs: RunSummary[], run: RunSummary): StageProgress {
+  const stageTwo = runs
+    .filter((r) => runStage(r) === 2)
+    .sort((a, b) => b.created_at.localeCompare(a.created_at));
+  const stageTwoRun =
+    stageTwo.find((r) => !TERMINAL_STATUSES.has(r.status)) ??
+    stageTwo.find((r) => r.status === 'completed') ??
+    stageTwo[0];
   return {
-    stageOneDone: mine.some((r) => r.status === 'completed' && runStage(r) === 1),
-    stageTwoDone: mine.some((r) => r.status === 'completed' && runStage(r) === 2),
-    stageTwoLive: mine.some((r) => runStage(r) === 2 && !TERMINAL_STATUSES.has(r.status)),
+    stageOneDone: runs.some((r) => r.status === 'completed' && runStage(r) === 1),
+    stageTwoDone: runs.some((r) => r.status === 'completed' && runStage(r) === 2),
+    stageTwoLive: runs.some((r) => runStage(r) === 2 && !TERMINAL_STATUSES.has(r.status)),
+    runIds: {
+      1: runStage(run) === 1 ? run.id : stageOneRunFor(runs, run)?.id,
+      2: runStage(run) === 2 ? run.id : stageTwoRun?.id,
+    },
   };
+}
+
+/** The stage-1 run a stage-2 run mined from, which its rail's stage-1 header opens: the newest completed one of its product's `runs` that predates it. Mirrors `StageTwoHandoff` in `server/src/agent/stage-two-handoff.ts`. */
+export function stageOneRunFor(runs: RunSummary[], run: RunSummary): RunSummary | undefined {
+  return runs
+    .filter(
+      (r) =>
+        runStage(r) === 1 &&
+        r.status === 'completed' &&
+        r.created_at <= run.created_at,
+    )
+    .sort((a, b) => b.created_at.localeCompare(a.created_at))[0];
 }
 
 export function RailColumn({
   run,
   runs,
-  runId,
+  nav,
   live,
   packet,
   judgements,
@@ -43,7 +47,7 @@ export function RailColumn({
 }: {
   run: RunDetail;
   runs: RunSummary[];
-  runId: string;
+  nav: ReactNode;
   live: boolean;
   packet: StagePacket | null;
   judgements: Judgement[];
@@ -59,6 +63,7 @@ export function RailColumn({
       scope={run.nodes ?? []}
       onRunNode={onRunNode}
       progress={subjectProgress(runs, run)}
+      onSelectRun={onSelectRun}
     />
 
     <h3 style={{ marginTop: 18 }}>
@@ -124,31 +129,7 @@ export function RailColumn({
       </div>
     ))}
 
-    <h3 style={{ marginTop: 18 }}>Runs</h3>
-    <div className="runlist">
-      {runs.map((r) => (
-        <div
-          key={r.id}
-          className={`runrow ${r.id === runId ? 'active' : ''}`}
-          onClick={() => onSelectRun(r.id)}
-        >
-          <div className="runrow-top">
-            <span className="runrow-title">{briefLabel(r.brief)}</span>
-            <span className={`status ${r.status}`}>{r.status}</span>
-          </div>
-          <div className="runrow-sub">
-            {r.nodes && r.nodes.length < NODE_ORDER.length && (
-              <span className="runrow-scope">{scopeLabel(r.nodes)} · </span>
-            )}
-            {r.counts.competitors &&
-              r.counts.competitors.direct + r.counts.competitors.indirect > 0 &&
-              `${r.counts.competitors.direct} direct · ${r.counts.competitors.indirect} indirect · `}
-            {r.counts.sources} sources · {r.counts.excerpts} excerpts ·{' '}
-            {r.counts.gaps} gaps
-          </div>
-        </div>
-      ))}
-    </div>
+    {nav}
   </div>
   );
 }

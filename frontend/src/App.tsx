@@ -9,24 +9,24 @@ import {
 } from './api';
 import Login from './Login';
 import LogsPage from './LogsPage';
+import ProductRuns from './ProductRuns';
+import ProductsPage from './ProductsPage';
+import { Link, navigate, paths, useRoute } from './route';
 import RunView from './RunView';
 import StartRun from './StartRun';
 import StageTwoPlan from './StageTwoPlan';
 import StepIn from './StepIn';
-
-/** `/runs/<id>/logs` — the LLM call log, opened in its own tab from a run. */
-const LOGS_PATH = /^\/runs\/([0-9a-f]+)\/logs\/?$/;
+import { useProduct, useProducts } from './use-products';
 
 export default function App() {
   const [authed, setAuthed] = useState<boolean | null>(null);
-  const [runs, setRuns] = useState<RunSummary[]>([]);
-  const [activeId, setActiveId] = useState<string | null>(null);
   const [config, setConfig] = useState<Config | null>(null);
   /** The Start run modal: null when closed, the nodes to run when open ([] = whole stage). */
   const [startNodes, setStartNodes] = useState<ResearchNode[] | null>(null);
   const [stepInOpen, setStepInOpen] = useState(false);
   const [error, setError] = useState('');
   const [judgementsRev, setJudgementsRev] = useState(0);
+  const route = useRoute();
 
   useEffect(() => {
     api
@@ -35,23 +35,27 @@ export default function App() {
       .catch(() => setAuthed(false));
   }, []);
 
-  const loadRuns = useCallback(async () => {
-    try {
-      const { data } = await api.runs();
-      setRuns(data);
-      setActiveId((current) => current ?? data[0]?.id ?? null);
-    } catch (e) {
-      setError((e as Error).message);
-    }
-  }, []);
-
-  const logsFor = window.location.pathname.match(LOGS_PATH)?.[1] ?? null;
+  const signedIn = !!authed && route.page !== 'logs';
+  const productId = signedIn && route.page === 'product' ? route.productId : null;
+  const { products, reload: reloadProducts } = useProducts(signedIn && route.page === 'products', setError);
+  const { product, runs, missing, reload: reloadProduct } = useProduct(productId, setError);
+  const activeId = route.page === 'product' ? (route.runId ?? product?.default_run_id ?? null) : null;
 
   useEffect(() => {
-    if (!authed || logsFor) return;
-    void loadRuns();
+    if (!signedIn) return;
     api.config().then(setConfig).catch(() => undefined);
-  }, [authed, loadRuns, logsFor]);
+  }, [signedIn]);
+
+  const reload = useCallback(() => {
+    reloadProducts();
+    reloadProduct();
+  }, [reloadProducts, reloadProduct]);
+
+  function showStarted(run: RunSummary) {
+    setStartNodes(null);
+    navigate(paths.run(run.product_id, run.id));
+    reload();
+  }
 
   const activeRun = runs.find((r) => r.id === activeId) ?? null;
   const live = !!activeRun && !TERMINAL_STATUSES.has(activeRun.status);
@@ -61,7 +65,7 @@ export default function App() {
     if (!activeRun) return;
     try {
       await api.stopRun(activeRun.id);
-      await loadRuns();
+      reload();
     } catch (e) {
       setError((e as Error).message);
     }
@@ -84,12 +88,14 @@ export default function App() {
 
   if (authed === null) return <div className="boot">Loading…</div>;
   if (!authed) return <Login onSuccess={() => setAuthed(true)} />;
-  if (logsFor) return <LogsPage runId={logsFor} />;
+  if (route.page === 'logs') return <LogsPage runId={route.runId} />;
 
   return (
     <div className="app">
       <header>
-        <span className="brand">research cockpit</span>
+        <Link to={paths.products()} className="brand">
+          research cockpit
+        </Link>
         <div className="subject">
           {activeRun && (
             <>
@@ -137,44 +143,32 @@ export default function App() {
         </div>
       )}
 
-      {activeId ? (
+      {route.page === 'products' && <ProductsPage products={products} />}
+      {(route.page === 'missing' || missing) && (
+        <div className="empty">
+          No page here. <Link to={paths.products()}>All products</Link>
+        </div>
+      )}
+      {route.page === 'product' && !missing && (!product || !activeId) && (
+        <div className="empty">Loading product…</div>
+      )}
+      {route.page === 'product' && product && activeId && (
         <RunView
           runId={activeId}
           runs={runs}
+          nav={<ProductRuns product={product} runs={runs} activeId={activeId} />}
           judgementsRev={judgementsRev}
-          onSelectRun={setActiveId}
-          onChanged={loadRuns}
+          onSelectRun={(id) => navigate(paths.run(product.id, id))}
+          onChanged={reload}
           onRunNode={(node) => setStartNodes([node])}
         />
-      ) : (
-        <div className="empty intro">
-          <h2>Stage 1 — raw material</h2>
-          <p>
-            Four nodes: product data, competitors, review mining, category
-            data. Their job is to put material in a box — not to read it,
-            weigh it, or notice patterns in it.
-          </p>
-          <p>
-            The output schema has no field a conclusion could be written into.
-            An agent that wants to conclude something here has nowhere to put
-            it, which is a stronger guarantee than a prompt asking it not to.
-          </p>
-          <p className="muted">
-            Press <b>Start run</b>. A product name and a market is the whole
-            brief — finding the URLs is the agent's job.
-          </p>
-        </div>
       )}
 
       {startNodes && startNodes.includes('review_mining') && (
         <StageTwoPlan
           brief={activeRun?.brief ?? { product: '', url: '', market: '', notes: '' }}
-          onStarted={async (run) => {
-            setStartNodes(null);
-            await loadRuns();
-            setActiveId(run.id);
-          }}
-          onFailed={loadRuns}
+          onStarted={async (run) => showStarted(run)}
+          onFailed={async () => reload()}
           onClose={() => setStartNodes(null)}
         />
       )}
@@ -184,12 +178,8 @@ export default function App() {
           nodes={startNodes}
           initial={startNodes.length > 0 ? activeRun?.brief : undefined}
           onClose={() => setStartNodes(null)}
-          onStarted={async (run) => {
-            setStartNodes(null);
-            await loadRuns();
-            setActiveId(run.id);
-          }}
-          onFailed={loadRuns}
+          onStarted={async (run) => showStarted(run)}
+          onFailed={async () => reload()}
         />
       )}
       {stepInOpen && activeRun && (

@@ -1,6 +1,6 @@
 import type Database from "better-sqlite3";
 
-import { Clock, Ids, type ResearchRun, type RunUpdate } from "../../domain/index.js";
+import { Clock, Ids, type ResearchRun, type RunHead, type RunUpdate } from "../../domain/index.js";
 
 import { Rows } from "./rows.js";
 
@@ -33,16 +33,18 @@ export class RunTable {
     judgementIds: string[];
     nodes?: string[];
     stage?: number;
+    productId: string;
   }): ResearchRun {
     const now = Clock.nowIso();
     const runId = Ids.next();
     this.db
       .prepare(
-        "INSERT INTO research_runs (id, status, stage, model, brief, reject_kinds," +
-          " judgement_ids, nodes, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?)",
+        "INSERT INTO research_runs (id, product_id, status, stage, model, brief, reject_kinds," +
+          " judgement_ids, nodes, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
       )
       .run(
         runId,
+        input.productId,
         "queued",
         input.stage ?? 1,
         input.model,
@@ -68,6 +70,13 @@ export class RunTable {
       .prepare("SELECT * FROM research_runs ORDER BY created_at DESC LIMIT ?")
       .all(limit) as Array<Record<string, any>>;
     return rows.map(Rows.run);
+  }
+
+  heads(): RunHead[] {
+    const rows = this.db
+      .prepare("SELECT id, product_id, stage, status, created_at FROM research_runs ORDER BY created_at DESC")
+      .all() as Array<Record<string, any>>;
+    return rows.map(Rows.head);
   }
 
   update(runId: string, fields: RunUpdate): void {

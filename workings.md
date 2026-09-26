@@ -60,10 +60,19 @@ stage's nodes — that is a separate run. Downstream the compartment is six stag
 5 customer truth · 6 synthesis.
 
 **Stage 2 is gated.** `POST /runs` with `nodes: ["review_mining"]` returns **409**
-unless a stage-1 run for the same brief has completed. Subjects are matched with
-`briefKey()` — the site's host, else the product name reduced to letters and digits —
-so a retyped product name still counts. The rail greys the stage-2 ▶ for the same
-reason, before the click.
+unless a stage-1 run for the same product has completed. Products are matched with
+`Briefs.key` (`server/src/domain/brief.ts`): for a URL, the page — host without
+`www.` plus path, lowercased, with scheme, port, trailing slash, `?query` and
+`#fragment` ignored; else the product name reduced to lowercase letters and digits,
+so `vitamin D`, `vitamin_d` and `VITAMIND` are one product. Each run is filed under
+a stored product (`research_products`) when it is created; the hand-off looks the
+product up by key and searches every run of it, not a recent page of runs. The rail greys the stage-2 ▶
+for the same reason, before the click.
+
+*Superseded 2026-09-26:* a URL used to match on the site's host alone, so every
+product on one site shared a subject and a stage-2 run could mine another page's
+stage-1 packet. It now matches per page, because the same key names the product
+folders in the cockpit and one site can sell many products.
 
 `App.tsx` opens `StartRun.tsx`. It asks for two things, **product** and **markets**,
 and deliberately has no URL field: finding the product's site, reviews, competitors

@@ -202,6 +202,9 @@ h3 .n { color: var(--faint); text-transform: none; letter-spacing: 0.02em; font-
 .stage.active .dot { background: var(--accent); box-shadow: 0 0 0 4px rgba(0, 82, 255, 0.15); }
 .stage.blocked .dot { background: var(--warn); box-shadow: 0 0 0 4px rgba(217, 119, 6, 0.15); }
 .stage.unbuilt { opacity: 0.42; }
+.stage.linked { cursor: pointer; }
+.stage.linked:hover { background: var(--accent-soft); }
+.stage.linked:hover .stage-t { text-decoration: underline; }
 /* Stage 2 once stage 1 is in: the obvious next step, not a dimmed placeholder. */
 .stage.ready { background: var(--accent-soft); outline: 1px dashed var(--accent); outline-offset: -1px; }
 .stage.ready .dot { background: #fff; border: 2px solid var(--accent); width: 7px; height: 7px; }
@@ -422,6 +425,25 @@ label.market:has(input:checked) { color: var(--ink); }
 .node.out { opacity: 0.45; }
 .node.out .node-dot { background: transparent; border: 1px dashed #cbd5e1; }
 .runrow-scope { color: var(--accent); }
+.folder-back { display: inline-block; margin-top: 18px; padding: 4px 8px; font-size: 12px; text-decoration: none; }
+a.brand { text-decoration: none; color: inherit; }
+a.runrow { display: block; color: inherit; text-decoration: none; }
+
+.products-page { padding: 28px 32px; overflow-y: auto; }
+.products-page h2 { margin: 0 0 18px; font-family: var(--font-display); font-weight: 400; font-size: 26px; }
+.product-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; }
+.product-card {
+  display: flex; flex-direction: column; gap: 10px; padding: 16px 18px;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
+  color: inherit; text-decoration: none; transition: all 0.15s ease-out;
+}
+.product-card:hover { border-color: rgba(0, 82, 255, 0.35); background: var(--accent-soft); }
+.product-card-top { display: flex; align-items: flex-start; gap: 10px; }
+.product-card-title { flex: 1; font-weight: 600; font-size: 15px; overflow-wrap: anywhere; }
+.product-card-stats { display: flex; gap: 16px; color: var(--dim); font-size: 13px; }
+.product-card-stats b { color: var(--ink); }
+.product-card-when { color: var(--faint); font-size: 12px; }
+@media (max-width: 640px) { .products-page { padding: 18px 16px; } }
 .logs-link { float: right; text-transform: none; letter-spacing: 0; font-weight: 400; color: var(--accent); text-decoration: none; font-family: var(--font-ui); }
 .logs-link:hover { text-decoration: underline; }
 

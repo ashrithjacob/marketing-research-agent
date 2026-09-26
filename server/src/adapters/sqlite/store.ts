@@ -3,24 +3,30 @@ import { dirname } from "node:path";
 
 import Database from "better-sqlite3";
 
-import type {
-  Judgement,
-  LlmCall,
-  LlmCallRecord,
-  PacketCheck,
-  ResearchRun,
-  ResearchStore,
-  ReviewLedgerSnapshot,
-  RunEvent,
-  RunUpdate,
-  SourceKind,
-  StoredRunReview,
+import {
+  Briefs,
+  type Judgement,
+  type LlmCall,
+  type LlmCallRecord,
+  type PacketCheck,
+  type ResearchRun,
+  type ResearchStore,
+  type ReviewLedgerSnapshot,
+  type ProductCatalog,
+  type RunEvent,
+  type RunUpdate,
+  type SourceKind,
+  type StoredRunReview,
 } from "../../domain/index.js";
 
 import { CallLog } from "./call-log.js";
 import { EventLog } from "./event-log.js";
 import { JudgementTable } from "./judgement-table.js";
 import { PacketCheckLog } from "./check-log.js";
+import { PacketRowTable } from "./packet-row-table.js";
+import { ProductBackfill } from "./product-backfill.js";
+import { SqliteProductCatalog } from "./product-catalog.js";
+import { ProductTable } from "./product-table.js";
 import { ReviewTable } from "./review-table.js";
 import { RunTable } from "./run-table.js";
 import { SqliteSchema } from "./schema.js";
@@ -33,6 +39,9 @@ export class SqliteResearchStore implements ResearchStore {
   private readonly checks: PacketCheckLog;
   private readonly calls: CallLog;
   private readonly reviews: ReviewTable;
+  private readonly productTable: ProductTable;
+  private readonly packetRows: PacketRowTable;
+  readonly products: ProductCatalog;
 
   constructor(path: string) {
     if (path !== ":memory:") mkdirSync(dirname(path), { recursive: true });
@@ -47,17 +56,15 @@ export class SqliteResearchStore implements ResearchStore {
     this.checks = new PacketCheckLog(this.db);
     this.calls = new CallLog(this.db);
     this.reviews = new ReviewTable(this.db);
+    this.productTable = new ProductTable(this.db);
+    this.packetRows = new PacketRowTable(this.db);
+    this.products = new SqliteProductCatalog(this.productTable, this.runs, this.packetRows);
+    new ProductBackfill(this.db, this.productTable, this.packetRows).apply();
   }
 
-  createRun(input: {
-    brief: Record<string, unknown>;
-    model: string;
-    rejectKinds: string[];
-    judgementIds: string[];
-    nodes?: string[];
-    stage?: number;
-  }): ResearchRun {
-    return this.runs.create(input);
+  createRun(input: Parameters<ResearchStore["createRun"]>[0]): ResearchRun {
+    const productId = this.productTable.ensure(Briefs.key(input.brief), Briefs.label(input.brief));
+    return this.runs.create({ ...input, productId });
   }
 
   getRun(runId: string): ResearchRun | null {
@@ -70,6 +77,9 @@ export class SqliteResearchStore implements ResearchStore {
 
   updateRun(runId: string, fields: RunUpdate): void {
     this.runs.update(runId, fields);
+    if (fields.packet !== undefined) {
+      this.packetRows.replace(runId, this.productOf(runId), fields.packet);
+    }
   }
 
   addEvent(runId: string, kind: string, payload: Record<string, unknown>): RunEvent {
@@ -117,11 +127,15 @@ export class SqliteResearchStore implements ResearchStore {
   }
 
   saveRunReviews(runId: string, ledger: ReviewLedgerSnapshot): number {
-    return this.reviews.save(runId, ledger);
+    return this.reviews.save(runId, this.productOf(runId), ledger);
   }
 
   listRunReviews(runId: string): StoredRunReview[] {
     return this.reviews.list(runId);
+  }
+
+  private productOf(runId: string): string {
+    return this.runs.get(runId)?.product_id ?? "";
   }
 
   close(): void {

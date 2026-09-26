@@ -6,6 +6,8 @@ export * from "./packet.js";
 export * from "./stage-two.js";
 export * from "./request.js";
 export * from "./records.js";
+export * from "./products.js";
+export * from "./packet-rows.js";
 export * from "./logs.js";
 export * from "./reject-kinds.js";
 export * from "./ports.js";

@@ -1,4 +1,4 @@
-import type { ResearchRun } from "../../domain/index.js";
+import type { ResearchRun, RunHead } from "../../domain/index.js";
 
 /** Reads SQLite rows back into domain records; a bad JSON column becomes a default. */
 export class Rows {
@@ -11,9 +11,20 @@ export class Rows {
     }
   }
 
+  static head(row: Record<string, any>): RunHead {
+    return {
+      id: row.id,
+      product_id: row.product_id,
+      stage: row.stage,
+      status: row.status,
+      created_at: row.created_at,
+    };
+  }
+
   static run(row: Record<string, any>): ResearchRun {
     return {
       id: row.id,
+      product_id: row.product_id ?? "",
       agent_run_id: row.agent_run_id ?? "",
       session_id: row.session_id,
       stage: row.stage,
