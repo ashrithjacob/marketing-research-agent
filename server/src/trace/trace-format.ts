@@ -24,10 +24,12 @@ export class TraceFormat {
     file: string,
     name: string,
     fields?: Record<string, unknown>,
+    toolCallId?: string,
   ): string {
     const clock = new Date(now).toISOString().slice(11, 23);
     const rendered = fields ? TraceFormat.fields(fields) : "";
-    return `${clock} +${TraceFormat.elapsed(now - startedAt)} [${file}] ${name}${rendered ? ` ${rendered}` : ""}`;
+    const tool = toolCallId ? ` <${toolCallId}>` : "";
+    return `${clock} +${TraceFormat.elapsed(now - startedAt)}${tool} [${file}] ${name}${rendered ? ` ${rendered}` : ""}`;
   }
 
   static elapsed(ms: number): string {

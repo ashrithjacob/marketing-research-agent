@@ -27,12 +27,16 @@ classDiagram
       <<interface>>
       write()
     }
+    class TraceStep {
+      <<interface>>
+    }
     class TraceScope {
       <<interface>>
     }
     class Trace {
       install()
       within()
+      withinTool()
       line()
       tick()
     }
@@ -86,6 +90,9 @@ classDiagram
       <<interface>>
     }
     class LlmCallRecord {
+      <<interface>>
+    }
+    class Generation {
       <<interface>>
     }
     class LlmCall {
@@ -182,6 +189,15 @@ classDiagram
     }
     class StoredRunReview {
       <<interface>>
+    }
+    class ServicePart {
+      <<interface>>
+    }
+    class ServiceReport {
+      <<interface>>
+    }
+    class ServiceReports {
+      is()
     }
   }
   namespace config {
@@ -326,11 +342,14 @@ classDiagram
       withTimeout()
       pool()
     }
+    class OpenRouterGeneration {
+      parse()
+    }
     class OpenRouterPrices {
       start()
       refreshPrices()
       ratesFor()
-      generationCost()
+      generation()
       stop()
     }
     class Rates {
@@ -353,6 +372,9 @@ classDiagram
     class SearchHit {
       <<interface>>
     }
+    class SearchPage {
+      <<interface>>
+    }
     class Searxng {
       find()
     }
@@ -368,7 +390,7 @@ classDiagram
     }
     class CallLog {
       add()
-      setBilled()
+      setGeneration()
       list()
     }
     class PacketCheckLog {
@@ -544,6 +566,10 @@ classDiagram
     class StageTwoPlanner {
       plan()
     }
+    class ToolSteps {
+      start()
+      take()
+    }
     class ToolsetOptions {
       <<interface>>
     }
@@ -583,6 +609,9 @@ classDiagram
     }
     class TrustpilotReviewsTool {
       tool()
+    }
+    class TracedTool {
+      wrap()
     }
     class WebFetchTool {
       tool()
@@ -682,6 +711,7 @@ classDiagram
   BilledCosts --> ResearchStore
   BilledCosts --> LiveRuns
   AgentEventRecorder --> LiveRuns
+  AgentEventRecorder --> ToolSteps
   LiveRuns --> ResearchStore
   ModelPricing --> OpenRouterPrices
   RunAgentFactory --> Settings
@@ -761,10 +791,11 @@ classDiagram
 | `adapters` | `adapters/fetch-gate.ts` | OpenRouterGate |
 | `adapters` | `adapters/firecrawl.ts` | Firecrawl |
 | `adapters` | `adapters/http.ts` | Http |
+| `adapters` | `adapters/openrouter-generation.ts` | OpenRouterGeneration |
 | `adapters` | `adapters/openrouter-prices.ts` | OpenRouterPrices |
 | `adapters` | `adapters/rates.ts` | Rates, Pricing, Billed, Money |
 | `adapters` | `adapters/run-billing.ts` | RunBilling |
-| `adapters` | `adapters/searxng.ts` | SearchHit, Searxng |
+| `adapters` | `adapters/searxng.ts` | SearchHit, SearchPage, Searxng |
 | `adapters` | `adapters/sqlite/account-table.ts` | AccountTable |
 | `adapters` | `adapters/sqlite/call-log.ts` | CallLog |
 | `adapters` | `adapters/sqlite/check-log.ts` | PacketCheckLog |
@@ -802,19 +833,21 @@ classDiagram
 | `agent` | `agent/run-watch.ts` | RunWatch |
 | `agent` | `agent/stage-two-handoff.ts` | StageTwoHandoff |
 | `agent` | `agent/stage-two-plan.ts` | StageTwoPlanner |
+| `agent` | `agent/tool-steps.ts` | ToolSteps |
 | `agent` | `agent/tools/factory.ts` | ToolsetOptions, ResearchToolset |
 | `agent` | `agent/tools/lanes.ts` | FetchRecord, PacketCheckOptions |
 | `agent` | `agent/tools/mine-reviews-tool.ts` | MiningJob, MineReviewsTool |
 | `agent` | `agent/tools/packet-check-tool.ts` | PacketCheckTool |
 | `agent` | `agent/tools/review-rendering.ts` | PullLabel, ReviewRendering |
 | `agent` | `agent/tools/review-tools.ts` | FindProductTool, AmazonReviewsTool, TrustpilotReviewsTool |
+| `agent` | `agent/tools/traced-tool.ts` | TracedTool |
 | `agent` | `agent/tools/web-fetch-tool.ts` | WebFetchTool |
 | `agent` | `agent/tools/web-search-tool.ts` | WebSearchTool |
 | `agent` | `agent/usage.ts` | UsageTotals |
 | `config` | `config/settings.ts` | Settings, Env |
 | `domain` | `domain/accounts.ts` | Workspace, Account, AccountListing, Principal, Scope |
 | `domain` | `domain/brief.ts` | Briefs |
-| `domain` | `domain/logs.ts` | RunEvent, Judgement, PacketCheck, RunUpdate, LlmCallRecord, LlmCall |
+| `domain` | `domain/logs.ts` | RunEvent, Judgement, PacketCheck, RunUpdate, LlmCallRecord, Generation, LlmCall |
 | `domain` | `domain/nodes.ts` | Stages |
 | `domain` | `domain/packet-rows.ts` | PacketRowSet, PacketRows |
 | `domain` | `domain/ports.ts` | ProductCatalog, AccountDirectory, ResearchStore, GateVerdict, FetchGate |
@@ -822,6 +855,7 @@ classDiagram
 | `domain` | `domain/records.ts` | Clock, Ids, ResearchRun, RunSummary, Runs |
 | `domain` | `domain/reject-kinds.ts` | RejectKinds |
 | `domain` | `domain/reviews.ts` | LedgerPull, LedgerReview, ReviewLedgerSnapshot, StoredRunReview |
+| `domain` | `domain/service-report.ts` | ServicePart, ServiceReport, ServiceReports |
 | `extract` | `extract/blocks.ts` | JsonBlocks, PacketExtractor |
 | `extract` | `extract/brief-check.ts` | BriefCheck |
 | `extract` | `extract/champion-check.ts` | ChampionCheck |
@@ -858,5 +892,5 @@ classDiagram
 | `http` | `http/trace-route.ts` | TraceRoute |
 | `trace` | `trace/trace-file.ts` | TraceLimits, TraceFile |
 | `trace` | `trace/trace-format.ts` | TraceFormat |
-| `trace` | `trace/trace.ts` | TraceSink, TraceScope, Trace |
+| `trace` | `trace/trace.ts` | TraceSink, TraceStep, TraceScope, Trace |
 | `trace` | `trace/wire-tap.ts` | Pending, UndiciRequest, NodeRequest, WireTap |

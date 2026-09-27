@@ -27,7 +27,9 @@ import {
 } from "./review-tools.js";
 import { ReviewRendering } from "./review-rendering.js";
 import { WebFetchTool } from "./web-fetch-tool.js";
+import { TracedTool } from "./traced-tool.js";
 import { WebSearchTool } from "./web-search-tool.js";
+import type { ToolSteps } from "../tool-steps.js";
 import { Trace } from "../../trace/index.js";
 
 export interface ToolsetOptions {
@@ -42,6 +44,7 @@ export interface ToolsetOptions {
   productSearch?: boolean;
   subject?: string;
   market?: string;
+  steps?: ToolSteps;
 }
 
 /** The tools one run gets; without an Apify runner the review tools are withheld, not stubbed. */
@@ -50,6 +53,13 @@ export class ResearchToolset {
 
   build(): AgentTool<any>[] {
     Trace.line(import.meta.url, "ResearchToolset.build");
+    const steps = this.options.steps;
+    const tools = this.tools();
+    return steps ? tools.map((tool) => TracedTool.wrap(tool, steps)) : tools;
+  }
+
+  private tools(): AgentTool<any>[] {
+    Trace.line(import.meta.url, "ResearchToolset.tools");
     const { settings, runId, onFetch } = this.options;
     const reviews = this.options.reviewTools !== false;
     const bare =

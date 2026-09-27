@@ -588,10 +588,18 @@ describe("the LLM call trace", () => {
     expect(toolResult.content.length).toBeGreaterThan(0);
   });
 
-  it("attaches what OpenRouter billed to each call", async () => {
+  it("attaches what OpenRouter billed, and where the time went, to each call", async () => {
     const fetch = (async (input: string | URL | Request) =>
       new Response(
-        JSON.stringify({ data: { total_cost: String(input).includes("gen-2") ? 0.02 : 0.01 } }),
+        JSON.stringify({
+          data: {
+            total_cost: String(input).includes("gen-2") ? 0.02 : 0.01,
+            latency: 900,
+            generation_time: 30000,
+            native_tokens_reasoning: 1200,
+            provider_name: "Parasail",
+          },
+        }),
         { status: 200 },
       )) as typeof globalThis.fetch;
     const costs = new OpenRouterPrices({ apiKey: "k", fetch, lookupDelaysMs: [] });
@@ -599,7 +607,35 @@ describe("the LLM call trace", () => {
     twoTurns();
     const runId = supervisor.start(request(), "admin");
     await supervisor.waitFor(runId);
-    expect(store.listLlmCalls(runId).map((c) => c.billed_cost)).toEqual([0.01, 0.02]);
+    const calls = store.listLlmCalls(runId);
+    expect(calls.map((c) => c.billed_cost)).toEqual([0.01, 0.02]);
+    expect(calls.map((c) => c.generation?.latency_ms)).toEqual([900, 900]);
+    expect(calls[1]!.generation).toMatchObject({ generation_ms: 30000, reasoning_tokens: 1200 });
+  });
+
+  it("tags each tool event with the id of the tool call that asked for it", async () => {
+    faux.setResponses([
+      fauxAssistantMessage(fauxToolCall("validate_packet", { packet: minimalPacket() }), {
+        responseId: "gen-1",
+        stopReason: "toolUse",
+      }),
+      fauxAssistantMessage(fenced(minimalPacket()), { responseId: "gen-2" }),
+    ]);
+    const runId = supervisor.start(request(), "admin");
+    await supervisor.waitFor(runId);
+
+    const [first, second] = store.listLlmCalls(runId) as [any, any];
+    const asked = first.output.content.find((b: any) => b.type === "toolCall").id;
+    const answered = second.input.find((m: any) => m.role === "toolResult").toolCallId;
+    const tagged = store
+      .listEvents(runId)
+      .filter((e) => e.kind === "tool.started" || e.kind === "tool.completed")
+      .map((e) => (e.payload as any).tool_call_id);
+    expect(asked).toBeTruthy();
+    expect(answered).toBe(asked);
+    expect(tagged).toEqual([asked, asked]);
+    const completed = store.listEvents(runId).find((e) => e.kind === "tool.completed")!.payload as any;
+    expect(completed.inside.map((s: any) => s.name)).toContain("PacketCheckTool.tool.execute");
   });
 
   it("records a call the provider failed, with its error", async () => {

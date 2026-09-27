@@ -1,6 +1,6 @@
 import type Database from "better-sqlite3";
 
-import type { LlmCall, LlmCallRecord } from "../../domain/index.js";
+import type { Generation, LlmCall, LlmCallRecord } from "../../domain/index.js";
 
 import { Rows } from "./rows.js";
 import { Trace } from "../../trace/index.js";
@@ -34,14 +34,16 @@ export class CallLog {
         JSON.stringify(call.usage ?? {}),
         call.response_id,
       );
-    return { ...call, id: Number(info.lastInsertRowid), billed_cost: null };
+    return { ...call, id: Number(info.lastInsertRowid), billed_cost: null, generation: null };
   }
 
-  setBilled(runId: string, responseId: string, cost: number): void {
-    Trace.line(import.meta.url, "CallLog.setBilled", { runId, responseId, cost });
+  setGeneration(runId: string, responseId: string, generation: Generation): void {
+    Trace.line(import.meta.url, "CallLog.setGeneration", { runId, responseId, generation });
     this.db
-      .prepare("UPDATE research_llm_calls SET billed_cost = ? WHERE run_id = ? AND response_id = ?")
-      .run(cost, runId, responseId);
+      .prepare(
+        "UPDATE research_llm_calls SET billed_cost = ?, generation = ? WHERE run_id = ? AND response_id = ?",
+      )
+      .run(generation.cost, JSON.stringify(generation), runId, responseId);
   }
 
   list(runId: string): LlmCall[] {
@@ -68,6 +70,7 @@ export class CallLog {
       usage: Rows.json(row.usage, {}) as Record<string, unknown>,
       response_id: row.response_id as string,
       billed_cost: (row.billed_cost as number | null) ?? null,
+      generation: Rows.json(row.generation, null) as Generation | null,
     }));
   }
 }

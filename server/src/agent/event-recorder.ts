@@ -1,8 +1,11 @@
 import type { AgentEvent } from "@earendil-works/pi-agent-core";
 import type { Usage } from "@earendil-works/pi-ai";
 
+import { ServiceReports } from "../domain/index.js";
+
 import { Frames } from "./frames.js";
 import type { LiveRuns } from "./live-runs.js";
+import type { ToolSteps } from "./tool-steps.js";
 import { TOOL_LANES } from "./tools/index.js";
 import { Trace } from "../trace/index.js";
 
@@ -20,6 +23,7 @@ export class AgentEventRecorder {
     private readonly runs: LiveRuns,
     private readonly runId: string,
     private readonly onTurnEnd: (message: TurnEnd) => void,
+    private readonly steps?: ToolSteps,
   ) {}
 
   record(event: AgentEvent): void {
@@ -57,6 +61,7 @@ export class AgentEventRecorder {
       case "tool_execution_start":
         this.runs.emit(this.runId, "tool.started", {
           tool: event.toolName,
+          tool_call_id: event.toolCallId,
           preview: Frames.toolPreview(event.toolName, event.args),
           lane: TOOL_LANES[event.toolName] ?? "other",
         });
@@ -64,9 +69,12 @@ export class AgentEventRecorder {
       case "tool_execution_end":
         this.runs.emit(this.runId, "tool.completed", {
           tool: event.toolName,
+          tool_call_id: event.toolCallId,
           error: Boolean(event.isError),
           ...(event.isError ? { error_text: Frames.toolErrorText(event.result) } : {}),
           lane: TOOL_LANES[event.toolName] ?? "other",
+          inside: this.steps?.take(event.toolCallId) ?? [],
+          ...(ServiceReports.is(event.result?.details?.service) ? { service: event.result.details.service } : {}),
         });
         return;
       default:

@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import type { LlmCall } from '../api';
+import type { Generation, LlmCall } from '../api';
 import { formatTokens } from '../format';
 import { BlockView, Clip, Collapsible, MessageView, ToolsList } from './parts';
 
@@ -17,6 +17,9 @@ export function CallView({ call, calls, index }: { call: LlmCall; calls: LlmCall
         <span className="call-n">#{call.seq}</span>
         <span className="call-t">{new Date(call.started_at).toLocaleTimeString()}</span>
         <span>{(call.duration_ms / 1000).toFixed(1)}s</span>
+        <span className="call-t">
+          {call.generation?.latency_ms != null ? `first token ${seconds(call.generation.latency_ms)}` : ''}
+        </span>
         <span>
           {formatTokens((usage.input ?? 0) + (usage.cacheRead ?? 0))} in ·{' '}
           {formatTokens(usage.output ?? 0)} out
@@ -97,10 +100,27 @@ export function CallView({ call, calls, index }: { call: LlmCall; calls: LlmCall
             {(usage.cost?.total ?? 0).toFixed(6)}
             {call.billed_cost !== null ? ` · billed $${call.billed_cost.toFixed(6)}` : ''}
           </div>
+          {call.generation && <GenerationLine generation={call.generation} />}
         </section>
       </div>
     </details>
   );
+}
+
+function GenerationLine({ generation }: { generation: Generation }) {
+  const parts = [
+    generation.latency_ms != null ? `first token ${seconds(generation.latency_ms)}` : '',
+    generation.generation_ms != null && generation.latency_ms != null
+      ? `then ${seconds(generation.generation_ms - generation.latency_ms)} streaming`
+      : '',
+    generation.reasoning_tokens != null ? `reasoning ${generation.reasoning_tokens} tokens` : '',
+    generation.provider,
+  ].filter(Boolean);
+  return <div className="call-usage">OpenRouter: {parts.join(' · ')}</div>;
+}
+
+function seconds(ms: number) {
+  return `${(ms / 1000).toFixed(1)}s`;
 }
 
 function contextAt(calls: LlmCall[], index: number) {

@@ -101,6 +101,36 @@ describe("web_search", () => {
     expect((result.content[0] as any).text).toMatch(/No results/);
   });
 
+  it("reports which engines answered and which failed, without changing what the model reads", async () => {
+    stubFetch(() =>
+      json({
+        results: [
+          { title: "A", url: "https://a.example", content: "a", engines: ["google cse"] },
+          { title: "B", url: "https://b.example", content: "b", engines: ["google cse", "bing"] },
+        ],
+        unresponsive_engines: [["brave", "too many requests"], ["duckduckgo", "CAPTCHA"]],
+      }),
+    );
+    const result = await tools().search.execute("1", { query: "magnesium" });
+    expect(result.details.service).toEqual({
+      service: "SearXNG",
+      outcome: "degraded",
+      parts: [
+        { name: "google cse", ok: true, detail: "2 results" },
+        { name: "bing", ok: true, detail: "1 result" },
+        { name: "brave", ok: false, detail: "too many requests" },
+        { name: "duckduckgo", ok: false, detail: "CAPTCHA" },
+      ],
+    });
+    expect((result.content[0] as any).text).not.toMatch(/brave|engine/i);
+  });
+
+  it("calls a search failed, not empty, when no engine answered", async () => {
+    stubFetch(() => json({ results: [], unresponsive_engines: [["brave", "too many requests"]] }));
+    const result = await tools().search.execute("1", { query: "x" });
+    expect(result.details.service.outcome).toBe("failed");
+  });
+
   it("throws on a SearXNG error rather than returning an empty page", async () => {
     // A stock SearXNG refuses format=json with a 403, and swallowing that makes
     // it look like the web simply has nothing to say about the product.

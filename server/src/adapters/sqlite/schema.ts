@@ -15,6 +15,7 @@ const MIGRATIONS: ReadonlyArray<readonly [string, string, string]> = [
   ["research_run_reviews", "product_id", "ALTER TABLE research_run_reviews ADD COLUMN product_id TEXT NOT NULL DEFAULT ''"],
   ["research_runs", "workspace_id", "ALTER TABLE research_runs ADD COLUMN workspace_id TEXT NOT NULL DEFAULT 'admin'"],
   ["research_judgements", "workspace_id", "ALTER TABLE research_judgements ADD COLUMN workspace_id TEXT NOT NULL DEFAULT 'admin'"],
+  ["research_llm_calls", "generation", "ALTER TABLE research_llm_calls ADD COLUMN generation TEXT"],
 ];
 
 /** CREATE TABLE IF NOT EXISTS never alters an existing table, so columns migrate here. */
@@ -85,7 +86,8 @@ CREATE TABLE IF NOT EXISTS research_llm_calls (
     error            TEXT NOT NULL DEFAULT '',
     usage            TEXT NOT NULL DEFAULT '{}',
     response_id      TEXT NOT NULL DEFAULT '',
-    billed_cost      REAL
+    billed_cost      REAL,
+    generation       TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_research_llm_calls_run
     ON research_llm_calls(run_id, seq);

@@ -7,6 +7,21 @@ export interface RunEvent {
   created_at: string;
 }
 
+/** One trace line written while a tool call ran: a function it called, or a request it sent. */
+export interface ToolStep {
+  at: string;
+  file: string;
+  name: string;
+  fields: string;
+}
+
+/** What an outside service said about one request beyond its HTTP status, e.g. which search engines answered. */
+export interface ServiceReport {
+  service: string;
+  outcome: 'ok' | 'degraded' | 'failed';
+  parts: Array<{ name: string; ok: boolean; detail: string }>;
+}
+
 /** One content block of a message, as pi-ai shapes it. */
 export interface ContentBlock {
   type: 'text' | 'thinking' | 'toolCall' | 'image' | string;
@@ -25,6 +40,15 @@ export interface TraceMessage {
   toolCallId?: string;
   isError?: boolean;
   stopReason?: string;
+}
+
+/** What OpenRouter recorded for one call: its charge, and where its time went. */
+export interface Generation {
+  cost: number | null;
+  latency_ms: number | null;
+  generation_ms: number | null;
+  reasoning_tokens: number | null;
+  provider: string;
 }
 
 /** One LLM call; `input` holds only what is new since the previous call (workings.md §5). */
@@ -52,6 +76,7 @@ export interface LlmCall {
   usage: Usage;
   response_id: string;
   billed_cost: number | null;
+  generation: Generation | null;
 }
 
 export interface CallStats {

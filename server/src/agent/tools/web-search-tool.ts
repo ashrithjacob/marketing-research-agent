@@ -22,11 +22,11 @@ export class WebSearchTool {
       async execute(_id, params, signal) {
         Trace.line(import.meta.url, "WebSearchTool.tool.execute", { params });
         const max = Math.min(Math.max(Math.trunc(params.max_results ?? 10), 1), 25);
-        const hits = await search.find(params.query, max, signal);
+        const { hits, report } = await search.find(params.query, max, signal);
         if (hits.length === 0) {
           return {
             content: [{ type: "text", text: `No results for ${JSON.stringify(params.query)}.` }],
-            details: { query: params.query, hits: [] },
+            details: { query: params.query, hits: [], service: report },
           };
         }
         const rendered = hits
@@ -34,7 +34,7 @@ export class WebSearchTool {
           .join("\n\n");
         return {
           content: [{ type: "text", text: rendered }],
-          details: { query: params.query, hits },
+          details: { query: params.query, hits, service: report },
         };
       },
     };

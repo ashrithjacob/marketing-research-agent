@@ -16,7 +16,7 @@ import { SqliteResearchStore } from "../src/adapters/index.js";
 import { RunSupervisor } from "../src/agent/index.js";
 import { Env } from "../src/config/index.js";
 import { App } from "../src/http/index.js";
-import { Trace, TraceFile, TraceFormat, WireTap } from "../src/trace/index.js";
+import { Trace, TraceFile, TraceFormat, WireTap, type TraceStep } from "../src/trace/index.js";
 import { fenced, minimalPacket } from "./fixtures.js";
 import { TraceCoverage } from "./trace-coverage.js";
 
@@ -152,6 +152,32 @@ describe("the wire", () => {
     expect(text).toMatch(new RegExp(`← GET 127\\.0\\.0\\.1:${port}/search\\S* status=201 ms=\\d+`));
     expect(text).toMatch(new RegExp(`← GET 127\\.0\\.0\\.1:${port}/reviews status=201 ms=\\d+`));
     expect(text).not.toContain("secret");
+  });
+
+  it("keeps each tool call's own lines and requests apart, even when two run at once", async () => {
+    const first: TraceStep[] = [];
+    const second: TraceStep[] = [];
+    await Trace.within("runX", {}, async () => {
+      Trace.line(here, "Loop.beforeTools");
+      await Promise.all([
+        Trace.withinTool("call_a", first, async () => {
+          Trace.line(here, "Search.find", { query: "a" });
+          await (await fetch(`http://127.0.0.1:${port}/a`)).text();
+        }),
+        Trace.withinTool("call_b", second, async () => {
+          Trace.line(here, "Fetch.scrape", { url: "b" });
+          await (await fetch(`http://127.0.0.1:${port}/b`)).text();
+        }),
+      ]);
+    });
+    expect(first.map((s) => s.name)).toEqual(["Search.find", `→ GET 127.0.0.1:${port}/a`, `← GET 127.0.0.1:${port}/a`]);
+    expect(first[0]!.fields).toBe("query=a");
+    expect(first[2]!.fields).toMatch(/status=201 ms=\d+/);
+    expect(second.map((s) => s.name)).toEqual(["Fetch.scrape", `→ GET 127.0.0.1:${port}/b`, `← GET 127.0.0.1:${port}/b`]);
+    const text = log("runX.log");
+    expect(text).toMatch(/<call_a> \[[^\]]*tests\/trace\.test\.ts\] Search\.find/);
+    expect(text).toMatch(/\] Loop\.beforeTools/);
+    expect(text).not.toMatch(/<call_\w+> \[[^\]]*\] Loop\.beforeTools/);
   });
 });
 

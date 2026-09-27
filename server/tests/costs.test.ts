@@ -103,28 +103,58 @@ describe("billed cost", () => {
       ++asked < 3 ? { status: 404 } : { status: 200, body: { data: { total_cost: 8.008e-6 } } },
     );
     const costs = new OpenRouterPrices({ apiKey: "k", fetch, lookupDelaysMs: [0, 0, 0] });
-    expect(await costs.generationCost("gen-1")).toBe(8.008e-6);
+    expect((await costs.generation("gen-1"))?.cost).toBe(8.008e-6);
     expect(asked).toBe(3);
+  });
+
+  it("keeps where a call's time went: first token, generating, reasoning, provider", async () => {
+    const { fetch } = scripted(() => ({
+      status: 200,
+      body: {
+        data: {
+          total_cost: 0.0317,
+          latency: 1759,
+          generation_time: 252063,
+          native_tokens_completion: 37199,
+          native_tokens_reasoning: 18191,
+          provider_name: "Parasail",
+        },
+      },
+    }));
+    const costs = new OpenRouterPrices({ apiKey: "k", fetch, lookupDelaysMs: [] });
+    expect(await costs.generation("gen-1")).toEqual({
+      cost: 0.0317,
+      latency_ms: 1759,
+      generation_ms: 252063,
+      reasoning_tokens: 18191,
+      provider: "Parasail",
+    });
+  });
+
+  it("keeps the timing when the record carries no cost", async () => {
+    const { fetch } = scripted(() => ({ status: 200, body: { data: { latency: 949, total_cost: null } } }));
+    const costs = new OpenRouterPrices({ apiKey: "k", fetch, lookupDelaysMs: [] });
+    expect(await costs.generation("gen-1")).toMatchObject({ cost: null, latency_ms: 949, provider: "" });
   });
 
   it("gives up after the retry schedule instead of holding the run open", async () => {
     const { fetch, calls } = scripted(() => ({ status: 404 }));
     const costs = new OpenRouterPrices({ apiKey: "k", fetch, lookupDelaysMs: [0, 0] });
-    expect(await costs.generationCost("gen-1")).toBeNull();
+    expect(await costs.generation("gen-1")).toBeNull();
     expect(calls).toHaveLength(3);
   });
 
   it("does not retry an error that waiting will not fix", async () => {
     const { fetch, calls } = scripted(() => ({ status: 401 }));
     const costs = new OpenRouterPrices({ apiKey: "k", fetch, lookupDelaysMs: [0, 0] });
-    expect(await costs.generationCost("gen-1")).toBeNull();
+    expect(await costs.generation("gen-1")).toBeNull();
     expect(calls).toHaveLength(1);
   });
 
   it("abandons a pending lookup on stop, so shutdown does not wait out retries", async () => {
     const { fetch } = scripted(() => ({ status: 404 }));
     const costs = new OpenRouterPrices({ apiKey: "k", fetch, lookupDelaysMs: [60_000] });
-    const pending = costs.generationCost("gen-1");
+    const pending = costs.generation("gen-1");
     await new Promise((r) => setTimeout(r, 10));
     costs.stop();
     expect(await pending).toBeNull();

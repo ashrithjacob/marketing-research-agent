@@ -199,8 +199,8 @@ events into cockpit events and `emit()` writes each one to `research_events`
 |---|---|---|
 | assistant text grows | `message.delta` | `{delta}` — only the new characters |
 | assistant message ends, with thinking | `reasoning.available` | `{text}` |
-| tool starts | `tool.started` | `{tool, preview, lane}` — preview is the query or url; lane is `search`/`fetch`/`other` |
-| tool ends | `tool.completed` | `{tool, error, lane}` |
+| tool starts | `tool.started` | `{tool, tool_call_id, preview, lane}` — preview is the query or url; lane is `search`/`fetch`/`other` |
+| tool ends | `tool.completed` | `{tool, tool_call_id, error, lane, inside, service?}` — `tool_call_id` is the id on the model's `toolCall` block and on the `toolResult` that answers it, so the three can be joined; `inside` is every trace line the call wrote (§2e); `service` is what the outside service said beyond its HTTP status (below) |
 
 At each message end, the message's text is appended to the run's output and its token
 usage is added to a running total (the last turn alone would understate cost by an
@@ -346,6 +346,21 @@ The cockpit shows both, because they answer different questions.
   schedule and give up after that. `{total, turns, resolved}` — `resolved < turns`
   means some turns' charges were never read and `total` is an undercount.
   No `OPENROUTER_API_KEY` → no lookups and no `billed` at all, not $0.
+- **Where a call's time went** — the same `/generation` record also carries
+  `latency` (time to the first token), `generation_time`, `native_tokens_reasoning`
+  and `provider_name`. Since 2026-09-27 the lookup keeps them with the charge, as
+  the call's `generation` (`OpenRouterGeneration`,
+  `adapters/openrouter-generation.ts`). They cost no extra request. `generation_time` **includes**
+  `latency`: on local run `b6f0d355` (2026-09-27) call 6 took 15.0s by our clock,
+  `generation_time` 14.9s and `latency` 11.1s — 11.1s before the first token,
+  then 3.8s streaming. So streaming time is `generation_ms − latency_ms`, which is
+  what the logs page shows. On the Mullein run `5dbd1714` (glm-5.3-flash on
+  Parasail) the first token took 0.9–2.6s, and the 252s packet-writing call was
+  1.8s to the first token, then 250.3s streaming 37,199 tokens, 18,191 of them
+  reasoning. OpenRouter routes each call separately: `b6f0d355`'s calls went to
+  Relace and Together. OpenRouter counts reasoning tokens but does not time them, so
+  the thinking-versus-writing split within a call is an estimate from the token
+  shares.
 
 Neither includes Apify, which bills separately per event.
 
@@ -374,7 +389,10 @@ all keyed off the run's `nodes`:
 that sees the exact context sent to the provider and the exact message returned,
 error responses included. Each call becomes a `research_llm_calls` row: start/end
 time, duration, model, stop reason, error, usage (tokens and calculated cost), the
-`gen-…` id, and — once `/generation` answers — `billed_cost`.
+`gen-…` id, and — once `/generation` answers — `billed_cost` and `generation`
+(§2a: time to first token, generation time, reasoning tokens, provider). The logs
+page shows the time to the first token on each row, and the rest on an
+"OpenRouter:" line under the answer.
 
 Storage is **incremental**. The agent only appends to its context, and pi-agent-core's
 default `convertToLlm` filters the transcript without copying it, so each row stores
@@ -531,6 +549,33 @@ events: undici's for `fetch` (OpenRouter through pi-ai, Firecrawl, SearXNG) and
 response event fires in the socket's context, not the caller's, so the tap
 captures the run context when the request starts and writes the `←` line inside
 it.
+
+**Lines inside a tool call carry its id.** `ResearchToolset` wraps every tool
+(`TracedTool`), so each call runs in its own nested scope,
+`Trace.withinTool(toolCallId, …)`. Every line written inside it — the tool's own
+functions, the adapter it calls, and the `→`/`←` lines of each HTTP request it
+sends — is written as `… +00:07.936 <call_5e4b…> [adapters/searxng.ts] …`, and is
+also kept (up to 300) and sent on that call's `tool.completed` event as `inside`.
+That is what the activity page's *Inside the tool* shows. Keeping lines does not
+depend on the trace file: a tool call collects them even where no sink is
+installed. Two calls running at once keep theirs apart, because each request's
+`←` line is written back in the context that sent it.
+
+**What a service says beyond its status: `service`.** A request can come back
+200 and still have partly failed. SearXNG is the case that prompted this: it
+asks several search engines and answers 200 as long as one of them did, listing
+the rest under `unresponsive_engines`. `Searxng.find` now returns that as a
+`ServiceReport` (`domain/service-report.ts`): each engine that answered with its
+result count, each that did not with SearXNG's reason, and an outcome — `ok`,
+`degraded` (some failed), or `failed` (no results and at least one engine
+failed). Measured on local run `424c91a9` (2026-09-27): every search was
+`degraded` — Google CSE 20 results, Brave "too many requests", DuckDuckGo
+"CAPTCHA". The report goes to the page only; what the model reads is unchanged,
+so a `failed` search still reaches it as "No results". Firecrawl and Apify do
+not report yet. `Firecrawl.scrape` reads only the page title from Firecrawl's
+metadata, so whether the site itself served the page is not checked (see "A bot
+wall is not detected on `web_fetch`" below); what Firecrawl sends back for a
+refused page has not been measured here.
 
 **`×N` lines are counts, not calls.** Functions that run once per streamed chunk
 of model output, or once per row in a loop, use `Trace.tick`. That is counted
@@ -754,8 +799,8 @@ What the start modal needs to warn you before you pay for a run.
   | `llm.call` | `{seq, duration_ms, input_tokens, output_tokens, cache_read_tokens, cost, stop_reason, tool_calls, error}` — one per LLM call, never the prompt |
   | `message.delta` | `{delta}` |
   | `reasoning.available` | `{text}` |
-  | `tool.started` | `{tool, preview, lane}` |
-  | `tool.completed` | `{tool, error, lane}` |
+  | `tool.started` | `{tool, tool_call_id, preview, lane}` |
+  | `tool.completed` | `{tool, tool_call_id, error, error_text?, lane, inside: [{at, file, name, fields}], service?: {service, outcome, parts}}` |
   | `run.steered` | `{judgement_id, text}` |
   | `run.stopping` | `{}` |
   | `run.nudged` | `{reason}` — the run ended without a packet and was asked once more |
@@ -793,7 +838,9 @@ What the start modal needs to warn you before you pay for a run.
   charge has been read back; `wall_time_ms` runs to now while the run is live.
   An `LlmCall` is `{id, seq, started_at, ended_at, duration_ms, model, system_prompt,
   tools, context_reset, context_messages, input, output, stop_reason, error, usage,
-  response_id, billed_cost}`. `input` holds only the messages new since the previous
+  response_id, billed_cost, generation}`, where `generation` is `{cost, latency_ms,
+  generation_ms, reasoning_tokens, provider}` or `null` until `/generation` answers
+  (and on every call from before 2026-09-27). `input` holds only the messages new since the previous
   call, and `system_prompt`/`tools` are `null` where unchanged (§2b). `output` is the
   assistant message without its usage: `content` blocks (`text`, `thinking`,
   `toolCall` with `name` and `arguments`), `stopReason`, `responseId`,

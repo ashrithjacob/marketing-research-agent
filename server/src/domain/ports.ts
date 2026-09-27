@@ -1,5 +1,6 @@
 import type { SourceKind } from "./vocabulary.js";
 import type {
+  Generation,
   Judgement,
   LlmCall,
   LlmCallRecord,
@@ -69,7 +70,7 @@ export interface ResearchStore {
   addPacketCheck(runId: string, valid: boolean, problems: readonly string[]): PacketCheck;
   listPacketChecks(runId: string): PacketCheck[];
   addLlmCall(call: LlmCallRecord): LlmCall;
-  setLlmCallBilled(runId: string, responseId: string, cost: number): void;
+  setLlmCallGeneration(runId: string, responseId: string, generation: Generation): void;
   listLlmCalls(runId: string): LlmCall[];
   saveRunReviews(runId: string, ledger: ReviewLedgerSnapshot): number;
   listRunReviews(runId: string): StoredRunReview[];

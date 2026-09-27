@@ -1,82 +1,15 @@
 import { Fragment, useMemo } from 'react';
 import type { LlmCall } from '../api';
-import { formatTokens } from '../format';
-import { CallView } from './CallView';
-import { turnSummary, toolVerb, type Step } from './steps';
-
-function TurnBox({
-  step,
-  call,
-  calls,
-  isLast,
-}: {
-  step: Step;
-  call: LlmCall | undefined;
-  calls: LlmCall[];
-  isLast: boolean;
-}) {
-  const usage = call?.usage ?? {};
-  const tokensIn = Number(usage.input ?? 0) + Number(usage.cacheRead ?? 0);
-  const failed = !!step.error;
-  return (
-    <li className={`tl-step ${isLast ? 'last' : ''}`}>
-      <span className={`tl-dot ${failed ? 'bad' : ''}`} />
-      <details className={`tl-box ${failed ? 'failed' : ''}`}>
-        <summary>
-          <span className="tl-title">{turnSummary(step)}</span>
-          <span className="tl-meta">
-            {new Date(step.startedAt).toLocaleTimeString()}
-            {step.tools.length > 0 && ` · ${step.tools.length} tool call${step.tools.length === 1 ? '' : 's'}`}
-            {tokensIn > 0 && ` · ${formatTokens(tokensIn)} in · ${formatTokens(Number(usage.output ?? 0))} out`}
-            {Number(usage.cost?.total ?? 0) > 0 && ` · $${Number(usage.cost?.total ?? 0).toFixed(4)}`}
-          </span>
-        </summary>
-        <div className="tl-body">
-          {step.reasoning.length > 0 && (
-            <details className="tl-sub">
-              <summary>Reasoning trace ({step.reasoning.length})</summary>
-              {step.reasoning.map((text, index) => (
-                <p key={index} className="tl-reasoning">
-                  {text}
-                </p>
-              ))}
-            </details>
-          )}
-          {step.tools.length > 0 && (
-            <div className="tl-tools">
-              {step.tools.map((tool) => (
-                <div key={tool.key} className={`tl-tool ${tool.state}`}>
-                  <span className="tl-tool-state">
-                    {tool.state === 'running' ? 'RUNNING' : tool.state === 'error' ? 'ERROR' : 'DONE'}
-                  </span>
-                  <span className="tl-tool-what">
-                    {toolVerb(tool.tool)}
-                    {tool.preview ? ` — ${tool.preview}` : ''}
-                    {tool.errorText && <span className="tl-tool-err">{tool.errorText}</span>}
-                  </span>
-                  {tool.duration ? <span className="tl-tool-dur">{tool.duration}s</span> : null}
-                </div>
-              ))}
-            </div>
-          )}
-          {step.message && (
-            <details className="tl-sub">
-              <summary>Model output</summary>
-              <p className="tl-message">{step.message}</p>
-            </details>
-          )}
-          {call && <CallView call={call} calls={calls} index={calls.indexOf(call)} />}
-        </div>
-      </details>
-    </li>
-  );
-}
+import type { Step } from './steps';
+import { TurnCard } from './TurnCard';
+import { indexCalls } from './turn';
 
 function MilestoneBox({ step }: { step: Step }) {
   return (
     <li className={`tl-step milestone ${step.cls}`}>
       <span className={`tl-dot ${step.cls}`} />
       <div className="tl-box flat">
+        {step.origin && <span className={`badge ${step.origin}`}>{step.origin.toUpperCase()}</span>}
         <span className="tl-title">{step.text}</span>
         <span className="tl-meta">{new Date(step.startedAt).toLocaleTimeString()}</span>
       </div>
@@ -92,17 +25,20 @@ export function Timeline({
   steps: Step[];
   calls: LlmCall[];
 }) {
-  const bySeq = useMemo(() => new Map(calls.map((c) => [c.seq, c])), [calls]);
+  const index = useMemo(() => indexCalls(calls), [calls]);
+  const now = Date.now();
   return (
     <ol className="timeline">
-      {steps.map((step, index) => (
+      {steps.map((step, position) => (
         <Fragment key={step.key}>
           {step.kind === 'turn' ? (
-            <TurnBox
+            <TurnCard
               step={step}
-              call={step.seq != null ? bySeq.get(step.seq) : undefined}
+              call={step.seq != null ? index.bySeq.get(step.seq) : undefined}
               calls={calls}
-              isLast={index === steps.length - 1}
+              index={index}
+              now={now}
+              isLast={position === steps.length - 1}
             />
           ) : (
             <MilestoneBox step={step} />

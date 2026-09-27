@@ -164,6 +164,46 @@ describe("llm calls", () => {
     response_id: responseId,
   });
 
+  it("adds the generation column to a call log that predates it", () => {
+    const path = join(dir, "calls-before-generation.db");
+    const old = new Database(path);
+    old.exec(`
+      CREATE TABLE research_llm_calls (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, run_id TEXT NOT NULL, seq INTEGER NOT NULL,
+        started_at TEXT NOT NULL, ended_at TEXT NOT NULL, duration_ms INTEGER NOT NULL,
+        model TEXT NOT NULL DEFAULT '', system_prompt TEXT, tools TEXT,
+        context_reset INTEGER NOT NULL DEFAULT 0, context_messages INTEGER NOT NULL DEFAULT 0,
+        input TEXT NOT NULL DEFAULT '[]', output TEXT NOT NULL DEFAULT '{}',
+        stop_reason TEXT NOT NULL DEFAULT '', error TEXT NOT NULL DEFAULT '',
+        usage TEXT NOT NULL DEFAULT '{}', response_id TEXT NOT NULL DEFAULT '', billed_cost REAL
+      );
+    `);
+    old.close();
+
+    const migrated = new SqliteResearchStore(path);
+    try {
+      const run = migrated.createRun({
+        workspaceId: "admin",
+        brief: { product: "x" },
+        model: "m",
+        rejectKinds: [],
+        judgementIds: [],
+        nodes: ["product_data"],
+      });
+      migrated.addLlmCall(call(run.id, 1, "gen-1"));
+      migrated.setLlmCallGeneration(run.id, "gen-1", {
+        cost: 0.01,
+        latency_ms: 949,
+        generation_ms: 38233,
+        reasoning_tokens: 2015,
+        provider: "Parasail",
+      });
+      expect(migrated.listLlmCalls(run.id)[0]!.generation?.latency_ms).toBe(949);
+    } finally {
+      migrated.close();
+    }
+  });
+
   it("round-trips in order, keeping null where the prompt did not change", () => {
     const run = newRun();
     store.addLlmCall(call(run.id, 2, "gen-2"));
@@ -178,14 +218,23 @@ describe("llm calls", () => {
     expect(calls[0]!.billed_cost).toBeNull();
   });
 
-  it("attaches a billed cost to the call it was billed for", () => {
+  it("attaches a generation record, and its billed cost, to the call it belongs to", () => {
     const run = newRun();
     store.addLlmCall(call(run.id, 1, "gen-1"));
     store.addLlmCall(call(run.id, 2, "gen-2"));
-    store.setLlmCallBilled(run.id, "gen-2", 0.0042);
+    const generation = {
+      cost: 0.0042,
+      latency_ms: 949,
+      generation_ms: 38233,
+      reasoning_tokens: 2015,
+      provider: "Parasail",
+    };
+    store.setLlmCallGeneration(run.id, "gen-2", generation);
     const [first, second] = store.listLlmCalls(run.id);
     expect(first!.billed_cost).toBeNull();
+    expect(first!.generation).toBeNull();
     expect(second!.billed_cost).toBeCloseTo(0.0042, 10);
+    expect(second!.generation).toEqual(generation);
   });
 });
 

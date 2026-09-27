@@ -21,6 +21,7 @@ import type { RetryPolicy } from "./retry.js";
 import { ReviewLedger } from "./review-ledger.js";
 import { RunWatch } from "./run-watch.js";
 import { StageTwoHandoff } from "./stage-two-handoff.js";
+import { ToolSteps } from "./tool-steps.js";
 import { ResearchToolset } from "./tools/index.js";
 import { StageTwoRoster } from "../extract/index.js";
 import { Trace } from "../trace/index.js";
@@ -62,6 +63,7 @@ export class RunAgentFactory {
     const source = stageTwo ? this.handoff.forBrief(options.brief, Scope.of(options.workspaceId)) : null;
     const roster = source ? StageTwoRoster.of(source.packet) : [];
     const ledger = new ReviewLedger();
+    const steps = new ToolSteps();
     const watch = new RunWatch({
       store: this.store,
       runs: this.runs,
@@ -71,6 +73,7 @@ export class RunAgentFactory {
       nodes,
       pricing,
       ledger,
+      steps,
     });
     const billed = new BilledCosts(this.store, this.runs, runId);
     const streamFn = new LlmCallLog({
@@ -93,6 +96,7 @@ export class RunAgentFactory {
           productSearch: nodes.includes("competitors"),
           subject: options.brief.product || options.brief.url,
           market: options.brief.market,
+          steps,
           onApifyCharge: (charge) =>
             this.runs.emit(runId, "apify.charged", {
               actor: charge.actor,

@@ -1,4 +1,4 @@
-import type { RunEvent } from '../api';
+import type { RunEvent, ServiceReport, ToolStep } from '../api';
 
 export interface ToolRow {
   key: string;
@@ -6,9 +6,14 @@ export interface ToolRow {
   lane: string;
   preview: string;
   state: 'running' | 'done' | 'error';
+  callId: string;
+  startedAt: string;
+  endedAt?: string;
   duration?: number;
   /** What the failed tool told the model, when the server recorded it. */
   errorText?: string;
+  inside?: ToolStep[];
+  service?: ServiceReport;
 }
 
 /** One box on the timeline: a turn of the agent loop, or a run milestone. */
@@ -24,6 +29,7 @@ export interface Step {
   text: string;
   cls: string;
   error: string;
+  origin: 'code' | 'you' | '';
 }
 const TOOL_VERBS: Record<string, string> = {
   web_search: 'Searched the web',
@@ -59,7 +65,7 @@ function milestoneText(event: RunEvent): { text: string; cls: string } {
       return { text: 'The run ended without a packet — asked once more, tools off', cls: 'rule' };
     case 'run.resumed':
       return {
-        text: `The model stream dropped (${p.error || 'no detail'}) — retry ${p.attempt ?? 1} of 3`,
+        text: `The model stream dropped (${p.error || 'no detail'}) — the code waited ${(Number(p.delay_ms ?? 0) / 1000).toFixed(1)}s and asked it to carry on, retry ${p.attempt ?? 1} of 3`,
         cls: 'rule',
       };
     case 'packet.ready':
@@ -116,6 +122,7 @@ export function buildSteps(events: RunEvent[]): Step[] {
       text: '',
       cls: '',
       error: '',
+      origin: '',
     };
     steps.push(step);
     return step;
@@ -126,14 +133,20 @@ export function buildSteps(events: RunEvent[]): Step[] {
     queue.push(row);
     running.set(tool, queue);
   };
-  /** No correlation id upstream: a completion settles the oldest running call for that tool. */
-  const settleRow = (tool: string, error: unknown, duration: unknown, errorText: unknown) => {
+  /** Pairs on the tool-call id; a run recorded before events carried one settles the oldest running call of that tool. */
+  const settleRow = (event: RunEvent) => {
+    const p = event.payload as Record<string, unknown>;
+    const tool = String(p.tool ?? '');
     const queue = running.get(tool) ?? [];
-    const row = queue.find((r) => r.state === 'running');
+    const callId = String(p.tool_call_id ?? '');
+    const row = queue.find((r) => r.state === 'running' && (!callId || r.callId === callId));
     if (!row) return;
-    row.state = error ? 'error' : 'done';
-    row.duration = Number(duration ?? 0);
-    if (error && errorText) row.errorText = String(errorText);
+    row.state = p.error ? 'error' : 'done';
+    row.endedAt = event.created_at;
+    row.duration = (new Date(event.created_at).getTime() - new Date(row.startedAt).getTime()) / 1000;
+    if (p.error && p.error_text) row.errorText = String(p.error_text);
+    if (Array.isArray(p.inside)) row.inside = p.inside as ToolStep[];
+    if (p.service) row.service = p.service as ServiceReport;
     running.set(
       tool,
       queue.filter((r) => r.state === 'running'),
@@ -161,13 +174,15 @@ export function buildSteps(events: RunEvent[]): Step[] {
         lane: String(p.lane ?? 'other'),
         preview: String(p.preview ?? ''),
         state: 'running',
+        callId: String(p.tool_call_id ?? ''),
+        startedAt: event.created_at,
       };
       startRow(row.tool, row);
       turn.tools.push(row);
       continue;
     }
     if (event.kind === 'tool.completed') {
-      settleRow(String(p.tool ?? ''), p.error, p.duration, p.error_text);
+      settleRow(event);
       continue;
     }
     if (event.kind === 'reasoning.available') {
@@ -196,6 +211,7 @@ export function buildSteps(events: RunEvent[]): Step[] {
       text,
       cls,
       error: '',
+      origin: event.kind === 'run.steered' ? 'you' : 'code',
     });
   }
   return steps;

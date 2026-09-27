@@ -1,6 +1,7 @@
 import {
   Briefs,
   type AccountDirectory,
+  type Generation,
   type Judgement,
   type LlmCall,
   type LlmCallRecord,
@@ -100,9 +101,9 @@ export class SqliteResearchStore implements ResearchStore {
     return this.tables.calls.add(call);
   }
 
-  setLlmCallBilled(runId: string, responseId: string, cost: number): void {
-    Trace.line(import.meta.url, "SqliteResearchStore.setLlmCallBilled", { runId, responseId, cost });
-    this.tables.calls.setBilled(runId, responseId, cost);
+  setLlmCallGeneration(runId: string, responseId: string, generation: Generation): void {
+    Trace.line(import.meta.url, "SqliteResearchStore.setLlmCallGeneration", { runId, responseId, generation });
+    this.tables.calls.setGeneration(runId, responseId, generation);
   }
 
   listLlmCalls(runId: string): LlmCall[] {

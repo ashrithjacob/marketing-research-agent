@@ -1,7 +1,7 @@
 import type { Agent } from "@earendil-works/pi-agent-core";
 
 import { OpenRouterPrices, RunBilling, type Pricing } from "../adapters/index.js";
-import { Clock, type Node, type ResearchStore } from "../domain/index.js";
+import { Clock, type Generation, type Node, type ResearchStore } from "../domain/index.js";
 import { PacketExtractor } from "../extract/index.js";
 
 import { AgentEventRecorder } from "./event-recorder.js";
@@ -9,6 +9,7 @@ import type { LiveRuns } from "./live-runs.js";
 import { AgentMessages } from "./prompt/index.js";
 import { Retries, type RetryPolicy } from "./retry.js";
 import type { ReviewLedger } from "./review-ledger.js";
+import type { ToolSteps } from "./tool-steps.js";
 import { RunSettlement } from "./run-settlement.js";
 import { UsageTotals } from "./usage.js";
 import { Trace } from "../trace/index.js";
@@ -27,6 +28,7 @@ export class RunWatch {
       nodes: readonly Node[];
       pricing: Pricing;
       ledger: ReviewLedger;
+      steps?: ToolSteps;
     },
   ) {
     Trace.line(import.meta.url, "RunWatch.constructor");
@@ -36,9 +38,9 @@ export class RunWatch {
   async run(
     agent: Agent,
     instructions: string,
-    onBilled: (responseId: string, cost: number) => void,
+    onGeneration: (responseId: string, generation: Generation) => void,
   ): Promise<void> {
-    Trace.line(import.meta.url, "RunWatch.run", { agent, instructions, onBilled });
+    Trace.line(import.meta.url, "RunWatch.run", { agent, instructions, onGeneration });
     const { store, runs, costs, retry, runId, nodes, pricing } = this.options;
     let usage = UsageTotals.empty();
     const billing = new RunBilling(costs);
@@ -46,10 +48,10 @@ export class RunWatch {
     const recorder = new AgentEventRecorder(runs, runId, (message) => {
       usage = UsageTotals.add(usage, message.usage);
       const responseId = message.responseId;
-      billing.track(responseId)?.then((cost) => {
-        if (cost !== null && responseId) onBilled(responseId, cost);
+      billing.track(responseId)?.then((generation) => {
+        if (generation !== null && responseId) onGeneration(responseId, generation);
       });
-    });
+    }, this.options.steps);
     const unsubscribe = agent.subscribe((event) => {
       try {
         recorder.record(event);

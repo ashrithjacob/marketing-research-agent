@@ -1,3 +1,6 @@
+import type { Generation } from "../domain/index.js";
+
+import { OpenRouterGeneration } from "./openrouter-generation.js";
 import type { Rates } from "./rates.js";
 import { Money } from "./rates.js";
 import { Trace } from "../trace/index.js";
@@ -8,7 +11,7 @@ const OPENROUTER_API = "https://openrouter.ai/api/v1";
 const PRICE_REFRESH_MS = 6 * 60 * 60 * 1000;
 const LOOKUP_DELAYS_MS = [1000, 2000, 3000, 5000, 8000, 10000];
 
-/** OpenRouter's live list prices, and what a finished generation was billed. */
+/** OpenRouter's live list prices, and what it recorded for a finished generation. */
 export class OpenRouterPrices {
   private readonly apiKey: string;
   private readonly baseUrl: string;
@@ -71,8 +74,8 @@ export class OpenRouterPrices {
     return this.apiKey !== "";
   }
 
-  async generationCost(id: string): Promise<number | null> {
-    Trace.line(import.meta.url, "OpenRouterPrices.generationCost", { id });
+  async generation(id: string): Promise<Generation | null> {
+    Trace.line(import.meta.url, "OpenRouterPrices.generation", { id });
     const url = `${this.baseUrl}/generation?id=${encodeURIComponent(id)}`;
     for (let attempt = 0; ; attempt++) {
       try {
@@ -81,9 +84,8 @@ export class OpenRouterPrices {
           signal: this.controller.signal,
         });
         if (response.ok) {
-          const body = (await response.json()) as { data?: { total_cost?: unknown } };
-          const cost = Number(body.data?.total_cost);
-          return Number.isFinite(cost) ? cost : null;
+          const body = (await response.json()) as { data?: Record<string, unknown> };
+          return body.data ? OpenRouterGeneration.parse(body.data) : null;
         }
         if (response.status !== 404) {
           console.error(`openrouter generation ${id}: HTTP ${response.status}`);

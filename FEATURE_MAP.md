@@ -210,19 +210,49 @@ Header `research cockpit · activity log`, the brief and `Stage N · <scope>` as
 chips, a row of stat cards, then a **vertical timeline** — one box per agent
 action, joined by a line, top to bottom.
 
-- **Boxes** (`logs/timeline.tsx`): an `llm.call` event opens a *turn* box whose
-  collapsed summary is what the agent did ("5 searches", "read 5 pages ·
-  2 searches", "Thought, then answered") plus time, tokens and cost.
-- **Progressive disclosure**: clicking a turn box expands to the reasoning
-  trace, the per-tool rows with the URLs fetched (searches, page reads, packet
-  checks), the model output, and the full LLM call (`logs/CallView.tsx` —
-  prompt, answer, tokens, cost).
-- **Milestones** (run started, packet checked/accepted/rejected, billed, run
-  completed) are separate flat boxes with hollow dots; failures red,
-  acceptance green.
-- The grouping lives in `logs/steps.ts` (`buildSteps`): no correlation id
-  upstream, so a `tool.completed` settles the oldest running row of that tool
-  name — parallel same-tool calls settle in start order.
+- **Turn cards** (`logs/TurnCard.tsx`, badge **MODEL**): each `llm.call` is
+  one pass through the agent loop, in four numbered sections:
+  1. **Sent to the model** — tokens in and cached, and each message new in this
+     call, badged by who produced it: CODE (the instructions, or a message the
+     code injected: retry, nudge, your Step in), MODEL (its previous answer),
+     TOOL (a tool's result).
+  2. **Model output** — first token, thinking length, tokens out; then
+     *Thinking* (first line, expandable), *Said* (the text), *Asked to run*
+     (each tool call with its arguments, in written order), what the stop
+     reason means ("toolUse → the code ran 3 tools"), and **Raw JSON**: the
+     assembled message exactly as stored.
+  3. **Tools** (`logs/ToolLane.tsx`, badge CODE) — one row per tool call,
+     numbered in the order the model wrote them, with a bar showing when it
+     ran within the turn: bars that start together ran in parallel, and the
+     next turn waits for the slowest. Expanding a row shows which tool call
+     asked for it (turn, "call 1 of 3", id), its arguments, and exactly what
+     went back to the model and in which turn's prompt. A failed tool shows
+     what the model was told and **what it did next** (the first thought and
+     tool calls of the turn that received the error).
+     Each row also shows **Inside the tool** (`logs/InsideTool.tsx`): every
+     function the call ran and every HTTP request it sent (`→` out, `←` back
+     with status and time, red when 4xx/5xx or an error), timed from the call's
+     start — the `inside` lines on `tool.completed` (`workings.md` §2e). Above
+     them, a service line when the service reported more than a status, e.g.
+     **SearXNG · 1 of 3 answered ✓ google cse — 20 results ✗ brave — too many
+     requests**. Such a search is marked **DEGRADED** (amber), or **EMPTY** when
+     nothing answered, although the tool itself succeeded.
+  4. **→ the results go into turn #N's prompt**, in the order asked for.
+
+  At the bottom, *Full LLM call* is the previous view (`logs/CallView.tsx`):
+  prompt and answer as sent. Its row shows **first token Ns**, and under the
+  answer an **OpenRouter:** line gives time to the first token, the streaming
+  after it, reasoning tokens and provider, read from `/generation` with the
+  billed cost (`call.generation`, `workings.md` §2a). Both are blank for about
+  four seconds after a call, and on calls from before 2026-09-27.
+- **Milestones** (run started, packet checked/accepted/rejected, retry after a
+  dropped stream, billed, run completed) are flat boxes badged CODE, or YOU for
+  a Step in; failures red, acceptance green.
+- The grouping lives in `logs/steps.ts` (`buildSteps`); the joining of tool
+  calls, executions and results lives in `logs/turn.ts` (`indexCalls`), keyed
+  on `tool_call_id`. A run from before 2026-09-27 has no ids in its events, so
+  a `tool.completed` settles the oldest running row of that tool name and the
+  "asked for / returned" links are missing.
 
 Data still comes from two streams: `GET /api/research/runs/:id/calls?after=<seq>`
 polled incrementally by sequence number, and the SSE event stream
