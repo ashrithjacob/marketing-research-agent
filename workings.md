@@ -99,7 +99,7 @@ Submitting sends:
 
 ```http
 POST /api/research/runs
-{"brief": {"product": "Mullein", "market": "UK"}, "model": "", "nodes": []}
+{"brief": {"product": "Mullein", "market": "UK"}, "nodes": []}
 ```
 
 `nodes: []` is the whole of **stage 1**. The **▶** beside a node in the stage rail opens the
@@ -130,8 +130,27 @@ All of this happens **before the HTTP response is sent**:
 3. **Run row** — written to `research_runs` with status `queued`, the brief, the
    model, the reject list, the judgement ids and the nodes it covers (`runNodes()`:
    stage order, no repeats, empty → all four).
-4. **Model lookup** — `openrouter/<model>`, defaulting to `MRA_MODEL`. Unknown
-   model → the row is set `failed`, a `run.failed` event is written, and the
+4. **Model lookup** — `openrouter/<MRA_MODEL>`. The model is set in `.env` and
+   nowhere else: `Env.required("MRA_MODEL")` has no fallback, both compose files
+   refuse to start without it, and a run request cannot name one (a `model` key is a
+   `400`). *Superseded 2026-09-28:* a request's `model` used to override `MRA_MODEL`,
+   and the code and compose files each carried `z-ai/glm-5.3-flash` as a default —
+   three places a model could come from besides `.env`. Nothing sent a `model`
+   (the cockpit always sent `""`), so it was removed rather than kept.
+
+   **Backups** come from `MRA_BACKUP_MODELS` in `.env` — optional, comma-separated,
+   in fallback order, no id twice. `ModelChain.resolve()` (`agent/model-chain.ts`)
+   looks up the primary and every backup and prices each. They are used two ways:
+
+   - **Before an answer starts** — every request carries OpenRouter's `models` field
+     (the models after the one answering), added through pi-ai's `onPayload` hook
+     (`ModelChain.withFallbacks`). OpenRouter tries them if the request is refused:
+     rate limits, downtime, context length, moderation. It routes providers within
+     each model as it always has; we set no provider preferences.
+   - **After an answer has started** — OpenRouter cannot switch then, so our retry
+     does: see step 0a.
+
+   Any unknown id, primary or backup, → the row is set `failed`, a `run.failed` event is written, and the
    endpoint returns **502**. The row stays, so the runs list still shows the attempt.
    The model is then **priced**: `costs.price()` writes OpenRouter's current list
    rates onto its `cost`, so pi-ai's per-turn arithmetic uses them rather than the
@@ -188,7 +207,17 @@ matches. If the write fails (unwritable or missing volume), the tool still retur
 the text, with `archived: false` and an instruction to record a gap.
 
 A tool that throws (Firecrawl 4xx, SearXNG down, Apify 402) is handed back to the
-model as an error result; the run carries on. Those are the red `ERROR` rows in the
+model as an error result; the run carries on.
+
+**Except a Firecrawl rate limit, which is waited out.** Firecrawl limits requests
+per minute per API key. On a 429, `Firecrawl.scrape` reads how long it asks us to
+wait — a `Retry-After` header, or the "retry after 11s" in its error text — waits
+120% of that (`RateLimitWait`, `adapters/rate-limit-wait.ts`) and tries again, at
+most twice, never past the fetch's own timeout, and stopping at once on Stop. A 429
+that names no wait is reported as before. Why: run `94142db4` (2026-09-28) sent 7
+page reads at once and two came back "Consumed (req/min): 11 / 12, Remaining: 0 …
+retry after 11s"; each went to the model as a failed read, and re-reading costs the
+model a whole turn rather than 13 seconds. Those are the red `ERROR` rows in the
 lanes.
 
 **Every agent event is persisted before it is shown.** `onAgentEvent` turns agent
@@ -223,6 +252,13 @@ Otherwise, when the agent goes idle:
    `isRetryableAssistantError` calls it transient, the run waits and is prompted to
    carry on — the message says the last turn's connection dropped and that the tool
    results above still stand. Event `run.resumed` with `attempt` and `delay_ms`.
+   **Each retry first moves to the next model in `MRA_BACKUP_MODELS`**
+   (`ModelChain.failover`, which sets `agent.state.model`), and `run.resumed`
+   carries `from` and `to`. Once the list is used up, the remaining retries stay on
+   the last model. Why: on run `72c65135` (2026-09-27) GLM-5.3 Flash on Relace
+   timed out four times running at the same step, so retrying the same model only
+   repeated the failure. The failed turn is still redone from its start: pi-ai
+   drops a failed answer before sending, so the backup never sees it (§2b).
    `prompt()` clears `errorMessage` and keeps the transcript, so this continues
    rather than restarts.
 
@@ -347,8 +383,9 @@ The cockpit shows both, because they answer different questions.
   means some turns' charges were never read and `total` is an undercount.
   No `OPENROUTER_API_KEY` → no lookups and no `billed` at all, not $0.
 - **Where a call's time went** — the same `/generation` record also carries
-  `latency` (time to the first token), `generation_time`, `native_tokens_reasoning`
-  and `provider_name`. Since 2026-09-27 the lookup keeps them with the charge, as
+  `model` (the one that actually answered — not always the one asked for, once
+  OpenRouter falls back), `latency` (time to the first token), `generation_time`,
+  `native_tokens_reasoning` and `provider_name`. Since 2026-09-27 the lookup keeps them with the charge, as
   the call's `generation` (`OpenRouterGeneration`,
   `adapters/openrouter-generation.ts`). They cost no extra request. `generation_time` **includes**
   `latency`: on local run `b6f0d355` (2026-09-27) call 6 took 15.0s by our clock,
@@ -386,8 +423,16 @@ all keyed off the run's `nodes`:
   labels a partial run, and the results column shows that run's packet as usual.
 
 **The call log.** `recordLlmCalls()` wraps the agent's `streamFn` — the one place
-that sees the exact context sent to the provider and the exact message returned,
-error responses included. Each call becomes a `research_llm_calls` row: start/end
+that sees the context handed to pi-ai and the exact message returned, error
+responses included. The context is recorded *before* pi-ai converts it for the
+provider, and that conversion drops one kind of message: an assistant answer that
+ended in `error` or `aborted` (`pi-ai/dist/api/transform-messages.js`, the skip
+at "Skip errored/aborted assistant messages entirely"). So after a dropped stream,
+the retry's logged input includes the failed answer, but the model never received
+it. Measured on run `72c65135` (2026-09-27): call 16's input held call 15's
+65,132-character failed answer, and call 16 rebuilt the same plan from scratch in
+99,418 characters. The activity page marks such a message "dropped by pi-ai, not
+sent to the model". Each call becomes a `research_llm_calls` row: start/end
 time, duration, model, stop reason, error, usage (tokens and calculated cost), the
 `gen-…` id, and — once `/generation` answers — `billed_cost` and `generation`
 (§2a: time to first token, generation time, reasoning tokens, provider). The logs
@@ -738,7 +783,6 @@ What the start modal needs to warn you before you pay for a run.
 - **In:**
   ```json
   {"brief": {"product": "Mullein", "market": "UK", "url": "", "notes": ""},
-   "model": "",
    "reject_kinds": [],
    "nodes": []}
   ```
@@ -748,7 +792,8 @@ What the start modal needs to warn you before you pay for a run.
   (adding `https://` if missing) and `product` is left **empty**. `product` is a
   name; a url never belongs in it. Either field satisfies the request, so
   `{"brief": {"url": "https://…"}}` is valid, and only a brief with neither is a
-  `400`. `notes` is accepted and reaches the prompt. Empty `model` means `MRA_MODEL`. Empty
+  `400`. `notes` is accepted and reaches the prompt. There is no `model`: the model is
+  `MRA_MODEL` from `.env`, and sending the key is a `400`. Empty
   `reject_kinds` means the defaults; a non-empty list **replaces** the defaults, and
   judgements then add to it. `nodes` picks what the run researches — any of
   `product_data`, `competitors`, `review_mining`, `category_data`; empty is the
@@ -804,7 +849,7 @@ What the start modal needs to warn you before you pay for a run.
   | `run.steered` | `{judgement_id, text}` |
   | `run.stopping` | `{}` |
   | `run.nudged` | `{reason}` — the run ended without a packet and was asked once more |
-  | `run.resumed` | `{error, attempt, delay_ms}` — the model stream dropped and the run was continued after a backoff |
+  | `run.resumed` | `{error, attempt, delay_ms, from?, to?}` — the model stream dropped and the run was continued after a backoff; `from`/`to` when it moved to the next backup model |
   | `run.completed` | `{usage}` |
   | `run.billed` | `{billed: {total, turns, resolved}}` — after the terminal event |
   | `packet.checked` | `{valid, problems[]}` — one per `validate_packet` call; a failed check is the loop working, not an error |

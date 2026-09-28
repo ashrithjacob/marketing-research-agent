@@ -1,10 +1,19 @@
 import type { Settings } from "../config/index.js";
 
 import { Http } from "./http.js";
+import { RateLimitWait } from "./rate-limit-wait.js";
 import { Trace } from "../trace/index.js";
 
-/** Reads one page as markdown. Throws rather than returning an empty body. */
+interface FirecrawlPayload {
+  success?: boolean;
+  error?: string;
+  data?: { markdown?: string; metadata?: { title?: string } };
+}
+
+/** Reads one page as markdown, waiting out a rate limit when Firecrawl says how long. Throws rather than returning an empty body. */
 export class Firecrawl {
+  static readonly RATE_LIMIT_RETRIES = 2;
+
   constructor(private readonly settings: Settings) {}
 
   async scrape(
@@ -15,7 +24,24 @@ export class Firecrawl {
     if (!this.settings.firecrawlApiKey) {
       throw new Error("FIRECRAWL_API_KEY is not set — web_fetch cannot read pages");
     }
-    const response = await Http.withTimeout(
+    const deadline = Date.now() + this.settings.webTimeoutSeconds * 1000;
+    for (let retry = 0; ; retry++) {
+      const response = await this.request(url, signal);
+      const payload = (await response.json().catch(() => ({}))) as FirecrawlPayload;
+      if (response.ok && payload.success !== false) return Firecrawl.page(payload);
+      const error = `Firecrawl returned ${response.status}: ${payload.error ?? "no body"}`.slice(0, 300);
+      const asked = response.status === 429 ? RateLimitWait.askedMs(response.headers, payload.error ?? "") : null;
+      const waitMs = asked === null ? null : RateLimitWait.withMarginMs(asked);
+      if (waitMs === null || retry >= Firecrawl.RATE_LIMIT_RETRIES || Date.now() + waitMs > deadline) {
+        throw new Error(error);
+      }
+      await RateLimitWait.sleep(waitMs, signal);
+    }
+  }
+
+  private request(url: string, signal?: AbortSignal): Promise<Response> {
+    Trace.line(import.meta.url, "Firecrawl.request", { url });
+    return Http.withTimeout(
       `${this.settings.firecrawlBaseUrl.replace(/\/$/, "")}/v2/scrape`,
       {
         method: "POST",
@@ -28,16 +54,10 @@ export class Firecrawl {
       this.settings.webTimeoutSeconds,
       signal,
     );
-    const payload = (await response.json().catch(() => ({}))) as {
-      success?: boolean;
-      error?: string;
-      data?: { markdown?: string; metadata?: { title?: string } };
-    };
-    if (!response.ok || payload.success === false) {
-      throw new Error(
-        `Firecrawl returned ${response.status}: ${payload.error ?? "no body"}`.slice(0, 300),
-      );
-    }
+  }
+
+  private static page(payload: FirecrawlPayload): { text: string; title: string } {
+    Trace.line(import.meta.url, "Firecrawl.page");
     const text = payload.data?.markdown ?? "";
     if (!text.trim()) throw new Error("Firecrawl returned an empty body for this url");
     return { text, title: payload.data?.metadata?.title ?? "" };

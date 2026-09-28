@@ -30,7 +30,9 @@ export function MessageView({ message }: { message: TraceMessage }) {
     message.role === 'toolResult'
       ? `tool result · ${message.toolName ?? ''}${message.isError ? ' · error' : ''}`
       : message.role === 'assistant'
-        ? 'assistant · its previous answer'
+        ? message.stopReason === 'error' || message.stopReason === 'aborted'
+          ? 'assistant · failed answer — dropped by pi-ai, not sent to the model'
+          : 'assistant · its previous answer'
         : message.role;
   const blocks: ContentBlock[] =
     typeof message.content === 'string'

@@ -1,6 +1,6 @@
 import type { Agent } from "@earendil-works/pi-agent-core";
 
-import { OpenRouterPrices, RunBilling, type Pricing } from "../adapters/index.js";
+import { OpenRouterPrices, RunBilling } from "../adapters/index.js";
 import { Clock, type Generation, type Node, type ResearchStore } from "../domain/index.js";
 import { PacketExtractor } from "../extract/index.js";
 
@@ -10,6 +10,7 @@ import { AgentMessages } from "./prompt/index.js";
 import { Retries, type RetryPolicy } from "./retry.js";
 import type { ReviewLedger } from "./review-ledger.js";
 import type { ToolSteps } from "./tool-steps.js";
+import type { ModelChain } from "./model-chain.js";
 import { RunSettlement } from "./run-settlement.js";
 import { UsageTotals } from "./usage.js";
 import { Trace } from "../trace/index.js";
@@ -26,9 +27,9 @@ export class RunWatch {
       retry: RetryPolicy;
       runId: string;
       nodes: readonly Node[];
-      pricing: Pricing;
       ledger: ReviewLedger;
       steps?: ToolSteps;
+      chain: ModelChain;
     },
   ) {
     Trace.line(import.meta.url, "RunWatch.constructor");
@@ -41,10 +42,10 @@ export class RunWatch {
     onGeneration: (responseId: string, generation: Generation) => void,
   ): Promise<void> {
     Trace.line(import.meta.url, "RunWatch.run", { agent, instructions, onGeneration });
-    const { store, runs, costs, retry, runId, nodes, pricing } = this.options;
+    const { store, runs, costs, retry, runId, nodes, chain } = this.options;
     let usage = UsageTotals.empty();
     const billing = new RunBilling(costs);
-    const recorded = () => ({ ...usage, pricing });
+    const recorded = () => ({ ...usage, pricing: chain.pricing });
     const recorder = new AgentEventRecorder(runs, runId, (message) => {
       usage = UsageTotals.add(usage, message.usage);
       const responseId = message.responseId;
@@ -67,7 +68,8 @@ export class RunWatch {
         const dropped = agent.state.errorMessage ?? "";
         if (!this.shouldRetry(dropped)) break;
         const delayMs = Retries.backoffMs(attempt, retry);
-        runs.emit(runId, "run.resumed", { error: dropped, attempt, delay_ms: delayMs });
+        const moved = chain.failover(agent);
+        runs.emit(runId, "run.resumed", { error: dropped, attempt, delay_ms: delayMs, ...moved });
         await Retries.sleep(delayMs);
         if (store.getRun(runId)?.status === "stopping") break;
         await agent.prompt(AgentMessages.resume(dropped));
@@ -93,7 +95,7 @@ export class RunWatch {
       runs.emit(runId, "run.failed", { error: message });
     } finally {
       unsubscribe();
-      this.keepReviews();
+      this.options.ledger.saveTo(store, runs, runId);
       await this.recordBilling(billing);
       runs.closeSubscribers(runId);
       runs.remove(runId);
@@ -118,17 +120,6 @@ export class RunWatch {
       return false;
     } catch {
       return true;
-    }
-  }
-
-  private keepReviews(): void {
-    Trace.line(import.meta.url, "RunWatch.keepReviews");
-    const { store, runs, runId, ledger } = this.options;
-    try {
-      const saved = store.saveRunReviews(runId, ledger.snapshot());
-      if (saved > 0) runs.emit(runId, "reviews.saved", { reviews: saved });
-    } catch (error) {
-      console.error(`research run ${runId}: saving the reviews failed`, error);
     }
   }
 

@@ -52,7 +52,8 @@ services:
       - MRA_DATABASE_PATH=/data/research.db
       - MRA_CORPUS_PATH=/corpus
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:?OPENROUTER_API_KEY is not set}
-      - MRA_MODEL=${MRA_MODEL:-z-ai/glm-5.3-flash}
+      - MRA_MODEL=${MRA_MODEL:?MRA_MODEL must be set in .env - the model id lives only there}
+      - MRA_BACKUP_MODELS=${MRA_BACKUP_MODELS:-}
       - SEARXNG_URL=http://searxng:8080
       - FIRECRAWL_API_KEY=${FIRECRAWL_API_KEY:?FIRECRAWL_API_KEY is not set}
       # Cheap pre-read gate over every fetch; empty disables. Fails open.

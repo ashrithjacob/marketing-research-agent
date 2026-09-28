@@ -215,11 +215,98 @@ describe("web_fetch", () => {
     );
   });
 
-  it("surfaces a Firecrawl error", async () => {
-    stubFetch(() => json({ success: false, error: "rate limited" }, 429));
+  it("surfaces a Firecrawl error, and does not retry a 429 that names no wait", async () => {
+    let asked = 0;
+    stubFetch(() => {
+      asked += 1;
+      return json({ success: false, error: "rate limited" }, 429);
+    });
     await expect(tools().fetch.execute("1", { url: "https://a.example" })).rejects.toThrow(
       /rate limited/,
     );
+    expect(asked).toBe(1);
+  });
+});
+
+describe("Firecrawl's rate limit", () => {
+  const limited = (seconds: number) =>
+    json(
+      {
+        success: false,
+        error: `Rate limit exceeded. Consumed (req/min): 12, Remaining (req/min): 0. Upgrade your plan at https://firecrawl.dev/pricing for increased rate limits or please retry after ${seconds}s, resets at Mon Sep 28 2026 08:28:46 GMT+0000 (Coordinated Universal Time)`,
+      },
+      429,
+    );
+  const page = () => json({ success: true, data: { markdown: "# page", metadata: { title: "T" } } });
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("waits 120% of the time Firecrawl names, then reads the page", async () => {
+    const at: number[] = [];
+    stubFetch(() => {
+      at.push(Date.now());
+      return at.length === 1 ? limited(11) : page();
+    });
+    const reading = new Firecrawl(settings).scrape("https://a.example");
+    await vi.advanceTimersByTimeAsync(13_199);
+    expect(at).toHaveLength(1);
+    await vi.advanceTimersByTimeAsync(1);
+    await expect(reading).resolves.toEqual({ text: "# page", title: "T" });
+    expect(at[1]! - at[0]!).toBe(13_200);
+  });
+
+  it("prefers a Retry-After header when Firecrawl sends one", async () => {
+    const at: number[] = [];
+    stubFetch(() => {
+      at.push(Date.now());
+      if (at.length > 1) return page();
+      return new Response(JSON.stringify({ success: false, error: "please retry after 11s" }), {
+        status: 429,
+        headers: { "Retry-After": "5" },
+      });
+    });
+    const reading = new Firecrawl(settings).scrape("https://a.example");
+    await vi.advanceTimersByTimeAsync(6_000);
+    await reading;
+    expect(at[1]! - at[0]!).toBe(6_000);
+  });
+
+  it("gives up after two retries, with Firecrawl's own error", async () => {
+    let asked = 0;
+    stubFetch(() => {
+      asked += 1;
+      return limited(1);
+    });
+    const reading = new Firecrawl(settings).scrape("https://a.example");
+    const failed = expect(reading).rejects.toThrow(/Firecrawl returned 429: Rate limit exceeded/);
+    await vi.advanceTimersByTimeAsync(10_000);
+    await failed;
+    expect(asked).toBe(3);
+  });
+
+  it("does not wait past the fetch's own timeout", async () => {
+    let asked = 0;
+    stubFetch(() => {
+      asked += 1;
+      return limited(200);
+    });
+    await expect(new Firecrawl(settings).scrape("https://a.example")).rejects.toThrow(/429/);
+    expect(asked).toBe(1);
+  });
+
+  it("stops waiting the moment the run is stopped", async () => {
+    stubFetch(() => limited(11));
+    const stop = new AbortController();
+    const reading = new Firecrawl(settings).scrape("https://a.example", stop.signal);
+    const stopped = expect(reading).rejects.toThrow();
+    await vi.advanceTimersByTimeAsync(1_000);
+    stop.abort(new Error("stopped"));
+    await stopped;
   });
 });
 

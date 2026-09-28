@@ -6,6 +6,7 @@ export class OpenRouterGeneration {
   static parse(data: Record<string, unknown>): Generation {
     Trace.line(import.meta.url, "OpenRouterGeneration.parse", { data });
     return {
+      model: typeof data.model === "string" ? data.model : "",
       cost: OpenRouterGeneration.number(data.total_cost),
       latency_ms: OpenRouterGeneration.number(data.latency),
       generation_ms: OpenRouterGeneration.number(data.generation_time),

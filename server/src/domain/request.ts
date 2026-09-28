@@ -16,7 +16,6 @@ export type JudgementIn = z.infer<typeof judgementInSchema>;
 export const runRequestSchema = z
   .object({
     brief: briefSchema,
-    model: z.string().default(""),
     reject_kinds: z.array(sourceKindSchema).default([]),
     nodes: z.array(nodeSchema).default([]),
     targets: z.array(z.string()).default([]),

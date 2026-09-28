@@ -109,6 +109,7 @@ export function CallView({ call, calls, index }: { call: LlmCall; calls: LlmCall
 
 function GenerationLine({ generation }: { generation: Generation }) {
   const parts = [
+    generation.model ? `answered by ${generation.model}` : '',
     generation.latency_ms != null ? `first token ${seconds(generation.latency_ms)}` : '',
     generation.generation_ms != null && generation.latency_ms != null
       ? `then ${seconds(generation.generation_ms - generation.latency_ms)} streaming`

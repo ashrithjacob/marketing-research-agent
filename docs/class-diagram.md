@@ -206,6 +206,9 @@ classDiagram
     }
     class Env {
       text()
+      required()
+      list()
+      backups()
       number()
       flag()
       settings()
@@ -335,6 +338,9 @@ classDiagram
       admit()
       parse()
     }
+    class FirecrawlPayload {
+      <<interface>>
+    }
     class Firecrawl {
       scrape()
     }
@@ -351,6 +357,11 @@ classDiagram
       ratesFor()
       generation()
       stop()
+    }
+    class RateLimitWait {
+      askedMs()
+      withMarginMs()
+      sleep()
     }
     class Rates {
       <<interface>>
@@ -500,6 +511,12 @@ classDiagram
     class LlmCallLog {
       wrap()
     }
+    class ModelChain {
+      resolve()
+      fallbacksAfter()
+      failover()
+      withFallbacks()
+    }
     class ModelPricing {
       apply()
     }
@@ -537,6 +554,7 @@ classDiagram
     class ReviewLedger {
       record()
       size()
+      saveTo()
       snapshot()
     }
     class RunAgentFactory {
@@ -713,6 +731,7 @@ classDiagram
   AgentEventRecorder --> LiveRuns
   AgentEventRecorder --> ToolSteps
   LiveRuns --> ResearchStore
+  ModelChain --> Pricing
   ModelPricing --> OpenRouterPrices
   RunAgentFactory --> Settings
   RunAgentFactory --> ResearchStore
@@ -789,10 +808,11 @@ classDiagram
 | `adapters` | `adapters/apify/types.ts` | ReviewExcerpt, ReviewResult, AmazonProduct |
 | `adapters` | `adapters/corpus.ts` | Corpus |
 | `adapters` | `adapters/fetch-gate.ts` | OpenRouterGate |
-| `adapters` | `adapters/firecrawl.ts` | Firecrawl |
+| `adapters` | `adapters/firecrawl.ts` | FirecrawlPayload, Firecrawl |
 | `adapters` | `adapters/http.ts` | Http |
 | `adapters` | `adapters/openrouter-generation.ts` | OpenRouterGeneration |
 | `adapters` | `adapters/openrouter-prices.ts` | OpenRouterPrices |
+| `adapters` | `adapters/rate-limit-wait.ts` | RateLimitWait |
 | `adapters` | `adapters/rates.ts` | Rates, Pricing, Billed, Money |
 | `adapters` | `adapters/run-billing.ts` | RunBilling |
 | `adapters` | `adapters/searxng.ts` | SearchHit, SearchPage, Searxng |
@@ -818,6 +838,7 @@ classDiagram
 | `agent` | `agent/frames.ts` | EventFrame, Frames |
 | `agent` | `agent/live-runs.ts` | Live, LiveRuns |
 | `agent` | `agent/llm-call-log.ts` | LlmCallLog |
+| `agent` | `agent/model-chain.ts` | ModelChain |
 | `agent` | `agent/pricing.ts` | ModelPricing |
 | `agent` | `agent/prompt/blocks.ts` | PromptBlocks |
 | `agent` | `agent/prompt/builder.ts` | PromptBuilder |

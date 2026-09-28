@@ -11,6 +11,23 @@ provider is failing. Everything else keeps today's behaviour.
 Status: **design, not built.** Written 2026-09-21 against the code at that date.
 Nothing here is implemented yet; §10 is the checklist.
 
+> **Superseded in part, 2026-09-28.** Two decisions below are reversed:
+>
+> - **Models are configured, never chosen per run.** The model — and its backups —
+>   are set in `.env` and nowhere else; no run request, UI select or code default can
+>   name one. §2's "chosen per run in the UI", §8.1's catalogue, §8.2's
+>   `backup_model` field, §8.4's modal selects and §9's `MRA_MODEL_CHOICES` are
+>   dropped. Why: the model was defined in four places (code default, two compose
+>   defaults, a per-run request field) besides `.env`, and which one a run used was
+>   not obvious. `MRA_MODEL` is now required with no fallback.
+> - **An ordered list of backups, not one**, using OpenRouter's own model fallbacks
+>   (`models` in the request) for failures before the answer starts, and our retry
+>   moving to the next model for a stream that dies mid-answer — the Relace idle
+>   timeout on run `72c65135`, where the same model failed four times running.
+>   Provider routing stays OpenRouter's.
+>
+> §3's error classes and §6's guards still stand.
+
 ---
 
 ## 1. What already exists (read this first)

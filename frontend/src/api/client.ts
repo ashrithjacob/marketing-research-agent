@@ -43,10 +43,10 @@ export const api = {
   productRuns: (id: string) =>
     request<{ data: RunSummary[] }>(`/api/research/products/${id}/runs`),
   run: (id: string) => request<RunDetail>(`/api/research/runs/${id}`),
-  startRun: (brief: Brief, nodes: ResearchNode[] = [], model = '', targets: string[] = []) =>
+  startRun: (brief: Brief, nodes: ResearchNode[] = [], targets: string[] = []) =>
     request<RunSummary>('/api/research/runs', {
       method: 'POST',
-      body: JSON.stringify({ brief, model, nodes, targets }),
+      body: JSON.stringify({ brief, nodes, targets }),
     }),
   stageTwoPlan: (brief: Brief, targets: string[] = []) =>
     request<StageTwoPlanResponse>('/api/research/stage2/plan', {

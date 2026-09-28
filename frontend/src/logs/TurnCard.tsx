@@ -8,6 +8,7 @@ import {
   askedOf,
   firstLine,
   saidOf,
+  sentCount,
   sentMessages,
   stopMeaning,
   thinkingOf,
@@ -17,17 +18,21 @@ import {
 function Sent({ call }: { call: LlmCall }) {
   const usage = call.usage ?? {};
   const messages = sentMessages(call);
+  const sent = sentCount(call);
   return (
     <section className="turn-sec">
       <h5>1 · Sent to the model</h5>
       <p className="small muted">
-        {formatTokens(Number(usage.input ?? 0) + Number(usage.cacheRead ?? 0))} tokens in (
-        {formatTokens(Number(usage.cacheRead ?? 0))} cached) · {messages.length} new message
-        {messages.length === 1 ? '' : 's'} on top of {call.context_messages - messages.length} already sent
+        {call.error && !Number(usage.input ?? 0) && !Number(usage.cacheRead ?? 0)
+          ? 'tokens in not reported: the stream failed before its last chunk, which carries the counts'
+          : `${formatTokens(Number(usage.input ?? 0) + Number(usage.cacheRead ?? 0))} tokens in (${formatTokens(Number(usage.cacheRead ?? 0))} cached)`}{' '}
+        ·{' '}{sent} new message
+        {sent === 1 ? '' : 's'} on top of {call.context_messages - messages.length} already sent
+        {messages.length > sent ? ` · ${messages.length - sent} dropped by pi-ai before sending` : ''}
       </p>
       <ul className="sent-list">
         {messages.map((m, i) => (
-          <li key={i}>
+          <li key={i} className={m.label.startsWith('its failed') ? 'dropped' : ''}>
             <span className={`badge ${m.who}`}>{m.who.toUpperCase()}</span> {m.label}
             <span className="muted"> — {m.preview}</span>
           </li>
@@ -51,7 +56,11 @@ function Output({ step, call }: { step: Step; call: LlmCall | undefined }) {
       <p className="small muted">
         {g?.latency_ms != null ? `first token ${(g.latency_ms / 1000).toFixed(1)}s · ` : ''}
         {thinking.length.toLocaleString()} chars thinking
-        {call ? ` · ${Number(usage.output ?? 0).toLocaleString()} tokens out` : ' · still streaming'}
+        {!call
+          ? ' · still streaming'
+          : call.error && !Number(usage.output ?? 0)
+            ? ' · tokens out not reported (stream failed)'
+            : ` · ${Number(usage.output ?? 0).toLocaleString()} tokens out`}
         {g?.reasoning_tokens != null ? ` (${g.reasoning_tokens.toLocaleString()} reasoning)` : ''}
       </p>
       <dl className="out-parts">

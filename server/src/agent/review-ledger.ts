@@ -1,6 +1,8 @@
 import type { ReviewExcerpt } from "../adapters/apify/index.js";
-import type { LedgerPull, LedgerReview, ReviewLedgerSnapshot } from "../domain/index.js";
+import type { LedgerPull, LedgerReview, ResearchStore, ReviewLedgerSnapshot } from "../domain/index.js";
 import { Trace } from "../trace/index.js";
+
+import type { LiveRuns } from "./live-runs.js";
 
 /** Every review this run has fetched, under a short ref, so the packet and the database get them without the model copying any. */
 export class ReviewLedger {
@@ -46,6 +48,16 @@ export class ReviewLedger {
   size(): number {
     Trace.line(import.meta.url, "ReviewLedger.size");
     return this.reviews.length;
+  }
+
+  saveTo(store: ResearchStore, runs: LiveRuns, runId: string): void {
+    Trace.line(import.meta.url, "ReviewLedger.saveTo", { runId });
+    try {
+      const saved = store.saveRunReviews(runId, this.snapshot());
+      if (saved > 0) runs.emit(runId, "reviews.saved", { reviews: saved });
+    } catch (error) {
+      console.error(`research run ${runId}: saving the reviews failed`, error);
+    }
   }
 
   snapshot(): ReviewLedgerSnapshot {

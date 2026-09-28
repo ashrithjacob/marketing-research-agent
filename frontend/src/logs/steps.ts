@@ -65,7 +65,7 @@ function milestoneText(event: RunEvent): { text: string; cls: string } {
       return { text: 'The run ended without a packet — asked once more, tools off', cls: 'rule' };
     case 'run.resumed':
       return {
-        text: `The model stream dropped (${p.error || 'no detail'}) — the code waited ${(Number(p.delay_ms ?? 0) / 1000).toFixed(1)}s and asked it to carry on, retry ${p.attempt ?? 1} of 3`,
+        text: `The model stream dropped (${p.error || 'no detail'}) — the code waited ${(Number(p.delay_ms ?? 0) / 1000).toFixed(1)}s and ${p.to ? `moved from ${p.from} to the next model in .env, ${p.to}` : 'asked the same model to carry on'}, retry ${p.attempt ?? 1} of 3`,
         cls: 'rule',
       };
     case 'packet.ready':

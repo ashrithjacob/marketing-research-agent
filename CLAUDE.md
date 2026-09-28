@@ -33,7 +33,7 @@ it failing gets sent back.
 from two sessions a week apart is comparable. `mra help`, or the `mra-control`
 skill.
 
-## Five rules that are not about code
+## Six rules that are not about code
 
 These are the corrections that have had to be given most often here. They are
 in this file because no lint rule can catch them.
@@ -70,6 +70,13 @@ To see a change work, run `product_data` alone (`mra run "<brief>" product_data`
 which only uses web search and page fetches. If the change can only be seen
 through an Apify tool, ask first and say what the run will cost. One run is
 enough to verify something; don't rerun to polish.
+
+**6. Answer the question asked, and stop.** The work here is building the app
+and helping the user understand its code. A question gets its answer and the
+evidence for it — not the adjacent gotchas, follow-up options, "what catches
+people", or what a later feature will look like. Add a nuance only if it changes
+a decision the user is making or the code being written. If something unrelated
+looks wrong, one line saying so is enough; don't explain it unasked.
 
 ## Architecture
 

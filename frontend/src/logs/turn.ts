@@ -100,7 +100,13 @@ export function sentMessages(call: LlmCall): SentMessage[] {
       };
     }
     if (message.role === 'assistant') {
-      return { who: 'model', label: 'its own previous answer', preview };
+      return {
+        who: 'model',
+        label: droppedBeforeSending(message)
+          ? 'its failed answer — dropped by pi-ai, not sent to the model'
+          : 'its own previous answer',
+        preview,
+      };
     }
     return {
       who: 'code',
@@ -108,6 +114,15 @@ export function sentMessages(call: LlmCall): SentMessage[] {
       preview,
     };
   });
+}
+
+/** pi-ai leaves errored and aborted answers out of what it sends, so the model never sees them again. */
+export function droppedBeforeSending(message: TraceMessage): boolean {
+  return message.role === 'assistant' && (message.stopReason === 'error' || message.stopReason === 'aborted');
+}
+
+export function sentCount(call: LlmCall): number {
+  return call.input.filter((m) => !droppedBeforeSending(m)).length;
 }
 
 export function stopMeaning(call: LlmCall | undefined): string {

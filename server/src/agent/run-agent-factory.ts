@@ -1,7 +1,7 @@
 import { Agent } from "@earendil-works/pi-agent-core";
-import type { Api, Model, Models } from "@earendil-works/pi-ai";
+import type { Models } from "@earendil-works/pi-ai";
 
-import { OpenRouterPrices, type Pricing } from "../adapters/index.js";
+import { OpenRouterPrices } from "../adapters/index.js";
 import type { ActorRunner } from "../adapters/apify/index.js";
 import type { Settings } from "../config/index.js";
 import type {
@@ -15,6 +15,7 @@ import { Scope, Stages } from "../domain/index.js";
 
 import { BilledCosts } from "./billed-costs.js";
 import { LlmCallLog } from "./llm-call-log.js";
+import type { ModelChain } from "./model-chain.js";
 import type { LiveRuns } from "./live-runs.js";
 import type { PromptBuilder } from "./prompt/index.js";
 import type { RetryPolicy } from "./retry.js";
@@ -44,7 +45,7 @@ export class RunAgentFactory {
     this.handoff = new StageTwoHandoff(store);
   }
 
-  assemble<TApi extends Api>(
+  assemble(
     runId: string,
     options: {
       workspaceId: string;
@@ -52,13 +53,12 @@ export class RunAgentFactory {
       nodes: readonly Node[];
       rejectKinds: SourceKind[];
       judgements: readonly Judgement[];
-      model: Model<TApi>;
-      pricing: Pricing;
+      chain: ModelChain;
       targets?: readonly string[];
     },
   ): { agent: Agent; done: Promise<void> } {
     Trace.line(import.meta.url, "RunAgentFactory.assemble", { runId, options });
-    const { nodes, model, pricing } = options;
+    const { nodes, chain } = options;
     const stageTwo = Stages.covering(nodes) === 2;
     const source = stageTwo ? this.handoff.forBrief(options.brief, Scope.of(options.workspaceId)) : null;
     const roster = source ? StageTwoRoster.of(source.packet) : [];
@@ -71,22 +71,22 @@ export class RunAgentFactory {
       retry: this.retry,
       runId,
       nodes,
-      pricing,
       ledger,
       steps,
+      chain,
     });
     const billed = new BilledCosts(this.store, this.runs, runId);
     const streamFn = new LlmCallLog({
       runId,
       store: this.store,
       onCall: billed.onCall,
-    }).wrap((m, c, o) => this.models.streamSimple(m, c, o));
+    }).wrap((m, c, o) => this.models.streamSimple(m, c, { ...o, onPayload: chain.withFallbacks(o?.onPayload) }));
     const agent = new Agent({
       streamFn,
       sessionId: `research-${runId}`,
       initialState: {
         systemPrompt: this.prompts.system(nodes),
-        model,
+        model: chain.current,
         tools: new ResearchToolset({
           settings: this.settings,
           runId,

@@ -20,7 +20,8 @@ function stateLabel(row: ToolRow) {
 }
 
 function stateClass(row: ToolRow) {
-  return row.state === 'done' && row.service && row.service.outcome !== 'ok' ? `${row.state} ${row.service.outcome}` : row.state;
+  const service = row.state === 'done' && row.service && row.service.outcome !== 'ok' ? ` st-${row.service.outcome}` : '';
+  return `st-${row.state}${service}`;
 }
 
 function ToolLine({ row, index, t0, span, now }: {

@@ -246,7 +246,7 @@ action, joined by a line, top to bottom.
   billed cost (`call.generation`, `workings.md` §2a). Both are blank for about
   four seconds after a call, and on calls from before 2026-09-27.
 - **Milestones** (run started, packet checked/accepted/rejected, retry after a
-  dropped stream, billed, run completed) are flat boxes badged CODE, or YOU for
+  dropped stream — naming the backup model it moved to, billed, run completed) are flat boxes badged CODE, or YOU for
   a Step in; failures red, acceptance green.
 - The grouping lives in `logs/steps.ts` (`buildSteps`); the joining of tool
   calls, executions and results lives in `logs/turn.ts` (`indexCalls`), keyed

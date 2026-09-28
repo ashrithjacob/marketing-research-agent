@@ -192,6 +192,7 @@ describe("llm calls", () => {
       });
       migrated.addLlmCall(call(run.id, 1, "gen-1"));
       migrated.setLlmCallGeneration(run.id, "gen-1", {
+        model: "z-ai/glm-5.3-flash",
         cost: 0.01,
         latency_ms: 949,
         generation_ms: 38233,
@@ -223,6 +224,7 @@ describe("llm calls", () => {
     store.addLlmCall(call(run.id, 1, "gen-1"));
     store.addLlmCall(call(run.id, 2, "gen-2"));
     const generation = {
+      model: "z-ai/glm-5.3-flash",
       cost: 0.0042,
       latency_ms: 949,
       generation_ms: 38233,

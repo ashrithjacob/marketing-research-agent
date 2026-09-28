@@ -112,6 +112,7 @@ describe("billed cost", () => {
       status: 200,
       body: {
         data: {
+          model: "z-ai/glm-5.3-flash-20260826",
           total_cost: 0.0317,
           latency: 1759,
           generation_time: 252063,
@@ -123,6 +124,7 @@ describe("billed cost", () => {
     }));
     const costs = new OpenRouterPrices({ apiKey: "k", fetch, lookupDelaysMs: [] });
     expect(await costs.generation("gen-1")).toEqual({
+      model: "z-ai/glm-5.3-flash-20260826",
       cost: 0.0317,
       latency_ms: 1759,
       generation_ms: 252063,

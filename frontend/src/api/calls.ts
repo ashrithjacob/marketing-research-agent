@@ -44,6 +44,7 @@ export interface TraceMessage {
 
 /** What OpenRouter recorded for one call: its charge, and where its time went. */
 export interface Generation {
+  model: string;
   cost: number | null;
   latency_ms: number | null;
   generation_ms: number | null;

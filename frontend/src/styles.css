@@ -596,7 +596,6 @@ button.tile-chip.active {
 }
 .timeline {
   margin: 0; padding: 0; list-style: none; position: relative;
-  max-width: 880px;
 }
 .tl-step { position: relative; padding: 0 0 14px 34px; }
 .tl-step::before {
@@ -663,8 +662,8 @@ button.tile-chip.active {
   font-family: var(--font-mono); font-size: 9.5px; letter-spacing: 0.05em;
   color: var(--ok); flex: 0 0 auto; width: 62px;
 }
-.tl-tool.running .tl-tool-state { color: var(--accent); }
-.tl-tool.error .tl-tool-state { color: var(--bad); }
+.tl-tool.st-running .tl-tool-state { color: var(--accent); }
+.tl-tool.st-error .tl-tool-state { color: var(--bad); }
 .tl-tool-what { flex: 1; min-width: 0; color: var(--dim); word-break: break-word; }
 .tl-tool-err { display: block; margin-top: 2px; color: var(--bad); font-size: 11.5px; font-family: var(--font-mono); }
 .tl-tool-dur { color: var(--faint); font-size: 11px; flex: 0 0 auto; }
@@ -683,6 +682,7 @@ button.tile-chip.active {
 .turn-sec h5 { margin: 0; font-size: 11px; letter-spacing: 0.05em; text-transform: uppercase; color: var(--dim); }
 .sent-list { margin: 0; padding: 0; list-style: none; display: grid; gap: 3px; font-size: 12px; }
 .sent-list li { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sent-list li.dropped { text-decoration: line-through; color: var(--faint); }
 .out-parts { display: grid; grid-template-columns: 96px 1fr; gap: 6px 12px; margin: 0; font-size: 12.5px; }
 .out-parts dt { color: var(--faint); font-size: 11px; padding-top: 2px; }
 .out-parts dd { margin: 0; min-width: 0; }
@@ -700,8 +700,8 @@ details.tl-tool.lane[open] > summary { border-bottom: 1px solid var(--line); }
   position: relative; flex: 0 0 160px; height: 8px; background: var(--panel-2); border-radius: 4px;
 }
 .tl-bar { position: absolute; top: 0; bottom: 0; border-radius: 4px; background: var(--ok); }
-.tl-bar.running { background: var(--accent); }
-.tl-bar.error { background: var(--bad); }
+.tl-bar.st-running { background: var(--accent); }
+.tl-bar.st-error { background: var(--bad); }
 .tl-tool-body { display: grid; gap: 6px; padding: 9px 11px; }
 .tl-tool-body p { margin: 0; }
 .tl-next { color: var(--dim); }
@@ -740,9 +740,9 @@ details.tl-tool.lane[open] > summary { border-bottom: 1px solid var(--line); }
 .comp-copy { color: var(--ink); font-style: italic; margin-top: 4px; }
 
 /* ---------- inside a tool call: its code path and the services it asked ---------- */
-.tl-tool.degraded .tl-tool-state, .tl-tool.failed .tl-tool-state { color: var(--warn); }
-.tl-bar.degraded { background: var(--warn); }
-.tl-bar.failed { background: var(--bad); }
+.tl-tool.st-degraded .tl-tool-state, .tl-tool.st-failed .tl-tool-state { color: var(--warn); }
+.tl-bar.st-degraded { background: var(--warn); }
+.tl-bar.st-failed { background: var(--bad); }
 .inside { display: grid; gap: 6px; }
 .service { margin: 0; display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; }
 .service.degraded b, .service.failed b { color: var(--warn); }

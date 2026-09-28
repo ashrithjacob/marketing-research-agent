@@ -11,7 +11,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { createModels, type MutableModels } from "@earendil-works/pi-ai";
+import { createModels, getCurrentSystemPrompt, getCurrentTools, type JsonValue, type MutableModels } from "@earendil-works/pi-ai";
 import { fauxAssistantMessage, fauxProvider, fauxToolCall } from "@earendil-works/pi-ai/providers/faux";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
@@ -163,17 +163,51 @@ describe("settling a run", () => {
     expect(usage.totalTokens).toBeGreaterThan(0);
   });
 
-  it("fails the run when the model is not one the provider has", async () => {
-    expect(() => supervisor.start(request({ model: "no-such-model" }), "admin")).toThrow(/unknown model/);
+  it("fails the run when the model in .env is not one the provider has", async () => {
+    await supervisor.close();
+    supervisor = new RunSupervisor({ store, settings: { ...settings, model: "no-such-model" }, models, retry: FAST_RETRY });
+    expect(() => supervisor.start(request(), "admin")).toThrow(/unknown model "no-such-model"/);
     const run = store.listRuns(Scope.everything)[0]!;
     expect(run.status).toBe("failed");
     expect(run.error).toMatch(/unknown model/);
+  });
+
+  it("moves to the next backup in .env when the stream dies mid-answer", async () => {
+    const backup = "backup/model";
+    await supervisor.close();
+    faux = fauxProvider({ provider: "openrouter", models: [{ id: MODEL_ID }, { id: backup }] });
+    models = createModels();
+    models.setProvider(faux.provider);
+    supervisor = new RunSupervisor({ store, settings: { ...settings, backupModels: [backup] }, models, retry: FAST_RETRY });
+    faux.setResponses([
+      fauxAssistantMessage("", { stopReason: "error", errorMessage: "Upstream idle timeout exceeded" }),
+      fauxAssistantMessage(fenced(minimalPacket())),
+    ]);
+    const runId = supervisor.start(request(), "admin");
+    await supervisor.waitFor(runId);
+
+    const resumed = store.listEvents(runId).find((e) => e.kind === "run.resumed")!.payload as any;
+    expect(resumed).toMatchObject({ from: MODEL_ID, to: backup, attempt: 1 });
+    expect(store.listLlmCalls(runId).map((c) => c.model)).toEqual([MODEL_ID, backup]);
+    expect(store.getRun(runId)!.status).toBe("completed");
+  });
+
+  it("fails the run when a backup in .env is not a model the provider has", async () => {
+    await supervisor.close();
+    supervisor = new RunSupervisor({ store, settings: { ...settings, backupModels: ["no/such-backup"] }, models, retry: FAST_RETRY });
+    expect(() => supervisor.start(request(), "admin")).toThrow(/unknown model "no\/such-backup"/);
+  });
+
+  it("takes the model from .env only: a run request cannot name one", () => {
+    expect(() => runRequestSchema.parse({ brief: { product: "x" }, model: "other/model" })).toThrow(/model/);
+    const runId = supervisor.start(request(), "admin");
+    expect(store.getRun(runId)!.model).toBe(MODEL_ID);
   });
 });
 
 describe("the packet check tool", () => {
   /** A turn that calls validate_packet with `packet`, then a final text turn. */
-  const checkThen = (packet: unknown, final: string) => [
+  const checkThen = (packet: JsonValue, final: string) => [
     fauxAssistantMessage(fauxToolCall("validate_packet", { packet }), { stopReason: "toolUse" }),
     fauxAssistantMessage(final),
   ];
@@ -818,9 +852,9 @@ describe("a run that covers part of the stage", () => {
     faux.setResponses([
       (context) => {
         seen = {
-          system: context.systemPrompt,
-          tools: (context.tools ?? []).map((t) => t.name),
-          prompt: JSON.stringify(context.messages[0]),
+          system: getCurrentSystemPrompt(context.messages),
+          tools: getCurrentTools(context.messages).map((t) => t.name),
+          prompt: JSON.stringify(context.messages.find((m) => m.role === "user")),
         };
         return fauxAssistantMessage(fenced(minimalPacket()));
       },
@@ -865,7 +899,7 @@ describe("a run that covers part of the stage", () => {
     let tools: string[] = [];
     faux.setResponses([
       (context) => {
-        tools = (context.tools ?? []).map((t) => t.name);
+        tools = getCurrentTools(context.messages).map((t) => t.name);
         return fauxAssistantMessage(fenced(minimalPacket()));
       },
     ]);
@@ -879,7 +913,7 @@ describe("a run that covers part of the stage", () => {
     let tools: string[] = [];
     faux.setResponses([
       (context) => {
-        tools = (context.tools ?? []).map((t) => t.name);
+        tools = getCurrentTools(context.messages).map((t) => t.name);
         return fauxAssistantMessage(fenced(minimalPacket()));
       },
     ]);

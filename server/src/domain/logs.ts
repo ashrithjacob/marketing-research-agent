@@ -85,6 +85,7 @@ export interface LlmCallRecord {
 
 /** What OpenRouter recorded for one generation: its charge, and where its time went. */
 export interface Generation {
+  model: string;
   cost: number | null;
   latency_ms: number | null;
   generation_ms: number | null;

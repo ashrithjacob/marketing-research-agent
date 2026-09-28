@@ -7,10 +7,11 @@ import { Trace } from "../trace/index.js";
 
 import { RunError } from "./errors.js";
 import type { LiveRuns } from "./live-runs.js";
+import { ModelChain } from "./model-chain.js";
 import { ModelPricing } from "./pricing.js";
 import type { RunAgentFactory } from "./run-agent-factory.js";
 
-/** Starts one run: records it, resolves the model and price, and hands the agent to LiveRuns. */
+/** Starts one run: records it, resolves its models and prices, and hands the agent to LiveRuns. */
 export class RunLauncher {
   constructor(
     private readonly store: ResearchStore,
@@ -25,7 +26,7 @@ export class RunLauncher {
     Trace.line(import.meta.url, "RunLauncher.launch", { request, workspaceId });
     const judgements = this.store.listJudgements(Scope.of(workspaceId), true);
     const rejectKinds = RejectKinds.effective(request, judgements);
-    const modelId = request.model || this.settings.model;
+    const modelId = this.settings.model;
     const nodes = Stages.expand(request.nodes);
 
     const run = this.store.createRun({
@@ -38,14 +39,17 @@ export class RunLauncher {
       stage: Stages.covering(nodes) ?? 1,
     });
 
-    const listed = this.models.getModel("openrouter", modelId);
-    if (!listed) {
-      const error = `unknown model ${JSON.stringify(modelId)} for provider openrouter`;
+    const resolved = ModelChain.resolve(
+      [modelId, ...this.settings.backupModels],
+      this.models,
+      new ModelPricing(this.costs),
+    );
+    if ("unknown" in resolved) {
+      const error = `unknown model ${JSON.stringify(resolved.unknown)} for provider openrouter`;
       this.store.updateRun(run.id, { status: "failed", error, ended_at: Clock.nowIso() });
       this.runs.emit(run.id, "run.failed", { error });
       throw new RunError(error);
     }
-    const { model, pricing } = new ModelPricing(this.costs).apply(listed);
 
     const header = { product: request.brief.product, url: request.brief.url, model: modelId, nodes };
     const { agent, done } = Trace.within(run.id, header, () =>
@@ -55,8 +59,7 @@ export class RunLauncher {
         nodes,
         rejectKinds,
         judgements,
-        model,
-        pricing,
+        chain: resolved.chain,
         targets: request.targets,
       }),
     );

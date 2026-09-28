@@ -1,5 +1,5 @@
 import type { StreamFn } from "@earendil-works/pi-agent-core";
-import type { AssistantMessage, Message } from "@earendil-works/pi-ai";
+import { getCurrentSystemPrompt, getCurrentTools, type AssistantMessage, type Message } from "@earendil-works/pi-ai";
 
 import type { LlmCall, ResearchStore } from "../domain/index.js";
 import { Trace } from "../trace/index.js";
@@ -25,7 +25,7 @@ export class LlmCallLog {
       const n = ++this.seq;
       const started = Date.now();
 
-      const messages = context.messages;
+      const messages = context.messages.filter((m) => m.role !== "system");
       let prefix = 0;
       while (
         prefix < this.previous.length &&
@@ -40,11 +40,11 @@ export class LlmCallLog {
       ) as unknown[];
       this.previous = [...messages];
 
-      const systemPrompt = context.systemPrompt ?? "";
+      const systemPrompt = getCurrentSystemPrompt(context.messages);
       const system = systemPrompt !== this.lastSystem ? systemPrompt : null;
       this.lastSystem = systemPrompt;
 
-      const toolList = (context.tools ?? []).map((t) => ({
+      const toolList = getCurrentTools(context.messages).map((t) => ({
         name: t.name,
         description: t.description,
         parameters: t.parameters,

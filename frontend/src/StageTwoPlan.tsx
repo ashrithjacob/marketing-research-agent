@@ -46,7 +46,7 @@ export default function StageTwoPlan({
     setBusy(true);
     setError('');
     try {
-      const run = await api.startRun(brief, ['review_mining'], '', selected);
+      const run = await api.startRun(brief, ['review_mining'], selected);
       await onStarted(run);
     } catch (e) {
       setError((e as Error).message);

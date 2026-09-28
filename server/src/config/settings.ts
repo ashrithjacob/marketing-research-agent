@@ -9,6 +9,7 @@ export interface Settings {
 
   openrouterApiKey: string;
   model: string;
+  backupModels: string[];
 
   searxngUrl: string;
   firecrawlApiKey: string;
@@ -43,6 +44,34 @@ export class Env {
     return value === undefined || value === "" ? fallback : value;
   }
 
+  static required(name: string): string {
+    Trace.line(import.meta.url, "Env.required", { name });
+    const value = process.env[name];
+    if (value === undefined || value.trim() === "") {
+      throw new Error(`${name} is not set. It lives only in .env; the code carries no default.`);
+    }
+    return value.trim();
+  }
+
+  static list(name: string): string[] {
+    Trace.line(import.meta.url, "Env.list", { name });
+    return (process.env[name] ?? "")
+      .split(",")
+      .map((item) => item.trim())
+      .filter((item) => item !== "");
+  }
+
+  static backups(primary: string): string[] {
+    Trace.line(import.meta.url, "Env.backups", { primary });
+    const backups = Env.list("MRA_BACKUP_MODELS");
+    const chain = [primary, ...backups];
+    const repeated = chain.find((id, index) => chain.indexOf(id) !== index);
+    if (repeated) {
+      throw new Error(`MRA_BACKUP_MODELS repeats ${repeated}: a model can appear once, primary included.`);
+    }
+    return backups;
+  }
+
   static number(name: string, fallback: number): number {
     Trace.line(import.meta.url, "Env.number", { name, fallback });
     const raw = process.env[name];
@@ -63,6 +92,7 @@ export class Env {
 
   static settings(): Settings {
     Trace.line(import.meta.url, "Env.settings");
+    const model = Env.required("MRA_MODEL");
     return {
 
       appUser: Env.text("MRA_APP_USER", "ash"),
@@ -72,7 +102,8 @@ export class Env {
       cookieSecure: Env.flag("MRA_COOKIE_SECURE", true),
 
       openrouterApiKey: Env.text("OPENROUTER_API_KEY", ""),
-      model: Env.text("MRA_MODEL", "z-ai/glm-5.3-flash"),
+      model,
+      backupModels: Env.backups(model),
 
       searxngUrl: Env.text("SEARXNG_URL", "http://searxng:8080"),
       firecrawlApiKey: Env.text("FIRECRAWL_API_KEY", ""),
