@@ -13,4 +13,5 @@ export * from "./reject-kinds.js";
 export * from "./accounts.js";
 export * from "./ports.js";
 export * from "./reviews.js";
+export * from "./review-analysis.js";
 export * from "./service-report.js";

@@ -37,6 +37,11 @@ export class ModelChain {
     return this.models[this.position]!;
   }
 
+  get sequence(): readonly Model<Api>[] {
+    Trace.line(import.meta.url, "ModelChain.sequence");
+    return this.models;
+  }
+
   fallbacksAfter(id: string): string[] {
     Trace.line(import.meta.url, "ModelChain.fallbacksAfter", { id });
     const index = this.models.findIndex((m) => m.id === id);

@@ -1,8 +1,8 @@
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
 
-import { StageTwoPlanner, type StageTwoHandoff } from "../agent/index.js";
+import { StageTwoListings, StageTwoPlanner, type StageTwoHandoff } from "../agent/index.js";
 import type { Settings } from "../config/index.js";
-import { Briefs, Scope, stageTwoPlanRequestSchema } from "../domain/index.js";
+import { Briefs, Scope, stageTwoPlanRequestSchema, type ResearchRun, type StagePacket } from "../domain/index.js";
 import { StageTwoRoster } from "../extract/index.js";
 import type { ApiEnv } from "./api-env.js";
 import { Trace } from "../trace/index.js";
@@ -12,33 +12,49 @@ export class StageTwoRoutes {
   constructor(
     private readonly handoff: StageTwoHandoff,
     private readonly settings: Settings,
+    private readonly listings: StageTwoListings,
   ) {}
 
   register(api: Hono<ApiEnv>): void {
     Trace.line(import.meta.url, "StageTwoRoutes.register");
     api.post("/stage2/plan", async (c) => {
-      const parsed = stageTwoPlanRequestSchema.safeParse(await c.req.json().catch(() => null));
-      if (!parsed.success) {
-        return c.json({ detail: parsed.error.issues.map((i) => i.message).join("; ") }, 400);
-      }
-      const brief = Briefs.normalise(parsed.data.brief);
-      const source = this.handoff.forBrief(brief, Scope.of(c.get("principal").workspaceId));
-      if (!source) {
-        return c.json({
+      const found = await this.source(c);
+      if ("error" in found) return found.error;
+      const cached = this.listings.cached(found.run.id);
+      const full = StageTwoListings.withAmazon(StageTwoRoster.of(found.packet), cached);
+      const selected = StageTwoRoster.select(full, found.targets);
+      const plan = new StageTwoPlanner(this.settings.apifyMaxReviews).plan(selected, found.run.id);
+      if (!plan) return c.json({ ready: false, detail: "stage-1 packet names no targets" });
+      return c.json({ ready: true, plan, listings: cached, lookup_available: this.listings.available });
+    });
+    api.post("/stage2/listings", async (c) => {
+      const found = await this.source(c);
+      if ("error" in found) return found.error;
+      if (!this.listings.available) return c.json({ detail: "APIFY_TOKEN is not set, so Amazon cannot be searched" }, 409);
+      return c.json({ listings: await this.listings.ensure(found.run.id, StageTwoRoster.of(found.packet)) });
+    });
+  }
+
+  private async source(
+    c: Context<ApiEnv>,
+  ): Promise<{ run: ResearchRun; packet: StagePacket; targets: string[] } | { error: Response }> {
+    Trace.line(import.meta.url, "StageTwoRoutes.source");
+    const parsed = stageTwoPlanRequestSchema.safeParse(await c.req.json().catch(() => null));
+    if (!parsed.success) {
+      return { error: c.json({ detail: parsed.error.issues.map((i) => i.message).join("; ") }, 400) };
+    }
+    const brief = Briefs.normalise(parsed.data.brief);
+    const source = this.handoff.forBrief(brief, Scope.of(c.get("principal").workspaceId));
+    if (!source) {
+      return {
+        error: c.json({
           ready: false,
           detail:
             "no stage-1 packet for this subject yet. Run stage 1 for this brief first, " +
             "and let it complete — its packet names the listings stage 2 mines.",
-        });
-      }
-      const full = StageTwoRoster.of(source.packet);
-      const selected = StageTwoRoster.select(full, parsed.data.targets);
-      const plan = new StageTwoPlanner(this.settings.apifyMaxReviews).plan(
-        selected,
-        source.run.id,
-      );
-      if (!plan) return c.json({ ready: false, detail: "stage-1 packet names no targets" });
-      return c.json({ ready: true, plan });
-    });
+        }),
+      };
+    }
+    return { ...source, targets: parsed.data.targets };
   }
 }

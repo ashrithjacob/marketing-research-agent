@@ -12,11 +12,12 @@ export class RosterBlock {
     const lines = ["## Targets from stage 1", "", ROSTER_LEAD, ""];
     for (const target of targets) {
       const inScope = selected.length === 0 || chosen.has(target.id);
-      const known = StageTwoRoster.amazonListing(target.url) ? " (Amazon listing known — skip the search)" : "";
+      const known = target.amazon_url || StageTwoRoster.amazonListing(target.url) ? " (Amazon listing known — skip the search)" : "";
       const state = inScope ? known : " (out of scope this run)";
       lines.push(
         `- **${target.id}** — ${RELATION_LABEL[target.relation]}${state}: ${target.name} ` +
-          `(${target.form}; shares ${target.actives.join(", ")})${target.url ? ` — ${target.url}` : ""}`,
+          `(${target.form}; shares ${target.actives.join(", ")})${target.url ? ` — ${target.url}` : ""}` +
+          (target.amazon_url ? ` — Amazon: ${target.amazon_url}` : ""),
       );
     }
     lines.push("", ROSTER_METHOD);

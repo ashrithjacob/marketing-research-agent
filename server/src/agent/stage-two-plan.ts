@@ -7,6 +7,7 @@ import {
   START_FEE_USD,
   UNIT_PRICE_USD,
 } from "../adapters/apify/actors.js";
+import { StageTwoRoster } from "../extract/index.js";
 import { Trace } from "../trace/index.js";
 
 /** The stage-2 go-ahead a human approves: which targets, how many reviews, what it costs. */
@@ -20,8 +21,9 @@ export class StageTwoPlanner {
     if (targets.length === 0) return null;
     const perTargetReviews = StageTwoPlanner.BANDS * this.reviewsPerBand;
     const reviews = targets.length * perTargetReviews;
+    const unresolved = targets.filter((t) => !t.amazon_url && !StageTwoRoster.amazonListing(t.url)).length;
     const amazon =
-      targets.length * UNIT_PRICE_USD[AMAZON_SEARCH_ACTOR] +
+      unresolved * UNIT_PRICE_USD[AMAZON_SEARCH_ACTOR] +
       reviews * UNIT_PRICE_USD[AMAZON_REVIEWS_ACTOR];
     const trustpilot =
       START_FEE_USD[TRUSTPILOT_ACTOR] +
@@ -39,8 +41,8 @@ export class StageTwoPlanner {
         trustpilot_usd: Number(trustpilot.toFixed(4)),
         cost_usd: Number((amazon + trustpilot).toFixed(4)),
         arithmetic:
-          `${targets.length} targets x (1 resolver result $${UNIT_PRICE_USD[AMAZON_SEARCH_ACTOR]} + ` +
-          `${StageTwoPlanner.BANDS} bands x ${this.reviewsPerBand} reviews $${UNIT_PRICE_USD[AMAZON_REVIEWS_ACTOR]}) ` +
+          `${unresolved} unresolved targets x 1 resolver result $${UNIT_PRICE_USD[AMAZON_SEARCH_ACTOR]} + ` +
+          `${targets.length} targets x ${StageTwoPlanner.BANDS} bands x ${this.reviewsPerBand} reviews $${UNIT_PRICE_USD[AMAZON_REVIEWS_ACTOR]} ` +
           `+ Trustpilot $${START_FEE_USD[TRUSTPILOT_ACTOR]} start + ${reviews} x $${UNIT_PRICE_USD[TRUSTPILOT_ACTOR]}`,
       },
     });

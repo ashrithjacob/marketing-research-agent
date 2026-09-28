@@ -2,7 +2,8 @@ import type { CallsResponse } from './calls';
 import type { Config } from './config';
 import type { Judgement } from './judgements';
 import type { Brief, ProductSummary, ResearchNode, RunDetail, RunSummary } from './runs';
-import type { StageTwoPlanResponse } from './stage-two';
+import type { ReviewAnalysisResponse } from './review-analysis';
+import type { StageTwoPlanResponse, TargetListing } from './stage-two';
 
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, {
@@ -53,6 +54,15 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ brief, targets }),
     }),
+  stageTwoListings: (brief: Brief) =>
+    request<{ listings: TargetListing[] }>('/api/research/stage2/listings', {
+      method: 'POST',
+      body: JSON.stringify({ brief }),
+    }),
+  reviewAnalysis: (id: string) =>
+    request<ReviewAnalysisResponse>(`/api/research/runs/${id}/review-analysis`),
+  startReviewAnalysis: (id: string) =>
+    request<ReviewAnalysisResponse>(`/api/research/runs/${id}/review-analysis`, { method: 'POST' }),
   /** Every LLM call, or only those after `after` (a seq), plus the run's totals. */
   calls: (id: string, after = 0) =>
     request<CallsResponse>(`/api/research/runs/${id}/calls${after > 0 ? `?after=${after}` : ''}`),

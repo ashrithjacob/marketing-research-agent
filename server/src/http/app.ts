@@ -2,8 +2,9 @@ import { Hono, type Context, type Next } from "hono";
 
 import { RunSupervisor } from "../agent/index.js";
 import { SqliteResearchStore } from "../adapters/index.js";
+import { ActorRunners, AmazonListingLookup } from "../adapters/apify/index.js";
 import { Env, type Settings } from "../config/index.js";
-import type { ResearchStore } from "../domain/index.js";
+import type { AmazonListingSource, ResearchStore } from "../domain/index.js";
 import { Trace, TraceFile } from "../trace/index.js";
 
 import type { ApiEnv } from "./api-env.js";
@@ -24,6 +25,7 @@ export class App {
     traces?: TraceFile;
     store?: ResearchStore;
     supervisor?: RunSupervisor;
+    listingSource?: AmazonListingSource | null;
   }) {
     Trace.line(import.meta.url, "App.constructor");
     this.settings = overrides?.settings ?? Env.settings();
@@ -43,6 +45,7 @@ export class App {
         supervisor: this.supervisor,
         settings: this.settings,
         traces: this.traces,
+        listingSource: overrides?.listingSource !== undefined ? overrides.listingSource : App.listingSource(this.settings),
       }).router(),
     );
     new Frontend(this.settings.staticDir).mount(hono);
@@ -52,6 +55,12 @@ export class App {
   private async request(c: Context<ApiEnv>, next: Next): Promise<void> {
     Trace.line(import.meta.url, "App.request", { method: c.req.method, path: c.req.path });
     await next();
+  }
+
+  static listingSource(settings: Settings): AmazonListingSource | null {
+    Trace.line(import.meta.url, "App.listingSource");
+    const runner = ActorRunners.forSettings(settings);
+    return runner ? new AmazonListingLookup(runner) : null;
   }
 
   static traceFile(settings: Settings): TraceFile {

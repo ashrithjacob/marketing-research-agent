@@ -25,7 +25,7 @@ import { RunLauncher } from "./run-launcher.js";
 export class RunSupervisor {
   private readonly store: ResearchStore;
   private readonly settings: Settings;
-  private readonly models: Models;
+  readonly models: Models;
   readonly costs: OpenRouterPrices;
   private readonly runs: LiveRuns;
   private readonly launcher: RunLauncher;

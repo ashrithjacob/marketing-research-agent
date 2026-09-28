@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { api, RELATION_LABEL, type Brief, type RunSummary, type StageTwoPlanResponse } from './api';
+import { api, RELATION_LABEL, type Brief, type RunSummary, type StageTwoPlanResponse, type TargetListing } from './api';
+import { ListingLine } from './stage-two/ListingLine';
 
 /** The stage-2 go-ahead: the roster stage 1 found, what is approved, and what it costs. */
 export default function StageTwoPlan({
@@ -17,6 +18,9 @@ export default function StageTwoPlan({
   const [selected, setSelected] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [listings, setListings] = useState<TargetListing[] | null>(null);
+  const [looking, setLooking] = useState(false);
+  const [revision, setRevision] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -25,6 +29,7 @@ export default function StageTwoPlan({
       .then((response) => {
         if (cancelled) return;
         setPlan(response);
+        setListings((current) => current ?? response.listings ?? []);
         if (response.ready && selected.length === 0) {
           setSelected((response.plan?.targets ?? []).map((t) => t.id));
         }
@@ -33,7 +38,26 @@ export default function StageTwoPlan({
     return () => {
       cancelled = true;
     };
-  }, [selected.join(',')]);
+  }, [selected.join(','), revision]);
+
+  const lookupNeeded =
+    !!plan?.ready &&
+    !!plan.lookup_available &&
+    listings !== null &&
+    (plan.plan?.targets ?? []).some((t) => !listings.some((l) => l.target_id === t.id));
+
+  useEffect(() => {
+    if (!lookupNeeded || looking) return;
+    setLooking(true);
+    api
+      .stageTwoListings(brief)
+      .then(({ listings: found }) => {
+        setListings(found);
+        setRevision((r) => r + 1);
+      })
+      .catch((e) => setError(`Amazon lookup failed: ${(e as Error).message}`))
+      .finally(() => setLooking(false));
+  }, [lookupNeeded]);
 
   function toggle(id: string) {
     setSelected((current) =>
@@ -95,7 +119,15 @@ export default function StageTwoPlan({
                   />
                   <span>
                     <b>{RELATION_LABEL[target.relation]}</b> — {target.name} ({target.form})
-                    {target.url ? <span className="muted small"> · {target.url}</span> : null}
+                    {target.url ? (
+                      <>
+                        {' · '}
+                        <a className="small" href={target.url} target="_blank" rel="noreferrer">
+                          {target.url.replace(/^https?:\/\/(www\.)?/, '')} ↗
+                        </a>
+                      </>
+                    ) : null}
+                    <ListingLine row={listings?.find((l) => l.target_id === target.id)} looking={looking} form={target.form} />
                   </span>
                 </label>
               ))}

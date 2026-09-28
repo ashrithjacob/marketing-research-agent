@@ -22,6 +22,7 @@ import type { RetryPolicy } from "./retry.js";
 import { ReviewLedger } from "./review-ledger.js";
 import { RunWatch } from "./run-watch.js";
 import { StageTwoHandoff } from "./stage-two-handoff.js";
+import { StageTwoListings } from "./stage-two-listings.js";
 import { ToolSteps } from "./tool-steps.js";
 import { ResearchToolset } from "./tools/index.js";
 import { StageTwoRoster } from "../extract/index.js";
@@ -61,7 +62,7 @@ export class RunAgentFactory {
     const { nodes, chain } = options;
     const stageTwo = Stages.covering(nodes) === 2;
     const source = stageTwo ? this.handoff.forBrief(options.brief, Scope.of(options.workspaceId)) : null;
-    const roster = source ? StageTwoRoster.of(source.packet) : [];
+    const roster = source ? StageTwoListings.withAmazon(StageTwoRoster.of(source.packet), this.store.listings.list(source.run.id)) : [];
     const ledger = new ReviewLedger();
     const steps = new ToolSteps();
     const watch = new RunWatch({

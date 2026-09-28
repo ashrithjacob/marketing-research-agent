@@ -105,7 +105,7 @@ describe("a target whose url is already an Amazon listing", () => {
   });
 
   it("is marked in the roster so the agent skips amazon_find_product for it", () => {
-    const base = { relation: "direct" as const, form: "capsule" as const, actives: ["vitamin d3"] };
+    const base = { relation: "direct" as const, form: "capsule" as const, actives: ["vitamin d3"], brand: "", amazon_url: "" };
     const text = RosterBlock.text(
       [
         { ...base, id: "c1", name: "Listed", url: "https://www.amazon.com/dp/B0H2JVQ9GR" },

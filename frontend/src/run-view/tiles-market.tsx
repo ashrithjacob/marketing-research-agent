@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import type {
   Competitor,
   Excerpt,
@@ -7,7 +7,6 @@ import type {
   Source,
   StagePacket,
 } from '../api';
-import { VOICE_PER_STAR, sampleVoice } from '../api';
 import { BarList } from './charts';
 import { Chip, Tile, TileGaps } from './tile';
 import { SourceRow } from './packet-sections';
@@ -26,6 +25,7 @@ function CompetitorRow({ competitor: c }: { competitor: Competitor }) {
           {c.form}
           {c.form_as_printed ? ` · ${c.form_as_printed}` : ''}
         </span>
+        {c.market && <span>{c.market}</span>}
         <span>shares {c.shared_actives.join(', ')}</span>
         {c.dose_per_serving && <span>{c.dose_per_serving}</span>}
         {c.price && (
@@ -181,51 +181,6 @@ export function CompetitorsTile({
           )}
         </>
       )}
-    </Tile>
-  );
-}
-
-export function VoiceTile({ voice }: { voice: Excerpt[] }) {
-  const [open, setOpen] = useState(false);
-  const shown = useMemo(() => sampleVoice(voice), [voice]);
-  return (
-    <Tile
-      label="Voice of customer"
-      sub={
-        shown.length < voice.length
-          ? `verbatim · ${shown.length} of ${voice.length}, ${VOICE_PER_STAR} per star at random`
-          : 'verbatim, never paraphrased'
-      }
-      open={open}
-      onToggle={() => setOpen((o) => !o)}
-      chips={
-        <Chip onClick={() => setOpen((o) => !o)} active={open}>
-          {voice.length} quotes
-        </Chip>
-      }
-      preview={
-        shown[0] ? (
-          <div className="tile-headline">
-            <div className="tile-quote">“{shown[0].text}”</div>
-          </div>
-        ) : undefined
-      }
-    >
-      {voice.length === 0 && <p className="muted">Nothing yet.</p>}
-      {shown.map((excerpt) => (
-        <div key={excerpt.id} className="item">
-          <div className="q">
-            “{excerpt.text}”
-            {excerpt.star_rating != null && (
-              <span className="pill star">{excerpt.star_rating}★</span>
-            )}
-          </div>
-          <div className="src">
-            {excerpt.axis ? excerpt.axis.replace('why_', 'why ') : ''}
-            {excerpt.posted_at ? ` · ${excerpt.posted_at}` : ''}
-          </div>
-        </div>
-      ))}
     </Tile>
   );
 }

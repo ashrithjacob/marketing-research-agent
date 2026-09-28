@@ -9,12 +9,14 @@ import {
   type ResearchRun,
   type ResearchStore,
   type Scope,
+  type ReviewAnalysis,
   type ReviewLedgerSnapshot,
   type ProductCatalog,
   type RunEvent,
   type RunUpdate,
   type SourceKind,
   type StoredRunReview,
+  type TargetListings,
 } from "../../domain/index.js";
 import { Trace } from "../../trace/index.js";
 
@@ -24,12 +26,14 @@ export class SqliteResearchStore implements ResearchStore {
   private readonly tables: SqliteTables;
   readonly products: ProductCatalog;
   readonly accounts: AccountDirectory;
+  readonly listings: TargetListings;
 
   constructor(path: string) {
     Trace.line(import.meta.url, "SqliteResearchStore.constructor", { path });
     this.tables = SqliteTables.open(path);
     this.products = this.tables.catalog;
     this.accounts = this.tables.accounts;
+    this.listings = this.tables.listings;
   }
 
   createRun(input: Parameters<ResearchStore["createRun"]>[0]): ResearchRun {
@@ -119,6 +123,16 @@ export class SqliteResearchStore implements ResearchStore {
   listRunReviews(runId: string): StoredRunReview[] {
     Trace.line(import.meta.url, "SqliteResearchStore.listRunReviews", { runId });
     return this.tables.reviews.list(runId);
+  }
+
+  saveReviewAnalysis(analysis: ReviewAnalysis): void {
+    Trace.line(import.meta.url, "SqliteResearchStore.saveReviewAnalysis", { runId: analysis.run_id });
+    this.tables.analyses.save(analysis);
+  }
+
+  getReviewAnalysis(runId: string): ReviewAnalysis | null {
+    Trace.line(import.meta.url, "SqliteResearchStore.getReviewAnalysis", { runId });
+    return this.tables.analyses.get(runId);
   }
 
   private productOf(runId: string): string {

@@ -81,6 +81,19 @@ Submitting calls `POST /api/research/runs` with `{brief, nodes}`.
 > packet names a product that is not yours, check `brief` first, before the
 > prompt.
 
+### The stage-2 go-ahead (`StageTwoPlan.tsx`)
+
+Opened by **Start stage 2 →** or the review-mining ▶. Lists the stage-1 roster
+with checkboxes and the Apify estimate (`POST /stage2/plan`). Each target shows
+its brand-site link and, under it, its top Amazon listing (`stage-two/ListingLine.tsx`):
+stars, review count, share of 3★, "bought in past month", best-seller rank,
+price, Amazon's Choice, and a link. The first open runs `POST /stage2/listings`:
+one Amazon search per target with product details (`adapters/apify/listing-lookup.ts`),
+about $0.01 each, saved per stage-1 run in `research_target_listings`, so
+reopening is free. A hit from another brand is shown in amber and never mined.
+A brand-matched listing is handed to the mining agent as "Amazon listing known",
+and the estimate drops its resolver charge.
+
 ### The stage rail — left column (`StageRail.tsx`)
 
 `Stages`, then one block per stage, each listing its nodes with a dot, a label,
@@ -154,9 +167,9 @@ generic gaps table:
 | Product data (open by default) | attributes, SVG bars for numeric measurements, excerpts, gaps | packet rows with `node: 'product_data'` |
 | Competitors | direct/indirect groups, social-proof review-count chart, excerpts, gaps | `packet.competitors`, `measurements` |
 | Category data | market-size/CAGR bar charts, every figure with its period, gaps | `measurements` with `node: 'category_data'` |
-| Voice of customer | verbatim `review_mining` excerpts | `packet.excerpts` |
+| Customer voice (stage 2, `run-view/voice/`) | reviews cleaned (duplicates, under three words, off-product), issues ranked worst and best with quotes, product × issue grid, star spread — all filtered by source (all / Amazon / other sites) and group (all / your product / direct / indirect), or one product. Started by **Analyse reviews**; LLM calls only, no Apify | `GET`/`POST /runs/:id/review-analysis`, `agent/review-analysis/` |
 
-A run's view shows only its own packet. A stage-2 run shows Voice of customer
+A run's view shows only its own packet. A stage-2 run shows Customer voice
 alone; its stage-1 tiles are one click away on the rail's stage-1 header.
 
 Charts are hand-rolled SVG (`run-view/charts.tsx` `BarList`) — no chart

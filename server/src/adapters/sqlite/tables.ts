@@ -15,8 +15,10 @@ import { PacketRowTable } from "./packet-row-table.js";
 import { ProductBackfill } from "./product-backfill.js";
 import { SqliteProductCatalog } from "./product-catalog.js";
 import { ProductTable } from "./product-table.js";
+import { ReviewAnalysisTable } from "./review-analysis-table.js";
 import { ReviewTable } from "./review-table.js";
 import { RunTable } from "./run-table.js";
+import { TargetListingTable } from "./target-listing-table.js";
 import { SqliteSchema } from "./schema.js";
 
 /** Opens the database, applies the schema, and holds one object per table. */
@@ -27,6 +29,8 @@ export class SqliteTables {
   readonly checks: PacketCheckLog;
   readonly calls: CallLog;
   readonly reviews: ReviewTable;
+  readonly analyses: ReviewAnalysisTable;
+  readonly listings: TargetListingTable;
   readonly products: ProductTable;
   readonly packetRows: PacketRowTable;
   readonly accounts: AccountDirectory;
@@ -40,6 +44,8 @@ export class SqliteTables {
     this.checks = new PacketCheckLog(db);
     this.calls = new CallLog(db);
     this.reviews = new ReviewTable(db);
+    this.analyses = new ReviewAnalysisTable(db);
+    this.listings = new TargetListingTable(db);
     this.products = new ProductTable(db);
     this.packetRows = new PacketRowTable(db);
     this.accounts = new AccountTable(db);

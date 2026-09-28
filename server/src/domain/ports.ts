@@ -12,6 +12,8 @@ import type { Account, AccountListing, Scope, Workspace } from "./accounts.js";
 import type { ResearchRun } from "./records.js";
 import type { Product, RunHead } from "./products.js";
 import type { StoredPacketRows } from "./packet-rows.js";
+import type { ReviewAnalysis } from "./review-analysis.js";
+import type { AmazonListing, TargetListing } from "./stage-two.js";
 import type { ReviewLedgerSnapshot, StoredRunReview } from "./reviews.js";
 
 /** Products and what their runs found, counted only over the runs a scope admits. */
@@ -43,8 +45,20 @@ export interface AccountDirectory {
   seedAdmin(username: string, passwordHash: string): boolean;
 }
 
+/** The best-selling Amazon listings for a search phrase in one Amazon store, most popular first, with traction details. */
+export interface AmazonListingSource {
+  lookup(query: string, marketplace: string, max: number, signal?: AbortSignal): Promise<AmazonListing[]>;
+}
+
+/** The Amazon listing looked up for each stage-2 target, kept per stage-1 run so it is paid for once. */
+export interface TargetListings {
+  save(listing: TargetListing): void;
+  list(sourceRunId: string): TargetListing[];
+}
+
 export interface ResearchStore {
   readonly products: ProductCatalog;
+  readonly listings: TargetListings;
   readonly accounts: AccountDirectory;
   createRun(input: {
     workspaceId: string;
@@ -74,6 +88,8 @@ export interface ResearchStore {
   listLlmCalls(runId: string): LlmCall[];
   saveRunReviews(runId: string, ledger: ReviewLedgerSnapshot): number;
   listRunReviews(runId: string): StoredRunReview[];
+  saveReviewAnalysis(analysis: ReviewAnalysis): void;
+  getReviewAnalysis(runId: string): ReviewAnalysis | null;
 
   close(): void;
 }

@@ -2,6 +2,8 @@ import type Database from "better-sqlite3";
 
 import { AccountTable } from "./account-table.js";
 import { PacketRowTable } from "./packet-row-table.js";
+import { ReviewAnalysisTable } from "./review-analysis-table.js";
+import { TargetListingTable } from "./target-listing-table.js";
 import { Trace } from "../../trace/index.js";
 
 const MIGRATIONS: ReadonlyArray<readonly [string, string, string]> = [
@@ -30,6 +32,8 @@ export class SqliteSchema {
     }
     db.exec(SqliteSchema.INDEXES);
     db.exec(PacketRowTable.DDL);
+    db.exec(ReviewAnalysisTable.DDL);
+    db.exec(TargetListingTable.DDL);
   }
 
   static readonly INDEXES = `

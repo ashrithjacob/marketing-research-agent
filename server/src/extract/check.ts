@@ -4,7 +4,7 @@ export interface PacketContext {
   scope: readonly Node[];
   stage: Stage;
   sourceIds: ReadonlySet<string>;
-  brief?: { product?: unknown; url?: unknown } | undefined;
+  brief?: { product?: unknown; url?: unknown; market?: unknown } | undefined;
 }
 
 export interface PacketCheck {

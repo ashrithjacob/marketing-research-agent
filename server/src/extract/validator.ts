@@ -12,6 +12,7 @@ import {
 
 import { PacketExtractor } from "./blocks.js";
 import { BriefCheck } from "./brief-check.js";
+import { MarketCheck } from "./market-check.js";
 import { ChampionCheck } from "./champion-check.js";
 import { CitationCheck } from "./citation-check.js";
 import { CompetitorCheck } from "./competitor-check.js";
@@ -63,6 +64,7 @@ export class PacketValidator {
       new CitationCheck(),
       new CompletenessCheck(),
       new CompetitorCheck(),
+      new MarketCheck(),
       new ChampionCheck(),
     ];
   }
@@ -75,7 +77,7 @@ export class PacketValidator {
   validate(
     data: unknown,
     scope: readonly Node[] = STAGE_NODES[1],
-    brief?: { product?: unknown; url?: unknown },
+    brief?: { product?: unknown; url?: unknown; market?: unknown },
   ): StagePacket {
     Trace.line(import.meta.url, "PacketValidator.validate", { data, scope, brief });
     const assembled =
@@ -100,7 +102,7 @@ export class PacketValidator {
   parse(
     output: string,
     scope: readonly Node[] = STAGE_NODES[1],
-    brief?: { product?: unknown; url?: unknown },
+    brief?: { product?: unknown; url?: unknown; market?: unknown },
   ): StagePacket {
     Trace.line(import.meta.url, "PacketValidator.parse", { output, scope, brief });
     return this.validate(this.extractor.extract(output), scope, brief);

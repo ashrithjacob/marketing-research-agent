@@ -106,6 +106,7 @@ const CLIENT_ONLY_FIELDS = new Set([
   "handlers", "onEnd", "onError", "onEvent", "onReconnecting", "onConnected",
   "startRun", "stopRun",
   "logsUrl", "traceUrl", "sourceUrl", "arguments", "toolCallId", "stageTwoPlan", "productRuns",
+  "reviewAnalysis", "startReviewAnalysis", "stageTwoListings",
 ]);
 
 // The client's declared server surface: `frontend/src/api.ts`, or the

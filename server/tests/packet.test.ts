@@ -550,7 +550,7 @@ describe("validation: the champion is the genre's most-bought", () => {
       runner_up_reviews: 9211,
     };
     data.competitors = [
-      { id: "c1", name: "CalmWell 400", url: "https://calmwell.example/p", relation: "direct", form: "capsule", active_ingredients: [active], shared_actives: ["magnesium glycinate"], positioning_copy: "Sleep through.", source_id: "sha256:cw", ad_source_ids: [] },
+      { id: "c1", name: "CalmWell 400", url: "https://calmwell.example/p", relation: "direct", form: "capsule", active_ingredients: [active], shared_actives: ["magnesium glycinate"], positioning_copy: "Sleep through.", market: "UK", source_id: "sha256:cw", ad_source_ids: [] },
     ];
     return data;
   };

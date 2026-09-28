@@ -87,6 +87,7 @@ export const competitorSchema = z
     positioning_copy: z.string().default(""),
     price: z.string().default(""),
     price_per_dose: z.string().default(""),
+    market: z.string().default(""),
     source_id: z.string(),
     ad_source_ids: z.array(z.string()).default([]),
   })

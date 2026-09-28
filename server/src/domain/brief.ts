@@ -15,6 +15,12 @@ const URL_LIKE = /^(https?:\/\/\S+|(?!.*\s)[a-z0-9-]+(\.[a-z0-9-]+)+(\/\S*)?)$/i
 
 /** Keeps a url out of `product`, and decides when two briefs name one subject. */
 export class Briefs {
+  static markets(brief: { market?: unknown }): string[] {
+    Trace.line(import.meta.url, "Briefs.markets", { market: brief.market });
+    if (typeof brief.market !== "string") return [];
+    return brief.market.split(",").map((market) => market.trim()).filter((market) => market !== "");
+  }
+
   static looksLikeUrl(value: string): boolean {
     Trace.line(import.meta.url, "Briefs.looksLikeUrl", { value });
     return URL_LIKE.test(value.trim());

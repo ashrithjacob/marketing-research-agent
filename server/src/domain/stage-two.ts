@@ -10,6 +10,8 @@ export const miningTargetSchema = z
     form: formSchema,
     actives: z.array(z.string()).min(1),
     url: z.string().default(""),
+    brand: z.string().default(""),
+    amazon_url: z.string().default(""),
   })
   .strict();
 export type MiningTarget = z.infer<typeof miningTargetSchema>;
@@ -52,3 +54,37 @@ export const stageTwoPlanRequestSchema = z
   })
   .strict();
 export type StageTwoPlanRequest = z.infer<typeof stageTwoPlanRequestSchema>;
+
+export interface BestsellerRank {
+  rank: number;
+  category: string;
+}
+
+export interface AmazonListing {
+  asin: string;
+  title: string;
+  url: string;
+  brand: string;
+  marketplace: string;
+  price: number | null;
+  currency: string;
+  stars: number | null;
+  stars_breakdown: Record<string, number> | null;
+  reviews_count: number | null;
+  bought_past_month: string;
+  bestseller_ranks: BestsellerRank[];
+  amazon_choice: boolean;
+  thumbnail: string;
+}
+
+export interface TargetListing {
+  source_run_id: string;
+  target_id: string;
+  query: string;
+  strategy: string;
+  listing: AmazonListing | null;
+  matches: boolean;
+  mismatch: string;
+  error: string;
+  fetched_at: string;
+}

@@ -14,6 +14,8 @@ export class StageTwoRoster {
       form: reference.form,
       actives: [...reference.actives],
       url: "",
+      brand: "",
+      amazon_url: "",
     };
     const competitors = packet.competitors.map((competitor) => ({
       id: competitor.id,
@@ -22,6 +24,8 @@ export class StageTwoRoster {
       form: competitor.form,
       actives: [...competitor.shared_actives],
       url: competitor.url,
+      brand: competitor.brand,
+      amazon_url: "",
     }));
     return [product, ...competitors];
   }

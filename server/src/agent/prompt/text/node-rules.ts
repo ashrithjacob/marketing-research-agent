@@ -40,7 +40,10 @@ export const NODE_RULES: Record<Node, string> = {
       result is not a competitor, the page you read is.
    c. For each one, read off *its* page: form, actives, dose, price, and its
       positioning copy **verbatim** (the headline or tagline, character for
-      character). \`shared_actives\` names the actives it has in common with the
+      character). \`market\` is the market that page sells in, copied exactly as the
+      brief's **Markets** line names it ("UK", not "United Kingdom"); a brand you found
+      only outside those markets is out of scope — do not record it.
+      \`shared_actives\` names the actives it has in common with the
       reference; \`relation\` follows from comparing its \`form\` with the
       reference's, and the validator checks it. The form vocabulary is built for
       supplements, so a product outside that world — a brush, a device, a cloth —

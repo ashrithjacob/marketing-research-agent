@@ -7,6 +7,42 @@ export interface MiningTarget {
   form: string;
   actives: string[];
   url: string;
+  brand: string;
+  amazon_url: string;
+}
+
+export interface BestsellerRank {
+  rank: number;
+  category: string;
+}
+
+export interface AmazonListing {
+  asin: string;
+  title: string;
+  url: string;
+  brand: string;
+  marketplace: string;
+  price: number | null;
+  currency: string;
+  stars: number | null;
+  stars_breakdown: Record<string, number> | null;
+  reviews_count: number | null;
+  bought_past_month: string;
+  bestseller_ranks: BestsellerRank[];
+  amazon_choice: boolean;
+  thumbnail: string;
+}
+
+export interface TargetListing {
+  source_run_id: string;
+  target_id: string;
+  query: string;
+  strategy: string;
+  listing: AmazonListing | null;
+  matches: boolean;
+  mismatch: string;
+  error: string;
+  fetched_at: string;
 }
 
 export interface StageTwoEstimate {
@@ -31,6 +67,8 @@ export interface StageTwoPlanResponse {
   ready: boolean;
   detail?: string;
   plan?: StageTwoPlan;
+  listings?: TargetListing[];
+  lookup_available?: boolean;
 }
 
 export const RELATION_LABEL: Record<MiningTarget['relation'], string> = {

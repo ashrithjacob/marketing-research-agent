@@ -132,6 +132,9 @@ cmd_run() {
   else
     payload=$(jq -nc --arg p "$brief" '{brief:{product:$p}}')
   fi
+  if [ -n "${MARKET:-}" ]; then
+    payload=$(printf '%s' "$payload" | jq -c --arg m "$MARKET" '.brief.market = $m')
+  fi
   if [ -n "$nodes" ]; then
     payload=$(printf '%s' "$payload" | jq -c --arg n "$nodes" \
       '.nodes = ($n | split(","))')
@@ -211,7 +214,8 @@ mra — drive and inspect the research cockpit
   login                    session cookie (needs MRA_PASSWORD; usually
                            unnecessary locally, where login is disabled)
   run "<brief>" [nodes]    start a run. A brief starting with http goes to
-                           brief.url, never brief.product.
+                           brief.url, never brief.product. MARKET="US, UK"
+                           sets brief.market (unset: no market scope).
                            nodes: product_data,competitors,review_mining,category_data
   watch [runId]            poll until the run settles, then print the totals
   calls [runId]            the LLM call log, one line per turn

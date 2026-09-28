@@ -92,6 +92,13 @@ record it, and do not count it toward saturation", and tells the agent to gap a 
 that yields nothing rather than substitute another. The cockpit shows the list in the
 run-detail panel as **Markets**, beside Scope.
 
+From 2026-09-28 the scope is checked, not only asked for. Each competitor carries a
+`market`: the market of the page the agent read, copied as the brief names it.
+`MarketCheck` (`extract/market-check.ts`) rejects the packet if a competitor has no
+market or one the brief does not list, so an out-of-market competitor is an `invalid`
+run rather than a judgement call. It compares against the run's own brief, not the
+packet's copy of it. A brief with no market checks nothing.
+
 If `GET /api/research/config` reported `corpus_mounted: false`, the modal warns that
 nothing will be archived. The button is disabled until the product is non-empty.
 

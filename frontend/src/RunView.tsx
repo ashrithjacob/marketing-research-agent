@@ -12,7 +12,7 @@ import { nowPanel, runStage } from './run-view/now';
 import { RailColumn, subjectProgress } from './run-view/rail';
 import { StageOneTiles } from './run-view/stage-one-tiles';
 import { useRunStream } from './run-view/use-run-stream';
-import { VoiceTile } from './run-view/tiles-market';
+import { VoiceAnalysis } from './run-view/voice/VoiceAnalysis';
 
 export default function RunView({
   runId,
@@ -63,11 +63,6 @@ export default function RunView({
   const unarchived = useMemo(
     () => admitted.filter((s) => !s.archived).length,
     [admitted],
-  );
-
-  const voice = useMemo(
-    () => (packet?.excerpts ?? []).filter((e) => e.node === 'review_mining'),
-    [packet],
   );
 
   if (!run) return <div className="empty">Loading run…</div>;
@@ -146,14 +141,14 @@ export default function RunView({
           </div>
         )}
 
-        {packet && (
+        {packet && runStage(run) === 1 && (
           <div className="tiles">
-            {runStage(run) === 1 && (
-              <StageOneTiles runId={runId} packet={packet} nodes={nodesInRun} />
-            )}
-            {(voice.length > 0 || nodesInRun.has('review_mining')) && (
-              <VoiceTile voice={voice} />
-            )}
+            <StageOneTiles runId={runId} packet={packet} nodes={nodesInRun} />
+          </div>
+        )}
+        {nodesInRun.has('review_mining') && (
+          <div className="voice-tile">
+            <VoiceAnalysis runId={runId} finished={!live} />
           </div>
         )}
 
