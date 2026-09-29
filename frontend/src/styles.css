@@ -451,7 +451,7 @@ a.runrow { display: block; color: inherit; text-decoration: none; }
 .logs-back { text-decoration: none; padding: 6px 12px; border-radius: 10px; }
 .logs-body { flex: 1; min-height: 0; overflow-y: auto; padding: 18px 20px 40px; }
 .logs-stats {
-  display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 10px; margin-bottom: 20px;
 }
 .card .s { color: var(--dim); font-size: 11.5px; margin-top: 3px; }
@@ -505,7 +505,7 @@ details.sub.thinking > summary { color: var(--infer); }
 
 /* ---------- insights dashboard: tiles ---------- */
 .tiles {
-  display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
   gap: 16px; margin-bottom: 22px;
 }
 .tile {
