@@ -1,0 +1,82 @@
+#!/usr/bin/env bash
+# `shopify` — Firecrawl Alexandria: discover capabilities, call them, report the cost.
+set -uo pipefail
+
+REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)"
+BASE="${FIRECRAWL_BASE_URL:-https://api.firecrawl.dev}"
+
+die() { printf '%s\n' "$*" >&2; exit 1; }
+
+key() {
+  [ -n "${FIRECRAWL_API_KEY:-}" ] && { printf '%s' "$FIRECRAWL_API_KEY"; return; }
+  [ -f "$REPO/.env" ] || die "FIRECRAWL_API_KEY is not set and $REPO/.env does not exist."
+  local v
+  v=$(sed -n 's/^FIRECRAWL_API_KEY=//p' "$REPO/.env" | tail -1 | tr -d '"'"'"'\r')
+  [ -n "$v" ] || die "FIRECRAWL_API_KEY is empty in $REPO/.env."
+  printf '%s' "$v"
+}
+
+post() {
+  curl -sS --max-time 120 "$BASE/$1" \
+    -H "Authorization: Bearer $(key)" \
+    -H "Content-Type: application/json" \
+    -d "$2"
+}
+
+discover() {
+  [ -n "${1:-}" ] || die "discover \"<what you are trying to do>\""
+  post v2/search "$(jq -nc --arg q "$1" '{query: $q, sources: ["alexandria"]}')" \
+    | jq '{creditsUsed, tools: .data.tools}'
+}
+
+call() {
+  local provider="$1" capability="$2" options="$3" out
+  printf '%s' "$options" | jq -e 'type == "object"' >/dev/null 2>&1 || die "options must be a JSON object: $options"
+  out=$(post v2/scrape "$(jq -nc --arg p "$provider" --arg c "$capability" --argjson o "$options" \
+    '{alexandria: {provider: $p, capability: $c, options: $o}}')")
+  printf '%s\n' "$out"
+  printf '==> %s %s cost: %s credits\n' "$provider" "$capability" \
+    "$(jq -r '[.data.alexandria[]?.creditsCost] | if length == 0 then "unknown" else add end' <<<"$out" 2>/dev/null || echo unknown)" >&2
+}
+
+usage() {
+  cat <<'USAGE'
+shopify discover "<what you are trying to do>"
+                                    free; ranked provider/capability list. Call only what this returns.
+shopify lookup <url-or-id>... [--country GB] [--currency GBP] [--language en]
+                                    catalog/lookup_catalog, 1-50 ids or product URLs (5 credits)
+shopify call <provider> <capability> '<options-json>'
+                                    any Alexandria capability; spends credits
+Every paid call prints its cost to stderr. Output is the raw JSON response. Pipe to jq, e.g. | jq '.data.alexandria[0].data.products[] | {title, price_range, rating}'
+USAGE
+}
+
+cmd_lookup() {
+  local ids=() extra='{}'
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --country|--currency|--language|--region|--postal_code|--intent|--view)
+        [ $# -ge 2 ] || die "$1 needs a value."
+        extra=$(jq -c --arg k "${1#--}" --arg v "$2" '. + {($k): $v}' <<<"$extra"); shift 2 ;;
+      --filters)
+        [ $# -ge 2 ] || die "--filters needs a JSON object."
+        extra=$(jq -c --argjson v "$2" '. + {filters: $v}' <<<"$extra") || die "--filters is not JSON."; shift 2 ;;
+      -*) die "unknown flag $1" ;;
+      *) ids+=("$1"); shift ;;
+    esac
+  done
+  [ ${#ids[@]} -ge 1 ] && [ ${#ids[@]} -le 50 ] || die "lookup takes 1-50 product ids or URLs."
+  local options
+  options=$(jq -c --args '. + {product_ids: $ARGS.positional}' "${ids[@]}" <<<"$extra")
+  call shopify "catalog/lookup_catalog" "$options"
+}
+
+need() { command -v "$1" >/dev/null 2>&1 || die "$1 is not installed."; }
+need jq; need curl
+
+case "${1:-help}" in
+  discover) shift; discover "$*" ;;
+  lookup)   shift; cmd_lookup "$@" ;;
+  call)     shift; [ $# -eq 3 ] || die "call <provider> <capability> '<options-json>'"; call "$1" "$2" "$3" ;;
+  *)      usage ;;
+esac
