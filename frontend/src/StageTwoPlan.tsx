@@ -127,7 +127,7 @@ export default function StageTwoPlan({
                         </a>
                       </>
                     ) : null}
-                    <ListingLine row={listings?.find((l) => l.target_id === target.id)} looking={looking} form={target.form} />
+                    <ListingLine row={listings?.find((l) => l.target_id === target.id)} looking={looking} target={target} />
                   </span>
                 </label>
               ))}
