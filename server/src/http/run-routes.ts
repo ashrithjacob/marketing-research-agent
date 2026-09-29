@@ -1,9 +1,13 @@
 import type { Context, Hono } from "hono";
 
-import { RunError, RunSupervisor, type StageTwoHandoff } from "../agent/index.js";
+import { RunError, RunSupervisor, type StageTwoHandoff, type StageTwoListings } from "../agent/index.js";
+import { StageTwoRoster } from "../extract/index.js";
 import {
   Briefs,
+  stagePacketSchema,
+  type ResearchRun,
   type ResearchStore,
+  type TargetListing,
   Runs,
   Scope,
   Stages,
@@ -21,6 +25,7 @@ export class RunRoutes {
     private readonly store: ResearchStore,
     private readonly supervisor: RunSupervisor,
     private readonly handoff: StageTwoHandoff,
+    private readonly listings: StageTwoListings,
   ) {}
 
   register(api: Hono<ApiEnv>): void {
@@ -40,6 +45,7 @@ export class RunRoutes {
         packet: run.packet,
         output: run.output,
         reject_kinds: run.reject_kinds,
+        listings: this.judgedListings(run),
         live: this.supervisor.isLive(run.id),
       });
     });
@@ -131,5 +137,12 @@ export class RunRoutes {
       return c.json({ detail: error.message }, 409);
     }
     return c.json(judgement);
+  }
+
+  private judgedListings(run: ResearchRun): TargetListing[] {
+    Trace.line(import.meta.url, "RunRoutes.judgedListings", { runId: run.id });
+    const packet = stagePacketSchema.safeParse(run.packet);
+    if (!packet.success || packet.data.stage !== 1) return [];
+    return this.listings.judged(run.id, StageTwoRoster.of(packet.data));
   }
 }

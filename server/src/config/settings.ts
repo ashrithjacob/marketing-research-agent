@@ -16,6 +16,8 @@ export interface Settings {
   firecrawlBaseUrl: string;
   webTimeoutSeconds: number;
   fetchCharLimit: number;
+  firecrawlConcurrency: number;
+  searchConcurrency: number;
   gateModel: string;
   gateCharLimit: number;
   gateTimeoutSeconds: number;
@@ -24,6 +26,7 @@ export interface Settings {
   apifyMaxReviews: number;
   apifyWaitSeconds: number;
   apifyConcurrency: number;
+  apifyPullRetries: number;
 
   corpusPath: string;
 
@@ -110,6 +113,8 @@ export class Env {
       firecrawlBaseUrl: Env.text("FIRECRAWL_BASE_URL", "https://api.firecrawl.dev"),
       webTimeoutSeconds: Env.number("MRA_WEB_TIMEOUT_SECONDS", 90),
       fetchCharLimit: Env.number("MRA_FETCH_CHAR_LIMIT", 25000),
+      firecrawlConcurrency: Env.number("MRA_FIRECRAWL_CONCURRENCY", 2),
+      searchConcurrency: Env.number("MRA_SEARCH_CONCURRENCY", 2),
       gateModel: Env.text("MRA_GATE_MODEL", ""),
       gateCharLimit: Env.number("MRA_GATE_CHAR_LIMIT", 4000),
       gateTimeoutSeconds: Env.number("MRA_GATE_TIMEOUT_SECONDS", 12),
@@ -118,6 +123,7 @@ export class Env {
       apifyMaxReviews: Env.number("MRA_APIFY_MAX_REVIEWS", 50),
       apifyWaitSeconds: Env.number("MRA_APIFY_WAIT_SECONDS", 300),
       apifyConcurrency: Env.number("MRA_APIFY_CONCURRENCY", 16),
+      apifyPullRetries: Env.number("MRA_APIFY_PULL_RETRIES", 1),
 
       corpusPath: Env.text("MRA_CORPUS_PATH", "/corpus"),
 

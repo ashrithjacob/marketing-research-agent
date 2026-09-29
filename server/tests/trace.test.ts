@@ -17,7 +17,7 @@ import { RunSupervisor } from "../src/agent/index.js";
 import { Env } from "../src/config/index.js";
 import { App } from "../src/http/index.js";
 import { Trace, TraceFile, TraceFormat, WireTap, type TraceStep } from "../src/trace/index.js";
-import { fenced, minimalPacket } from "./fixtures.js";
+import { minimalPacket, recorded } from "./fixtures.js";
 import { TraceCoverage } from "./trace-coverage.js";
 
 let dir: string;
@@ -190,7 +190,7 @@ describe("the download", () => {
     models.setProvider(faux.provider);
     const supervisor = new RunSupervisor({ store, settings, models, retry: { attempts: 1, baseMs: 0, capMs: 0 } });
     const app = new App({ settings, store, supervisor, traces });
-    faux.setResponses([fauxAssistantMessage(fenced(minimalPacket()))]);
+    faux.setResponses(recorded(minimalPacket()));
 
     const created = await app.fetch(new Request("http://test/api/research/runs", {
       method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ brief: { product: "MagnaCalm" } }),

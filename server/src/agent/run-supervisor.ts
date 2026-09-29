@@ -1,8 +1,7 @@
 import { createModels, type Models } from "@earendil-works/pi-ai";
 import { openrouterProvider } from "@earendil-works/pi-ai/providers/openrouter";
 
-import { OpenRouterPrices } from "../adapters/index.js";
-import type { ActorRunner } from "../adapters/apify/index.js";
+import { OpenRouterPrices, ServiceClients } from "../adapters/index.js";
 import type { Settings } from "../config/index.js";
 import {
   Clock,
@@ -19,6 +18,8 @@ import { LiveRuns, type Subscriber } from "./live-runs.js";
 import { AgentMessages, PromptBuilder } from "./prompt/index.js";
 import { DEFAULT_RETRY, type RetryPolicy } from "./retry.js";
 import { RunAgentFactory } from "./run-agent-factory.js";
+import { ReviewMiningJob } from "./review-mining-job.js";
+import { RunError } from "./errors.js";
 import { RunLauncher } from "./run-launcher.js";
 
 /** Owns a research run for its whole life: one Agent per run, in this process. */
@@ -36,7 +37,8 @@ export class RunSupervisor {
     models?: Models;
     costs?: OpenRouterPrices;
     retry?: RetryPolicy;
-    actorRunner?: ActorRunner | null;
+    services?: ServiceClients;
+    pullRetryDelayMs?: number;
   }) {
     Trace.line(import.meta.url, "RunSupervisor.constructor");
     this.store = options.store;
@@ -44,6 +46,7 @@ export class RunSupervisor {
     this.settings = options.settings;
     this.costs = options.costs ?? new OpenRouterPrices({ apiKey: options.settings.openrouterApiKey });
     this.models = options.models ?? RunSupervisor.defaultModels();
+    const services = options.services ?? ServiceClients.forSettings(options.settings);
     const factory = new RunAgentFactory(
       this.settings,
       this.store,
@@ -52,9 +55,10 @@ export class RunSupervisor {
       this.costs,
       options.retry ?? DEFAULT_RETRY,
       new PromptBuilder(),
-      options.actorRunner,
+      services,
     );
-    this.launcher = new RunLauncher(this.store, this.settings, this.models, this.costs, this.runs, factory);
+    const mining = new ReviewMiningJob(this.store, this.runs, this.settings, services.actors, options.pullRetryDelayMs);
+    this.launcher = new RunLauncher(this.store, this.settings, this.models, this.costs, this.runs, factory, mining);
   }
 
   readonly subscribe = (runId: string, subscriber: Subscriber): (() => void) | null => {
@@ -93,11 +97,8 @@ export class RunSupervisor {
   steer(runId: string, judgement: Judgement): void {
     Trace.line(import.meta.url, "RunSupervisor.steer", { runId, judgement });
     const live = this.runs.controllable(runId);
-    live.agent.steer({
-      role: "user",
-      content: [{ type: "text", text: AgentMessages.steer(judgement) }],
-      timestamp: Date.now(),
-    } as any);
+    if (!live.control.steer) throw new RunError(`run ${runId} is a stage-2 pipeline: there is no agent to steer`);
+    live.control.steer(AgentMessages.steer(judgement));
     this.runs.emit(runId, "run.steered", { judgement_id: judgement.id, text: judgement.text });
   }
 
@@ -106,7 +107,7 @@ export class RunSupervisor {
     const live = this.runs.controllable(runId);
     this.store.updateRun(runId, { status: "stopping" });
     this.runs.emit(runId, "run.stopping", {});
-    live.agent.abort();
+    live.control.abort();
   }
 
   async close(): Promise<void> {

@@ -1,4 +1,4 @@
-import { Http } from "../adapters/index.js";
+import { Http, type TrustpilotProfiles } from "../adapters/index.js";
 import {
   Clock,
   type AmazonListing,
@@ -7,11 +7,12 @@ import {
   type TargetListings,
   type TargetListing,
 } from "../domain/index.js";
+import { StageTwoOffer } from "../extract/index.js";
 import { Trace } from "../trace/index.js";
 
 import { ListingMatch } from "./listing-match.js";
 
-/** Each stage-2 target's Amazon listing, looked up once per stage-1 run and reused when mining starts. */
+/** Each stage-2 target's Amazon listing, and for one mined on Trustpilot its Trustpilot score, looked up once per stage-1 run and reused when mining starts. */
 export class StageTwoListings {
   static readonly CANDIDATES = 5;
   static readonly STORES: ReadonlyArray<readonly [RegExp, string]> = [
@@ -28,6 +29,7 @@ export class StageTwoListings {
     private readonly listings: TargetListings,
     private readonly source: AmazonListingSource | null,
     private readonly concurrency: number,
+    private readonly profiles: TrustpilotProfiles | null = null,
   ) {}
 
   get available(): boolean {
@@ -35,9 +37,10 @@ export class StageTwoListings {
     return this.source !== null;
   }
 
-  cached(sourceRunId: string): TargetListing[] {
-    Trace.line(import.meta.url, "StageTwoListings.cached", { sourceRunId });
-    return this.listings.list(sourceRunId);
+  /** The stored listings, each re-judged by today's matcher, so a verdict from an older rule is never shown or mined. */
+  judged(sourceRunId: string, targets: readonly MiningTarget[]): TargetListing[] {
+    Trace.line(import.meta.url, "StageTwoListings.judged", { sourceRunId, targets: targets.length });
+    return this.listings.list(sourceRunId).map((row) => this.recheck(row, targets));
   }
 
   ensure(sourceRunId: string, targets: readonly MiningTarget[]): Promise<TargetListing[]> {
@@ -79,7 +82,20 @@ export class StageTwoListings {
         });
       });
     }
+    await this.fillTrustpilot(sourceRunId, targets);
     return this.listings.list(sourceRunId);
+  }
+
+  /** Only a target mined on Trustpilot — no matched listing, its own domain — has its Trustpilot page read. */
+  private async fillTrustpilot(sourceRunId: string, targets: readonly MiningTarget[]): Promise<void> {
+    Trace.line(import.meta.url, "StageTwoListings.fillTrustpilot", { sourceRunId });
+    const profiles = this.profiles;
+    if (!profiles) return;
+    const rows = new Map(this.listings.list(sourceRunId).map((row) => [row.target_id, row]));
+    const unread = StageTwoOffer.of(targets, [...rows.values()]).filter((t) => t.trustpilot && rows.get(t.id) && !rows.get(t.id)!.trustpilot);
+    await Http.pool(unread, this.concurrency, async (target) => {
+      this.listings.save({ ...rows.get(target.id)!, trustpilot: await profiles.read(target.trustpilot) });
+    });
   }
 
   static marketplace(target: MiningTarget): string {
@@ -117,11 +133,5 @@ export class StageTwoListings {
     const updated = { ...row, matches: mismatch === "", mismatch };
     this.listings.save(updated);
     return updated;
-  }
-
-  static withAmazon(roster: readonly MiningTarget[], listings: readonly TargetListing[]): MiningTarget[] {
-    Trace.line(import.meta.url, "StageTwoListings.withAmazon", { roster: roster.length, listings: listings.length });
-    const matched = new Map(listings.filter((l) => l.listing && l.matches).map((l) => [l.target_id, l.listing!.url]));
-    return roster.map((target) => ({ ...target, amazon_url: matched.get(target.id) ?? target.amazon_url }));
   }
 }

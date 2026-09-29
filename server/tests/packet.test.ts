@@ -9,94 +9,58 @@
 
 import { describe, expect, it } from "vitest";
 
-import { BrandLabels, JsonBlocks, PacketError, PacketExtractor, PacketValidator } from "../src/extract/index.js";
+import { BrandLabels, PacketAssembly, PacketError, PacketValidator } from "../src/extract/index.js";
 import {
+  Findings,
   STAGE_NODES,
   Stages,
+  type Finding,
+  type FindingKind,
 } from "../src/domain/index.js";
-import { fenced, minimalPacket, reviewPacket } from "./fixtures.js";
+import { minimalPacket, reviewPacket } from "./fixtures.js";
 
 const packets = new PacketValidator();
-const extractor = new PacketExtractor();
 
 /** Stage 1 is the product, its competitors and its category; stage 2 is review
  *  mining. A packet belongs to one of them, so its scope comes with it. */
 const STAGE1 = STAGE_NODES[1];
 const REVIEW = STAGE_NODES[2];
 
-describe("extraction", () => {
-  it("reads a fenced block", () => {
-    expect(extractor.extract(fenced(minimalPacket())).stage).toBe(1);
+describe("assembly from the ledger", () => {
+  let seq = 0;
+  const row = (kind: FindingKind, payload: Record<string, unknown>, retracted = false): Finding => {
+    seq += 1;
+    return {
+      run_id: "run-a", seq, id: Findings.rowId(kind, seq), kind, entity: "product", agent_id: "parent",
+      source_id: "", payload, created_at: "", retracted_at: retracted ? "x" : "", retracted_why: "",
+    };
+  };
+  const brief = { product: "MagnaCalm 400mg", url: "", market: "UK", notes: "" };
+  const rowsOf = (packet: Record<string, any>): Finding[] => [
+    ...packet.sources.map((p: any) => row("source", p)),
+    ...packet.attributes.map(({ id: _id, ...p }: any) => row("attribute", p)),
+    ...packet.nodes.map((p: any) => row("node_status", p)),
+    ...packet.gaps.map((p: any) => row("gap", p)),
+  ];
+
+  it("builds a packet the validator accepts, stamped with this run's stage, id and brief", () => {
+    const draft = new PacketAssembly(rowsOf(minimalPacket())).draft({ runId: "run-a", brief, nodes: ["product_data"] });
+    const packet = packets.validate(draft, ["product_data"], brief);
+    expect(packet).toMatchObject({ stage: 1, run_id: "run-a", brief });
+    expect(packet.attributes[0]!.id).toMatch(/^at\d+$/);
   });
 
-  it("takes the last packet — an agent that shows its working writes the example first", () => {
-    const first = minimalPacket();
-    first.brief.product = "an example";
-    const output = fenced(first, "For illustration:") + fenced(minimalPacket(), "And the real one:");
-    expect((extractor.extract(output).brief as any).product).toBe("MagnaCalm 400mg");
+  it("leaves retracted rows out", () => {
+    const rows = [...rowsOf(minimalPacket()), row("gap", { node: "product_data", missing: "withdrawn" }, true)];
+    const draft = new PacketAssembly(rows).draft({ runId: "run-a", brief, nodes: ["product_data"] });
+    expect((draft.gaps as any[]).map((g) => g.missing)).toEqual(["no certificate of analysis published"]);
   });
 
-  it("accepts bare JSON", () => {
-    expect(extractor.extract(JSON.stringify(minimalPacket())).stage).toBe(1);
-  });
-
-  it("ignores unrelated fences", () => {
-    const output = "```python\nprint('hi')\n```\n\n" + fenced(minimalPacket());
-    expect(extractor.extract(output).stage).toBe(1);
-  });
-
-  it("finds the packet when the model's fences do not pair", () => {
-    // Measured on a HappyWags run that cost $0.065 and 1.16M tokens: the model
-    // wrote a placeholder block, a stray fence after "Now, finally, emitting.",
-    // and two abandoned attempts — eight fence lines, unbalanced. One stray
-    // fence inverts the pairing for everything after it, so the real 47k-char
-    // packet ended up outside every block and the run was rejected with "found
-    // fenced blocks but none decoded to a stage packet object".
-    const output = [
-      "FINAL OUTPUT:",
-      "```json ",
-      "{...}",
-      "```",
-      "",
-      "Now, finally, emitting.",
-      "```", // the stray one
-      "",
-      "I'm clearly stuck in a loop of intent without emitting.",
-      "",
-      "The packet, emitted now as my final answer:",
-      "",
-      "```json",
-      JSON.stringify(minimalPacket(), null, 2),
-      "```",
-    ].join("\n");
-    expect(extractor.extract(output).stage).toBe(1);
-    expect((extractor.extract(output).brief as any).product).toBe("MagnaCalm 400mg");
-  });
-
-  it("is not fooled by braces inside quoted text", () => {
-    const packet = reviewPacket();
-    packet.excerpts[0].text = 'She wrote "it arrived broken }" and left it at that {';
-    const output = `here you go\n\`\`\`\n${JSON.stringify(packet)}\n\`\`\`\ndone`;
-    expect((extractor.extract(output).excerpts as any)[0].text).toContain("arrived broken");
-  });
-
-  it("collects balanced objects and skips the unbalanced", () => {
-    expect(JsonBlocks.balanced('noise {"a":1} more {"b":{"c":2}} and {"d": unterminated')).toEqual([
-      '{"a":1}',
-      '{"b":{"c":2}}',
-    ]);
-    // A stray closing brace in prose closes nothing.
-    expect(JsonBlocks.balanced("} nothing here")).toEqual([]);
-  });
-
-  it("errors when there is no JSON at all", () => {
-    expect(() => extractor.extract("I did the research and here is what I think.")).toThrow(
-      /no fenced JSON/,
-    );
-  });
-
-  it("errors on empty output", () => {
-    expect(() => extractor.extract("   ")).toThrow(/no output/);
+  it("names a site brief's product from the product's own `name` attribute", () => {
+    const rows = [...rowsOf(minimalPacket()), row("attribute", { node: "product_data", key: "name", value: "Mullein Drops", source_id: "sha256:aaa" })];
+    const site = { ...brief, product: "", url: "https://mullevia.com/products/mullein-drops" };
+    const draft = new PacketAssembly(rows).draft({ runId: "run-a", brief: site, nodes: ["product_data"] });
+    expect(draft.brief).toMatchObject({ product: "Mullein Drops", url: site.url });
   });
 });
 
@@ -146,8 +110,15 @@ describe("validation: the cross-object rules", () => {
     expect(() => packets.validate(data, REVIEW)).toThrow(/no 3-star excerpt/);
   });
 
-  it("requires a saturation curve for a complete node", () => {
-    expect(() => packets.validate(reviewPacket({ saturation: [] }), REVIEW)).toThrow(/saturation curve/);
+  it("requires a saturation curve for a complete stage-1 node", () => {
+    const data = minimalPacket();
+    data.nodes.push({ node: "category_data", status: "complete", done_criterion_met: true, why: "saturated" });
+    expect(() => packets.validate(data)).toThrow(/category_data is complete with no saturation curve/);
+  });
+
+  it("asks stage 2 for neither a curve nor a gap: it searches nothing, and no agent invents completeness", () => {
+    // spec-stage-2-pipeline.md §5: the packet is computed from fixed pulls.
+    expect(() => packets.validate(reviewPacket({ saturation: [], gaps: [] }), REVIEW)).not.toThrow();
   });
 
   it("treats product_data as a checklist, not a search", () => {
@@ -231,7 +202,7 @@ describe("validation: the cross-object rules", () => {
   });
 
   it("round-trips a valid packet", () => {
-    const parsed = packets.parse(fenced(reviewPacket()), REVIEW);
+    const parsed = packets.validate(reviewPacket(), REVIEW);
     expect(parsed.excerpts[0]!.text.startsWith("I wake up at 3am")).toBe(true);
     expect(parsed.excerpts[0]!.star_rating).toBe(3);
   });
@@ -576,6 +547,23 @@ describe("validation: the champion is the genre's most-bought", () => {
     const data = withGenreBrief();
     data.competitor_reference.runner_up_name = "";
     expect(() => validate(data)).toThrow(/names no runner-up/);
+  });
+
+  it("rejects a null runner-up on a genre brief as no runner-up", () => {
+    // Null is the url brief's "no ranking" (spec-context-subagents §9); a genre
+    // brief still needs the ranking.
+    const data = withGenreBrief();
+    data.competitor_reference.runner_up_name = null;
+    data.competitor_reference.runner_up_reviews = null;
+    expect(() => validate(data)).toThrow(/names no runner-up/);
+  });
+
+  it("accepts a null runner-up on a url brief (run 8a02bed6)", () => {
+    const data = withGenreBrief();
+    data.brief.url = "https://magnacalm.example";
+    data.competitor_reference.runner_up_name = null;
+    data.competitor_reference.runner_up_reviews = null;
+    expect(() => validate(data)).not.toThrow();
   });
 
   it("rejects a champion its own runner-up out-reviews", () => {

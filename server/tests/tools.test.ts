@@ -25,15 +25,16 @@ import {
 import { Env, type Settings } from "../src/config/index.js";
 import {
   ResearchToolset,
-  ReviewRendering,
   WebFetchTool,
-  type ToolsetOptions,
 } from "../src/agent/tools/index.js";
+import { LedgerPacket, RunFindings } from "../src/agent/index.js";
+import { ServiceClients } from "../src/adapters/index.js";
 import {
   STAGE_NODES,
   locatorSchema,
+  type Node,
 } from "../src/domain/index.js";
-import { minimalPacket, reviewPacket } from "./fixtures.js";
+import { MemoryLedger, minimalPacket, reviewPacket, services } from "./fixtures.js";
 
 let dir: string;
 let settings: Settings;
@@ -56,7 +57,7 @@ afterEach(() => {
 });
 
 const tools = (runId = "run-1") => {
-  const list = new ResearchToolset({ settings, runId }).build();
+  const list = new ResearchToolset({ settings, runId, services: services(settings) }).build();
   return {
     search: list.find((t) => t.name === "web_search")!,
     fetch: list.find((t) => t.name === "web_fetch")!,
@@ -321,227 +322,52 @@ describe("archive", () => {
 });
 
 /**
- * The three review tools.
- *
- * The Apify runner is injected, so nothing here touches the network. What these
- * protect is the wiring rather than the mapping (`apify.test.ts` covers that):
- * the tools must be absent without a token, and every excerpt must be archived
- * under a re-hashable id, because §2.3 requires each one to cite a source that
- * can be read back.
+ * Amazon product search: the one Apify tool a stage-1 agent has. It is absent
+ * without a token, and offered only to a run that covers competitors.
  */
-describe("review tools", () => {
+describe("Amazon product search", () => {
   const runner = (items: Array<Record<string, unknown>>) => ({
     async run() {
       return { status: "SUCCEEDED", items };
     },
   });
 
-  const reviewTools = (actorRunner: any, runId = "run-r") =>
-    new ResearchToolset({ settings, runId, actorRunner }).build();
-
-  it("are withheld entirely when no Apify token is configured", () => {
+  it("is withheld entirely when no Apify token is configured", () => {
     // Withheld rather than stubbed: an agent told it has a tool that always
-    // throws burns turns rediscovering that, and the prompt knows how to gap.
-    const names = new ResearchToolset({
-      settings: { ...settings, apifyToken: "" },
-      runId: "run-x",
-      actorRunner: null,
-    }).build().map((t) => t.name);
-
+    // throws burns turns rediscovering that.
+    const names = new ResearchToolset({ settings, runId: "run-x", services: services(settings, null), productSearch: true })
+      .build()
+      .map((t) => t.name);
     expect(names).toEqual(["web_search", "web_fetch"]);
   });
 
-  it("are withheld from a run that does not cover review mining, token or not", () => {
-    // The only tools that cost money per call; a product-data run has no use for them.
-    const names = new ResearchToolset({
-      settings,
-      runId: "run-x",
-      actorRunner: runner([]),
-      reviewTools: false,
-    }).build().map((t) => t.name);
+  it("is withheld from a run that does not cover competitors, token or not", () => {
+    const names = new ResearchToolset({ settings, runId: "run-x", services: services(settings, runner([])) })
+      .build()
+      .map((t) => t.name);
     expect(names).toEqual(["web_search", "web_fetch"]);
   });
 
-  it("offers Amazon product search alone to a competitors run", () => {
-    // Discovery, not reviews: the review tools stay withheld.
-    const names = new ResearchToolset({
-      settings,
-      runId: "run-x",
-      actorRunner: runner([]),
-      reviewTools: false,
-      productSearch: true,
-    }).build().map((t) => t.name);
+  it("is the only Apify tool a competitors run gets", () => {
+    const names = new ResearchToolset({ settings, runId: "run-x", services: services(settings, runner([])), productSearch: true })
+      .build()
+      .map((t) => t.name);
     expect(names).toEqual(["web_search", "web_fetch", "amazon_find_product"]);
   });
 
-  it("are present once a runner exists", () => {
-    const names = reviewTools(runner([])).map((t) => t.name);
-    expect(names).toContain("amazon_find_product");
-    expect(names).toContain("amazon_reviews");
-    expect(names).toContain("trustpilot_reviews");
-  });
-
-  it("archives excerpts under an id that re-hashes to the stored bytes", async () => {
-    const list = reviewTools(
-      runner([
-        {
-          reviewDescription: "It works but you must reapply several times a day.",
-          ratingScore: 3,
-          date: "2026-09-06",
-          reviewUrl: "https://www.amazon.com/gp/customer-reviews/R1",
-          reviewTitle: "ok",
-          isVerified: true,
-        },
-      ]),
-    );
-    const tool = list.find((t) => t.name === "amazon_reviews")!;
-    const result = await tool.execute("1", {
-      product_url: "https://www.amazon.com/dp/B0H2JVQ9GR",
-      star: 3,
-    });
-
-    const sourceId: string = (result.details as any).source_id;
-    expect(sourceId).toMatch(/^sha256:[0-9a-f]{64}$/);
-    expect((result.details as any).archived).toBe(true);
-
-    const stored = readFileSync(
-      join(settings.corpusPath, "runs", "run-r", "sources", sourceId.slice(7)),
-    );
-    expect(`sha256:${createHash("sha256").update(stored).digest("hex")}`).toBe(sourceId);
-    expect(JSON.parse(stored.toString())[0].text).toBe(
-      "It works but you must reapply several times a day.",
-    );
-    expect((result.content[0] as any).text).toContain("pull: p1");
-  });
-
-  it("keeps review text out of what the model reads", async () => {
-    // Run 1d2ad3f2 (2026-09-25): shown every review in the pull result, the model
-    // spent 720s and 78,225 output tokens copying them into the packet, dropped
-    // 135 of 216, and mangled a source hash. The server now writes the excerpts,
-    // so the text never needs to reach the model at all.
-    const list = reviewTools(
-      runner([
-        {
-          reviewDescription: "Less swelling after three weeks.",
-          ratingScore: 4,
-          reviewUrl: "https://www.amazon.com/gp/customer-reviews/R83A6B2PFC42",
-        },
-      ]),
-    );
-    const pull = await list.find((t) => t.name === "amazon_reviews")!.execute("1", {
-      product_url: "https://www.amazon.com/dp/B0H2JVQ9GR",
-      star: 4,
-    });
-    const text = (pull.content[0] as any).text as string;
-    expect(text).not.toContain("Less swelling");
-    expect(text).toContain("reviews: 1 new (4* 1)");
-    expect(text).toContain("Never copy a review into the packet");
-  });
-
-  it("surfaces a gap in the text the model reads, not just in details", async () => {
-    // A gap the model cannot see is a gap it will not record.
-    const list = reviewTools(
-      runner([{ error: "no_relevant_reviews_found", totalCategoryRatings: 61, totalCategoryReviews: 0 }]),
-    );
-    const tool = list.find((t) => t.name === "amazon_reviews")!;
-    const result = await tool.execute("1", {
-      product_url: "https://www.amazon.com/dp/B0H2JVQ9GR",
-      star: 3,
-    });
-
-    const text = (result.content[0] as any).text;
-    expect(text).toContain("GAP:");
-    expect(text).toContain("No 3-star reviews with text");
-    expect(text).toContain("do not describe the node as complete");
-  });
-
-  it("rejects a star band outside 1-5 rather than silently fetching a mixed sample", async () => {
-    const list = reviewTools(runner([]));
-    const tool = list.find((t) => t.name === "trustpilot_reviews")!;
-    await expect(tool.execute("1", { domain: "huel.com", star: 9 })).rejects.toThrow(
-      /star must be between 1 and 5/,
-    );
-  });
-
   it("orders found products by reviewsCount so the agent spends on the right one", async () => {
-    const list = reviewTools(
-      runner([
+    const list = new ResearchToolset({
+      settings,
+      runId: "run-x",
+      productSearch: true,
+      services: services(settings, runner([
         { asin: "B0THIN", title: "four reviews", stars: 5, reviewsCount: 4 },
         { asin: "B0GOOD", title: "sixty one reviews", stars: 3.9, reviewsCount: 61 },
-      ]),
-    );
-    const tool = list.find((t) => t.name === "amazon_find_product")!;
-    const result = await tool.execute("1", { query: "intertrigo cream" });
-
+      ])),
+    }).build();
+    const result = await list.find((t) => t.name === "amazon_find_product")!.execute("1", { query: "intertrigo cream" });
     expect((result.details as any).products[0].asin).toBe("B0GOOD");
     expect((result.content[0] as any).text).toContain("reviews=61");
-  });
-});
-
-/**
- * `MRA_APIFY_MAX_REVIEWS` is the ceiling, not just the default.
- *
- * It used to be only the default: `max_reviews` from the model went straight to
- * the actor, and `capFor` sized the spend cap from it — so asking for 500
- * authorised $6 on one Amazon call. The free plan's 10-per-call limit hid that;
- * a paid plan would not have.
- */
-describe("review volume is bounded by the server, not the agent", () => {
-  const recording = () => {
-    const calls: Array<{ actorId: string; input: Record<string, any>; cap: number }> = [];
-    const actorRunner = {
-      async run(actorId: string, input: Record<string, unknown>, cap: number) {
-        calls.push({ actorId, input, cap });
-        return { status: "SUCCEEDED", items: [{ text: "fine", rating: 3, reviewDescription: "fine", ratingScore: 3 }] };
-      },
-    };
-    return { calls, actorRunner };
-  };
-
-  const tool = (actorRunner: any, name: string) =>
-    new ResearchToolset({ settings: { ...settings, apifyMaxReviews: 10 }, runId: "run-cap", actorRunner }).build()
-      .find((t) => t.name === name)!;
-
-  it("cuts an Amazon request to the setting, and sizes the spend cap from the cut number", async () => {
-    const { calls, actorRunner } = recording();
-    const result = await tool(actorRunner, "amazon_reviews").execute("1", {
-      product_url: "https://www.amazon.com/dp/B0H2JVQ9GR",
-      star: 3,
-      max_reviews: 500,
-    });
-
-    expect(calls[0]!.input.maxReviews).toBe(10);
-    expect(calls[0]!.cap).toBe(Spend.capFor(AMAZON_REVIEWS_ACTOR, 10));
-    expect(calls[0]!.cap).toBeLessThan(Spend.capFor(AMAZON_REVIEWS_ACTOR, 500));
-    // Told, so a capped pull is not mistaken for a product with few reviews.
-    expect((result.content[0] as any).text).toMatch(/asked for 500 reviews; this server caps each call at 10/);
-  });
-
-  it("cuts a Trustpilot request the same way", async () => {
-    const { calls, actorRunner } = recording();
-    await tool(actorRunner, "trustpilot_reviews").execute("1", { domain: "huel.com", max_reviews: 500 });
-
-    expect(calls[0]!.input.maxItems).toBe(10);
-    expect(calls[0]!.cap).toBe(Spend.capFor(TRUSTPILOT_ACTOR, 10));
-  });
-
-  it("leaves a request within the limit alone, with no note", async () => {
-    const { calls, actorRunner } = recording();
-    const result = await tool(actorRunner, "amazon_reviews").execute("1", {
-      product_url: "https://www.amazon.com/dp/B0H2JVQ9GR",
-      max_reviews: 4,
-    });
-
-    expect(calls[0]!.input.maxReviews).toBe(4);
-    expect((result.content[0] as any).text).not.toMatch(/caps each call/);
-  });
-
-  it("uses the setting when the agent asks for nothing, and never goes below one", () => {
-    expect(ReviewRendering.limit(undefined, 10)).toBe(10);
-    expect(ReviewRendering.limit(0, 10)).toBe(1);
-    expect(ReviewRendering.limit(-5, 10)).toBe(1);
-    expect(ReviewRendering.limit(7.9, 10)).toBe(7);
-    expect(ReviewRendering.limit(Number.NaN, 10)).toBe(10);
   });
 });
 
@@ -600,117 +426,176 @@ describe("the fetch gate", () => {
   });
 });
 
-describe("validate_packet", () => {
-  const check = (overrides: Partial<ToolsetOptions["packetCheck"] & {}> = {}) => {
+describe("the ledger tools", () => {
+  const ledgerTools = (nodes: readonly Node[] = STAGE_NODES[1], brief = { product: "MagnaCalm 400mg", url: "", market: "", notes: "" }) => {
+    const ledger = new MemoryLedger();
+    const findings = new RunFindings(ledger, "run-l", "parent", nodes);
+    const packet = new LedgerPacket(findings, { brief, nodes });
     const valid: any[] = [];
     const checked: Array<{ valid: boolean; problems: readonly string[] }> = [];
     const list = new ResearchToolset({
       settings,
-      runId: "run-v",
-      packetCheck: {
-        nodes: STAGE_NODES[1],
-        brief: { product: "MagnaCalm 400mg" },
-        onValid: (p) => valid.push(p),
-        onChecked: (v, problems) => checked.push({ valid: v, problems }),
-        ...overrides,
+      runId: "run-l",
+      services: services(settings),
+      findings: {
+        nodes,
+        findings,
+        packet,
+        hooks: { onValid: (p) => valid.push(p), onChecked: (v, problems) => checked.push({ valid: v, problems }) },
       },
     }).build();
-    return { tool: list.find((t) => t.name === "validate_packet")!, valid, checked };
+    const tool = (name: string) => list.find((t) => t.name === name)!;
+    return { ledger, tool, names: list.map((t) => t.name), valid, checked };
   };
   const text = (result: any) => result.content[0].text as string;
 
-  it("is offered to every run that has a contract to check", () => {
-    const names = new ResearchToolset({ settings, runId: "r" }).build().map((t) => t.name);
-    expect(names).not.toContain("validate_packet");
-    expect(check().tool).toBeDefined();
+  it("are offered only to a run that has a ledger, and competitor records only with competitors in scope", () => {
+    const bare = new ResearchToolset({ settings, runId: "r", services: services(settings) }).build().map((t) => t.name);
+    expect(bare).not.toContain("finish");
+    expect(ledgerTools().names).toContain("record_competitor");
+    const productOnly = ledgerTools(["product_data"]).names;
+    expect(productOnly).toContain("finish");
+    expect(productOnly).not.toContain("record_competitor");
+    expect(productOnly).not.toContain("record_reference");
   });
 
-  it("passes a good draft, and hands it over exactly once", async () => {
-    const { tool, valid, checked } = check();
-    const result = await tool.execute("1", { packet: minimalPacket() });
-    expect(text(result)).toMatch(/^VALID/);
-    expect(text(result)).toContain("sources 1");
-    expect(valid).toHaveLength(1);
-    expect(checked).toEqual([{ valid: true, problems: [] }]);
-
-    // First pass wins: a second valid draft does not replace it.
-    await tool.execute("2", { packet: minimalPacket() });
-    expect(valid).toHaveLength(1);
-  });
-
-  it("names the problems instead of rejecting a run for them", async () => {
+  it("names the one problem with a record, and records nothing", async () => {
     // The two live shapes that each killed a run: an invented enum value and a
-    // float star rating.
-    const draft = minimalPacket();
-    draft.sources[0].kind = "marketplace";
-    draft.attributes[0].value = 400; // a number where the contract wants a string
-    const { tool, valid, checked } = check();
-    const result = await tool.execute("1", { packet: draft });
-
-    expect(text(result)).toMatch(/^NOT VALID — 2 problems/);
-    expect(text(result)).toContain("received 'marketplace'");
-    expect(text(result)).toContain("Checks used: 1 of 5");
-    expect(valid).toHaveLength(0);
-    expect(checked[0]!.valid).toBe(false);
+    // number where the contract wants a string.
+    const { ledger, tool } = ledgerTools();
+    const source = { ...minimalPacket().sources[0], kind: "marketplace" };
+    expect(text(await tool("record_source").execute("1", { item: source }))).toMatch(/^NOT RECORDED — kind: .*received 'marketplace'/);
+    const attribute = { ...minimalPacket().attributes[0], value: 400 };
+    expect(text(await tool("record_attribute").execute("2", { item: attribute }))).toMatch(/^NOT RECORDED — value: Expected string, received number/);
+    expect(ledger.rows).toHaveLength(0);
   });
 
-  it("refuses a draft that dropped evidence rather than fixing it", async () => {
-    const { tool } = check();
-    const full = minimalPacket();
-    full.sources.push({ ...full.sources[0], id: "sha256:second" });
-    await tool.execute("1", { packet: full });
-
-    const thinner = minimalPacket(); // one source again
-    const result = await tool.execute("2", { packet: thinner });
-    expect(text(result)).toMatch(/^NOT CHECKED/);
-    expect(text(result)).toContain("do not drop the evidence");
-    // A refusal is not a contract failure, so it costs no budget.
-    expect((result.details as any).reason).toBe("evidence_shrank");
+  it("takes the item as one JSON string as well as an object", async () => {
+    // A live glm run stringified the packet on every one of six calls.
+    const { tool } = ledgerTools();
+    const result = await tool("record_source").execute("1", { item: JSON.stringify(minimalPacket().sources[0]) });
+    expect(text(result)).toBe("RECORDED src1");
+    expect(text(await tool("record_gap").execute("2", { item: '{"node": "product_data"' }))).toMatch(/^NOT RECORDED — the item did not decode/);
   });
 
-  it("stops after five checks", async () => {
-    const { tool } = check();
-    const bad = minimalPacket();
-    bad.gaps = [];
-    for (let i = 1; i <= 5; i++) {
-      expect(text(await tool.execute(String(i), { packet: bad }))).toMatch(/^NOT VALID/);
+  it("assigns an excerpt's id itself, whatever the model sent", async () => {
+    const { ledger, tool } = ledgerTools();
+    const excerpt = { id: "sha256:bbb", source_id: "sha256:aaa", text: "Wake up rested.", node: "product_data" };
+    expect(text(await tool("record_excerpt").execute("1", { item: excerpt }))).toBe("RECORDED ex1");
+    expect(ledger.rows[0]!.payload).not.toHaveProperty("id");
+    expect(ledger.rows[0]!.entity).toBe("product");
+  });
+
+  it("files a competitor under its own id", async () => {
+    const { ledger, tool } = ledgerTools();
+    const competitor = {
+      id: "c3", name: "HERBIFY Mullein", url: "https://herbify.example", relation: "direct", form: "liquid",
+      active_ingredients: [{ name_as_printed: "Mullein", name_normalised: "mullein" }],
+      shared_actives: ["mullein"], source_id: "sha256:ccc",
+    };
+    expect(text(await tool("record_competitor").execute("1", { item: competitor }))).toBe("RECORDED co1");
+    expect(ledger.rows[0]!.entity).toBe("c3");
+    expect(ledger.rows[0]!.source_id).toBe("sha256:ccc");
+  });
+
+  it("retracts a live row once, and says so when there is none", async () => {
+    const { tool } = ledgerTools();
+    await tool("record_gap").execute("1", { item: minimalPacket().gaps[0] });
+    expect(text(await tool("retract").execute("2", { id: "gap1", why: "found it" }))).toBe("RETRACTED gap1");
+    expect(text(await tool("retract").execute("3", { id: "gap1", why: "again" }))).toMatch(/^NOT RETRACTED/);
+  });
+
+  it("finishes a complete ledger, ends the loop, and hands the packet over", async () => {
+    const { tool, valid, checked } = ledgerTools(["product_data"]);
+    const packet = minimalPacket();
+    for (const [name, items] of [
+      ["record_source", packet.sources],
+      ["record_attribute", packet.attributes],
+      ["record_node_status", packet.nodes],
+      ["record_gap", packet.gaps],
+    ] as const) {
+      for (const item of items) expect(text(await tool(name).execute("r", { item }))).toMatch(/^RECORDED/);
     }
-    const spent = await tool.execute("6", { packet: bad });
-    expect(text(spent)).toMatch(/^NOT CHECKED/);
-    expect(text(spent)).toContain("checks for this run are spent");
-  });
-
-  it("takes the packet as one JSON string as well as an object", async () => {
-    // A live glm run stringified the packet on every one of six calls and got
-    // back "Expected object, received string", so the contract problems it was
-    // there to learn about were never named and the run settled invalid.
-    const { tool, valid, checked } = check();
-    const result = await tool.execute("1", { packet: JSON.stringify(minimalPacket()) });
-    expect(text(result)).toMatch(/^VALID/);
+    const result = await tool("finish").execute("f", {});
+    expect(text(result)).toMatch(/^FINISHED/);
+    expect(result.terminate).toBe(true);
     expect(valid).toHaveLength(1);
+    expect(valid[0].brief.product).toBe("MagnaCalm 400mg");
+    expect(valid[0].attributes[0].id).toBe("at2");
     expect(checked).toEqual([{ valid: true, problems: [] }]);
   });
 
-  it("refuses a string that is not one JSON object, without spending budget", async () => {
-    const { tool } = check();
-    const truncated = await tool.execute("1", { packet: '{"contract_version": "1"' });
-    expect(text(truncated)).toMatch(/^NOT CHECKED/);
-    expect(text(truncated)).toContain("one string");
-    expect((truncated.details as any).reason).toBe("not_a_packet_object");
-
-    const prose = await tool.execute("2", { packet: "here is the packet you asked for" });
-    expect(text(prose)).toMatch(/^NOT CHECKED/);
-    expect((prose.details as any).reason).toBe("not_a_packet_object");
-
-    const good = await tool.execute("3", { packet: minimalPacket() });
-    expect(text(good)).toMatch(/^VALID/);
+  it("hands back every cross-field problem, numbered, and keeps the run going", async () => {
+    const { tool, valid, checked } = ledgerTools(["product_data"]);
+    const orphan = { node: "product_data", key: "dose_per_serving", value: "400 mg", source_id: "sha256:nowhere" };
+    await tool("record_attribute").execute("1", { item: orphan });
+    const result = await tool("finish").execute("f", {});
+    expect(text(result)).toMatch(/^NOT FINISHED — 3 problems/);
+    expect(text(result)).toContain("2. attribute 'at1' cites source 'sha256:nowhere', which is not in the packet");
+    expect(text(result)).toContain("3. gap list is empty; real research always has holes");
+    expect(result.terminate).toBeUndefined();
+    expect(valid).toHaveLength(0);
+    expect(checked[0]!.problems).toHaveLength(3);
   });
 
-  it("checks against the run's own scope and brief", async () => {
-    // A review-mining packet is stage 2: not this run's work at all.
-    const { tool } = check({ nodes: ["product_data"] as any });
-    const answer = text(await tool.execute("1", { packet: reviewPacket() }));
-    expect(answer).toContain("which is collected in stage 2");
-    expect(answer).toContain("that is a separate run");
+  it("refuses a sixth check without spending anything, and ends the loop", async () => {
+    const { tool, checked } = ledgerTools(["product_data"]);
+    for (let i = 1; i <= 5; i++) {
+      expect(text(await tool("finish").execute(String(i), {}))).toContain(`Checks used: ${i} of 5.`);
+    }
+    for (const call of ["6", "7"]) {
+      const refused = await tool("finish").execute(call, {});
+      expect(text(refused)).toMatch(/^NOT CHECKED — the 5 checks for this run are spent/);
+      expect(refused.terminate).toBe(true);
+    }
+    expect(checked).toHaveLength(5);
+  });
+
+  it("runs finish after the records it arrived with", () => {
+    // pi runs a tool batch in parallel unless one of its tools is sequential.
+    expect(ledgerTools().tool("finish").executionMode).toBe("sequential");
+  });
+});
+
+describe("the service queues", () => {
+  it("lets three fetches issued at once reach Firecrawl at most two at a time", async () => {
+    // Firecrawl's plan allows 2 concurrent scrapes (GET /v2/concurrency-check,
+    // 2026-09-29); one agent alone sent 3 within 2 ms.
+    let inFlight = 0;
+    let peak = 0;
+    stubFetch(async () => {
+      inFlight += 1;
+      peak = Math.max(peak, inFlight);
+      await new Promise((r) => setTimeout(r, 20));
+      inFlight -= 1;
+      return json({ success: true, data: { markdown: "a page", metadata: { title: "t" } } });
+    });
+    const shared = ServiceClients.forSettings({ ...settings, firecrawlConcurrency: 2 });
+    const fetches = [1, 2, 3].map((n) =>
+      new ResearchToolset({ settings, runId: `run-q${n}`, services: shared }).build().find((t) => t.name === "web_fetch")!,
+    );
+    const results = await Promise.all(fetches.map((f, n) => f.execute(String(n), { url: `https://a.example/${n}` })));
+    expect(results).toHaveLength(3);
+    expect(peak).toBe(2);
+  });
+
+  it("drops a waiting call whose run was stopped, without taking a slot", async () => {
+    let release!: () => void;
+    const held = new Promise<void>((r) => (release = r));
+    let calls = 0;
+    stubFetch(async () => {
+      calls += 1;
+      await held;
+      return json({ success: true, data: { markdown: "a page" } });
+    });
+    const shared = ServiceClients.forSettings({ ...settings, firecrawlConcurrency: 1 });
+    const first = shared.pages.scrape("https://a.example/1");
+    const stop = new AbortController();
+    const waiting = shared.pages.scrape("https://a.example/2", stop.signal);
+    stop.abort(new Error("stopped"));
+    await expect(waiting).rejects.toThrow("stopped");
+    release();
+    await first;
+    expect(calls).toBe(1);
   });
 });

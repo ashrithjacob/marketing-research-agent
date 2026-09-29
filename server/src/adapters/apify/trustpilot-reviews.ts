@@ -34,6 +34,7 @@ export class TrustpilotReviews {
     const band = star === null ? "any star" : `${star}-star`;
     if (items.length === 0) {
       return {
+        status,
         excerpts: [],
         gap: `Apify run finished ${status} with an empty dataset for ${domainOrUrl} (${band}).`,
         offBand: 0,
@@ -64,6 +65,6 @@ export class TrustpilotReviews {
       rows.length === 0
         ? `Apify returned ${items.length} rows for ${domainOrUrl} (${band}) but none carried text.`
         : filed.gap;
-    return { excerpts: filed.excerpts, gap, offBand: filed.offBand, totalReviews: null, totalRatings: null };
+    return { status, excerpts: filed.excerpts, gap, offBand: filed.offBand, totalReviews: null, totalRatings: null };
   }
 }

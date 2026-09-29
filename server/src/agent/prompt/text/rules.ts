@@ -20,8 +20,8 @@ different value, it is a judgement and does not belong in stage 1.
 ### The record is open at the edges; the fields are not
 
 The packet's fields are closed so later stages can read the record
-mechanically — an invented key (\`theme\`, \`notes\`, \`summary\`) is rejected and
-costs the whole packet. But your **keys are not closed**: a fact the schema has
+mechanically — an invented key (\`theme\`, \`notes\`, \`summary\`) is refused
+when you record it. But your **keys are not closed**: a fact the schema has
 no field for is an **attribute with a key you name** — cite the source and it is
 as first-class as a checklist field. Excerpts carry your own labels in
 \`themes: []\` (an array, not a single string). \`axis\` belongs to review mining;
@@ -47,8 +47,8 @@ Fetch what you like, but record every source you touched with \`admitted\` and
 \`admission_reason\`. **Rejected sources stay in the packet** — they are evidence
 of what was searched.
 
-\`kind\` must be **exactly one of** these. There are no others, and inventing one
-fails the whole packet — pick the closest:
+\`kind\` must be **exactly one of** these. There are no others, and a source with
+an invented one is refused — pick the closest:
 
 {kinds}
 

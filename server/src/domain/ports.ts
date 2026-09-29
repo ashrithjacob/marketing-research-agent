@@ -15,6 +15,8 @@ import type { StoredPacketRows } from "./packet-rows.js";
 import type { ReviewAnalysis } from "./review-analysis.js";
 import type { AmazonListing, TargetListing } from "./stage-two.js";
 import type { ReviewLedgerSnapshot, StoredRunReview } from "./reviews.js";
+import type { Finding, FindingDraft } from "./findings.js";
+import type { FetchedPage, SearchPage } from "./web.js";
 
 /** Products and what their runs found, counted only over the runs a scope admits. */
 export interface ProductCatalog {
@@ -56,9 +58,27 @@ export interface TargetListings {
   list(sourceRunId: string): TargetListing[];
 }
 
+/** What a run has found, one row per finding, written as it is found. Rows are retracted, never deleted. */
+export interface FindingLedger {
+  append(draft: FindingDraft): Finding;
+  retract(runId: string, id: string, why: string): Finding | null;
+  list(runId: string): Finding[];
+}
+
+/** Reads one page as text. Throws rather than returning an empty body. */
+export interface PageFetcher {
+  scrape(url: string, signal?: AbortSignal): Promise<FetchedPage>;
+}
+
+/** Finds urls for a query; it cannot read pages. */
+export interface WebSearch {
+  find(query: string, maxResults: number, signal?: AbortSignal): Promise<SearchPage>;
+}
+
 export interface ResearchStore {
   readonly products: ProductCatalog;
   readonly listings: TargetListings;
+  readonly findings: FindingLedger;
   readonly accounts: AccountDirectory;
   createRun(input: {
     workspaceId: string;

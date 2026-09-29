@@ -1,6 +1,7 @@
 import type Database from "better-sqlite3";
 
 import { AccountTable } from "./account-table.js";
+import { FindingTable } from "./finding-table.js";
 import { PacketRowTable } from "./packet-row-table.js";
 import { ReviewAnalysisTable } from "./review-analysis-table.js";
 import { TargetListingTable } from "./target-listing-table.js";
@@ -31,9 +32,7 @@ export class SqliteSchema {
       if (!have.includes(column)) db.exec(ddl);
     }
     db.exec(SqliteSchema.INDEXES);
-    db.exec(PacketRowTable.DDL);
-    db.exec(ReviewAnalysisTable.DDL);
-    db.exec(TargetListingTable.DDL);
+    for (const ddl of [PacketRowTable.DDL, ReviewAnalysisTable.DDL, TargetListingTable.DDL, FindingTable.DDL]) db.exec(ddl);
   }
 
   static readonly INDEXES = `

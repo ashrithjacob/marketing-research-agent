@@ -1,7 +1,7 @@
 import type { Judgement, SourceKind } from "../../domain/index.js";
 import { Trace } from "../../trace/index.js";
 
-/** Single messages injected mid-run: a steer, a nudge, a resume after a drop. */
+/** Single messages injected mid-run: a steer, a resume after a drop. */
 export class AgentMessages {
   static steer(judgement: Judgement): string {
     Trace.line(import.meta.url, "AgentMessages.steer", { judgement });
@@ -18,23 +18,13 @@ export class AgentMessages {
     );
   }
 
-  static packetNudge(): string {
-    Trace.line(import.meta.url, "AgentMessages.packetNudge");
-    return (
-      "Your last reply ended without the stage-1 packet, so this run has no " +
-      "result yet. Do not research further; tools are switched off. Write the " +
-      "packet now from what you have already gathered, as a single fenced " +
-      "```json block, and record what you did not reach as gaps."
-    );
-  }
-
   static resume(error: string): string {
     Trace.line(import.meta.url, "AgentMessages.resume", { error });
     return (
       `The connection to the model dropped part-way through your last turn (${error || "no detail"}), ` +
       "so that turn was lost. Everything before it stands: the tool results above " +
-      "are yours and do not need fetching again. Carry on from where you were, and " +
-      "finish with the stage-1 packet as a single fenced ```json block."
+      "are yours and do not need fetching again, and everything you recorded is still in " +
+      "the ledger. Carry on from where you were, and call finish when you are done."
     );
   }
 }

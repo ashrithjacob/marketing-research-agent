@@ -39,7 +39,7 @@ mra container — one Node process (server/src, layered — see CLAUDE.md)
         ├──▶ OpenRouter            the model (MRA_MODEL); /models prices; /generation cost
         ├──▶ searxng:8080          web_search (container on the same network)
         ├──▶ api.firecrawl.dev     web_fetch
-        ├──▶ Apify                 amazon_find_product, amazon_reviews, trustpilot_reviews
+        ├──▶ Apify                 amazon_find_product; the listing lookup after stage 1; stage 2's review pulls
         └──▶ /corpus               every fetched body, content-addressed (volume corpus)
 ```
 
@@ -196,9 +196,42 @@ which is how the status chip and counters change.
 | `web_search` | SearXNG `GET /search?format=json` | numbered titles, urls, snippets (default 10, max 25) | none |
 | `web_fetch` | Firecrawl `POST /v2/scrape` (markdown, main content) | header (`source_id`, url, title, `archived`) + the page text, cut at `MRA_FETCH_CHAR_LIMIT` (25 000; was 60 000 until a run's context reached 208k tokens) | body written to `/corpus/runs/<runId>/sources/<sha256>` |
 | `amazon_find_product` | Apify `junglee/free-amazon-product-scraper` | asin, stars, `reviewsCount`, title, url — most-reviewed first | none |
-| `mine_reviews` | both actors, every chosen Amazon listing × five star bands plus one Trustpilot pull per merchant, fetched in parallel, filed in job order | per pull: its **handle** (`p1`, `p2`…), counts by star, totals, any `GAP:` — **no review text** | each pull archived like a fetch; every review filed in the run's **review ledger** |
-| `amazon_reviews` / `trustpilot_reviews` | one actor run, one listing or merchant | the same per-pull summary | same as `mine_reviews`; only for retrying one failed pull |
-| `validate_packet` | `extract/`'s `PacketValidator` — the same class `RunSettlement` runs | `VALID` + counts, or the numbered problems and `Checks used: N of 5` | on the first pass: the packet is written to the run row with `packet_source = "tool"` and `packet.ready` fires mid-run |
+| `record_source`, `record_excerpt`, `record_measurement`, `record_attribute`, `record_saturation`, `record_node_status`, `record_gap`; with `competitors` in scope also `record_reference`, `record_competitor` | the **run ledger** (`research_findings`, one SQLite row per finding, written at once) | `RECORDED <row id>` (`src3`, `ex14`, …), `(replaces <id>)` when it supersedes an earlier row with the same key, or `NOT RECORDED — <problem>` | the row is checked against its section's zod schema and the run's scope *before* it is written (`extract/finding-check.ts`); a refused row writes nothing |
+| `retract` | the run ledger | `RETRACTED <id>`, or `NOT RETRACTED` | marks the row retracted with the reason; rows are never deleted |
+| `finish` | `extract/`'s `PacketAssembly` then `PacketValidator` — the same pair `RunSettlement` runs | `FINISHED` + counts, or `NOT FINISHED — N problems` numbered and `Checks used: N of 5`; past five checks (`FINISH_BUDGET`), `NOT CHECKED — … spent` with `terminate: true`, and the run is settled from its ledger (Step 6, 3) | on a pass: the packet is written to the run row with `packet_source = "finish"`, `packet.ready` fires, and the result carries pi's `terminate: true`, which ends the agent loop. Declared `executionMode: "sequential"`, so a `finish` sent in the same turn as records runs after them |
+
+**These are stage 1's tools.** Stage 2 has no agent and no tools since 2026-09-30
+(`spec-stage-2-pipeline.md`): `mine_reviews`, `amazon_reviews` and
+`trustpilot_reviews` are retired, and their pull logic lives in `ReviewPuller`
+(§2d). `amazon_find_product` is offered only to a run that covers `competitors`.
+
+**When a competitors run completes**, `RunWatch.lookUpListings` looks up the Amazon
+listing of the champion and every competitor (`StageOneListings`, one search each,
+about $0.01, charged to the run as `apify.charged`), matches each with
+`ListingMatch` (brand, one of its actives, and its form named in the title — a
+liquid by its volume, a powder by its weight), stores the rows in
+`research_target_listings`, and emits `packet.listings {total, matched}`. It runs
+after the status is `completed`, never before: an Apify search can wait minutes.
+`GET /runs/:id` serves the rows as `listings`, **re-judged by today's matcher on
+every read** (`StageTwoListings.judged`), and the Competitors tile shows each
+competitor's Amazon link or "not on Amazon".
+
+**The model never writes the packet** (since 2026-09-29, `spec-context-subagents.md`
+§4). Each tool's description carries one example item; `PacketAssembly` builds the
+packet from the live ledger rows — `brief` is the run's own, and a site brief's
+product name is the `product_data` attribute with key `name`, else the champion's
+name. Code assigns the ids of excerpts, measurements and attributes. A kind with a
+natural key — a source's id, a competitor's id, the one reference, one status per
+node, one saturation curve per node and class — is replaced by a newer row with the
+same key; the older row is retracted, not deleted.
+
+**Every outside call goes through one queue per service**, shared by every run in
+the process (`adapters/service-queue.ts`, wrapped round the adapter behind its port
+in `adapters/throttled.ts`, built once in `App`): Firecrawl 2
+(`MRA_FIRECRAWL_CONCURRENCY`, the plan's `maxConcurrency` measured 2026-09-29),
+SearXNG 2 (`MRA_SEARCH_CONCURRENCY`), Apify 16 (`MRA_APIFY_CONCURRENCY`, now shared
+across tools, runs and the stage-2 listing lookup). Each admitted call writes a
+`ServiceQueue.admitted {service, waited_ms}` trace line.
 
 The Apify review tools exist **only when `APIFY_TOKEN` is set and the run covers
 `review_mining`**; otherwise they are not offered at all. Without the token the
@@ -245,12 +278,8 @@ lookup in the background, so by the end of the run only the last turn's is pendi
 
 ### Step 6 — the run is settled (`agent/run-settlement.ts` `settle()`)
 
-**The short path first.** If the agent validated a packet mid-run with
-`validate_packet`, the run already has its deliverable: status `completed`, no
-extraction, no re-validation. If the agent *also* errored or the stream died after
-that, the run is still `completed` and an extra `run.ended_early {error}` event
-records it — the artefact is valid even though the turn was not, and calling such a
-run `failed` would be a lie about the packet. A Stop still wins over both.
+**The short path first.** If the agent's `finish` passed, the run already has its
+deliverable: status `completed`, nothing re-checked. A Stop still wins.
 
 Otherwise, when the agent goes idle:
 
@@ -294,41 +323,30 @@ Otherwise, when the agent goes idle:
    `error: "terminated"` (undici's word for a socket that went away), zero tokens
    recorded for that call, and OpenRouter still billed the run.
 
-0b. **One nudge** (`watch()`, `lacksPacket()`): if the run holds no packet object
-   at all, it gets one more turn with tools switched off, asking for the packet
-   from what it already gathered. Event `run.nudged`. Two cases reach it:
-
-   - it **ended cleanly** with no packet — a DeepSeek run at 208k input tokens
-     wrote "let me write the JSON now" 56 times and then ended its turn without
-     writing it;
-   - it **died with the retry budget spent**, but had at least one tool result in
-     the transcript. A run that fetched 30 pages is worth one tools-off ask before
-     it is written off; a run whose provider never answered has nothing to salvage,
-     so the tool result is the bar. If the ask fails too, the run settles `failed`
-     with that error.
-
-   A packet that exists but breaks the contract is *not* nudged. That is an
-   `invalid` run, and asking again would hide the mistake. Never for a Stop.
+0b. **Superseded 2026-09-29: the one nudge.** A run with no packet used to get one
+   more turn, tools off, asking it to write the packet. It existed because the
+   findings lived only in the model's context. They are in the ledger now, so there
+   is nothing to ask for: the run is settled from what it recorded (step 3).
 1. `output` (all assistant text, in order), `usage` and `ended_at` are saved.
-2. **Error or Stop:** if the agent reported an error → `failed`, or `cancelled` if
-   you had pressed Stop. A stop with no error → `cancelled`.
-3. **Extract** (`extract/`'s `PacketExtractor`): every ```` ``` ```` block is collected by scanning
-   lines, and **every balanced `{ … }` in the output** is collected too
-   (`balancedObjects()`, which tracks strings and escapes so a brace inside a quote
-   closes nothing). The **last** candidate that parses as JSON and has a `stage` key
-   is the packet; the brace-derived ones are tried first. No such candidate →
-   `invalid`.
+2. **Stop:** `cancelled` (with the error, if there was one). **Error with an empty
+   ledger** (no live row and no review pulled): `failed`.
+3. **Settle from the ledger** — `finish` run on the agent's behalf
+   (`settleFromLedger()`): `PacketAssembly` builds the packet from the live rows and
+   `PacketValidator` checks it. A pass is `completed` with `packet_source =
+   "ledger"`; if the agent had also errored, `run.ended_early {error}` records it —
+   the artefact is valid even though the turn was not. A failure is `invalid` with
+   the problems, or `failed` if the agent had errored (a crash that left an
+   unfinished ledger is a crash, not a contract failure). This is what run
+   `8a02bed6` needed: four calls cut at ~304 s by GMICloud lost the reply that was
+   to hold the packet, while everything it had found was already known.
 
-   The brace pass exists because fences drift. Measured 2026-09-21 on a HappyWags
-   run that cost $0.065 and 1.16M tokens: the model wrote a placeholder
-   ```` ```json {...} ```` block, a stray ```` ``` ```` after "Now, finally,
-   emitting.", and two abandoned attempts — eight fence lines, unbalanced. One stray
-   fence inverts the pairing for everything after it, so the prose became block
-   content and the real 47k-character packet (22 sources, 16 excerpts, 15 gaps) sat
-   outside every block. The run was rejected with "found fenced blocks but none
-   decoded to a stage packet object" while its packet was right there in `output`.
-4. **Validate:** `stagePacketSchema` — every object `.strict()`, so a field that
-   is not in the contract (a `summary`, a `finding`) fails the packet. A run that
+   **Superseded 2026-09-29: extracting the packet from `output`.** `PacketExtractor`
+   scanned fences and balanced braces for the last JSON object with a `stage` key
+   (fences drift: a HappyWags run's stray fence hid a 47k-character packet outside
+   every block). With no packet in the text, the extractor is deleted.
+4. **Validate** (in `finish` and in step 3 alike): `stagePacketSchema` — every
+   object `.strict()`. Per-row shape and scope were already checked when each row
+   was written; what remains are the cross-object rules. A run that
    covers part of the stage then gets the scope rule (§2b). Then seven cross-object
    rules:
    - the packet's `brief.product` must echo the run's brief (containment,
@@ -356,7 +374,7 @@ Otherwise, when the agent goes idle:
      `ad_source_ids` must point at `ad_library` sources.
 5. **Invalid** → status `invalid` with the reason, event `packet.invalid`.
    **Valid** → status `completed`, packet stored, judgement `applied_count`s bumped,
-   events `run.completed` then `packet.ready {sources, excerpts, gaps}`.
+   events `packet.ready {sources, excerpts, gaps, via}` and `run.completed`.
 6. **Billed cost** — whatever the outcome (a failed or cancelled run was still
    charged), the per-turn lookups are awaited and summed into `usage.billed`, and a
    `run.billed` event is sent. This happens *after* the status is final, so a slow
@@ -524,7 +542,35 @@ things it showed:
   from tools it was never meant to have. It now describes only the tools the run
   is given (`systemPrompt(nodes)`).
 
-### §2d — the review ledger: why the model never copies a review
+### §2d — stage 2: a pipeline, and a review ledger no model copies from
+
+**Since 2026-09-30 stage 2 has no model** (`spec-stage-2-pipeline.md`).
+`RunLauncher` hands a `review_mining` run to `ReviewMiningJob`:
+
+1. The stage-1 roster (`StageTwoRoster`) and its listings, re-judged
+   (`StageTwoListings.ensure`, which looks up only what stage 1 did not).
+2. `StageTwoOffer`: each target is mined on Amazon (five star bands) if it has a
+   matched listing, else on Trustpilot if it has its own domain (`TrustpilotDomain`:
+   a host carrying its brand; the champion's is the brief's host), else not at all.
+   Two targets on one listing mine nothing from it, and both get a gap.
+3. `ReviewPuller` runs the pulls through the shared Apify queue. A transient
+   failure (a throw, or a run ending `FAILED`/`TIMED-OUT`/`ABORTED` with nothing)
+   is retried once after 10 s (`MRA_APIFY_PULL_RETRIES`); an absent band is not;
+   a 402 stops the pulls not yet started. A run still `RUNNING` when the 300 s wait
+   ends is waited on again, not restarted (`ApifyActorRunner`). Stop keeps the
+   pulls already done.
+4. `ReviewFiling` archives each pull and files it in the `ReviewLedger` below;
+   `StageTwoPacket` computes the packet (per-listing totals as measurements, the
+   gaps, and `review_mining` `complete` when every mined target has a 3★ review);
+   `StageTwoSettlement` validates it and ends the run with `packet_source =
+   "pipeline"`. Stage 2 needs no saturation curve and may have no gaps.
+
+The cockpit sees a `tool.started` / `tool.completed` pair per pull, as before.
+
+**Superseded 2026-09-30: stage 2 as an agent.** Run `f1b67523`'s mining took
+3 min 52 s; its last model call then reasoned for 2,233 s (332,947 reasoning
+tokens) without output and was stopped. What follows is the review ledger, which
+stays; its first measurement is from the agent era.
 
 Measured on run `1d2ad3f2` (2026-09-25): `mine_reviews` returned 216 reviews as
 text, and the model then spent **720s and 78,225 output tokens** (55,063 of them
@@ -534,22 +580,21 @@ the run happened. The packet still failed with 9 problems.
 
 So the reviews never pass through the model at all:
 
-1. The review tools (`agent/tools/review-rendering.ts`) archive each pull, then
-   file every review in the run's `ReviewLedger` (`agent/review-ledger.ts`). The
+1. Each pull is archived, then every review filed in the run's `ReviewLedger`
+   (`agent/review-ledger.ts`; since 2026-09-30 by `ReviewFiling`). The
    ledger gives each pull a handle `pN`, and each review a ref `rN.M`,
-   deduplicated on (platform, platform review id). `mine_reviews` fetches in
-   parallel but files the pulls in the order it asked for them, so refs do not
+   deduplicated on (platform, platform review id). The pulls run in
+   parallel but are filed in the order they were asked for, so refs do not
    depend on network timing. A review the actor returns off the band requested
    is **kept under its own rating** (`adapters/apify/band-filing.ts`); only a
    band with nothing at its own rating becomes a gap.
-2. The model sees counts per pull, handles and gaps, never review text. Its
-   packet holds no review sources and no review excerpts; its measurements and
+2. The model sees counts per pull, handles and gaps, never review text. It
+   records no review sources and no review excerpts; its measurements and
    saturation points cite pull handles.
 3. `PacketValidator` (`extract/validator.ts`) takes the ledger snapshot. Before
    checking, `ReviewAssembly` (`extract/review-assembly.ts`) adds one source per
    pull and one excerpt per review, verbatim, and swaps handles for hashes.
-   `validate_packet` and `RunSettlement` use the same class, so they cannot
-   disagree.
+   `finish` and `RunSettlement` use the same class, so they cannot disagree.
 4. Reviews are stored **raw**: `axis` null, `themes` empty. Coding them, and
    screening reviews about a different product, belong to a later stage.
 5. When the run ends, however it ends, `RunWatch` saves the ledger to SQLite:
@@ -855,13 +900,14 @@ What the start modal needs to warn you before you pay for a run.
   | `tool.completed` | `{tool, tool_call_id, error, error_text?, lane, inside: [{at, file, name, fields}], service?: {service, outcome, parts}}` |
   | `run.steered` | `{judgement_id, text}` |
   | `run.stopping` | `{}` |
-  | `run.nudged` | `{reason}` — the run ended without a packet and was asked once more |
+  | `run.nudged` | `{reason}` — runs before 2026-09-29 only: the run ended without a packet and was asked once more |
   | `run.resumed` | `{error, attempt, delay_ms, from?, to?}` — the model stream dropped and the run was continued after a backoff; `from`/`to` when it moved to the next backup model |
   | `run.completed` | `{usage}` |
   | `run.billed` | `{billed: {total, turns, resolved}}` — after the terminal event |
-  | `packet.checked` | `{valid, problems[]}` — one per `validate_packet` call; a failed check is the loop working, not an error |
-  | `packet.ready` | `{sources, excerpts, gaps, via?}` — `via: "tool"` when it was validated mid-run, and then it arrives **before** the run ends |
-  | `run.ended_early` | `{error}` — the run died after validating a packet; the packet stands |
+  | `packet.checked` | `{valid, problems[]}` — one per `finish` call; a failed check is the loop working, not an error |
+  | `packet.ready` | `{sources, excerpts, gaps, via}` — `via: "finish"` when the agent's `finish` passed, `"ledger"` when the run was settled from its ledger on its behalf, `"pipeline"` for stage 2 |
+  | `packet.listings` | `{total, matched}` or `{error}` — after a completed competitors run, the Amazon listing lookup (§2 Step 5) |
+  | `run.ended_early` | `{error}` — the run died, but its ledger already made a valid packet; the packet stands |
   | `packet.invalid` | `{error}` |
   | `run.failed` | `{error}` |
   | `run.cancelled` | `{}` or `{error}` |

@@ -9,21 +9,29 @@
 
 import { describe, expect, it } from "vitest";
 
-import { PacketError, PacketExtractor, PacketValidator } from "../src/extract/index.js";
+import { FindingCheck, PacketError, PacketValidator } from "../src/extract/index.js";
 
 import {
   FORMS,
+  NODES,
+  PRODUCT_ATTRIBUTES,
   SOURCE_KINDS,
   STAGE_NODES,
   briefSchema,
 } from "../src/domain/index.js";
-import type { Judgement, ReviewLedgerSnapshot } from "../src/domain/index.js";
+import type { Judgement } from "../src/domain/index.js";
 import { AgentMessages, PromptBuilder } from "../src/agent/prompt/index.js";
+import { RECORD_TOOLS } from "../src/agent/prompt/text/record-tools.js";
 
 const prompts = new PromptBuilder();
 
 const packets = new PacketValidator();
-const extractor = new PacketExtractor();
+
+/** The JSON a record tool's description shows the model. */
+const exampleOf = (name: string): Record<string, any> => {
+  const description = RECORD_TOOLS.find((t) => t.name === name)!.description;
+  return JSON.parse(description.slice(description.indexOf("Example: ") + "Example: ".length));
+};
 
 const brief = (overrides: Record<string, unknown> = {}) =>
   briefSchema.parse({ product: "MagnaCalm", ...overrides });
@@ -36,67 +44,13 @@ const build = (overrides: Parameters<PromptBuilder["instructions"]>[0] | Record<
     ...(overrides as Record<string, never>),
   });
 
-describe("the worked example", () => {
-  it("is itself a valid packet", () => {
-    // If the example drifts out of the contract, every run copies the drift.
-    const parsed = packets.parse(build());
-    expect(parsed.sources.length).toBeGreaterThan(0);
-    expect(parsed.gaps.length).toBeGreaterThan(0);
-  });
-
-  it("is cut to the stage it is shown in", () => {
-    // Review mining is stage 2, so a stage-1 example that shows review excerpts
-    // teaches every run to break the boundary it is about to be validated against.
-    const stage1 = packets.parse(build(), STAGE_NODES[1]);
-    expect(stage1.stage).toBe(1);
-    expect(stage1.excerpts).toHaveLength(0);
-    expect(stage1.competitors.length).toBeGreaterThan(0);
-
-    // A stage-2 example carries no review the model copied: its reviews come
-    // from the ledger, and its pull handle "p1" becomes that pull's hash.
-    const ledger: ReviewLedgerSnapshot = {
-      pulls: [
-        {
-          handle: "p1",
-          source_id: `sha256:${"a".repeat(64)}`,
-          target_id: "product",
-          platform: "amazon",
-          listing: "https://www.amazon.co.uk/dp/B0C0000000",
-          band_requested: 3,
-          fetched_at: "2026-09-10T09:20:11Z",
-          archived: true,
-          total_reviews: 40,
-          total_ratings: 25331,
-          gap: null,
-        },
-      ],
-      reviews: [
-        {
-          ref: "r1.1",
-          pull: "p1",
-          platform: "amazon",
-          review_key: "R1",
-          listing: "https://www.amazon.co.uk/dp/B0C0000000",
-          star: 3,
-          title: "slow",
-          text: "Took it for a week, felt nothing, cancelled.",
-          posted_at: "2026-05-19",
-          verified: true,
-          locator: "https://www.amazon.co.uk/gp/customer-reviews/R1",
-        },
-      ],
-    };
-    const drafted = extractor.extract(build({ nodes: ["review_mining"] }));
-    expect(drafted.sources as unknown[]).not.toContainEqual(
-      expect.objectContaining({ kind: "marketplace_review" }),
-    );
-    const stage2 = new PacketValidator(ledger).validate(drafted, STAGE_NODES[2]);
-    expect(stage2.stage).toBe(2);
-    expect(stage2.competitors).toHaveLength(0);
-    expect(stage2.excerpts.some((e) => e.star_rating === 3)).toBe(true);
-    expect(stage2.measurements.find((m) => m.node === "review_mining")?.source_id).toBe(
-      `sha256:${"a".repeat(64)}`,
-    );
+describe("the record examples", () => {
+  it("are each a record the ledger accepts", () => {
+    // If an example drifts out of the contract, every run copies the drift.
+    for (const spec of RECORD_TOOLS) {
+      const checked = FindingCheck.check(spec.kind, exampleOf(spec.name), NODES);
+      expect(checked, spec.name).toHaveProperty("payload");
+    }
   });
 });
 
@@ -134,11 +88,10 @@ describe("what the instructions must state", () => {
     expect(text).toMatch(/attribute with a key you name/);
   });
 
-  it("shows a custom-key attribute in the worked example", () => {
+  it("shows a custom-key attribute in the record_attribute example", () => {
     // The example is the shape the model copies; the open channel is taught by
     // showing one, or every packet copies only the ten checklist keys.
-    const text = build();
-    expect(text).toContain(`"third_party_lab_tested"`);
+    expect(PRODUCT_ATTRIBUTES).not.toContain(exampleOf("record_attribute").key);
   });
 
   it("says the worked example is not the brief", () => {
@@ -147,7 +100,7 @@ describe("what the instructions must state", () => {
     // that happening again at the model's initiative.
     const text = build();
     expect(text).toMatch(/shape only/);
-    expect(text).toMatch(/a packet about the example's product is rejected/);
+    expect(text).toMatch(/their products and values are invented/);
   });
 
   it("refuses an invented gap node, and a node from the other stage", () => {
@@ -160,7 +113,7 @@ describe("what the instructions must state", () => {
   });
 
   it("states that the gap list may not be empty", () => {
-    expect(build()).toMatch(/`gaps` must not be empty/);
+    expect(build()).toMatch(/A run with no gaps fails/);
   });
 
   it("lists this run's rejected kinds", () => {
@@ -261,12 +214,6 @@ describe("the system prompt", () => {
   });
 });
 
-describe("the example survives the validator's cross-object rules", () => {
-  it("passes packets.validate() directly, not just extractor.extract()", () => {
-    expect(() => packets.validate(packets.parse(build()))).not.toThrow();
-  });
-});
-
 describe("a run that covers part of the stage", () => {
   const scoped = (nodes: string[]) => build({ nodes });
 
@@ -279,11 +226,10 @@ describe("a run that covers part of the stage", () => {
     expect(text).not.toContain("### The four nodes");
   });
 
-  it("states the scope, and that the example's other nodes are shape only", () => {
+  it("states the scope", () => {
     const text = scoped(["competitors", "category_data"]);
     expect(text).toContain("## Scope of this run");
     expect(text).toMatch(/researches \*\*only\*\* `competitors`, `category_data`/);
-    expect(text).toMatch(/The example shows every node, for shape only/);
   });
 
   it("sends a run-level gap to a node in scope, not to category_data", () => {
@@ -335,31 +281,27 @@ describe("the competitors node", () => {
     for (const form of FORMS) expect(text).toContain(`\`${form}\``);
   });
 
-  it("shows a direct and an indirect competitor in the example", () => {
-    const parsed = packets.parse(build());
-    expect(parsed.competitors.map((c) => c.relation).sort()).toEqual(["direct", "indirect"]);
-    expect(parsed.competitor_reference?.form).toBe("capsule");
-  });
-
   it("shows the champion's ranking evidence in the example", () => {
-    // The example is parsed against a name-only brief, so the champion check
-    // applies to it: the evidence it shows must be a real ranking.
-    const parsed = packets.parse(build());
-    expect(parsed.competitor_reference?.reviews_count).toBeGreaterThan(0);
-    expect(parsed.competitor_reference?.runner_up_name).not.toBe("");
-    expect(parsed.competitor_reference?.runner_up_reviews ?? 0).toBeLessThanOrEqual(
-      parsed.competitor_reference?.reviews_count ?? 0,
-    );
+    // A genre brief's champion check applies to what the example teaches: the
+    // evidence it shows must be a real ranking.
+    const reference = exampleOf("record_reference");
+    expect(reference.reviews_count).toBeGreaterThan(0);
+    expect(reference.runner_up_name).not.toBe("");
+    expect(reference.runner_up_reviews).toBeLessThanOrEqual(reference.reviews_count);
   });
 });
 
 describe("the system prompt names only the tools a run is given", () => {
   // The first competitors-only run gapped "amazon_reviews was not available" —
   // told about tools it did not have, it reported their absence as a finding.
-  it("gives a product-data run web search and fetch only", () => {
+  it("gives a product-data run web search and fetch, and the ledger", () => {
     const text = prompts.system(["product_data"]);
     expect(text).toContain("web_fetch");
     expect(text).not.toMatch(/amazon_|trustpilot_/);
+    // Cutting the review tools out of the text must not cut the ledger's with them.
+    expect(text).toContain("`record_gap` — write one finding");
+    expect(text).toContain("`finish` — build the packet");
+    expect(text).not.toContain("record_competitor");
   });
 
   it("gives a competitors run Amazon search as discovery, and no review tools", () => {
@@ -368,10 +310,9 @@ describe("the system prompt names only the tools a run is given", () => {
     expect(text).not.toMatch(/amazon_reviews|trustpilot_reviews|mine_reviews|may be absent. If they are/);
   });
 
-  it("describes all five to a run that covers review mining", () => {
-    const text = prompts.system(["review_mining"]);
-    expect(text).toContain("amazon_reviews");
-    expect(text).toContain("mine_reviews");
-    expect(text).toContain("The Amazon and Trustpilot tools may be absent");
+  it("names no review tool to a whole stage-1 run (run 99002ee8 gapped their absence)", () => {
+    const text = prompts.system();
+    expect(text).not.toMatch(/mine_reviews|amazon_reviews|trustpilot_reviews/);
+    expect(text).toContain("`amazon_find_product` —");
   });
 });

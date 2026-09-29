@@ -29,14 +29,14 @@ export class ChampionCheck implements PacketCheck {
       );
       return problems;
     }
-    if (!reference.runner_up_name.trim()) {
+    if (!reference.runner_up_name?.trim()) {
       problems.push(
         `champion product '${reference.name}' names no runner-up — a ranking of one ` +
           "listing is not a ranking: record the second most-reviewed listing's name " +
           'and count, or gap it as "champion ranking unavailable: <why>"',
       );
     }
-    if (reference.runner_up_reviews > reference.reviews_count) {
+    if ((reference.runner_up_reviews ?? 0) > reference.reviews_count) {
       problems.push(
         `the runner-up '${reference.runner_up_name}' records ${reference.runner_up_reviews} ` +
           `reviews against the champion's ${reference.reviews_count} — '${reference.name}' ` +

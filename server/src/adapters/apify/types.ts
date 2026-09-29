@@ -10,6 +10,8 @@ export interface ReviewExcerpt {
 }
 
 export interface ReviewResult {
+  /** The actor run's final status: SUCCEEDED, or FAILED / TIMED-OUT / ABORTED when the run itself went wrong. */
+  status: string;
   excerpts: ReviewExcerpt[];
   gap: string | null;
   offBand: number;

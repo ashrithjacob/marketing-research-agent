@@ -4,3 +4,7 @@ export * from "./openrouter-prices.js";
 export * from "./run-billing.js";
 export * from "./fetch-gate.js";
 export * from "./sqlite/store.js";
+export * from "./service-queue.js";
+export * from "./throttled.js";
+export * from "./service-clients.js";
+export * from "./trustpilot-profiles.js";

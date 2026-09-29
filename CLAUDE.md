@@ -63,9 +63,12 @@ quote it. A healthy `/api/health` on the live site means the container is up —
 it does not mean your change is on it. Only `deploy/vps/deploy.sh` does that.
 
 **5. Never start a run that spends Apify money without asking first.** Apify is
-billed to the user per run. That covers any stage-2 run, and any stage-1 run with
-the `review_mining` or `competitors` node, whose tools call Apify
-(`amazon_find_product`, `mine_reviews`, `amazon_reviews`, `trustpilot_reviews`).
+billed to the user per run. That covers any stage-2 run (a code pipeline since
+2026-09-30: Amazon review pulls, Trustpilot where a target has no Amazon listing),
+and any stage-1 run with the `competitors` node: its agent can call
+`amazon_find_product`, and **when it completes, code looks up the Amazon listing of
+the champion and every competitor automatically**, about $0.01 each
+(`spec-stage-2-pipeline.md` §3a).
 To see a change work, run `product_data` alone (`mra run "<brief>" product_data`),
 which only uses web search and page fetches. If the change can only be seen
 through an Apify tool, ask first and say what the run will cost. One run is

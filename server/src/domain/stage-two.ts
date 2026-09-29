@@ -12,6 +12,8 @@ export const miningTargetSchema = z
     url: z.string().default(""),
     brand: z.string().default(""),
     amazon_url: z.string().default(""),
+    trustpilot: z.string().default(""),
+    note: z.string().default(""),
   })
   .strict();
 export type MiningTarget = z.infer<typeof miningTargetSchema>;
@@ -34,6 +36,7 @@ export const stageTwoPlanSchema = z
   .object({
     source_run_id: z.string(),
     subject: miningTargetSchema,
+    offered: z.array(miningTargetSchema),
     targets: z.array(miningTargetSchema),
     estimate: stageTwoEstimateSchema,
   })
@@ -77,6 +80,16 @@ export interface AmazonListing {
   thumbnail: string;
 }
 
+/** A company's Trustpilot page header: its TrustScore and review count, read before anything is mined. */
+export interface TrustpilotSummary {
+  domain: string;
+  url: string;
+  stars: number | null;
+  reviews: number | null;
+  error: string;
+  fetched_at: string;
+}
+
 export interface TargetListing {
   source_run_id: string;
   target_id: string;
@@ -87,4 +100,5 @@ export interface TargetListing {
   mismatch: string;
   error: string;
   fetched_at: string;
+  trustpilot?: TrustpilotSummary | null;
 }

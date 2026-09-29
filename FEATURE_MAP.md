@@ -83,16 +83,20 @@ Submitting calls `POST /api/research/runs` with `{brief, nodes}`.
 
 ### The stage-2 go-ahead (`StageTwoPlan.tsx`)
 
-Opened by **Start stage 2 →** or the review-mining ▶. Lists the stage-1 roster
-with checkboxes and the Apify estimate (`POST /stage2/plan`). Each target shows
-its brand-site link and, under it, its top Amazon listing (`stage-two/ListingLine.tsx`):
-stars, review count, share of 3★, "bought in past month", best-seller rank,
-price, Amazon's Choice, and a link. The first open runs `POST /stage2/listings`:
-one Amazon search per target with product details (`adapters/apify/listing-lookup.ts`),
-about $0.01 each, saved per stage-1 run in `research_target_listings`, so
-reopening is free. A hit from another brand is shown in amber and never mined.
-A brand-matched listing is handed to the mining agent as "Amazon listing known",
-and the estimate drops its resolver charge.
+Opened by **Start stage 2 →** or the review-mining ▶. Lists what stage 2 can
+mine (`plan.offered`, from `POST /stage2/plan`) with checkboxes and the Apify
+estimate. Each target shows its brand-site link and, under it
+(`stage-two/ListingLine.tsx`), either its matched Amazon listing — stars, review
+count, share of 3★, "bought in past month", best-seller rank, price, Amazon's
+Choice, a link — or, for a target mined on Trustpilot, its Trustpilot score and
+review count ("★ 4.4 · 12 Trustpilot reviews", "no Trustpilot reviews yet", or
+why it could not be read) with a link to the page. A target
+two others collided on shows why it is not mined on Amazon. **A target with no
+matched listing and no domain of its own is not listed at all** (since 2026-09-30,
+`spec-stage-2-pipeline.md` §3a). The listings are normally looked up when stage 1
+completes; if they were not (an older run, or no token then), the first open runs
+`POST /stage2/listings`, about $0.01 per target. Approving starts the stage-2
+pipeline, which calls no model.
 
 ### The stage rail — left column (`StageRail.tsx`)
 
@@ -165,7 +169,7 @@ generic gaps table:
 | Tile | Shows | Where its data comes from |
 |---|---|---|
 | Product data (open by default) | attributes, SVG bars for numeric measurements, excerpts, gaps | packet rows with `node: 'product_data'` |
-| Competitors | direct/indirect groups, social-proof review-count chart, excerpts, gaps | `packet.competitors`, `measurements` |
+| Competitors | direct/indirect groups, each competitor's site link and its Amazon listing or "not on Amazon — <why>" (`run-view/amazon-link.tsx`, also on the champion line), social-proof review-count chart, excerpts, gaps | `packet.competitors`, `measurements`, `listings` on `GET /runs/:id` (re-judged by today's matcher on each read) |
 | Category data | market-size/CAGR bar charts, every figure with its period, gaps | `measurements` with `node: 'category_data'` |
 | Customer voice (stage 2, `run-view/voice/`) | reviews cleaned (duplicates, under three words, off-product), issues ranked worst and best with quotes, product × issue grid, star spread — all filtered by source (all / Amazon / other sites) and group (all / your product / direct / indirect), or one product. Started by **Analyse reviews**; LLM calls only, no Apify | `GET`/`POST /runs/:id/review-analysis`, `agent/review-analysis/` |
 
@@ -227,7 +231,7 @@ action, joined by a line, top to bottom.
   one pass through the agent loop, in four numbered sections:
   1. **Sent to the model** — tokens in and cached, and each message new in this
      call, badged by who produced it: CODE (the instructions, or a message the
-     code injected: retry, nudge, your Step in), MODEL (its previous answer),
+     code injected: retry, your Step in), MODEL (its previous answer),
      TOOL (a tool's result).
   2. **Model output** — first token, thinking length, tokens out; then
      *Thinking* (first line, expandable), *Said* (the text), *Asked to run*
@@ -281,7 +285,8 @@ The same file from a terminal: `mra trace <id>`.
 
 This page is the first place to look when a run "did nothing": an idle run with
 no boxes is a start-up failure, while a run with forty calls and no packet is
-the agent failing to emit the fenced JSON block.
+the agent never calling `finish`, or a ledger that fails the contract: the
+`finish` and `record_*` results say which.
 
 ---
 

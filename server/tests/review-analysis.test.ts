@@ -82,7 +82,7 @@ describe("IssueTally", () => {
     const tags = new Map([["a", tag(["too_big"])], ["b", tag(["too_big", "no_effect"])], ["c", tag(["easy"], 1)], ["d", tag(["no_effect"])]]);
     const [product, rival] = new IssueTally(ISSUES, tags).products(
       reviews,
-      [{ id: "product", name: "Ours", relation: "product", form: "tablet", actives: ["d3"], url: "", brand: "", amazon_url: "" }],
+      [{ id: "product", name: "Ours", relation: "product", form: "tablet", actives: ["d3"], url: "", brand: "", amazon_url: "", trustpilot: "", note: "" }],
       "all",
     );
     expect(product!.name).toBe("Ours");
@@ -102,8 +102,8 @@ describe("IssueSlices", () => {
     const review = (ref: string, target_id: string, platform: "amazon" | "trustpilot"): AnalysedReview => ({ ...analysed(ref, 3, target_id), platform });
     const tag = (issues: string[]): ReviewTag => ({ n: 0, issues, severity: 2, off_product: false, new_label: "", new_kind: "complaint" });
     const roster: MiningTarget[] = [
-      { id: "c1", name: "Direct", relation: "direct", form: "tablet", actives: ["d3"], url: "", brand: "", amazon_url: "" },
-      { id: "c2", name: "Indirect", relation: "indirect", form: "gummy", actives: ["d3"], url: "", brand: "", amazon_url: "" },
+      { id: "c1", name: "Direct", relation: "direct", form: "tablet", actives: ["d3"], url: "", brand: "", amazon_url: "", trustpilot: "", note: "" },
+      { id: "c2", name: "Indirect", relation: "indirect", form: "gummy", actives: ["d3"], url: "", brand: "", amazon_url: "", trustpilot: "", note: "" },
     ];
     const tags = new Map([["a", tag(["too_big"])], ["b", tag(["no_effect"])], ["c", tag(["too_big"])]]);
     const built = new IssueSlices(new IssueTally(ISSUES, tags), roster).build([

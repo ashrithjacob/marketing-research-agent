@@ -7,15 +7,13 @@ import {
   Stages,
   type Brief,
   type Judgement,
-  type MiningTarget,
   type Node,
 } from "../../domain/index.js";
 
 import { PromptBlocks, STAGE_NAMES } from "./blocks.js";
-import { WorkedExample } from "./example-picker.js";
-import { RosterBlock } from "./roster-block.js";
-import { OUTPUT } from "./text/output.js";
+import { RECORDING } from "./text/recording.js";
 import { RULES } from "./text/rules.js";
+import { AMAZON_SEARCH_TOOL } from "./text/amazon-search.js";
 import { SYSTEM_PROMPT } from "./text/system.js";
 import { Trace } from "../../trace/index.js";
 
@@ -24,15 +22,17 @@ export class PromptBuilder {
   system(nodes: readonly Node[] = STAGE_NODES[1]): string {
     Trace.line(import.meta.url, "PromptBuilder.system", { nodes });
     const stage = Stages.covering(nodes) ?? 1;
-    const base = SYSTEM_PROMPT.replace("{stage}", String(stage));
+    const competitors = nodes.includes("competitors");
+    const base = SYSTEM_PROMPT.replace("{stage}", String(stage))
+      .replace("{competitor_records}", competitors ? ", `record_reference`, `record_competitor`" : "")
+      .replace("{amazon_search}\n", competitors ? `${AMAZON_SEARCH_TOOL}\n` : "\n");
     if (!Stages.isPartial(nodes)) return base;
-    const text = base.replace(
+    return base.replace(
       "Work through this stage's nodes methodically.",
       `This run covers only ${PromptBlocks.code(nodes)} — work through ${
         nodes.length === 1 ? "it" : "them"
       } methodically and leave the rest of stage ${stage} alone.`,
     );
-    return nodes.includes("review_mining") ? text : PromptBuilder.withoutReviewTools(text, nodes);
   }
 
   instructions(options: {
@@ -40,8 +40,6 @@ export class PromptBuilder {
     rejectKinds: readonly string[];
     judgements: readonly Judgement[];
     nodes?: readonly Node[];
-    roster?: readonly MiningTarget[];
-    targets?: readonly string[];
   }): string {
     Trace.line(import.meta.url, "PromptBuilder.instructions", { options });
     const { brief, rejectKinds, judgements } = options;
@@ -62,50 +60,18 @@ export class PromptBuilder {
         .replace("{gap_nodes}", PromptBlocks.gapNodes(nodes)),
     ];
     if (Stages.isPartial(nodes)) parts.push(PromptBlocks.scope(nodes));
-    if (options.roster && options.roster.length > 0) {
-      parts.push(RosterBlock.text(options.roster, options.targets ?? []));
-    }
     if (judgements.length > 0) parts.push(PromptBlocks.judgements(judgements));
     parts.push(PromptBlocks.brief(brief));
-    parts.push(this.output(nodes, stage));
+    parts.push(PromptBuilder.recording(nodes));
     return parts.join("\n\n");
   }
 
-  private output(nodes: readonly Node[], stage: number): string {
-    Trace.line(import.meta.url, "PromptBuilder.output", { nodes, stage });
+  private static recording(nodes: readonly Node[]): string {
+    Trace.line(import.meta.url, "PromptBuilder.recording", { nodes });
     const listed = PromptBlocks.code(nodes);
-    let output = OUTPUT.replace(
-      "{example}",
-      JSON.stringify(WorkedExample.forStage(stage as 1 | 2), null, 2),
-    )
-      .replaceAll("{stage}", String(stage))
-      .replace(
-        "{nodes_note}",
-        Stages.isPartial(nodes)
-          ? `each node in scope (${listed})`
-          : `each of this stage's nodes (${listed})`,
-      )
-      .replace("{forms}", PromptBlocks.code(FORMS));
-    if (Stages.isPartial(nodes)) {
-      output += `\nThe example shows every node, for shape only. Your packet records only ${listed}.\n`;
-    }
-    return output;
-  }
-
-  private static withoutReviewTools(text: string, nodes: readonly Node[]): string {
-    Trace.line(import.meta.url, "PromptBuilder.withoutReviewTools", { text, nodes });
-    const findStart = text.indexOf("- `amazon_find_product`");
-    const findEnd = text.indexOf("\n\nWork through");
-    const thisRun = text.indexOf("\n\nThis run covers only");
-    const end = findEnd === -1 ? thisRun : findEnd;
-    const tools = nodes.includes("competitors")
-      ? "- `amazon_find_product` — search Amazon (amazon.com) by product name for asin, " +
-        "title, stars and `reviewsCount`, most-reviewed first: how the genre is ranked " +
-        "to pick the champion product, a way to find competitors, and to see which " +
-        "sell. It may be absent."
-      : "";
-    return (
-      text.slice(0, findStart).replace(/\n+$/, "") + (tools ? `\n${tools}` : "") + text.slice(end)
-    );
+    return RECORDING.replace(
+      "{nodes_note}",
+      Stages.isPartial(nodes) ? `each node in scope (${listed})` : `each of this stage's nodes (${listed})`,
+    ).replace("{forms}", PromptBlocks.code(FORMS));
   }
 }

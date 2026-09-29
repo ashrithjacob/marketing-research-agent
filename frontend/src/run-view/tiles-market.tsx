@@ -6,20 +6,23 @@ import type {
   Measurement,
   Source,
   StagePacket,
+  TargetListing,
 } from '../api';
+import { AmazonLink } from './amazon-link';
 import { BarList } from './charts';
 import { Chip, Tile, TileGaps } from './tile';
 import { SourceRow } from './packet-sections';
 
 type Focus = 'direct' | 'indirect' | 'sources' | 'gaps' | null;
 
-function CompetitorRow({ competitor: c }: { competitor: Competitor }) {
+function CompetitorRow({ competitor: c, listing }: { competitor: Competitor; listing: TargetListing | undefined }) {
   const ads = c.ad_source_ids?.length ?? 0;
   return (
     <div className="comp">
       <a href={c.url} target="_blank" rel="noreferrer" className="comp-name">
         {c.name} <span className="comp-open">↗</span>
-      </a>
+      </a>{' '}
+      <AmazonLink row={listing} />
       <div className="comp-facts">
         <span className="comp-form">
           {c.form}
@@ -72,9 +75,11 @@ export function CompetitorsTile({
   excerpts,
   sources,
   gaps,
+  listings,
 }: {
   runId: string;
   packet: StagePacket;
+  listings: TargetListing[];
   measurements: Measurement[];
   excerpts: Excerpt[];
   sources: Source[];
@@ -108,7 +113,8 @@ export function CompetitorsTile({
       {reference.actives.join(', ')}
       {reference.reviews_count
         ? ` · ${reference.reviews_count.toLocaleString()} reviews`
-        : ''}
+        : ''}{' '}
+      <AmazonLink row={listings.find((l) => l.target_id === 'product')} />
     </p>
   );
   return (
@@ -159,7 +165,7 @@ export function CompetitorsTile({
                   </div>
                   {group.length === 0 && <p className="muted">None recorded.</p>}
                   {group.map((c) => (
-                    <CompetitorRow key={c.id} competitor={c} />
+                    <CompetitorRow key={c.id} competitor={c} listing={listings.find((l) => l.target_id === c.id)} />
                   ))}
                 </div>
               );

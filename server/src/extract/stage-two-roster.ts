@@ -13,9 +13,11 @@ export class StageTwoRoster {
       relation: "product",
       form: reference.form,
       actives: [...reference.actives],
-      url: "",
+      url: packet.brief.url,
       brand: "",
       amazon_url: "",
+      trustpilot: "",
+      note: "",
     };
     const competitors = packet.competitors.map((competitor) => ({
       id: competitor.id,
@@ -26,13 +28,10 @@ export class StageTwoRoster {
       url: competitor.url,
       brand: competitor.brand,
       amazon_url: "",
+      trustpilot: "",
+      note: "",
     }));
     return [product, ...competitors];
-  }
-
-  static amazonListing(url: string): boolean {
-    Trace.line(import.meta.url, "StageTwoRoster.amazonListing", { url });
-    return /^https?:\/\/(www\.)?amazon\.[a-z.]+\/(.*\/)?(dp|gp\/product)\/[A-Z0-9]{10}/i.test(url);
   }
 
   static select(targets: readonly MiningTarget[], ids: readonly string[]): MiningTarget[] {

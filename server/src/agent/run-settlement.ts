@@ -1,11 +1,10 @@
 import type { Usage } from "@earendil-works/pi-ai";
 
 import type { Pricing } from "../adapters/index.js";
-import { Clock, Scope, type Node, type ResearchStore, type StagePacket } from "../domain/index.js";
-import { PacketError, PacketValidator } from "../extract/index.js";
+import { Clock, Scope, type ResearchStore, type StagePacket } from "../domain/index.js";
 
+import type { LedgerPacket } from "./ledger-packet.js";
 import type { LiveRuns } from "./live-runs.js";
-import type { ReviewLedger } from "./review-ledger.js";
 import { Trace } from "../trace/index.js";
 
 /** Decides what a finished run is: completed, invalid, failed or cancelled. */
@@ -16,81 +15,80 @@ export class RunSettlement {
     private readonly store: ResearchStore,
     private readonly runs: LiveRuns,
     private readonly runId: string,
-    private readonly ledger: ReviewLedger,
+    private readonly packet: LedgerPacket,
   ) {}
 
   keepValidated(packet: StagePacket): void {
     Trace.line(import.meta.url, "RunSettlement.keepValidated", { packet });
     if (this.validated) return;
     this.validated = packet;
-    this.store.updateRun(this.runId, { packet, packet_source: "tool", error: "" });
+    this.store.updateRun(this.runId, { packet, packet_source: "finish", error: "" });
     this.runs.emit(this.runId, "packet.ready", {
       sources: packet.sources.length,
       excerpts: packet.excerpts.length,
       gaps: packet.gaps.length,
-      via: "tool",
+      via: "finish",
     });
   }
 
-  hasValidated(): boolean {
-    Trace.line(import.meta.url, "RunSettlement.hasValidated");
-    return this.validated !== null;
-  }
-
-  settle(
-    output: string,
-    usage: Usage & { pricing: Pricing },
-    nodes: readonly Node[],
-    errorMessage?: string,
-  ): void {
-    Trace.line(import.meta.url, "RunSettlement.settle", { output, usage, nodes, errorMessage });
-    const run = this.store.getRun(this.runId);
-    const stopping = run?.status === "stopping";
-
+  settle(output: string, usage: Usage & { pricing: Pricing }, errorMessage?: string): void {
+    Trace.line(import.meta.url, "RunSettlement.settle", { output, usage, errorMessage });
+    const stopping = this.store.getRun(this.runId)?.status === "stopping";
     this.store.updateRun(this.runId, { output, usage, ended_at: Clock.nowIso() });
 
     if (this.validated && !stopping) {
-      this.store.updateRun(this.runId, { status: "completed", error: "" });
-      this.countJudgementApplications(this.validated);
-      this.runs.emit(this.runId, "run.completed", { usage });
-      if (errorMessage) this.runs.emit(this.runId, "run.ended_early", { error: errorMessage });
-      return;
-    }
-
-    if (errorMessage) {
-      const status = stopping ? "cancelled" : "failed";
-      this.store.updateRun(this.runId, { status, error: errorMessage });
-      this.runs.emit(this.runId, `run.${status}`, { error: errorMessage });
+      this.complete(this.validated, usage, errorMessage);
       return;
     }
     if (stopping) {
-      this.store.updateRun(this.runId, { status: "cancelled", error: "stopped by the operator" });
-      this.runs.emit(this.runId, "run.cancelled", {});
+      this.store.updateRun(this.runId, { status: "cancelled", error: errorMessage || "stopped by the operator" });
+      this.runs.emit(this.runId, "run.cancelled", errorMessage ? { error: errorMessage } : {});
       return;
     }
+    if (errorMessage && this.packet.isEmpty()) {
+      this.fail(errorMessage);
+      return;
+    }
+    this.settleFromLedger(usage, errorMessage);
+  }
 
-    let parsed: StagePacket;
-    try {
-      parsed = new PacketValidator(this.ledger.snapshot()).parse(output, nodes, run?.brief);
-    } catch (error) {
-      if (!(error instanceof PacketError)) throw error;
-      this.store.updateRun(this.runId, { status: "invalid", error: error.message });
-      this.runs.emit(this.runId, "packet.invalid", { error: error.message });
+  /** The agent never called finish: finish is run on its behalf, and only a failing ledger is invalid. */
+  private settleFromLedger(usage: Usage & { pricing: Pricing }, errorMessage?: string): void {
+    Trace.line(import.meta.url, "RunSettlement.settleFromLedger", { errorMessage });
+    const result = this.packet.assemble();
+    if ("problems" in result) {
+      if (errorMessage) {
+        this.fail(errorMessage);
+        return;
+      }
+      const error = result.problems.join("; ");
+      this.store.addPacketCheck(this.runId, false, result.problems);
+      this.store.updateRun(this.runId, { status: "invalid", error });
+      this.runs.emit(this.runId, "packet.invalid", { error });
       return;
     }
-    this.store.updateRun(this.runId, {
-      status: "completed",
-      packet: parsed,
-      error: "",
-      packet_source: "output",
-    });
-    this.countJudgementApplications(parsed);
-    this.runs.emit(this.runId, "run.completed", { usage });
+    this.store.updateRun(this.runId, { packet: result.packet, packet_source: "ledger" });
     this.runs.emit(this.runId, "packet.ready", {
-      sources: parsed.sources.length,
-      excerpts: parsed.excerpts.length,
-      gaps: parsed.gaps.length,
+      sources: result.packet.sources.length,
+      excerpts: result.packet.excerpts.length,
+      gaps: result.packet.gaps.length,
+      via: "ledger",
     });
+    this.complete(result.packet, usage, errorMessage);
+  }
+
+  private complete(packet: StagePacket, usage: Usage & { pricing: Pricing }, errorMessage?: string): void {
+    Trace.line(import.meta.url, "RunSettlement.complete", { errorMessage });
+    this.store.updateRun(this.runId, { status: "completed", error: "" });
+    this.countJudgementApplications(packet);
+    this.runs.emit(this.runId, "run.completed", { usage });
+    if (errorMessage) this.runs.emit(this.runId, "run.ended_early", { error: errorMessage });
+  }
+
+  private fail(errorMessage: string): void {
+    Trace.line(import.meta.url, "RunSettlement.fail", { errorMessage });
+    this.store.updateRun(this.runId, { status: "failed", error: errorMessage });
+    this.runs.emit(this.runId, "run.failed", { error: errorMessage });
   }
 
   private countJudgementApplications(parsed: StagePacket): void {

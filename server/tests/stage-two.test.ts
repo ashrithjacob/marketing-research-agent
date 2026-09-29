@@ -5,7 +5,7 @@
  */
 import { Scope } from "../src/domain/index.js";
 
-import { fauxAssistantMessage, fauxProvider } from "@earendil-works/pi-ai/providers/faux";
+import { fauxProvider } from "@earendil-works/pi-ai/providers/faux";
 import { createModels, type MutableModels } from "@earendil-works/pi-ai";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -13,14 +13,14 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { App } from "../src/http/index.js";
-import { PromptBuilder, RunSupervisor } from "../src/agent/index.js";
+import { RunSupervisor } from "../src/agent/index.js";
 import { Env, type Settings } from "../src/config/index.js";
 import { StageTwoRoster } from "../src/extract/index.js";
 import { StageTwoHandoff, StageTwoPlanner } from "../src/agent/index.js";
-import type { Brief, StagePacket } from "../src/domain/index.js";
+import type { StagePacket } from "../src/domain/index.js";
 import { SqliteResearchStore } from "../src/adapters/index.js";
 
-import { fenced, minimalPacket } from "./fixtures.js";
+import { minimalPacket } from "./fixtures.js";
 
 let dir: string;
 let app: App;
@@ -119,7 +119,6 @@ async function seedStageOne(briefProduct = "MagnaCalm 400mg"): Promise<string> {
   return run.id;
 }
 
-const BRIEF: Brief = { product: "MagnaCalm 400mg", url: "", market: "UK", notes: "" };
 
 describe("the stage-2 roster", () => {
   it("reads the product reference and the competitors out of the stage-1 packet", () => {
@@ -141,26 +140,32 @@ describe("the stage-2 roster", () => {
 });
 
 describe("the stage-2 estimate", () => {
-  it("prices resolver + five banded pulls per target, plus one Trustpilot run", () => {
-    const targets = StageTwoRoster.of(rosterPacket() as unknown as StagePacket);
-    const plan = new StageTwoPlanner(10).plan(targets, "run-1")!;
+  const offered = () => {
+    const [product, c1, c2] = StageTwoRoster.of(rosterPacket() as unknown as StagePacket);
+    return [
+      { ...product!, trustpilot: "magnacalm.example" },
+      { ...c1!, amazon_url: "https://www.amazon.com/dp/B0CALMWELL" },
+      { ...c2!, amazon_url: "https://www.amazon.com/dp/B0SLEEPMST" },
+    ];
+  };
+
+  it("prices five banded Amazon pulls per Amazon target, and one Trustpilot pull per Trustpilot target", () => {
+    const targets = offered();
+    const plan = new StageTwoPlanner(10).plan(targets[0]!, targets, targets, "run-1")!;
     expect(plan.estimate.targets).toBe(3);
-    expect(plan.estimate.reviews_per_target).toBe(50);
-    expect(plan.estimate.reviews).toBe(150);
-    expect(plan.estimate.amazon_usd).toBeCloseTo(3 * 0.012 + 150 * 0.005, 4);
-    expect(plan.estimate.trustpilot_usd).toBeCloseTo(0.05 + 150 * 0.00075, 4);
-    expect(plan.estimate.cost_usd).toBeCloseTo(
-      plan.estimate.amazon_usd + plan.estimate.trustpilot_usd,
-      4,
-    );
-    expect(plan.estimate.arithmetic).toMatch(/3 targets/);
+    expect(plan.estimate.reviews).toBe(2 * 5 * 10 + 10);
+    expect(plan.estimate.amazon_usd).toBeCloseTo(100 * 0.005, 4);
+    expect(plan.estimate.trustpilot_usd).toBeCloseTo(0.05 + 10 * 0.00075, 4);
+    expect(plan.estimate.cost_usd).toBeCloseTo(plan.estimate.amazon_usd + plan.estimate.trustpilot_usd, 4);
+    expect(plan.estimate.arithmetic).toMatch(/^2 Amazon targets .* 1 Trustpilot targets/);
   });
 
   it("shrinks with the approved subset", () => {
-    const targets = StageTwoRoster.of(rosterPacket() as unknown as StagePacket);
-    const full = new StageTwoPlanner(10).plan(targets, "run-1")!;
-    const one = new StageTwoPlanner(10).plan([targets[0]!], "run-1")!;
+    const targets = offered();
+    const full = new StageTwoPlanner(10).plan(targets[0]!, targets, targets, "run-1")!;
+    const one = new StageTwoPlanner(10).plan(targets[0]!, targets, [targets[1]!], "run-1")!;
     expect(one.estimate.cost_usd).toBeLessThan(full.estimate.cost_usd);
+    expect(one.offered).toHaveLength(3);
   });
 });
 
@@ -210,7 +215,7 @@ describe("the plan route", () => {
 });
 
 describe("the stage-2 gate", () => {
-  it("409s without a stage-1 packet, starts once it exists, and hands the roster in", async () => {
+  it("409s without a stage-1 packet, then starts the pipeline, which calls no model", async () => {
     const blocked = await post("/api/research/runs", {
       brief: { product: "MagnaCalm 400mg" },
       nodes: ["review_mining"],
@@ -219,7 +224,6 @@ describe("the stage-2 gate", () => {
     expect(((await blocked.json()) as any).detail).toMatch(/run stage 1 for this brief first/);
 
     await seedStageOne();
-    faux.setResponses([fauxAssistantMessage(fenced(minimalPacket({ stage: 2 })))]);
     const allowed = await post("/api/research/runs", {
       brief: { product: "magna calm 400mg" },
       nodes: ["review_mining"],
@@ -229,10 +233,8 @@ describe("the stage-2 gate", () => {
     expect(run.stage).toBe(2);
     await app.supervisor.waitFor(run.id);
 
-    const calls = store.listLlmCalls(run.id);
-    const seen = calls.map((call) => JSON.stringify(call.input)).join("\n");
-    expect(seen).toMatch(/Targets from stage 1/);
-    expect(seen).toMatch(/SleepMist spray/);
+    expect(store.listLlmCalls(run.id)).toHaveLength(0);
+    expect(store.getRun(run.id)).toMatchObject({ status: "failed", error: "APIFY_TOKEN is not set, so no review can be pulled" });
   });
 
   it("stays shut for a stage-1 run whose packet is absent", async () => {
@@ -251,37 +253,6 @@ describe("the stage-2 gate", () => {
       nodes: ["review_mining"],
     });
     expect(blocked.status).toBe(409);
-  });
-});
-
-describe("the stage-2 instructions", () => {
-  it("carry the roster and mark out-of-scope targets", () => {
-    const targets = StageTwoRoster.of(rosterPacket() as unknown as StagePacket);
-    const text = new PromptBuilder().instructions({
-      brief: BRIEF,
-      rejectKinds: [],
-      judgements: [],
-      nodes: ["review_mining"],
-      roster: targets,
-      targets: ["product", "c1"],
-    });
-    expect(text).toMatch(/Targets from stage 1/);
-    expect(text).toMatch(/CalmWell 400/);
-    expect(text).toMatch(/indirect competitor \(out of scope this run\): SleepMist spray/);
-    expect(text).toMatch(/mine \*\*only\*\* the targets below/i);
-  });
-
-  it("marks nothing when every target is approved", () => {
-    const targets = StageTwoRoster.of(rosterPacket() as unknown as StagePacket);
-    const text = new PromptBuilder().instructions({
-      brief: BRIEF,
-      rejectKinds: [],
-      judgements: [],
-      nodes: ["review_mining"],
-      roster: targets,
-      targets: targets.map((t) => t.id),
-    });
-    expect(text).toMatch(/indirect competitor: SleepMist spray/);
   });
 });
 

@@ -1,3 +1,11 @@
+import type { AssistantMessage, ToolCall } from "@earendil-works/pi-ai";
+import { fauxAssistantMessage, fauxToolCall } from "@earendil-works/pi-ai/providers/faux";
+
+import { ServiceClients } from "../src/adapters/index.js";
+import { Findings, type Finding, type FindingDraft, type FindingLedger, type PageFetcher } from "../src/domain/index.js";
+import type { ActorRunner } from "../src/adapters/apify/index.js";
+import type { Settings } from "../src/config/index.js";
+
 /**
  * Packets that validate. Tests mutate one thing and assert the failure.
  *
@@ -114,6 +122,70 @@ export function reviewPacket(overrides: Record<string, unknown> = {}): Record<st
   return { ...data, ...overrides };
 }
 
-export function fenced(data: unknown, prose = "Here is the packet."): string {
-  return `${prose}\n\n\`\`\`json\n${JSON.stringify(data)}\n\`\`\`\n`;
+const RECORDED_SECTIONS: ReadonlyArray<readonly [string, string]> = [
+  ["sources", "record_source"],
+  ["excerpts", "record_excerpt"],
+  ["measurements", "record_measurement"],
+  ["attributes", "record_attribute"],
+  ["competitors", "record_competitor"],
+  ["saturation", "record_saturation"],
+  ["nodes", "record_node_status"],
+  ["gaps", "record_gap"],
+];
+
+/** The record_* calls an agent makes to put a packet's rows in the ledger. */
+export function recordCalls(packet: Record<string, any>): ToolCall[] {
+  const calls: ToolCall[] = [];
+  if (packet.competitor_reference) {
+    calls.push(fauxToolCall("record_reference", { item: packet.competitor_reference }));
+  }
+  for (const [section, tool] of RECORDED_SECTIONS) {
+    for (const item of packet[section] ?? []) calls.push(fauxToolCall(tool, { item }));
+  }
+  return calls;
+}
+
+/** A run that records `packet`, one turn of record_* calls, then calls finish. */
+export function recorded(packet: Record<string, any>, options: { responseId?: string } = {}): AssistantMessage[] {
+  return [
+    fauxAssistantMessage(recordCalls(packet), { stopReason: "toolUse" }),
+    fauxAssistantMessage(fauxToolCall("finish", {}), { stopReason: "toolUse", ...options }),
+  ];
+}
+
+/** The shared service clients, with a stand-in Apify runner when a test needs one. */
+export function services(settings: Settings, actors: ActorRunner | null = null, pages?: PageFetcher): ServiceClients {
+  const real = ServiceClients.forSettings(settings);
+  return new ServiceClients(pages ?? real.pages, real.search, actors);
+}
+
+/** The run ledger held in memory, for tests that need the port and not SQLite. */
+export class MemoryLedger implements FindingLedger {
+  readonly rows: Finding[] = [];
+
+  append(draft: FindingDraft): Finding {
+    const seq = this.rows.filter((row) => row.run_id === draft.run_id).length + 1;
+    const row: Finding = {
+      ...draft,
+      seq,
+      id: Findings.rowId(draft.kind, seq),
+      created_at: "2026-09-29T00:00:00Z",
+      retracted_at: "",
+      retracted_why: "",
+    };
+    this.rows.push(row);
+    return row;
+  }
+
+  retract(runId: string, id: string, why: string): Finding | null {
+    const row = this.rows.find((r) => r.run_id === runId && r.id === id && r.retracted_at === "");
+    if (!row) return null;
+    row.retracted_at = "2026-09-29T00:00:01Z";
+    row.retracted_why = why;
+    return row;
+  }
+
+  list(runId: string): Finding[] {
+    return this.rows.filter((row) => row.run_id === runId);
+  }
 }

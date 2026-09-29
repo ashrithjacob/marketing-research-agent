@@ -3,7 +3,7 @@ import { Hono, type Context } from "hono";
 import { StageTwoListings, StageTwoPlanner, type StageTwoHandoff } from "../agent/index.js";
 import type { Settings } from "../config/index.js";
 import { Briefs, Scope, stageTwoPlanRequestSchema, type ResearchRun, type StagePacket } from "../domain/index.js";
-import { StageTwoRoster } from "../extract/index.js";
+import { StageTwoOffer, StageTwoRoster } from "../extract/index.js";
 import type { ApiEnv } from "./api-env.js";
 import { Trace } from "../trace/index.js";
 
@@ -20,12 +20,15 @@ export class StageTwoRoutes {
     api.post("/stage2/plan", async (c) => {
       const found = await this.source(c);
       if ("error" in found) return found.error;
-      const cached = this.listings.cached(found.run.id);
-      const full = StageTwoListings.withAmazon(StageTwoRoster.of(found.packet), cached);
-      const selected = StageTwoRoster.select(full, found.targets);
-      const plan = new StageTwoPlanner(this.settings.apifyMaxReviews).plan(selected, found.run.id);
-      if (!plan) return c.json({ ready: false, detail: "stage-1 packet names no targets" });
-      return c.json({ ready: true, plan, listings: cached, lookup_available: this.listings.available });
+      const roster = StageTwoRoster.of(found.packet);
+      const cached = this.listings.judged(found.run.id, roster);
+      const offered = StageTwoOffer.of(roster, cached);
+      const chosen = StageTwoRoster.select(offered, found.targets);
+      const unscored = offered.some((t) => t.trustpilot && cached.some((row) => row.target_id === t.id && !row.trustpilot));
+      const lookupNeeded = this.listings.available && (unscored || roster.some((t) => !cached.some((row) => row.target_id === t.id)));
+      const plan = roster[0] ? new StageTwoPlanner(this.settings.apifyMaxReviews).plan(roster[0], offered, chosen, found.run.id) : null;
+      if (!plan) return c.json({ ready: false, detail: "no target stage 1 found is on Amazon or has its own Trustpilot domain" });
+      return c.json({ ready: true, plan, listings: cached, lookup_available: this.listings.available, lookup_needed: lookupNeeded });
     });
     api.post("/stage2/listings", async (c) => {
       const found = await this.source(c);

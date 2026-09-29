@@ -1,11 +1,11 @@
 import { COMPETITOR_RELATIONS, type Node, type StagePacket } from "../domain/index.js";
 
-import type { PacketCheck } from "./check.js";
+import type { PacketCheck, PacketContext } from "./check.js";
 import { Trace } from "../trace/index.js";
 
-/** "Done" has to be a measurement, and real research always has holes. */
+/** "Done" has to be a measurement, and real research always has holes. Stage 2 searches nothing, so neither saturation nor the gap rule applies to it. */
 export class CompletenessCheck implements PacketCheck {
-  problems(packet: StagePacket): string[] {
+  problems(packet: StagePacket, context: PacketContext): string[] {
     Trace.line(import.meta.url, "CompletenessCheck.problems", { packet });
     const complete = new Set(
       packet.nodes.filter((entry) => entry.status === "complete").map((entry) => entry.node),
@@ -15,6 +15,7 @@ export class CompletenessCheck implements PacketCheck {
     if (complete.has("review_mining") && !packet.excerpts.some((e) => e.star_rating === 3)) {
       problems.push("review_mining is complete but no 3-star excerpt was captured");
     }
+    if (context.stage === 2) return problems;
     if (packet.gaps.length === 0) {
       problems.push(
         "gap list is empty; real research always has holes, so the run is treated as failed",

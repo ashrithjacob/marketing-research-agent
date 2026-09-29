@@ -61,7 +61,7 @@ export interface RunUpdate {
   output?: string;
   usage?: unknown;
   ended_at?: string;
-  packet_source?: "tool" | "output" | "";
+  packet_source?: "finish" | "ledger" | "pipeline" | "";
 }
 
 export interface LlmCallRecord {

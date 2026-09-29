@@ -143,7 +143,7 @@ export default function RunView({
 
         {packet && runStage(run) === 1 && (
           <div className="tiles">
-            <StageOneTiles runId={runId} packet={packet} nodes={nodesInRun} />
+            <StageOneTiles runId={runId} packet={packet} nodes={nodesInRun} listings={run?.listings ?? []} />
           </div>
         )}
         {nodesInRun.has('review_mining') && (

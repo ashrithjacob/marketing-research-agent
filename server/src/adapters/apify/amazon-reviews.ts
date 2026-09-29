@@ -38,6 +38,7 @@ export class AmazonReviews {
     const band = star === null ? "any star" : `${star}-star`;
     if (items.length === 0) {
       return {
+        status,
         excerpts: [],
         gap: `Apify run finished ${status} with an empty dataset for ${productUrl} ` +
           `(${band}). That is not evidence the product has no reviews.`,
@@ -56,7 +57,7 @@ export class AmazonReviews {
           ? `No ${band} reviews with text on ${productUrl}` +
             (totalRatings !== null ? ` (${totalRatings} ratings exist, none written at this band)` : "")
           : `Apify reported ${Field.text(first.error)} for ${productUrl}: ${Field.text(first.errorDescription)}`;
-      return { excerpts: [], gap: why, offBand: 0, totalReviews, totalRatings };
+      return { status, excerpts: [], gap: why, offBand: 0, totalReviews, totalRatings };
     }
 
     const rows: ReviewExcerpt[] = [];
@@ -81,6 +82,6 @@ export class AmazonReviews {
       rows.length === 0
         ? `Apify returned ${items.length} rows for ${productUrl} (${band}) but none carried review text.`
         : filed.gap;
-    return { excerpts: filed.excerpts, gap, offBand: filed.offBand, totalReviews, totalRatings };
+    return { status, excerpts: filed.excerpts, gap, offBand: filed.offBand, totalReviews, totalRatings };
   }
 }

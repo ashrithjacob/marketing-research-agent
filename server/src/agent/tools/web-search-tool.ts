@@ -1,12 +1,12 @@
 import type { AgentTool } from "@earendil-works/pi-agent-core";
 
-import { Searxng } from "../../adapters/searxng.js";
+import type { WebSearch } from "../../domain/index.js";
 
 import { searchParameters } from "./parameters.js";
 import { Trace } from "../../trace/index.js";
 
 export class WebSearchTool {
-  constructor(private readonly search: Searxng) {}
+  constructor(private readonly search: WebSearch) {}
 
   tool(): AgentTool<typeof searchParameters> {
     Trace.line(import.meta.url, "WebSearchTool.tool");

@@ -31,7 +31,7 @@ export default function StageTwoPlan({
         setPlan(response);
         setListings((current) => current ?? response.listings ?? []);
         if (response.ready && selected.length === 0) {
-          setSelected((response.plan?.targets ?? []).map((t) => t.id));
+          setSelected((response.plan?.offered ?? []).filter((t) => !t.note || t.trustpilot).map((t) => t.id));
         }
       })
       .catch((e) => !cancelled && setError((e as Error).message));
@@ -40,11 +40,7 @@ export default function StageTwoPlan({
     };
   }, [selected.join(','), revision]);
 
-  const lookupNeeded =
-    !!plan?.ready &&
-    !!plan.lookup_available &&
-    listings !== null &&
-    (plan.plan?.targets ?? []).some((t) => !listings.some((l) => l.target_id === t.id));
+  const lookupNeeded = !!plan?.ready && !!plan.lookup_needed;
 
   useEffect(() => {
     if (!lookupNeeded || looking) return;
@@ -53,6 +49,7 @@ export default function StageTwoPlan({
       .stageTwoListings(brief)
       .then(({ listings: found }) => {
         setListings(found);
+        setSelected([]);
         setRevision((r) => r + 1);
       })
       .catch((e) => setError(`Amazon lookup failed: ${(e as Error).message}`))
@@ -81,7 +78,7 @@ export default function StageTwoPlan({
   }
 
   const estimate = plan?.plan?.estimate;
-  const targets = plan?.plan?.targets ?? [];
+  const targets = plan?.plan?.offered ?? [];
 
   return (
     <div className="scrim" onClick={onClose}>
@@ -104,8 +101,9 @@ export default function StageTwoPlan({
               Stage 1 chose <b>{plan.plan.subject.name}</b> ({plan.plan.subject.form};{' '}
               {plan.plan.subject.actives.join(', ')}) as the champion product — the genre's
               most-bought — plus the brands that share its active ingredient. Stage 2 mines
-              verbatim customer language for the approved targets — Amazon per star band, 3★
-              first, plus Trustpilot where a brand has a presence.
+              verbatim customer reviews for the approved targets: on Amazon, per star band,
+              where the target has a matched listing, and on its own Trustpilot page where it
+              does not. A target with neither is not listed.
             </p>
             <fieldset className="markets">
               <legend>Targets</legend>
@@ -127,7 +125,7 @@ export default function StageTwoPlan({
                         </a>
                       </>
                     ) : null}
-                    <ListingLine row={listings?.find((l) => l.target_id === target.id)} looking={looking} form={target.form} />
+                    <ListingLine target={target} row={listings?.find((l) => l.target_id === target.id)} looking={looking} />
                   </span>
                 </label>
               ))}

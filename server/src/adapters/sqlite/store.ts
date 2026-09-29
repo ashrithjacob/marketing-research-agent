@@ -1,22 +1,9 @@
 import {
   Briefs,
-  type AccountDirectory,
-  type Generation,
-  type Judgement,
-  type LlmCall,
-  type LlmCallRecord,
-  type PacketCheck,
-  type ResearchRun,
-  type ResearchStore,
-  type Scope,
-  type ReviewAnalysis,
-  type ReviewLedgerSnapshot,
-  type ProductCatalog,
-  type RunEvent,
-  type RunUpdate,
-  type SourceKind,
-  type StoredRunReview,
-  type TargetListings,
+  type AccountDirectory, type FindingLedger, type Generation, type Judgement, type LlmCall,
+  type LlmCallRecord, type PacketCheck, type ProductCatalog, type ResearchRun, type ResearchStore,
+  type ReviewAnalysis, type ReviewLedgerSnapshot, type RunEvent, type RunUpdate, type Scope,
+  type SourceKind, type StoredRunReview, type TargetListings,
 } from "../../domain/index.js";
 import { Trace } from "../../trace/index.js";
 
@@ -27,6 +14,7 @@ export class SqliteResearchStore implements ResearchStore {
   readonly products: ProductCatalog;
   readonly accounts: AccountDirectory;
   readonly listings: TargetListings;
+  readonly findings: FindingLedger;
 
   constructor(path: string) {
     Trace.line(import.meta.url, "SqliteResearchStore.constructor", { path });
@@ -34,6 +22,7 @@ export class SqliteResearchStore implements ResearchStore {
     this.products = this.tables.catalog;
     this.accounts = this.tables.accounts;
     this.listings = this.tables.listings;
+    this.findings = this.tables.findings;
   }
 
   createRun(input: Parameters<ResearchStore["createRun"]>[0]): ResearchRun {

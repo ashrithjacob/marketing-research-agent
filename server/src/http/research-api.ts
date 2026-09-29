@@ -1,8 +1,9 @@
 import { Hono } from "hono";
 
 import { ReviewAnalyst, RunSupervisor, StageTwoHandoff, StageTwoListings } from "../agent/index.js";
+import { TrustpilotProfiles } from "../adapters/index.js";
 import type { Settings } from "../config/index.js";
-import type { AmazonListingSource, ResearchStore } from "../domain/index.js";
+import type { AmazonListingSource, PageFetcher, ResearchStore } from "../domain/index.js";
 import { Trace, type TraceFile } from "../trace/index.js";
 
 import type { ApiEnv } from "./api-env.js";
@@ -26,17 +27,19 @@ export class ResearchApi {
       settings: Settings;
       traces: TraceFile;
       listingSource: AmazonListingSource | null;
+      pages: PageFetcher;
     },
   ) {}
 
   router(): Hono<ApiEnv> {
     Trace.line(import.meta.url, "ResearchApi.router");
     const api = new Hono<ApiEnv>();
-    const { store, supervisor, settings, traces, listingSource } = this.options;
+    const { store, supervisor, settings, traces, listingSource, pages } = this.options;
     const handoff = new StageTwoHandoff(store);
     new ScopeGuard(store).register(api);
-    new RunRoutes(store, supervisor, handoff).register(api);
-    new StageTwoRoutes(handoff, settings, new StageTwoListings(store.listings, listingSource, settings.apifyConcurrency)).register(api);
+    const listings = new StageTwoListings(store.listings, listingSource, settings.apifyConcurrency, new TrustpilotProfiles(pages));
+    new RunRoutes(store, supervisor, handoff, listings).register(api);
+    new StageTwoRoutes(handoff, settings, listings).register(api);
     new ReviewAnalysisRoutes(store, supervisor, new ReviewAnalyst(store, settings, supervisor.models, supervisor.costs)).register(api);
     new ProductRoutes(store).register(api);
     new EventStream(store, supervisor).register(api);

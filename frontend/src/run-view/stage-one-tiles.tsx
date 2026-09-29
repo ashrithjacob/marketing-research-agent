@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import type { Source, StagePacket } from '../api';
+import type { Source, StagePacket, TargetListing } from '../api';
 import { CompetitorsTile } from './tiles-market';
 import { CategoryTile, ProductTile } from './tiles-data';
 
@@ -12,10 +12,12 @@ export function StageOneTiles({
   runId,
   packet,
   nodes,
+  listings,
 }: {
   runId: string;
   packet: StagePacket;
   nodes: ReadonlySet<string>;
+  listings: TargetListing[];
 }) {
   const byNode = useMemo(() => {
     const map: Record<string, Rows> = {};
@@ -56,6 +58,7 @@ export function StageOneTiles({
           excerpts={competitors.excerpts}
           sources={competitors.sources}
           gaps={competitors.gaps}
+          listings={listings}
         />
       )}
       {nodes.has('category_data') && (

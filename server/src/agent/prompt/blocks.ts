@@ -29,7 +29,8 @@ export class PromptBlocks {
     const heading = Stages.isPartial(nodes)
       ? `### This run's ${nodes.length === 1 ? "node" : "nodes"}`
       : `### Stage ${stage}${STAGE_NODES[stage].length > 1 ? "'s nodes" : "'s node"}`;
-    const items = nodes.map((node, index) => `${index + 1}. ${NODE_RULES[node]}`);
+    const researched = nodes.filter((node): node is keyof typeof NODE_RULES => node in NODE_RULES);
+    const items = researched.map((node, index) => `${index + 1}. ${NODE_RULES[node]}`);
     return [heading, "", ...items].join("\n");
   }
 
@@ -44,13 +45,13 @@ export class PromptBlocks {
 fetch path blocked, a site refusing to serve — still goes in this list. Attach it
 to the node it blocked; if it blocked nothing in particular, use
 \`node: "${fallback}"\`. Never invent a node name (\`all\`, \`general\`, \`run\`), and
-never use a node from another stage: only ${listed} ${verb} accepted in a stage-${stage} packet, and anything else fails the whole packet.`;
+never use a node from another stage: only ${listed} ${verb} accepted in a stage-${stage} run, and a row recorded against anything else is refused.`;
     }
     return `A run-level problem — a tool failing, a fetch path blocked, a site refusing
 to serve — still goes in this list, attached to \`node: "${nodes[0]}"\`. Use no
 node name outside this run's scope, and never invent one (\`all\`, \`general\`,
 \`run\`): only ${listed} ${verb} accepted, and
-anything else fails the whole packet.`;
+a row recorded against anything else is refused.`;
   }
 
   static scope(nodes: readonly Node[]): string {
@@ -61,9 +62,9 @@ anything else fails the whole packet.`;
       "",
       `This run researches **only** ${listed}. The rest of stage 1 is out of`,
       "scope: do not search for it, and record nothing against it. Every `node` field",
-      "in the packet — on sources, excerpts, measurements, attributes, saturation,",
-      `nodes and gaps — must be one of ${listed}, and \`nodes\` has one entry for`,
-      `each of them. Anything recorded against another node fails the whole packet.`,
+      "you record — on sources, excerpts, measurements, attributes, saturation,",
+      `node statuses and gaps — must be one of ${listed}, and each of them gets one`,
+      "`record_node_status`. A row recorded against another node is refused.",
     ].join("\n");
   }
 
@@ -98,11 +99,11 @@ anything else fails the whole packet.`;
         `**Site:** ${brief.url}`,
         "",
         "The brief is this site, not a product name. Your first step is to fetch " +
-          "it and read what it sells. Then set `brief.product` in your packet to " +
-          "the product's own name **as the site writes it** — the name on the " +
-          "product page or in the site's title, with no description, no domain " +
-          "and no url appended. If the site sells a range, name the line the site " +
-          "leads with and say in a gap which others you left.",
+          "it and read what it sells. Then record the product's own name **as the " +
+          "site writes it** as the `product_data` attribute with key `name` — the " +
+          "name on the product page or in the site's title, with no description, " +
+          "no domain and no url appended. If the site sells a range, name the line " +
+          "the site leads with and say in a gap which others you left.",
       ];
     }
     const lines = [`**Product:** ${brief.product}`];

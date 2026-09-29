@@ -33,9 +33,8 @@ Before the HTTP response even returns (`RunSupervisor.start()`, which hands off 
 2. A run row is written (`queued`), the model is looked up and priced from
    OpenRouter's live rates (unknown model → row is `failed`, endpoint 502).
 3. The prompt is built: system prompt naming only the tools this run gets, and
-   a user turn of rules → judgements → brief → output contract with a worked
-   example packet (its product is invented; a packet about *it* is rejected as
-   wrong-subject).
+   a user turn of rules → judgements → brief → how to record findings. Each
+   `record_*` tool's description carries one example item (invented values).
 4. A pi-agent-core `Agent` runs in-process; its `streamFn` is wrapped so every
    LLM call is logged (`research_llm_calls`). Row becomes `running`, SSE opens,
    the browser follows `GET /runs/:id/events?after=0`.
@@ -44,8 +43,8 @@ Before the HTTP response even returns (`RunSupervisor.start()`, which hands off 
 
 One **LLM call** = one turn: the whole transcript so far is sent, the model
 answers with text, thinking, and/or tool calls, tools execute, results append
-to the transcript, repeat — until the model stops calling tools or calls
-`validate_packet` and then stops. In the measured run the context grew
+to the transcript, repeat — until the model stops calling tools or its
+`finish` passes (which ends the loop). In the measured run the context grew
 6,160 → 45,782 tokens per call as pages piled up; ~80% of tokens were cache
 reads, which is why a run this size costs $0.04 rather than $0.40.
 
@@ -57,7 +56,7 @@ Tool calls in the real run (36 total):
 | `web_fetch` | 13 | Firecrawl cloud API → brand/retailer/market-research pages |
 | `amazon_find_product` | 3 | Apify actor → amazon.com (always .com, whatever the market) |
 | `amazon_reviews` | 1 | Apify actor → amazon.com reviews |
-| `validate_packet` | 2 | local — the same validator that settles the run |
+| `validate_packet` | 2 | local — the same validator that settles the run (retired 2026-09-29; `record_*` and `finish` now, see below) |
 
 The sites it visited, in order (from the event log): amazon.com (product
 discovery), naturemade.com (the reference product's own page — a first-party
@@ -98,25 +97,29 @@ saturation curves, 3 node entries, 6 gaps. All three nodes honestly
 every node finished.** Honesty about saturation is the design; a node may call
 itself complete only with a saturation curve behind it.
 
-The model emits the packet either by calling `validate_packet` mid-run
-(`packet.ready` fires with `via: "tool"` — the short path at settlement) or as
-a final JSON block, which `PacketExtractor` pulls from the last balanced
-`{ … }` with a `stage` key. Then seven cross-object rules run: brief echoes
-the run's brief (no wrong-subject packets), cited source_ids exist, complete
-nodes have saturation, competitor relations recomputed from forms, gaps
-non-empty, scope respected.
+Since 2026-09-29 the model never writes the packet. It records each finding as
+it goes with a `record_*` tool, into the run ledger (`research_findings`); each
+row is checked against its section's schema and the run's scope when written,
+and a bad one comes back `NOT RECORDED — <problem>` on that small turn. `finish`
+has `PacketAssembly` build the packet from the live rows (brief from the run)
+and runs the cross-object rules: cited source_ids exist, complete nodes have
+saturation, competitor relations recomputed from forms, gaps non-empty, scope
+respected. A pass ends the run (`packet.ready` `via: "finish"`); a failure
+returns the numbered problems and the run carries on. A run that stops without
+calling `finish` is settled from its ledger (`via: "ledger"`).
 
 ## Outcome-first debug table
 
 | You observed | Mechanism | Look at |
 |---|---|---|
 | `completed`, thin packet | Schema was satisfied; nodes may be `incomplete`, saturation never reached. Thin = agent stopped early or rejected most sources. | packet `nodes[].status`, `counts`, gaps list |
-| `invalid` | The agent FINISHED; the schema refused the packet. Most informative failure there is. | `packet.invalid` payload names the field/rule; `output` on the run; `mra calls <id>` for the last turns |
+| `invalid` | The agent ended; the packet assembled from its ledger failed the cross-object rules. Most informative failure there is. | `packet.invalid` payload names the rule; `research_packet_checks` for each `finish` the agent tried; `mra calls <id>` for the last turns |
+| Many `NOT RECORDED` tool results | The model keeps sending a row the schema refuses; the reason is in the tool result. | the `record_*` tool results in `mra calls <id>` |
 | `failed` | A crash: stream died past 3 retries (deny-list retries, 2/4/8s ± jitter), bad model, restart killed it. | `error` on the run row; `run.resumed` count in events |
 | `cancelled` | You pressed Stop, or a Stop landed in the ~30s billing window. | — |
-| `completed` but `ended_early` | Packet validated mid-run, THEN the stream died. The packet stands. | `run.ended_early` payload |
+| `completed` but `ended_early` | The stream died, but the ledger already made a valid packet. The packet stands. | `run.ended_early` payload |
 | Lots of red tool rows | Firecrawl 4xx / SearXNG down / Apify 402 — handed to the model as errors, run continues. | `tool.completed` payloads with `error` |
-| `succeeded`-looking run with wrong product | The model anchored on the worked example or a url-as-product mixup. | packet `brief.product` vs the run's brief (containment, letters+digits) |
+| `succeeded`-looking run with wrong product | Research about the wrong subject: the brief is copied from the run now, so look at what the rows are about, not `brief.product`. | the sources' urls; the `name` attribute on a site brief |
 | Zero excerpts | See `workings.md` §2 — excerpts aren't checked against archived bodies; zero means the agent didn't quote, which is a prompt/scope issue, not a validator one. | `mra watch` counts while live |
 | Cost looks wrong | Calc (pi-ai × live rates, `usage.pricing.source`) vs Billed (`/generation` per `gen-…` id, 404s for ~4s after each turn; `billed.resolved < turns` = undercount). Apify is separate and never in either. | `usage` on the run, `/runs/<id>/logs` page |
 

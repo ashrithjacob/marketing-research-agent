@@ -1,8 +1,8 @@
 import { Hono, type Context, type Next } from "hono";
 
 import { RunSupervisor } from "../agent/index.js";
-import { SqliteResearchStore } from "../adapters/index.js";
-import { ActorRunners, AmazonListingLookup } from "../adapters/apify/index.js";
+import { ServiceClients, SqliteResearchStore } from "../adapters/index.js";
+import { AmazonListingLookup } from "../adapters/apify/index.js";
 import { Env, type Settings } from "../config/index.js";
 import type { AmazonListingSource, ResearchStore } from "../domain/index.js";
 import { Trace, TraceFile } from "../trace/index.js";
@@ -31,8 +31,9 @@ export class App {
     this.settings = overrides?.settings ?? Env.settings();
     this.traces = overrides?.traces ?? App.traceFile(this.settings);
     this.store = overrides?.store ?? new SqliteResearchStore(this.settings.databasePath);
+    const services = ServiceClients.forSettings(this.settings);
     this.supervisor =
-      overrides?.supervisor ?? new RunSupervisor({ store: this.store, settings: this.settings });
+      overrides?.supervisor ?? new RunSupervisor({ store: this.store, settings: this.settings, services });
 
     const hono = new Hono<ApiEnv>();
     hono.use("*", (c, next) => this.request(c, next));
@@ -45,7 +46,8 @@ export class App {
         supervisor: this.supervisor,
         settings: this.settings,
         traces: this.traces,
-        listingSource: overrides?.listingSource !== undefined ? overrides.listingSource : App.listingSource(this.settings),
+        listingSource: overrides?.listingSource !== undefined ? overrides.listingSource : App.listingSource(services),
+        pages: services.pages,
       }).router(),
     );
     new Frontend(this.settings.staticDir).mount(hono);
@@ -57,10 +59,9 @@ export class App {
     await next();
   }
 
-  static listingSource(settings: Settings): AmazonListingSource | null {
+  static listingSource(services: ServiceClients): AmazonListingSource | null {
     Trace.line(import.meta.url, "App.listingSource");
-    const runner = ActorRunners.forSettings(settings);
-    return runner ? new AmazonListingLookup(runner) : null;
+    return services.actors ? new AmazonListingLookup(services.actors) : null;
   }
 
   static traceFile(settings: Settings): TraceFile {

@@ -1,22 +1,11 @@
 import type { Settings } from "../config/index.js";
-import type { ServicePart, ServiceReport } from "../domain/index.js";
+import type { SearchPage, ServicePart, ServiceReport, WebSearch } from "../domain/index.js";
 
 import { Http } from "./http.js";
 import { Trace } from "../trace/index.js";
 
-export interface SearchHit {
-  title: string;
-  url: string;
-  snippet: string;
-}
-
-export interface SearchPage {
-  hits: SearchHit[];
-  report: ServiceReport;
-}
-
 /** SearXNG finds urls; it cannot read pages. That is Firecrawl's half. */
-export class Searxng {
+export class Searxng implements WebSearch {
   constructor(private readonly settings: Settings) {}
 
   async find(

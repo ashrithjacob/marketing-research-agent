@@ -1,4 +1,5 @@
 import type { Settings } from "../config/index.js";
+import type { FetchedPage, PageFetcher } from "../domain/index.js";
 
 import { Http } from "./http.js";
 import { RateLimitWait } from "./rate-limit-wait.js";
@@ -11,7 +12,7 @@ interface FirecrawlPayload {
 }
 
 /** Reads one page as markdown, waiting out a rate limit when Firecrawl says how long. Throws rather than returning an empty body. */
-export class Firecrawl {
+export class Firecrawl implements PageFetcher {
   static readonly RATE_LIMIT_RETRIES = 2;
 
   constructor(private readonly settings: Settings) {}
@@ -19,7 +20,7 @@ export class Firecrawl {
   async scrape(
     url: string,
     signal?: AbortSignal,
-  ): Promise<{ text: string; title: string }> {
+  ): Promise<FetchedPage> {
     Trace.line(import.meta.url, "Firecrawl.scrape", { url });
     if (!this.settings.firecrawlApiKey) {
       throw new Error("FIRECRAWL_API_KEY is not set — web_fetch cannot read pages");
@@ -56,7 +57,7 @@ export class Firecrawl {
     );
   }
 
-  private static page(payload: FirecrawlPayload): { text: string; title: string } {
+  private static page(payload: FirecrawlPayload): FetchedPage {
     Trace.line(import.meta.url, "Firecrawl.page");
     const text = payload.data?.markdown ?? "";
     if (!text.trim()) throw new Error("Firecrawl returned an empty body for this url");

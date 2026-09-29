@@ -1,5 +1,3 @@
-import type { Agent } from "@earendil-works/pi-agent-core";
-
 import { TERMINAL_STATUSES, type ResearchStore } from "../domain/index.js";
 
 import { RunError } from "./errors.js";
@@ -8,8 +6,14 @@ import { Trace } from "../trace/index.js";
 
 export type Subscriber = (frame: EventFrame | null) => void;
 
+/** What can be done to a run while it is in flight: every run can be stopped; only an agent can be steered. */
+export interface RunControl {
+  abort(): void;
+  steer?: (text: string) => void;
+}
+
 export interface Live {
-  agent: Agent;
+  control: RunControl;
   subscribers: Set<Subscriber>;
   done: Promise<void>;
 }
@@ -42,7 +46,7 @@ export class LiveRuns {
 
   abortAll(): void {
     Trace.line(import.meta.url, "LiveRuns.abortAll");
-    for (const live of this.live.values()) live.agent.abort();
+    for (const live of this.live.values()) live.control.abort();
   }
 
   async drain(): Promise<void> {

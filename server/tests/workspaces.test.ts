@@ -19,7 +19,7 @@ import { RunSupervisor } from "../src/agent/index.js";
 import { Env, type Settings } from "../src/config/index.js";
 import { Scope } from "../src/domain/index.js";
 import { AccountCommands, App, LoginThrottle, Passwords } from "../src/http/index.js";
-import { fenced, minimalPacket } from "./fixtures.js";
+import { minimalPacket, recorded } from "./fixtures.js";
 
 const MODEL_ID = "faux-model";
 const PASSWORD = "correct horse battery";
@@ -77,7 +77,7 @@ async function cookieFor(username: string): Promise<string> {
 }
 
 async function startRun(cookie: string, product = "MagnaCalm 400mg"): Promise<string> {
-  faux.setResponses([fauxAssistantMessage(fenced(minimalPacket()))]);
+  faux.setResponses(recorded(minimalPacket()));
   const created = await call("/api/research/runs", { method: "POST", cookie, body: JSON.stringify({ brief: { product } }) });
   expect(created.status).toBe(200);
   const { id } = (await created.json()) as { id: string };

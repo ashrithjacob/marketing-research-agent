@@ -35,6 +35,8 @@ const TOOL_VERBS: Record<string, string> = {
   web_search: 'Searched the web',
   web_fetch: 'Read a page',
   validate_packet: 'Checked the packet against the stage-1 contract',
+  finish: 'Built the packet from the ledger and checked it against the contract',
+  retract: 'Withdrew a recorded finding',
   corpus_write: 'Filed material into the corpus',
   corpus_read: 'Read material back from the corpus',
 };
@@ -46,7 +48,8 @@ export function toolVerb(tool: string): string {
 function toolLabel(tool: string, count: number): string {
   if (tool === 'web_search') return `${count} search${count === 1 ? '' : 'es'}`;
   if (tool === 'web_fetch') return `read ${count} page${count === 1 ? '' : 's'}`;
-  if (tool === 'validate_packet') return 'packet check';
+  if (tool === 'validate_packet' || tool === 'finish') return 'packet check';
+  if (tool.startsWith('record_')) return `recorded ${count} ${tool.slice('record_'.length).replace(/_/g, ' ')}${count === 1 ? '' : 's'}`;
   return `${count} × ${tool.replace(/_/g, ' ')}`;
 }
 
@@ -70,7 +73,7 @@ function milestoneText(event: RunEvent): { text: string; cls: string } {
       };
     case 'packet.ready':
       return {
-        text: `Packet accepted — ${p.sources} sources, ${p.excerpts} excerpts, ${p.gaps} gaps`,
+        text: `Packet accepted${p.via === 'ledger' ? ' — built from the ledger on the agent\u2019s behalf' : ''} — ${p.sources} sources, ${p.excerpts} excerpts, ${p.gaps} gaps`,
         cls: 'good',
       };
     case 'packet.checked': {
@@ -82,6 +85,10 @@ function milestoneText(event: RunEvent): { text: string; cls: string } {
         cls: p.valid ? 'good' : 'rule',
       };
     }
+    case 'packet.listings':
+      return p.error
+        ? { text: `Amazon lookup failed — ${p.error}`, cls: 'rule' }
+        : { text: `Amazon listings looked up — ${p.matched} of ${p.total} targets are on Amazon`, cls: 'good' };
     case 'run.ended_early':
       return { text: `The run ended early (${p.error || 'no detail'}) — the packet was already validated`, cls: 'rule' };
     case 'packet.invalid':

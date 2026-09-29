@@ -2,9 +2,11 @@ import { describe, expect, it } from "vitest";
 
 import { AmazonListingLookup } from "../src/adapters/apify/index.js";
 import type { ActorRunner } from "../src/adapters/apify/index.js";
-import { ListingMatch, StageTwoListings, StageTwoPlanner } from "../src/agent/index.js";
-import { RosterBlock } from "../src/agent/prompt/roster-block.js";
+import { ListingMatch, StageTwoListings } from "../src/agent/index.js";
 import type { AmazonListing, AmazonListingSource, MiningTarget, TargetListing, TargetListings } from "../src/domain/index.js";
+import { MULLEIN_LISTINGS } from "./mullein-listings.js";
+import { HERB_PHARM_PAGE, HUEL_PAGE } from "./trustpilot-pages.js";
+import { TrustpilotProfiles } from "../src/adapters/index.js";
 
 const target = (id: string, name: string, brand = ""): MiningTarget => ({
   id,
@@ -15,6 +17,8 @@ const target = (id: string, name: string, brand = ""): MiningTarget => ({
   actives: ["creatine monohydrate"],
   url: `https://example.com/${id}`,
   amazon_url: "",
+  trustpilot: "",
+  note: "",
 });
 
 const listing = (brand: string, title = "Creatine Monohydrate Powder"): AmazonListing => ({
@@ -59,7 +63,14 @@ describe("StageTwoListings", () => {
     expect(ListingMatch.mismatch(target("c9", "Creatine", "Acme"), listing(""))).toBe("brand");
   });
 
-  it("refuses a listing whose title names another form, and keeps one that names none (titles from the creatine run)", () => {
+  it("judges the 23 listings of the mullein roster as §4.2 requires", () => {
+    for (const row of MULLEIN_LISTINGS) {
+      const mined: MiningTarget = { id: row.id, name: row.name, brand: row.brand, relation: "direct", form: row.form, actives: row.actives, url: "", amazon_url: "", trustpilot: "", note: "" };
+      expect([row.id, ListingMatch.mismatch(mined, listing(row.listingBrand, row.title))]).toEqual([row.id, row.expected]);
+    }
+  });
+
+  it("refuses a listing whose title names another form, and names a powder by its weight (titles from the creatine run)", () => {
     const bulk = target("c2", "Creatine Monohydrate Powder", "Bulk");
     expect(ListingMatch.mismatch(bulk, listing("Bulk", "Bulk Creatine Monohydrate Tablets, Pack of 270"))).toBe("form");
     const sw = target("c5", "Creatine Monohydrate", "Switch Nutrition");
@@ -67,6 +78,16 @@ describe("StageTwoListings", () => {
     const gummies = { ...target("c8", "Creatine Gummies", "Bulk"), form: "gummy" as const };
     expect(ListingMatch.mismatch(gummies, listing("Bulk", "Bulk Creatine Gummies | 60 Blue Raspberry Flavour"))).toBe("");
     expect(ListingMatch.formMatches(bulk, "Creatine Powder or Capsules")).toBe(true);
+  });
+
+  it("re-judges a stored verdict on every read, so an older rule's match is neither shown nor mined (c16, run 99002ee8)", () => {
+    const store = new MemoryListings();
+    const spray = { ...target("c16", "A.Vogel Mullein & Marshmallow Spray", "A.Vogel"), form: "spray" as const, actives: ["mullein"] };
+    const sinuforce = listing("A.Vogel", "A.Vogel Sinuforce Nasal Spray + Menthol");
+    store.save({ source_run_id: "r", target_id: "c16", query: "", strategy: "", listing: sinuforce, matches: true, mismatch: "", error: "", fetched_at: "" });
+    const [row] = new StageTwoListings(store, null, 1).judged("r", [spray]);
+    expect([row!.matches, row!.mismatch]).toEqual([false, "active"]);
+    expect(store.list("r")[0]!.matches).toBe(false);
   });
 
   it("re-checks a saved listing against the rule without searching again", async () => {
@@ -114,7 +135,7 @@ describe("StageTwoListings", () => {
     const source: AmazonListingSource = {
       lookup: async (_query, marketplace, max) => {
         asked.push(`${marketplace} ${max}`);
-        return [listing("Optimum Nutrition"), listing("Switch Nutrition", "Switch Creatine"), listing("Switch Nutrition")];
+        return [listing("Optimum Nutrition"), listing("Switch Nutrition", "Switch Creatine Powder"), listing("Switch Nutrition")];
       },
     };
     const store = new MemoryListings();
@@ -122,25 +143,12 @@ describe("StageTwoListings", () => {
     store.save({ source_run_id: "r", target_id: "c5", query: "", strategy: "", listing: listing("Optimum Nutrition"), matches: false, mismatch: "brand", error: "", fetched_at: "" });
     const [row] = await new StageTwoListings(store, source, 2).ensure("r", [switchTarget]);
     expect(row!.matches).toBe(true);
-    expect(row!.listing!.title).toBe("Switch Creatine");
+    expect(row!.listing!.title).toBe("Switch Creatine Powder");
     await new StageTwoListings(store, source, 2).ensure("r", [switchTarget]);
     expect(asked).toEqual(["www.amazon.com.au 5"]);
     store.save({ source_run_id: "r", target_id: "c3", query: "", strategy: "", listing: listing("Thorne"), matches: true, mismatch: "", error: "", fetched_at: "" });
     await new StageTwoListings(store, source, 2).ensure("r", [{ ...target("c3", "Creatine", "Thorne"), url: "https://thorne.com/p" }]);
     expect(asked).toHaveLength(1);
-  });
-
-  it("hands mining only brand-matched listings, and the plan stops charging their resolver", () => {
-    const rows: TargetListing[] = [
-      { source_run_id: "r", target_id: "c1", query: "", strategy: "", listing: listing("Thorne"), matches: true, mismatch: "", error: "", fetched_at: "" },
-      { source_run_id: "r", target_id: "c2", query: "", strategy: "", listing: listing("Optimum Nutrition"), matches: false, mismatch: "brand", error: "", fetched_at: "" },
-    ];
-    const roster = StageTwoListings.withAmazon([target("c1", "Creatine", "Thorne"), target("c2", "Creatine", "Bulk")], rows);
-    expect(roster.map((t) => t.amazon_url)).toEqual(["https://www.amazon.com/dp/B002DYIZEE", ""]);
-    const text = RosterBlock.text(roster, []);
-    expect(text).toMatch(/\*\*c1\*\*.*Amazon listing known — skip the search.*Amazon: https:\/\/www\.amazon\.com\/dp\/B002DYIZEE/);
-    expect(text).not.toMatch(/\*\*c2\*\*.*Amazon listing known/);
-    expect(new StageTwoPlanner(50).plan(roster, "r")!.estimate.arithmetic).toMatch(/^1 unresolved targets/);
   });
 });
 
@@ -177,5 +185,24 @@ describe("AmazonListingLookup", () => {
       stars_breakdown: { "3": 0.05, "5": 0.81 },
       bestseller_ranks: [{ rank: 51, category: "Health & Household" }, { rank: 3, category: "Creatine Nutritional Supplements" }],
     });
+  });
+});
+
+describe("TrustpilotProfiles", () => {
+  it("reads the score and review count from the company's own header, not the sidebar's other companies", () => {
+    expect(TrustpilotProfiles.parse(HUEL_PAGE)).toEqual({ stars: 4.2, reviews: 29447, error: "" });
+  });
+
+  it("says a company with no reviews has none, and no score", () => {
+    expect(TrustpilotProfiles.parse(HERB_PHARM_PAGE)).toEqual({ stars: null, reviews: 0, error: "" });
+  });
+
+  it("says so when the page is not a company profile", () => {
+    expect(TrustpilotProfiles.parse("# Search results\n\nNo companies found")).toMatchObject({ reviews: null, error: "no Trustpilot page for this domain" });
+  });
+
+  it("keeps a failed read as an error rather than a zero", async () => {
+    const failing = new TrustpilotProfiles({ scrape: async () => { throw new Error("Firecrawl returned 502"); } });
+    expect(await failing.read("huel.com")).toMatchObject({ reviews: null, stars: null, error: "Firecrawl returned 502" });
   });
 });

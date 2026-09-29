@@ -22,7 +22,7 @@ import { RunSupervisor } from "../src/agent/index.js";
 import { Env, type Settings } from "../src/config/index.js";
 
 import { SqliteResearchStore } from "../src/adapters/index.js";
-import { fenced, minimalPacket, reviewPacket } from "./fixtures.js";
+import { minimalPacket, recordCalls, recorded, reviewPacket } from "./fixtures.js";
 
 const MODEL_ID = "faux-model";
 
@@ -81,7 +81,7 @@ const post = (path: string, body: unknown, init: RequestInit = {}) =>
 
 describe("runs", () => {
   it("starts a run and reads it back", async () => {
-    faux.setResponses([fauxAssistantMessage(fenced(minimalPacket()))]);
+    faux.setResponses(recorded(minimalPacket()));
     const created = await post("/api/research/runs", { brief: { product: "MagnaCalm" } });
     expect(created.status).toBe(200);
     const { id } = (await created.json()) as { id: string };
@@ -133,7 +133,7 @@ describe("runs", () => {
   });
 
   it("replays the whole run over SSE", async () => {
-    faux.setResponses([fauxAssistantMessage(fenced(minimalPacket()))]);
+    faux.setResponses(recorded(minimalPacket()));
     const { id } = (await (
       await post("/api/research/runs", { brief: { product: "MagnaCalm" } })
     ).json()) as { id: string };
@@ -323,7 +323,7 @@ describe("per-node runs and the LLM call log", () => {
   }
 
   it("starts a run on one node and reports its scope", async () => {
-    faux.setResponses([fauxAssistantMessage(fenced(minimalPacket()))]);
+    faux.setResponses([fauxAssistantMessage("Nothing found.")]);
     const run = await finishedRun({ nodes: ["competitors"] });
     expect(run.nodes).toEqual(["competitors"]);
     const listed = (await (await get("/api/research/runs")).json()) as { data: any[] };
@@ -341,7 +341,7 @@ describe("per-node runs and the LLM call log", () => {
     expect(((await blocked.json()) as any).detail).toMatch(/run stage 1 for this brief first/);
 
     // A stage-1 run for a *different* brief does not unlock it.
-    faux.setResponses([fauxAssistantMessage(fenced(minimalPacket()))]);
+    faux.setResponses(recorded(minimalPacket()));
     await finishedRun({ brief: { product: "Something else" } });
     const still = await post("/api/research/runs", {
       brief: { product: "MagnaCalm" },
@@ -350,9 +350,9 @@ describe("per-node runs and the LLM call log", () => {
     expect(still.status).toBe(409);
 
     // Its own completed stage 1 does, and the match survives spelling drift.
-    faux.setResponses([fauxAssistantMessage(fenced(minimalPacket()))]);
+    faux.setResponses(recorded(minimalPacket()));
     await finishedRun({ brief: { product: "MagnaCalm" } });
-    faux.setResponses([fauxAssistantMessage(fenced(reviewPacket()))]);
+    faux.setResponses(recorded(reviewPacket()));
     const allowed = await post("/api/research/runs", {
       brief: { product: "magna calm" },
       nodes: ["review_mining"],
@@ -362,7 +362,7 @@ describe("per-node runs and the LLM call log", () => {
   });
 
   it("reports a whole-stage run as covering stage 1's three nodes", async () => {
-    faux.setResponses([fauxAssistantMessage(fenced(minimalPacket()))]);
+    faux.setResponses(recorded(minimalPacket()));
     const run = await finishedRun();
     expect(run.nodes).toEqual(["product_data", "competitors", "category_data"]);
   });
@@ -377,8 +377,8 @@ describe("per-node runs and the LLM call log", () => {
 
   it("serves every call with its prompt, answer and the run's totals", async () => {
     faux.setResponses([
-      fauxAssistantMessage(fauxToolCall("no_such_tool", {}), { stopReason: "toolUse" }),
-      fauxAssistantMessage(fenced(minimalPacket())),
+      fauxAssistantMessage([fauxToolCall("no_such_tool", {}), ...recordCalls(minimalPacket())], { stopReason: "toolUse" }),
+      fauxAssistantMessage(fauxToolCall("finish", {}), { stopReason: "toolUse" }),
     ]);
     const run = await finishedRun();
     const response = await get(`/api/research/runs/${run.id}/calls`);
@@ -388,20 +388,17 @@ describe("per-node runs and the LLM call log", () => {
     expect(body.run.status).toBe("completed");
     expect(body.calls.map((c: any) => c.seq)).toEqual([1, 2]);
     expect(body.calls[0].system_prompt).toMatch(/stage-1 researcher/);
-    expect(body.calls[1].output.content[0].text).toContain("```json");
+    expect(body.calls[1].output.content[0].name).toBe("finish");
     expect(body.stats.llm_calls).toBe(2);
     expect(body.stats.tokens.total).toBeGreaterThan(0);
     expect(body.stats.llm_time_ms).toBeGreaterThanOrEqual(0);
     expect(body.stats.wall_time_ms).toBeGreaterThanOrEqual(0);
-    expect(body.stats.tool_calls).toBe(1);
+    expect(body.stats.tool_calls).toBe(6); // the unknown tool, four records, finish
     expect(body.stats.tool_errors).toBe(1); // the unknown tool comes back as an error
   });
 
   it("returns only later calls after a given seq, with totals for the whole run", async () => {
-    faux.setResponses([
-      fauxAssistantMessage(fauxToolCall("no_such_tool", {}), { stopReason: "toolUse" }),
-      fauxAssistantMessage(fenced(minimalPacket())),
-    ]);
+    faux.setResponses(recorded(minimalPacket()));
     const run = await finishedRun();
     const body = (await (await get(`/api/research/runs/${run.id}/calls?after=1`)).json()) as any;
     expect(body.calls.map((c: any) => c.seq)).toEqual([2]);

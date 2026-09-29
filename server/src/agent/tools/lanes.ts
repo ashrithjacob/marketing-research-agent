@@ -1,4 +1,3 @@
-import type { Node, ReviewLedgerSnapshot, StagePacket } from "../../domain/index.js";
 
 export interface FetchRecord {
   source_id: string;
@@ -20,15 +19,4 @@ export const TOOL_LANES: Record<string, ToolLane> = {
   amazon_reviews: "fetch",
   trustpilot_reviews: "fetch",
   mine_reviews: "fetch",
-  validate_packet: "other",
 };
-
-export const PACKET_CHECK_BUDGET = 5;
-
-export interface PacketCheckOptions {
-  nodes: readonly Node[];
-  brief: { product?: unknown; url?: unknown };
-  reviews?: () => ReviewLedgerSnapshot;
-  onValid: (packet: StagePacket) => void;
-  onChecked?: (valid: boolean, problems: readonly string[]) => void;
-}

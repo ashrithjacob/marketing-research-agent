@@ -296,3 +296,36 @@ describe("the review corpus", () => {
     }
   });
 });
+
+describe("the run ledger", () => {
+  const newRun = () =>
+    store.createRun({ workspaceId: "admin", brief: { product: "x" }, model: "m", rejectKinds: [], judgementIds: [] });
+  const draft = (runId: string, kind: "gap" | "source", payload: Record<string, unknown>) => ({
+    run_id: runId, kind, entity: "product", agent_id: "parent", source_id: "", payload,
+  });
+
+  it("numbers rows per run and names each by its kind", () => {
+    const a = newRun();
+    const b = newRun();
+    expect(store.findings.append(draft(a.id, "gap", { missing: "x" })).id).toBe("gap1");
+    expect(store.findings.append(draft(a.id, "source", { id: "sha256:a" })).id).toBe("src2");
+    expect(store.findings.append(draft(b.id, "gap", { missing: "y" })).id).toBe("gap1");
+    expect(store.findings.list(a.id).map((row) => row.seq)).toEqual([1, 2]);
+  });
+
+  it("retracts a row once, keeping it with its reason", () => {
+    const run = newRun();
+    store.findings.append(draft(run.id, "gap", { missing: "x" }));
+    expect(store.findings.retract(run.id, "gap1", "found it")?.retracted_why).toBe("found it");
+    expect(store.findings.retract(run.id, "gap1", "again")).toBeNull();
+    expect(store.findings.list(run.id)).toHaveLength(1);
+  });
+
+  it("keeps what was found through a restart, because each row is written as it is found", () => {
+    const run = newRun();
+    store.findings.append(draft(run.id, "gap", { missing: "no COA" }));
+    store.close();
+    store = new SqliteResearchStore(join(dir, "research.db"));
+    expect(store.findings.list(run.id).map((row) => row.payload)).toEqual([{ missing: "no COA" }]);
+  });
+});

@@ -1,21 +1,21 @@
 import type { Agent } from "@earendil-works/pi-agent-core";
 
 import { OpenRouterPrices, RunBilling } from "../adapters/index.js";
-import { Clock, type Generation, type Node, type ResearchStore } from "../domain/index.js";
-import { PacketExtractor } from "../extract/index.js";
+import { Clock, stagePacketSchema, type Generation, type Node, type ResearchStore } from "../domain/index.js";
 
 import { AgentEventRecorder } from "./event-recorder.js";
+import type { LedgerPacket } from "./ledger-packet.js";
 import type { LiveRuns } from "./live-runs.js";
 import { AgentMessages } from "./prompt/index.js";
 import { Retries, type RetryPolicy } from "./retry.js";
-import type { ReviewLedger } from "./review-ledger.js";
 import type { ToolSteps } from "./tool-steps.js";
 import type { ModelChain } from "./model-chain.js";
 import { RunSettlement } from "./run-settlement.js";
+import type { StageOneListings } from "./stage-one-listings.js";
 import { UsageTotals } from "./usage.js";
 import { Trace } from "../trace/index.js";
 
-/** Drives one run's agent to the end: retries, one packet nudge, settlement, billing. */
+/** Drives one run's agent to the end: retries, settlement, the Amazon listings of what it found, billing. */
 export class RunWatch {
   readonly settlement: RunSettlement;
 
@@ -26,14 +26,15 @@ export class RunWatch {
       costs: OpenRouterPrices;
       retry: RetryPolicy;
       runId: string;
-      nodes: readonly Node[];
-      ledger: ReviewLedger;
+      packet: LedgerPacket;
       steps?: ToolSteps;
       chain: ModelChain;
+      nodes: readonly Node[];
+      listings?: StageOneListings;
     },
   ) {
     Trace.line(import.meta.url, "RunWatch.constructor");
-    this.settlement = new RunSettlement(options.store, options.runs, options.runId, options.ledger);
+    this.settlement = new RunSettlement(options.store, options.runs, options.runId, options.packet);
   }
 
   async run(
@@ -42,7 +43,7 @@ export class RunWatch {
     onGeneration: (responseId: string, generation: Generation) => void,
   ): Promise<void> {
     Trace.line(import.meta.url, "RunWatch.run", { agent, instructions, onGeneration });
-    const { store, runs, costs, retry, runId, nodes, chain } = this.options;
+    const { store, runs, costs, retry, runId, chain } = this.options;
     let usage = UsageTotals.empty();
     const billing = new RunBilling(costs);
     const recorded = () => ({ ...usage, pricing: chain.pricing });
@@ -75,13 +76,8 @@ export class RunWatch {
         await agent.prompt(AgentMessages.resume(dropped));
         await agent.waitForIdle();
       }
-      if (this.lacksPacket(recorder.text(), agent)) {
-        agent.state.tools = [];
-        runs.emit(runId, "run.nudged", { reason: "the run ended without a packet" });
-        await agent.prompt(AgentMessages.packetNudge());
-        await agent.waitForIdle();
-      }
-      this.settlement.settle(recorder.text(), recorded(), nodes, agent.state.errorMessage);
+      this.settlement.settle(recorder.text(), recorded(), agent.state.errorMessage);
+      await this.lookUpListings();
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       console.error(`research run ${runId}: agent failed`, error);
@@ -95,7 +91,6 @@ export class RunWatch {
       runs.emit(runId, "run.failed", { error: message });
     } finally {
       unsubscribe();
-      this.options.ledger.saveTo(store, runs, runId);
       await this.recordBilling(billing);
       runs.closeSubscribers(runId);
       runs.remove(runId);
@@ -108,18 +103,21 @@ export class RunWatch {
     return this.options.store.getRun(this.options.runId)?.status !== "stopping";
   }
 
-  private lacksPacket(output: string, agent: Agent): boolean {
-    Trace.line(import.meta.url, "RunWatch.lacksPacket", { output, agent });
-    if (this.settlement.hasValidated()) return false;
-    if (agent.state.errorMessage && !agent.state.messages.some((m) => m.role === "toolResult")) {
-      return false;
-    }
-    if (this.options.store.getRun(this.options.runId)?.status === "stopping") return false;
+  /** After a completed competitors run, never before: an Apify search can wait minutes, and must not hold the run's status. */
+  private async lookUpListings(): Promise<void> {
+    Trace.line(import.meta.url, "RunWatch.lookUpListings");
+    const { store, runs, runId, nodes, listings } = this.options;
+    if (!listings?.available || !nodes.includes("competitors")) return;
+    const run = store.getRun(runId);
+    const packet = stagePacketSchema.safeParse(run?.packet);
+    if (run?.status !== "completed" || !packet.success) return;
     try {
-      new PacketExtractor().extract(output);
-      return false;
-    } catch {
-      return true;
+      const rows = await listings.lookUp(runId, packet.data, (charge) =>
+        runs.emit(runId, "apify.charged", { actor: charge.actor, usd: charge.usd, status: charge.status }),
+      );
+      runs.emit(runId, "packet.listings", { total: rows.length, matched: rows.filter((row) => row.matches).length });
+    } catch (error) {
+      runs.emit(runId, "packet.listings", { error: error instanceof Error ? error.message : String(error) });
     }
   }
 

@@ -72,10 +72,22 @@ classDiagram
       admits()
     }
     class Briefs {
+      markets()
       looksLikeUrl()
       normalise()
       label()
       key()
+    }
+    class FindingDraft {
+      <<interface>>
+    }
+    class Finding {
+      <<interface>>
+    }
+    class Findings {
+      rowId()
+      key()
+      live()
     }
     class RunEvent {
       <<interface>>
@@ -129,6 +141,29 @@ classDiagram
       list()
       setPassword()
     }
+    class AmazonListingSource {
+      <<interface>>
+      lookup()
+    }
+    class TargetListings {
+      <<interface>>
+      save()
+      list()
+    }
+    class FindingLedger {
+      <<interface>>
+      append()
+      retract()
+      list()
+    }
+    class PageFetcher {
+      <<interface>>
+      scrape()
+    }
+    class WebSearch {
+      <<interface>>
+      find()
+    }
     class ResearchStore {
       <<interface>>
       createRun()
@@ -178,6 +213,30 @@ classDiagram
     class RejectKinds {
       effective()
     }
+    class AnalysedReview {
+      <<interface>>
+    }
+    class CleaningTally {
+      <<interface>>
+    }
+    class IssueQuote {
+      <<interface>>
+    }
+    class ProductIssue {
+      <<interface>>
+    }
+    class ProductVoice {
+      <<interface>>
+    }
+    class RankedIssue {
+      <<interface>>
+    }
+    class IssueSlice {
+      <<interface>>
+    }
+    class ReviewAnalysis {
+      <<interface>>
+    }
     class LedgerPull {
       <<interface>>
     }
@@ -199,6 +258,24 @@ classDiagram
     class ServiceReports {
       is()
     }
+    class BestsellerRank {
+      <<interface>>
+    }
+    class AmazonListing {
+      <<interface>>
+    }
+    class TargetListing {
+      <<interface>>
+    }
+    class SearchHit {
+      <<interface>>
+    }
+    class SearchPage {
+      <<interface>>
+    }
+    class FetchedPage {
+      <<interface>>
+    }
   }
   namespace config {
     class Settings {
@@ -215,13 +292,6 @@ classDiagram
     }
   }
   namespace extract {
-    class JsonBlocks {
-      fenced()
-      balanced()
-    }
-    class PacketExtractor {
-      extract()
-    }
     class BriefCheck {
       problems()
     }
@@ -249,6 +319,12 @@ classDiagram
     }
     class PacketError {
     }
+    class FindingCheck {
+      check()
+    }
+    class MarketCheck {
+      problems()
+    }
     class Names {
       normalise()
       squash()
@@ -260,24 +336,38 @@ classDiagram
     class Relations {
       expected()
     }
+    class PacketAssembly {
+      draft()
+    }
     class ReviewAssembly {
       expand()
     }
     class ScopeCheck {
       problems()
     }
+    class TrustpilotDomain {
+      of()
+    }
+    class StageTwoOffer {
+      of()
+    }
+    class PullFailure {
+      <<interface>>
+    }
+    class StageTwoPacket {
+      draft()
+    }
     class StageTwoRoster {
       of()
-      amazonListing()
       select()
     }
     class ZodProblems {
       readable()
+      list()
     }
     class PacketValidator {
       expand()
       validate()
-      parse()
     }
   }
   namespace adapters {
@@ -297,8 +387,13 @@ classDiagram
     class ReviewKey {
       of()
     }
+    class AmazonListingLookup {
+      lookup()
+    }
     class AmazonProducts {
       find()
+    }
+    class ApifyCreditError {
     }
     class ActorRun {
       <<interface>>
@@ -380,14 +475,18 @@ classDiagram
       track()
       settle()
     }
-    class SearchHit {
-      <<interface>>
-    }
-    class SearchPage {
-      <<interface>>
-    }
     class Searxng {
       find()
+    }
+    class ServiceClients {
+      forSettings()
+      withActors()
+    }
+    class Waiter {
+      <<interface>>
+    }
+    class ServiceQueue {
+      run()
     }
     class AccountTable {
       addWorkspace()
@@ -410,6 +509,11 @@ classDiagram
     }
     class EventLog {
       add()
+      list()
+    }
+    class FindingTable {
+      append()
+      retract()
       list()
     }
     class JudgementTable {
@@ -437,6 +541,10 @@ classDiagram
       get()
       byKey()
       list()
+    }
+    class ReviewAnalysisTable {
+      save()
+      get()
     }
     class ReviewTable {
       save()
@@ -474,6 +582,19 @@ classDiagram
     class SqliteTables {
       open()
     }
+    class TargetListingTable {
+      save()
+      list()
+    }
+    class ThrottledPageFetcher {
+      scrape()
+    }
+    class ThrottledWebSearch {
+      find()
+    }
+    class ThrottledActorRunner {
+      run()
+    }
   }
   namespace agent {
     class BilledCosts {
@@ -494,6 +615,19 @@ classDiagram
       toolPreview()
       toolErrorText()
       callSummary()
+    }
+    class LedgerPacket {
+      assemble()
+      isEmpty()
+    }
+    class ListingMatch {
+      mismatch()
+      formMatches()
+      words()
+    }
+    class RunControl {
+      <<interface>>
+      abort()
     }
     class Live {
       <<interface>>
@@ -532,16 +666,9 @@ classDiagram
       system()
       instructions()
     }
-    class WorkedExample {
-      forStage()
-    }
     class AgentMessages {
       steer()
-      packetNudge()
       resume()
-    }
-    class RosterBlock {
-      text()
     }
     class RetryPolicy {
       <<interface>>
@@ -551,21 +678,85 @@ classDiagram
       backoffMs()
       sleep()
     }
+    class AnalysisPrompts {
+      catalogSystem()
+      catalogUser()
+      tagSystem()
+      tagUser()
+    }
+    class IssueSlices {
+      build()
+    }
+    class Mention {
+      <<interface>>
+    }
+    class IssueTally {
+      products()
+      ranked()
+      quote()
+      weight()
+    }
+    class NewIssueMerge {
+      apply()
+    }
+    class ReviewAnalysisJob {
+      run()
+    }
+    class ReviewAnalyst {
+      read()
+      start()
+      waitFor()
+    }
+    class ReviewCleaner {
+      clean()
+    }
+    class ReviewSample {
+      forCatalog()
+      batches()
+    }
+    class StructuredAsk {
+      ask()
+    }
+    class PullLabel {
+      <<interface>>
+    }
+    class ReviewFiling {
+      file()
+    }
     class ReviewLedger {
       record()
       size()
       saveTo()
       snapshot()
     }
+    class ReviewMiningJob {
+      start()
+    }
+    class PullJob {
+      <<interface>>
+    }
+    class PullEvents {
+      <<interface>>
+      started()
+      ended()
+    }
+    class ReviewPuller {
+      pullAll()
+    }
     class RunAgentFactory {
       assemble()
+    }
+    class RunFindings {
+      record()
+      retract()
+      rows()
+      live()
     }
     class RunLauncher {
       launch()
     }
     class RunSettlement {
       keepValidated()
-      hasValidated()
       settle()
     }
     class RunSupervisor {
@@ -578,15 +769,32 @@ classDiagram
     class RunWatch {
       run()
     }
+    class StageOneListings {
+      lookUp()
+    }
     class StageTwoHandoff {
       forBrief()
+    }
+    class StageTwoListings {
+      judged()
+      ensure()
+      marketplace()
+      strategy()
+      query()
     }
     class StageTwoPlanner {
       plan()
     }
+    class StageTwoSettlement {
+      settle()
+      fail()
+    }
     class ToolSteps {
       start()
       take()
+    }
+    class LedgerOptions {
+      <<interface>>
     }
     class ToolsetOptions {
       <<interface>>
@@ -594,38 +802,22 @@ classDiagram
     class ResearchToolset {
       build()
     }
-    class FetchRecord {
-      <<interface>>
-    }
-    class PacketCheckOptions {
-      <<interface>>
-    }
-    class MiningJob {
-      <<interface>>
-    }
-    class MineReviewsTool {
-      tool()
-    }
-    class PacketCheckTool {
-      tool()
-    }
-    class PullLabel {
-      <<interface>>
-    }
-    class ReviewRendering {
-      limit()
-      cappedNote()
-      starBand()
-      render()
-      footer()
-    }
     class FindProductTool {
       tool()
     }
-    class AmazonReviewsTool {
+    class FinishHooks {
+      <<interface>>
+    }
+    class FinishTool {
       tool()
     }
-    class TrustpilotReviewsTool {
+    class FetchRecord {
+      <<interface>>
+    }
+    class RecordTool {
+      tool()
+    }
+    class RetractTool {
       tool()
     }
     class TracedTool {
@@ -647,6 +839,7 @@ classDiagram
       run()
     }
     class App {
+      listingSource()
       traceFile()
       close()
     }
@@ -687,6 +880,9 @@ classDiagram
     class ResearchApi {
       router()
     }
+    class ReviewAnalysisRoutes {
+      register()
+    }
     class RunRoutes {
       register()
     }
@@ -714,6 +910,7 @@ classDiagram
     }
   }
   AmazonReviews --> ActorRunner
+  AmazonListingLookup --> ActorRunner
   AmazonProducts --> ActorRunner
   MeteredActorRunner --> ActorRunner
   TrustpilotReviews --> ActorRunner
@@ -721,58 +918,85 @@ classDiagram
   Firecrawl --> Settings
   RunBilling --> OpenRouterPrices
   Searxng --> Settings
+  ServiceClients --> PageFetcher
+  ServiceClients --> WebSearch
+  ServiceClients --> ActorRunner
   ProductBackfill --> ProductTable
   ProductBackfill --> PacketRowTable
   SqliteProductCatalog --> ProductTable
   SqliteProductCatalog --> RunTable
   SqliteProductCatalog --> PacketRowTable
+  ThrottledPageFetcher --> PageFetcher
+  ThrottledPageFetcher --> ServiceQueue
+  ThrottledWebSearch --> WebSearch
+  ThrottledWebSearch --> ServiceQueue
+  ThrottledActorRunner --> ActorRunner
+  ThrottledActorRunner --> ServiceQueue
   BilledCosts --> ResearchStore
   BilledCosts --> LiveRuns
   AgentEventRecorder --> LiveRuns
   AgentEventRecorder --> ToolSteps
+  LedgerPacket --> RunFindings
   LiveRuns --> ResearchStore
   ModelChain --> Pricing
   ModelPricing --> OpenRouterPrices
+  IssueSlices --> IssueTally
+  NewIssueMerge --> StructuredAsk
+  ReviewAnalysisJob --> StructuredAsk
+  ReviewAnalyst --> ResearchStore
+  ReviewAnalyst --> Settings
+  ReviewAnalyst --> OpenRouterPrices
+  StructuredAsk --> ModelChain
+  ReviewFiling --> Corpus
+  ReviewFiling --> ReviewLedger
+  ReviewMiningJob --> ResearchStore
+  ReviewMiningJob --> LiveRuns
+  ReviewMiningJob --> Settings
+  ReviewMiningJob --> ActorRunner
+  ReviewPuller --> PullEvents
   RunAgentFactory --> Settings
   RunAgentFactory --> ResearchStore
   RunAgentFactory --> LiveRuns
   RunAgentFactory --> OpenRouterPrices
   RunAgentFactory --> RetryPolicy
   RunAgentFactory --> PromptBuilder
-  RunAgentFactory --> ActorRunner
+  RunAgentFactory --> ServiceClients
+  RunFindings --> FindingLedger
   RunLauncher --> ResearchStore
   RunLauncher --> Settings
   RunLauncher --> OpenRouterPrices
   RunLauncher --> LiveRuns
   RunLauncher --> RunAgentFactory
+  RunLauncher --> ReviewMiningJob
   RunSettlement --> ResearchStore
   RunSettlement --> LiveRuns
-  RunSettlement --> ReviewLedger
-  RunSupervisor --> ActorRunner
+  RunSettlement --> LedgerPacket
+  StageOneListings --> TargetListings
+  StageOneListings --> ActorRunner
   StageTwoHandoff --> ResearchStore
+  StageTwoListings --> TargetListings
+  StageTwoListings --> AmazonListingSource
+  StageTwoSettlement --> ResearchStore
+  StageTwoSettlement --> LiveRuns
+  StageTwoSettlement --> ReviewLedger
   ResearchToolset --> ToolsetOptions
-  MineReviewsTool --> Settings
-  MineReviewsTool --> AmazonReviews
-  MineReviewsTool --> TrustpilotReviews
-  MineReviewsTool --> ReviewRendering
-  PacketCheckTool --> PacketCheckOptions
-  ReviewRendering --> Settings
-  ReviewRendering --> ReviewLedger
   FindProductTool --> AmazonProducts
-  AmazonReviewsTool --> Settings
-  AmazonReviewsTool --> AmazonReviews
-  AmazonReviewsTool --> ReviewRendering
-  TrustpilotReviewsTool --> Settings
-  TrustpilotReviewsTool --> TrustpilotReviews
-  TrustpilotReviewsTool --> ReviewRendering
+  FinishTool --> LedgerPacket
+  FinishTool --> FinishHooks
+  RecordTool --> RunFindings
+  RetractTool --> RunFindings
   WebFetchTool --> Settings
-  WebFetchTool --> Firecrawl
+  WebFetchTool --> PageFetcher
   WebFetchTool --> Corpus
   WebFetchTool --> FetchGate
-  WebSearchTool --> Searxng
+  WebSearchTool --> WebSearch
+  PacketAssembly --> Finding
   ReviewAssembly --> ReviewLedgerSnapshot
+  StageTwoPacket --> ReviewLedgerSnapshot
+  StageTwoPacket --> PullFailure
   PacketValidator --> ReviewLedgerSnapshot
   AccountCommands --> AccountDirectory
+  App --> AmazonListingSource
   AuthGate --> Settings
   AuthGate --> AccountDirectory
   ConfigRoute --> Settings
@@ -782,14 +1006,20 @@ classDiagram
   EventStream --> RunSupervisor
   JudgementRoutes --> ResearchStore
   ProductRoutes --> ResearchStore
+  ResearchApi --> AmazonListingSource
+  ReviewAnalysisRoutes --> ResearchStore
+  ReviewAnalysisRoutes --> RunSupervisor
+  ReviewAnalysisRoutes --> ReviewAnalyst
   RunRoutes --> ResearchStore
   RunRoutes --> RunSupervisor
   RunRoutes --> StageTwoHandoff
+  RunRoutes --> StageTwoListings
   ScopeGuard --> ResearchStore
   Sessions --> AccountDirectory
   Sessions --> Settings
   StageTwoRoutes --> StageTwoHandoff
   StageTwoRoutes --> Settings
+  StageTwoRoutes --> StageTwoListings
   TraceRoute --> TraceFile
   TraceFile --> TraceLimits
 ```
@@ -802,8 +1032,9 @@ classDiagram
 | `adapters` | `adapters/apify/amazon-reviews.ts` | AmazonReviews |
 | `adapters` | `adapters/apify/band-filing.ts` | BandFiling |
 | `adapters` | `adapters/apify/fields.ts` | Field, ReviewKey |
+| `adapters` | `adapters/apify/listing-lookup.ts` | AmazonListingLookup |
 | `adapters` | `adapters/apify/products.ts` | AmazonProducts |
-| `adapters` | `adapters/apify/runner.ts` | ActorRun, ActorCharge, ActorRunner, MeteredActorRunner, ApifyActorRunner, ActorRunners |
+| `adapters` | `adapters/apify/runner.ts` | ApifyCreditError, ActorRun, ActorCharge, ActorRunner, MeteredActorRunner, ApifyActorRunner, ActorRunners |
 | `adapters` | `adapters/apify/trustpilot-reviews.ts` | TrustpilotReviews |
 | `adapters` | `adapters/apify/types.ts` | ReviewExcerpt, ReviewResult, AmazonProduct |
 | `adapters` | `adapters/corpus.ts` | Corpus |
@@ -815,16 +1046,20 @@ classDiagram
 | `adapters` | `adapters/rate-limit-wait.ts` | RateLimitWait |
 | `adapters` | `adapters/rates.ts` | Rates, Pricing, Billed, Money |
 | `adapters` | `adapters/run-billing.ts` | RunBilling |
-| `adapters` | `adapters/searxng.ts` | SearchHit, SearchPage, Searxng |
+| `adapters` | `adapters/searxng.ts` | Searxng |
+| `adapters` | `adapters/service-clients.ts` | ServiceClients |
+| `adapters` | `adapters/service-queue.ts` | Waiter, ServiceQueue |
 | `adapters` | `adapters/sqlite/account-table.ts` | AccountTable |
 | `adapters` | `adapters/sqlite/call-log.ts` | CallLog |
 | `adapters` | `adapters/sqlite/check-log.ts` | PacketCheckLog |
 | `adapters` | `adapters/sqlite/event-log.ts` | EventLog |
+| `adapters` | `adapters/sqlite/finding-table.ts` | FindingTable |
 | `adapters` | `adapters/sqlite/judgement-table.ts` | JudgementTable |
 | `adapters` | `adapters/sqlite/packet-row-table.ts` | PacketRowTable |
 | `adapters` | `adapters/sqlite/product-backfill.ts` | ProductBackfill |
 | `adapters` | `adapters/sqlite/product-catalog.ts` | SqliteProductCatalog |
 | `adapters` | `adapters/sqlite/product-table.ts` | ProductTable |
+| `adapters` | `adapters/sqlite/review-analysis-table.ts` | ReviewAnalysisTable |
 | `adapters` | `adapters/sqlite/review-table.ts` | ReviewTable |
 | `adapters` | `adapters/sqlite/rows.ts` | Rows |
 | `adapters` | `adapters/sqlite/run-table.ts` | RunTable |
@@ -832,35 +1067,52 @@ classDiagram
 | `adapters` | `adapters/sqlite/scope-filter.ts` | ScopeFilter |
 | `adapters` | `adapters/sqlite/store.ts` | SqliteResearchStore |
 | `adapters` | `adapters/sqlite/tables.ts` | SqliteTables |
+| `adapters` | `adapters/sqlite/target-listing-table.ts` | TargetListingTable |
+| `adapters` | `adapters/throttled.ts` | ThrottledPageFetcher, ThrottledWebSearch, ThrottledActorRunner |
 | `agent` | `agent/billed-costs.ts` | BilledCosts |
 | `agent` | `agent/errors.ts` | RunError |
 | `agent` | `agent/event-recorder.ts` | TurnEnd, AgentEventRecorder |
 | `agent` | `agent/frames.ts` | EventFrame, Frames |
-| `agent` | `agent/live-runs.ts` | Live, LiveRuns |
+| `agent` | `agent/ledger-packet.ts` | LedgerPacket |
+| `agent` | `agent/listing-match.ts` | ListingMatch |
+| `agent` | `agent/live-runs.ts` | RunControl, Live, LiveRuns |
 | `agent` | `agent/llm-call-log.ts` | LlmCallLog |
 | `agent` | `agent/model-chain.ts` | ModelChain |
 | `agent` | `agent/pricing.ts` | ModelPricing |
 | `agent` | `agent/prompt/blocks.ts` | PromptBlocks |
 | `agent` | `agent/prompt/builder.ts` | PromptBuilder |
-| `agent` | `agent/prompt/example-picker.ts` | WorkedExample |
 | `agent` | `agent/prompt/messages.ts` | AgentMessages |
-| `agent` | `agent/prompt/roster-block.ts` | RosterBlock |
 | `agent` | `agent/retry.ts` | RetryPolicy, Retries |
+| `agent` | `agent/review-analysis/analysis-prompts.ts` | AnalysisPrompts |
+| `agent` | `agent/review-analysis/issue-slices.ts` | IssueSlices |
+| `agent` | `agent/review-analysis/issue-tally.ts` | Mention, IssueTally |
+| `agent` | `agent/review-analysis/new-issue-merge.ts` | NewIssueMerge |
+| `agent` | `agent/review-analysis/review-analysis-job.ts` | ReviewAnalysisJob |
+| `agent` | `agent/review-analysis/review-analyst.ts` | ReviewAnalyst |
+| `agent` | `agent/review-analysis/review-cleaner.ts` | ReviewCleaner |
+| `agent` | `agent/review-analysis/review-sample.ts` | ReviewSample |
+| `agent` | `agent/review-analysis/structured-ask.ts` | StructuredAsk |
+| `agent` | `agent/review-filing.ts` | PullLabel, ReviewFiling |
 | `agent` | `agent/review-ledger.ts` | ReviewLedger |
+| `agent` | `agent/review-mining-job.ts` | ReviewMiningJob |
+| `agent` | `agent/review-puller.ts` | PullJob, PullEvents, ReviewPuller |
 | `agent` | `agent/run-agent-factory.ts` | RunAgentFactory |
+| `agent` | `agent/run-findings.ts` | RunFindings |
 | `agent` | `agent/run-launcher.ts` | RunLauncher |
 | `agent` | `agent/run-settlement.ts` | RunSettlement |
 | `agent` | `agent/run-supervisor.ts` | RunSupervisor |
 | `agent` | `agent/run-watch.ts` | RunWatch |
+| `agent` | `agent/stage-one-listings.ts` | StageOneListings |
 | `agent` | `agent/stage-two-handoff.ts` | StageTwoHandoff |
+| `agent` | `agent/stage-two-listings.ts` | StageTwoListings |
 | `agent` | `agent/stage-two-plan.ts` | StageTwoPlanner |
+| `agent` | `agent/stage-two-settlement.ts` | StageTwoSettlement |
 | `agent` | `agent/tool-steps.ts` | ToolSteps |
-| `agent` | `agent/tools/factory.ts` | ToolsetOptions, ResearchToolset |
-| `agent` | `agent/tools/lanes.ts` | FetchRecord, PacketCheckOptions |
-| `agent` | `agent/tools/mine-reviews-tool.ts` | MiningJob, MineReviewsTool |
-| `agent` | `agent/tools/packet-check-tool.ts` | PacketCheckTool |
-| `agent` | `agent/tools/review-rendering.ts` | PullLabel, ReviewRendering |
-| `agent` | `agent/tools/review-tools.ts` | FindProductTool, AmazonReviewsTool, TrustpilotReviewsTool |
+| `agent` | `agent/tools/factory.ts` | LedgerOptions, ToolsetOptions, ResearchToolset |
+| `agent` | `agent/tools/find-product-tool.ts` | FindProductTool |
+| `agent` | `agent/tools/finish-tool.ts` | FinishHooks, FinishTool |
+| `agent` | `agent/tools/lanes.ts` | FetchRecord |
+| `agent` | `agent/tools/ledger-tools.ts` | RecordTool, RetractTool |
 | `agent` | `agent/tools/traced-tool.ts` | TracedTool |
 | `agent` | `agent/tools/web-fetch-tool.ts` | WebFetchTool |
 | `agent` | `agent/tools/web-search-tool.ts` | WebSearchTool |
@@ -868,16 +1120,19 @@ classDiagram
 | `config` | `config/settings.ts` | Settings, Env |
 | `domain` | `domain/accounts.ts` | Workspace, Account, AccountListing, Principal, Scope |
 | `domain` | `domain/brief.ts` | Briefs |
+| `domain` | `domain/findings.ts` | FindingDraft, Finding, Findings |
 | `domain` | `domain/logs.ts` | RunEvent, Judgement, PacketCheck, RunUpdate, LlmCallRecord, Generation, LlmCall |
 | `domain` | `domain/nodes.ts` | Stages |
 | `domain` | `domain/packet-rows.ts` | PacketRowSet, PacketRows |
-| `domain` | `domain/ports.ts` | ProductCatalog, AccountDirectory, ResearchStore, GateVerdict, FetchGate |
+| `domain` | `domain/ports.ts` | ProductCatalog, AccountDirectory, AmazonListingSource, TargetListings, FindingLedger, PageFetcher, WebSearch, ResearchStore, GateVerdict, FetchGate |
 | `domain` | `domain/products.ts` | RunHead, Product, ProductSummary, ProductFolders |
 | `domain` | `domain/records.ts` | Clock, Ids, ResearchRun, RunSummary, Runs |
 | `domain` | `domain/reject-kinds.ts` | RejectKinds |
+| `domain` | `domain/review-analysis.ts` | AnalysedReview, CleaningTally, IssueQuote, ProductIssue, ProductVoice, RankedIssue, IssueSlice, ReviewAnalysis |
 | `domain` | `domain/reviews.ts` | LedgerPull, LedgerReview, ReviewLedgerSnapshot, StoredRunReview |
 | `domain` | `domain/service-report.ts` | ServicePart, ServiceReport, ServiceReports |
-| `extract` | `extract/blocks.ts` | JsonBlocks, PacketExtractor |
+| `domain` | `domain/stage-two.ts` | BestsellerRank, AmazonListing, TargetListing |
+| `domain` | `domain/web.ts` | SearchHit, SearchPage, FetchedPage |
 | `extract` | `extract/brief-check.ts` | BriefCheck |
 | `extract` | `extract/champion-check.ts` | ChampionCheck |
 | `extract` | `extract/check.ts` | PacketContext, PacketCheck |
@@ -886,9 +1141,14 @@ classDiagram
 | `extract` | `extract/completeness-check.ts` | CompletenessCheck |
 | `extract` | `extract/draft.ts` | PacketDraft |
 | `extract` | `extract/errors.ts` | PacketError |
+| `extract` | `extract/finding-check.ts` | FindingCheck |
+| `extract` | `extract/market-check.ts` | MarketCheck |
 | `extract` | `extract/names.ts` | Names, BrandLabels, Relations |
+| `extract` | `extract/packet-assembly.ts` | PacketAssembly |
 | `extract` | `extract/review-assembly.ts` | ReviewAssembly |
 | `extract` | `extract/scope-check.ts` | ScopeCheck |
+| `extract` | `extract/stage-two-offer.ts` | TrustpilotDomain, StageTwoOffer |
+| `extract` | `extract/stage-two-packet.ts` | PullFailure, StageTwoPacket |
 | `extract` | `extract/stage-two-roster.ts` | StageTwoRoster |
 | `extract` | `extract/validator.ts` | ZodProblems, PacketValidator |
 | `http` | `http/account-commands.ts` | AccountCommands |
@@ -904,6 +1164,7 @@ classDiagram
 | `http` | `http/passwords.ts` | Passwords |
 | `http` | `http/product-routes.ts` | ProductRoutes |
 | `http` | `http/research-api.ts` | ResearchApi |
+| `http` | `http/review-analysis-routes.ts` | ReviewAnalysisRoutes |
 | `http` | `http/run-routes.ts` | RunRoutes |
 | `http` | `http/scope-guard.ts` | ScopeGuard |
 | `http` | `http/secret-prompt.ts` | SecretPrompt |

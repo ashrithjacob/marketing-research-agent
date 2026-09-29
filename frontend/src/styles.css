@@ -734,6 +734,8 @@ details.tl-tool.lane[open] > summary { border-bottom: 1px solid var(--line); }
 }
 .comp-name:hover { color: var(--accent); text-decoration: underline; }
 .comp-open { color: var(--faint); font-weight: 400; font-size: 12px; }
+.comp-amazon { font-size: 12px; margin-left: 6px; }
+.comp-amazon a { color: var(--accent); }
 .comp-name:hover .comp-open { color: var(--accent); }
 .comp-form { color: var(--faint); font-size: 11.5px; }
 .comp-facts { display: flex; flex-wrap: wrap; gap: 4px 12px; color: var(--dim); font-size: 11.5px; margin-top: 3px; }

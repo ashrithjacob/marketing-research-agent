@@ -1,5 +1,9 @@
 # Review mining — the access spec
 
+> **2026-09-29:** stage 2 becomes a code pipeline with no model in it, and no
+> Reddit or forum voice (`spec-stage-2-pipeline.md`). The reach, routes and costs
+> below are unchanged; §4 (Reddit) is not used by stage 2.
+
 > **Stage 2 as of 2026-09-21.** Review mining was stage 1's fourth node; it is now a
 > stage of its own, gated on a completed stage-1 run for the same brief. Its packet
 > carries `stage: 2` and may record nothing but `review_mining`. Nothing about the

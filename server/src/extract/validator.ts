@@ -10,7 +10,6 @@ import {
   type StagePacket,
 } from "../domain/index.js";
 
-import { PacketExtractor } from "./blocks.js";
 import { BriefCheck } from "./brief-check.js";
 import { MarketCheck } from "./market-check.js";
 import { ChampionCheck } from "./champion-check.js";
@@ -27,6 +26,11 @@ import { Trace } from "../trace/index.js";
 export class ZodProblems {
   static readable(error: z.ZodError): string {
     Trace.line(import.meta.url, "ZodProblems.readable", { error });
+    return ZodProblems.list(error).join("; ");
+  }
+
+  static list(error: z.ZodError): string[] {
+    Trace.line(import.meta.url, "ZodProblems.list", { error });
     const all: string[] = [];
     for (const issue of error.issues) {
       const where = issue.path.join(".") || "(root)";
@@ -45,7 +49,7 @@ export class ZodProblems {
     const lines = all.slice(0, 8);
     const remaining = all.length - lines.length;
     if (remaining > 0) lines.push(`(+${remaining} more)`);
-    return lines.join("; ");
+    return lines;
   }
 }
 
@@ -53,7 +57,6 @@ export class ZodProblems {
 export class PacketValidator {
   private readonly checks: readonly PacketCheck[];
   private readonly assembly: ReviewAssembly;
-  private readonly extractor = new PacketExtractor();
 
   constructor(ledger: ReviewLedgerSnapshot = EMPTY_LEDGER) {
     Trace.line(import.meta.url, "PacketValidator.constructor");
@@ -85,7 +88,7 @@ export class PacketValidator {
         ? this.assembly.expand(data as Record<string, unknown>)
         : data;
     const parsed = stagePacketSchema.safeParse(assembled);
-    if (!parsed.success) throw new PacketError(ZodProblems.readable(parsed.error));
+    if (!parsed.success) throw new PacketError(ZodProblems.list(parsed.error));
     const packet = parsed.data;
 
     const context: PacketContext = {
@@ -95,16 +98,7 @@ export class PacketValidator {
       brief,
     };
     const problems = this.checks.flatMap((check) => check.problems(packet, context));
-    if (problems.length > 0) throw new PacketError(problems.join("; "));
+    if (problems.length > 0) throw new PacketError(problems);
     return packet;
-  }
-
-  parse(
-    output: string,
-    scope: readonly Node[] = STAGE_NODES[1],
-    brief?: { product?: unknown; url?: unknown; market?: unknown },
-  ): StagePacket {
-    Trace.line(import.meta.url, "PacketValidator.parse", { output, scope, brief });
-    return this.validate(this.extractor.extract(output), scope, brief);
   }
 }

@@ -9,6 +9,10 @@ export interface MiningTarget {
   url: string;
   brand: string;
   amazon_url: string;
+  /** Its own domain, mined on Trustpilot when it has no matched Amazon listing. */
+  trustpilot: string;
+  /** Why its Amazon listing is not mined, e.g. two targets matched the same one. */
+  note: string;
 }
 
 export interface BestsellerRank {
@@ -33,6 +37,16 @@ export interface AmazonListing {
   thumbnail: string;
 }
 
+/** A company's Trustpilot header, read before mining: its score and how many reviews it has. */
+export interface TrustpilotSummary {
+  domain: string;
+  url: string;
+  stars: number | null;
+  reviews: number | null;
+  error: string;
+  fetched_at: string;
+}
+
 export interface TargetListing {
   source_run_id: string;
   target_id: string;
@@ -43,6 +57,7 @@ export interface TargetListing {
   mismatch: string;
   error: string;
   fetched_at: string;
+  trustpilot?: TrustpilotSummary | null;
 }
 
 export interface StageTwoEstimate {
@@ -59,6 +74,8 @@ export interface StageTwoEstimate {
 export interface StageTwoPlan {
   source_run_id: string;
   subject: MiningTarget;
+  /** Every target stage 2 can mine: a matched Amazon listing, else its own Trustpilot domain. */
+  offered: MiningTarget[];
   targets: MiningTarget[];
   estimate: StageTwoEstimate;
 }
@@ -69,6 +86,7 @@ export interface StageTwoPlanResponse {
   plan?: StageTwoPlan;
   listings?: TargetListing[];
   lookup_available?: boolean;
+  lookup_needed?: boolean;
 }
 
 export const RELATION_LABEL: Record<MiningTarget['relation'], string> = {

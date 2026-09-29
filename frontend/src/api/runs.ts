@@ -1,4 +1,5 @@
 import type { StagePacket } from './packet';
+import type { TargetListing } from './stage-two';
 
 export type RunStatus =
   | 'queued'
@@ -105,8 +106,10 @@ export interface ProductSummary {
 
 export interface RunDetail extends RunSummary {
   packet: StagePacket | null;
-  /** "tool" when the agent validated mid-run; "output" when read from the final message. */
+  /** "finish" when the agent's finish passed, "ledger" when settled from its ledger, "pipeline" for stage 2. */
   packet_source?: string;
+  /** The Amazon listing stage 1 looked up for its champion and each competitor. */
+  listings?: TargetListing[];
   output: string;
   reject_kinds: string[];
   live: boolean;

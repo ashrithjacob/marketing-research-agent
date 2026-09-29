@@ -1,9 +1,8 @@
 import type { AgentTool } from "@earendil-works/pi-agent-core";
 
 import { Corpus } from "../../adapters/corpus.js";
-import { Firecrawl } from "../../adapters/firecrawl.js";
 import type { Settings } from "../../config/index.js";
-import type { FetchGate } from "../../domain/index.js";
+import type { FetchGate, PageFetcher } from "../../domain/index.js";
 
 import type { FetchRecord } from "./lanes.js";
 import { fetchParameters } from "./parameters.js";
@@ -12,7 +11,7 @@ import { Trace } from "../../trace/index.js";
 export class WebFetchTool {
   constructor(
     private readonly settings: Settings,
-    private readonly firecrawl: Firecrawl,
+    private readonly firecrawl: PageFetcher,
     private readonly corpus: Corpus,
     private readonly runId: string,
     private readonly onFetch?: (record: FetchRecord) => void,

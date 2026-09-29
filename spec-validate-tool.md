@@ -1,3 +1,11 @@
+> **Superseded 2026-09-29** by `spec-context-subagents.md` §4. The model no longer
+> writes a packet for this tool to check: each finding is checked by its `record_*`
+> tool as it is written, and `finish` assembles the packet from the run ledger and
+> runs these same cross-object rules. `validate_packet` and its five-check budget are
+> deleted. Why: a packet written from memory in one final reply is the step that
+> ran past GMICloud's ~300 s cut-off on run `8a02bed6`, and it was lost along with
+> everything the check would have told the agent.
+
 # The contract as a tool — spec
 
 Stage 1's contract is enforced once, at the exit, after every token has been paid

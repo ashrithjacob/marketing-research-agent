@@ -2,7 +2,7 @@ import { Agent } from "@earendil-works/pi-agent-core";
 import type { Models } from "@earendil-works/pi-ai";
 
 import { OpenRouterPrices } from "../adapters/index.js";
-import type { ActorRunner } from "../adapters/apify/index.js";
+import type { ServiceClients } from "../adapters/service-clients.js";
 import type { Settings } from "../config/index.js";
 import type {
   Brief,
@@ -11,27 +11,23 @@ import type {
   ResearchStore,
   SourceKind,
 } from "../domain/index.js";
-import { Scope, Stages } from "../domain/index.js";
 
 import { BilledCosts } from "./billed-costs.js";
+import { LedgerPacket } from "./ledger-packet.js";
 import { LlmCallLog } from "./llm-call-log.js";
 import type { ModelChain } from "./model-chain.js";
 import type { LiveRuns } from "./live-runs.js";
 import type { PromptBuilder } from "./prompt/index.js";
 import type { RetryPolicy } from "./retry.js";
-import { ReviewLedger } from "./review-ledger.js";
+import { RunFindings } from "./run-findings.js";
+import { StageOneListings } from "./stage-one-listings.js";
 import { RunWatch } from "./run-watch.js";
-import { StageTwoHandoff } from "./stage-two-handoff.js";
-import { StageTwoListings } from "./stage-two-listings.js";
 import { ToolSteps } from "./tool-steps.js";
 import { ResearchToolset } from "./tools/index.js";
-import { StageTwoRoster } from "../extract/index.js";
 import { Trace } from "../trace/index.js";
 
-/** Builds one run's Agent — priced model, traced stream, the tools its nodes allow — and starts its watch. */
+/** Builds one stage-1 run's Agent — priced model, traced stream, the tools its nodes allow — and starts its watch. */
 export class RunAgentFactory {
-  private readonly handoff: StageTwoHandoff;
-
   constructor(
     private readonly settings: Settings,
     private readonly store: ResearchStore,
@@ -40,10 +36,9 @@ export class RunAgentFactory {
     private readonly costs: OpenRouterPrices,
     private readonly retry: RetryPolicy,
     private readonly prompts: PromptBuilder,
-    private readonly actorRunner?: ActorRunner | null,
+    private readonly services: ServiceClients,
   ) {
     Trace.line(import.meta.url, "RunAgentFactory.constructor");
-    this.handoff = new StageTwoHandoff(store);
   }
 
   assemble(
@@ -55,15 +50,12 @@ export class RunAgentFactory {
       rejectKinds: SourceKind[];
       judgements: readonly Judgement[];
       chain: ModelChain;
-      targets?: readonly string[];
     },
   ): { agent: Agent; done: Promise<void> } {
     Trace.line(import.meta.url, "RunAgentFactory.assemble", { runId, options });
     const { nodes, chain } = options;
-    const stageTwo = Stages.covering(nodes) === 2;
-    const source = stageTwo ? this.handoff.forBrief(options.brief, Scope.of(options.workspaceId)) : null;
-    const roster = source ? StageTwoListings.withAmazon(StageTwoRoster.of(source.packet), this.store.listings.list(source.run.id)) : [];
-    const ledger = new ReviewLedger();
+    const findings = new RunFindings(this.store.findings, runId, "parent", nodes);
+    const packet = new LedgerPacket(findings, { brief: options.brief, nodes });
     const steps = new ToolSteps();
     const watch = new RunWatch({
       store: this.store,
@@ -71,10 +63,11 @@ export class RunAgentFactory {
       costs: this.costs,
       retry: this.retry,
       runId,
-      nodes,
-      ledger,
+      packet,
       steps,
       chain,
+      nodes,
+      listings: new StageOneListings(this.store.listings, this.services.actors, this.services.pages, this.settings.apifyConcurrency),
     });
     const billed = new BilledCosts(this.store, this.runs, runId);
     const streamFn = new LlmCallLog({
@@ -91,9 +84,7 @@ export class RunAgentFactory {
         tools: new ResearchToolset({
           settings: this.settings,
           runId,
-          reviewTools: nodes.includes("review_mining"),
-          ledger,
-          actorRunner: this.actorRunner,
+          services: this.services,
           productSearch: nodes.includes("competitors"),
           subject: options.brief.product || options.brief.url,
           market: options.brief.market,
@@ -104,15 +95,17 @@ export class RunAgentFactory {
               usd: charge.usd,
               status: charge.status,
             }),
-          packetCheck: {
+          findings: {
             nodes,
-            brief: options.brief,
-            reviews: () => ledger.snapshot(),
-            onValid: (packet) => watch.settlement.keepValidated(packet),
-            onChecked: (valid, problems) => {
-              Trace.line(import.meta.url, "RunAgentFactory.assemble.onChecked", { valid, problems });
-              this.store.addPacketCheck(runId, valid, problems);
-              this.runs.emit(runId, "packet.checked", { valid, problems: [...problems] });
+            findings,
+            packet,
+            hooks: {
+              onValid: (checked) => watch.settlement.keepValidated(checked),
+              onChecked: (valid, problems) => {
+                Trace.line(import.meta.url, "RunAgentFactory.assemble.onChecked", { valid, problems });
+                this.store.addPacketCheck(runId, valid, problems);
+                this.runs.emit(runId, "packet.checked", { valid, problems: [...problems] });
+              },
             },
           },
         }).build(),
@@ -123,8 +116,6 @@ export class RunAgentFactory {
       rejectKinds: options.rejectKinds,
       judgements: options.judgements,
       nodes,
-      roster,
-      targets: options.targets,
     });
     return { agent, done: watch.run(agent, instructions, billed.attach) };
   }

@@ -12,7 +12,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { createModels, getCurrentSystemPrompt, getCurrentTools, type JsonValue, type MutableModels } from "@earendil-works/pi-ai";
-import { fauxAssistantMessage, fauxProvider, fauxToolCall } from "@earendil-works/pi-ai/providers/faux";
+import { fauxAssistantMessage, fauxProvider, fauxToolCall, type FauxResponseStep } from "@earendil-works/pi-ai/providers/faux";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { OpenRouterPrices } from "../src/adapters/index.js";
@@ -26,7 +26,8 @@ import {
 } from "../src/domain/index.js";
 import { SqliteResearchStore } from "../src/adapters/index.js";
 import { Env, type Settings } from "../src/config/index.js";
-import { fenced, minimalPacket, reviewPacket } from "./fixtures.js";
+import { minimalPacket, recordCalls, recorded, reviewPacket, services } from "./fixtures.js";
+import { HUEL_PAGE } from "./trustpilot-pages.js";
 
 const MODEL_ID = "faux-model";
 const FAST_RETRY = { attempts: 3, baseMs: 0, capMs: 0 };
@@ -60,105 +61,122 @@ function request(overrides: Partial<RunRequest> = {}): RunRequest {
   return runRequestSchema.parse({ brief: { product: "MagnaCalm 400mg" }, ...overrides });
 }
 
-/** Start a run whose single assistant turn is `text`, and wait for it to settle. */
-async function runWith(text: string, req: RunRequest = request()): Promise<string> {
-  faux.setResponses([fauxAssistantMessage(text)]);
+/** Start a run scripted by `steps`, and wait for it to settle. */
+async function runWith(steps: FauxResponseStep[], req: RunRequest = request()): Promise<string> {
+  faux.setResponses(steps);
   const runId = supervisor.start(req, "admin");
   await supervisor.waitFor(runId);
   return runId;
 }
 
+/** The text of the tool result that answered `toolCallId`, as the model saw it. */
+function toolAnswer(runId: string, name: string): string[] {
+  return store
+    .listLlmCalls(runId)
+    .flatMap((call) => call.input as any[])
+    .filter((m) => m.role === "toolResult" && m.toolName === name)
+    .map((m) => m.content.map((c: any) => c.text).join(""));
+}
+
 describe("settling a run", () => {
-  it("stores a validated packet and completes", async () => {
-    const runId = await runWith(fenced(minimalPacket()));
+  it("stores the packet assembled from the ledger and completes", async () => {
+    const runId = await runWith(recorded(minimalPacket()));
     const run = store.getRun(runId)!;
     expect(run.status).toBe("completed");
     expect((run.packet as any).attributes[0].key).toBe("dose_per_serving");
     expect(run.error).toBe("");
+    expect(run.packet_source).toBe("finish");
     expect(store.listEvents(runId).map((e) => e.kind)).toContain("packet.ready");
   });
 
-  it("marks a run that concludes `invalid`, not `failed`", async () => {
+  it("marks a run whose ledger breaks the contract `invalid`, not `failed`", async () => {
     // The agent finished and produced something, and what it produced broke the
     // contract. That is the most informative failure there is.
-    const packet = minimalPacket();
-    packet.findings = ["buyers want sleep"];
-    const runId = await runWith(fenced(packet));
+    const runId = await runWith([...recorded(minimalPacket({ gaps: [] })), fauxAssistantMessage("Done.")]);
     const run = store.getRun(runId)!;
     expect(run.status).toBe("invalid");
-    expect(run.error).toMatch(/not in the stage-1 contract/);
+    expect(run.error).toMatch(/gap list is empty/);
     expect(store.listEvents(runId).map((e) => e.kind)).toContain("packet.invalid");
   });
 
   it("marks a prose-only run invalid", async () => {
-    // Prose twice: the run's own ending, then the answer to the one nudge.
-    faux.setResponses([
-      fauxAssistantMessage("I looked into it and I think the market is crowded."),
-      fauxAssistantMessage("Still no packet, just my view that it is crowded."),
-    ]);
-    const runId = supervisor.start(request(), "admin");
-    await supervisor.waitFor(runId);
+    const runId = await runWith([fauxAssistantMessage("I looked into it and I think the market is crowded.")]);
     const run = store.getRun(runId)!;
     expect(run.status).toBe("invalid");
-    expect(run.error).toMatch(/no fenced JSON/);
+    expect(run.error).toMatch(/gap list is empty/);
   });
 
-  it("asks once for the packet when a run ends without one", async () => {
+  it("settles from the ledger a run that stopped without calling finish", async () => {
     // A DeepSeek run at 208k input tokens wrote "let me write the JSON now" 56
-    // times and ended its turn without it. The research was all there.
-    faux.setResponses([
-      fauxAssistantMessage("I have enough. Let me finalize and write the JSON now."),
-      fauxAssistantMessage(fenced(minimalPacket())),
+    // times and ended its turn without it. Its findings are in the ledger now.
+    const runId = await runWith([
+      fauxAssistantMessage(recordCalls(minimalPacket()), { stopReason: "toolUse" }),
+      fauxAssistantMessage("I have enough. Let me finalize."),
     ]);
-    const runId = supervisor.start(request(), "admin");
-    await supervisor.waitFor(runId);
-
-    expect(store.getRun(runId)!.status).toBe("completed");
-    expect(store.listEvents(runId).map((e) => e.kind)).toContain("run.nudged");
-    const [, nudged] = store.listLlmCalls(runId) as [any, any];
-    // Tools are off for the nudge, so it can only answer in text.
-    expect(nudged.tools).toEqual([]);
-    expect(JSON.stringify(nudged.input)).toContain("ended without the stage-1 packet");
-  });
-
-  it("does not nudge a run whose packet is there but breaks the contract", async () => {
-    const packet = minimalPacket();
-    packet.findings = ["buyers want sleep"];
-    const runId = await runWith(fenced(packet));
-    expect(store.getRun(runId)!.status).toBe("invalid");
-    expect(store.listEvents(runId).map((e) => e.kind)).not.toContain("run.nudged");
-    expect(store.listLlmCalls(runId)).toHaveLength(1);
-  });
-
-  it("marks a run about the wrong product invalid, not completed", async () => {
-    // The worked example names a product; a model that anchors on it hands back
-    // a packet about the example rather than the brief it was given.
-    const runId = await runWith(
-      fenced(minimalPacket()),
-      request({ brief: { product: "mullein", url: "", market: "", notes: "" } }),
-    );
     const run = store.getRun(runId)!;
-    expect(run.status).toBe("invalid");
-    expect(run.error).toMatch(/worked example is not the assignment/);
+    expect(run.status).toBe("completed");
+    expect(run.packet_source).toBe("ledger");
+    expect(store.listLlmCalls(runId)).toHaveLength(2);
   });
 
-  it("records the output it read the packet from", async () => {
-    const runId = await runWith(fenced(minimalPacket()));
-    expect(store.getRun(runId)!.output).toContain("MagnaCalm 400mg");
+  it("refuses a bad record on its own small turn, and records the corrected one", async () => {
+    const packet = minimalPacket();
+    const bad = { ...packet.sources[0], kind: "marketplace" };
+    const runId = await runWith([
+      fauxAssistantMessage(fauxToolCall("record_source", { item: bad }), { stopReason: "toolUse" }),
+      ...recorded(packet),
+    ]);
+    expect(toolAnswer(runId, "record_source")[0]).toMatch(/^NOT RECORDED — kind: .*received 'marketplace'/);
+    expect(toolAnswer(runId, "record_source")[1]).toMatch(/^RECORDED src\d+/);
+    expect(store.getRun(runId)!.status).toBe("completed");
+  });
+
+  it("records a champion with no ranking on a url brief (run 8a02bed6)", async () => {
+    // The prompt says a url brief needs no ranking; the schema used to refuse
+    // the null runner-up that instruction produces.
+    const reference = {
+      name: "Mullein Drops",
+      form: "liquid",
+      actives: ["mullein"],
+      source_id: "sha256:aaa",
+      runner_up_name: null,
+      runner_up_reviews: null,
+    };
+    const packet = minimalPacket({
+      competitor_reference: reference,
+      gaps: [{ node: "competitors", missing: "no competitor researched", would_need: "time" }],
+      nodes: [{ node: "competitors", status: "incomplete", done_criterion_met: false, why: "test" }],
+    });
+    packet.sources[0].node = "competitors";
+    delete packet.attributes;
+    const runId = await runWith(
+      recorded(packet),
+      request({ brief: { product: "", url: "https://mullevia.com/products/mullein-drops", market: "", notes: "" }, nodes: ["competitors"] }),
+    );
+    expect(toolAnswer(runId, "record_reference")[0]).toMatch(/^RECORDED ref\d+/);
+    const run = store.getRun(runId)!;
+    expect(run.status).toBe("completed");
+    expect((run.packet as any).competitor_reference.runner_up_name).toBeNull();
+    expect((run.packet as any).brief.product).toBe("Mullein Drops");
+  });
+
+  it("takes the packet's brief from the run, not from the model", async () => {
+    const runId = await runWith(recorded(minimalPacket()), request({ brief: { product: "mullein", url: "", market: "", notes: "" } }));
+    expect((store.getRun(runId)!.packet as any).brief.product).toBe("mullein");
+  });
+
+  it("refuses a row recorded against a node outside the run's scope", async () => {
+    const runId = await runWith(
+      [...recorded(minimalPacket()), fauxAssistantMessage("Done.")],
+      request({ nodes: ["category_data"] }),
+    );
+    expect(toolAnswer(runId, "record_source")[0]).toMatch(/NOT RECORDED — this belongs to product_data, which is outside this run's scope/);
   });
 
   it("sums usage across every turn rather than reporting only the last", async () => {
     // §11 asks what a run costs; a run is dozens of turns and the final message
     // carries only its own.
-    const packet = fenced(minimalPacket());
-    faux.setResponses([
-      fauxAssistantMessage("looking into it"),
-      fauxAssistantMessage("still going"),
-      fauxAssistantMessage(packet),
-    ]);
-    const runId = supervisor.start(request(), "admin");
-    // Two nudges, so the agent takes three turns instead of stopping at one.
-    await supervisor.waitFor(runId);
+    const runId = await runWith(recorded(minimalPacket()));
     const usage = store.getRun(runId)!.usage as any;
     expect(usage.totalTokens).toBeGreaterThan(0);
   });
@@ -181,14 +199,14 @@ describe("settling a run", () => {
     supervisor = new RunSupervisor({ store, settings: { ...settings, backupModels: [backup] }, models, retry: FAST_RETRY });
     faux.setResponses([
       fauxAssistantMessage("", { stopReason: "error", errorMessage: "Upstream idle timeout exceeded" }),
-      fauxAssistantMessage(fenced(minimalPacket())),
+      ...recorded(minimalPacket()),
     ]);
     const runId = supervisor.start(request(), "admin");
     await supervisor.waitFor(runId);
 
     const resumed = store.listEvents(runId).find((e) => e.kind === "run.resumed")!.payload as any;
     expect(resumed).toMatchObject({ from: MODEL_ID, to: backup, attempt: 1 });
-    expect(store.listLlmCalls(runId).map((c) => c.model)).toEqual([MODEL_ID, backup]);
+    expect(store.listLlmCalls(runId).map((c) => c.model)).toEqual([MODEL_ID, backup, backup]);
     expect(store.getRun(runId)!.status).toBe("completed");
   });
 
@@ -205,94 +223,89 @@ describe("settling a run", () => {
   });
 });
 
-describe("the packet check tool", () => {
-  /** A turn that calls validate_packet with `packet`, then a final text turn. */
-  const checkThen = (packet: JsonValue, final: string) => [
-    fauxAssistantMessage(fauxToolCall("validate_packet", { packet }), { stopReason: "toolUse" }),
-    fauxAssistantMessage(final),
-  ];
-
-  it("stores the packet the moment it validates, before the run ends", async () => {
-    let atToolTime: unknown = "not checked";
-    faux.setResponses([
-      fauxAssistantMessage(fauxToolCall("validate_packet", { packet: minimalPacket() }), {
-        stopReason: "toolUse",
-      }),
-      (_context) => {
-        // The next turn begins after the tool ran: the row must already have it.
-        atToolTime = store.getRun(runId)!.packet;
-        return fauxAssistantMessage(fenced(minimalPacket()));
-      },
-    ]);
-    const runId = supervisor.start(request(), "admin");
-    await supervisor.waitFor(runId);
-
-    expect(atToolTime).not.toBeNull();
-    expect((atToolTime as any).stage).toBe(1);
+describe("finish", () => {
+  it("stores the packet the moment finish passes, and ends the loop there", async () => {
+    const runId = await runWith([...recorded(minimalPacket()), fauxAssistantMessage("never reached")]);
     const run = store.getRun(runId)!;
     expect(run.status).toBe("completed");
-    expect(run.packet_source).toBe("tool");
+    expect(run.packet_source).toBe("finish");
     const ready = store.listEvents(runId).find((e) => e.kind === "packet.ready")!;
-    expect(ready.payload.via).toBe("tool");
+    expect(ready.payload.via).toBe("finish");
+    expect(store.listLlmCalls(runId)).toHaveLength(2);
+    expect(store.listPacketChecks(runId).map((c) => c.valid)).toEqual([true]);
   });
 
-  it("completes a run that validated and then died mid-stream", async () => {
-    // Three of the five runs lost in the week to 2026-09-21 had a good packet in
-    // hand when they died. The artefact is valid; the turn was not.
-    faux.setResponses([
-      fauxAssistantMessage(fauxToolCall("validate_packet", { packet: minimalPacket() }), {
-        stopReason: "toolUse",
-      }),
+  it("completes from the ledger a run that died after recording everything", async () => {
+    // Run 8a02bed6 had its research in hand when the provider cut it at ~300s,
+    // four times. The findings are the ledger's now, not the lost turn's.
+    const runId = await runWith([
+      fauxAssistantMessage(recordCalls(minimalPacket()), { stopReason: "toolUse" }),
       ...Array.from({ length: 5 }, () =>
         fauxAssistantMessage("", { stopReason: "error", errorMessage: "terminated" }),
       ),
     ]);
-    const runId = supervisor.start(request(), "admin");
-    await supervisor.waitFor(runId);
-
     const run = store.getRun(runId)!;
     expect(run.status).toBe("completed");
-    expect((run.packet as any).stage).toBe(1);
+    expect(run.packet_source).toBe("ledger");
     const early = store.listEvents(runId).find((e) => e.kind === "run.ended_early")!;
     expect(early.payload.error).toBe("terminated");
   });
 
-  it("does not ask for a packet it already has", async () => {
-    // The final turn is prose, which would normally earn a nudge.
-    faux.setResponses(checkThen(minimalPacket(), "Done — the packet is the one I validated."));
-    const runId = supervisor.start(request(), "admin");
-    await supervisor.waitFor(runId);
-
-    expect(store.getRun(runId)!.status).toBe("completed");
-    expect(store.listEvents(runId).map((e) => e.kind)).not.toContain("run.nudged");
-  });
-
-  it("records every check, valid or not, with its problems", async () => {
-    const bad = minimalPacket();
-    bad.sources[0].kind = "marketplace";
-    faux.setResponses([
-      fauxAssistantMessage(fauxToolCall("validate_packet", { packet: bad }), {
-        stopReason: "toolUse",
-      }),
-      fauxAssistantMessage(fauxToolCall("validate_packet", { packet: minimalPacket() }), {
-        stopReason: "toolUse",
-      }),
-      fauxAssistantMessage(fenced(minimalPacket())),
+  it("hands back the problems, and the run carries on to a fixed finish", async () => {
+    const packet = minimalPacket();
+    const runId = await runWith([
+      ...recorded({ ...packet, gaps: [] }),
+      fauxAssistantMessage(fauxToolCall("record_gap", { item: packet.gaps[0] }), { stopReason: "toolUse" }),
+      fauxAssistantMessage(fauxToolCall("finish", {}), { stopReason: "toolUse" }),
     ]);
-    const runId = supervisor.start(request(), "admin");
-    await supervisor.waitFor(runId);
-
+    expect(toolAnswer(runId, "finish")[0]).toMatch(/^NOT FINISHED — 1 problem\. [\s\S]*1\. gap list is empty/);
     const checks = store.listPacketChecks(runId);
     expect(checks.map((c) => c.valid)).toEqual([false, true]);
-    expect(checks[0]!.problems.join(" ")).toContain("received 'marketplace'");
     expect(store.listEvents(runId).filter((e) => e.kind === "packet.checked")).toHaveLength(2);
+    expect(store.getRun(runId)!.status).toBe("completed");
   });
 
-  it("still reads the final message when the tool was never called", async () => {
-    const runId = await runWith(fenced(minimalPacket()));
+  it("stops at five checks, and settles the ledger as it stands", async () => {
+    // An agent that cannot fix a cross-row problem would otherwise resend its
+    // whole context after every failed finish until it stopped of its own accord.
+    const finishTurn = () => fauxAssistantMessage(fauxToolCall("finish", {}), { stopReason: "toolUse" });
+    const runId = await runWith([
+      fauxAssistantMessage(recordCalls({ ...minimalPacket(), gaps: [] }), { stopReason: "toolUse" }),
+      ...Array.from({ length: 6 }, finishTurn),
+      fauxAssistantMessage("never reached"),
+    ]);
+    const answers = toolAnswer(runId, "finish");
+    expect(answers).toHaveLength(5);
+    expect(answers[4]).toMatch(/Checks used: 5 of 5\.$/);
+    expect(store.listLlmCalls(runId)).toHaveLength(7);
     const run = store.getRun(runId)!;
-    expect(run.status).toBe("completed");
-    expect(run.packet_source).toBe("output");
+    expect(run.status).toBe("invalid");
+    expect(run.error).toMatch(/gap list is empty/);
+    expect(store.listPacketChecks(runId).map((c) => c.valid)).toEqual([false, false, false, false, false, false]);
+  });
+
+  it("leaves a retracted row out of the packet", async () => {
+    const packet = minimalPacket();
+    const extra = { ...packet.attributes[0], key: "colour", value: "blue" };
+    const runId = await runWith([
+      fauxAssistantMessage([fauxToolCall("record_attribute", { item: extra })], { stopReason: "toolUse" }),
+      fauxAssistantMessage(fauxToolCall("retract", { id: "at1", why: "misread" }), { stopReason: "toolUse" }),
+      ...recorded(packet),
+    ]);
+    expect(toolAnswer(runId, "retract")[0]).toBe("RETRACTED at1");
+    const keys = (store.getRun(runId)!.packet as any).attributes.map((a: any) => a.key);
+    expect(keys).toEqual(["dose_per_serving"]);
+  });
+
+  it("replaces a row recorded again under the same key", async () => {
+    const packet = minimalPacket();
+    const runId = await runWith([
+      fauxAssistantMessage(fauxToolCall("record_source", { item: { ...packet.sources[0], title: "old" } }), { stopReason: "toolUse" }),
+      ...recorded(packet),
+    ]);
+    expect(toolAnswer(runId, "record_source")[1]).toMatch(/replaces src1/);
+    expect((store.getRun(runId)!.packet as any).sources).toHaveLength(1);
+    expect(store.findings.list(runId).find((row) => row.id === "src1")!.retracted_why).toMatch(/replaced by/);
   });
 });
 
@@ -316,8 +329,9 @@ describe("cost", () => {
     faux.setResponses([
       (_context, _options, _state, model) => {
         seen = model.cost;
-        return fauxAssistantMessage(fenced(minimalPacket()));
+        return recorded(minimalPacket())[0]!;
       },
+      recorded(minimalPacket())[1]!,
     ]);
     const runId = supervisor.start(request(), "admin");
     await supervisor.waitFor(runId);
@@ -336,12 +350,9 @@ describe("cost", () => {
     supervisor = new RunSupervisor({ store, settings, models, costs });
     faux.setResponses([
       // A tool call keeps the loop going; a text-only reply would end the run
-      // after one turn. An unknown tool is enough: it comes back as an error.
-      fauxAssistantMessage(fauxToolCall("no_such_tool", {}), {
-        responseId: "gen-1",
-        stopReason: "toolUse",
-      }),
-      fauxAssistantMessage(fenced(minimalPacket()), { responseId: "gen-2" }),
+      // after one turn.
+      fauxAssistantMessage(recordCalls(minimalPacket()), { responseId: "gen-1", stopReason: "toolUse" }),
+      fauxAssistantMessage(fauxToolCall("finish", {}), { responseId: "gen-2", stopReason: "toolUse" }),
     ]);
     const runId = supervisor.start(request(), "admin");
     await supervisor.waitFor(runId);
@@ -382,7 +393,7 @@ describe("cost", () => {
     async function settledButLive(): Promise<{ runId: string; release: () => void }> {
       const { costs, release } = heldBilling();
       supervisor = new RunSupervisor({ store, settings, models, costs });
-      faux.setResponses([fauxAssistantMessage(fenced(minimalPacket()), { responseId: "gen-1" })]);
+      faux.setResponses(recorded(minimalPacket(), { responseId: "gen-1" }));
       const runId = supervisor.start(request(), "admin");
       while (store.getRun(runId)!.status === "running") await new Promise((r) => setTimeout(r, 5));
       expect(store.getRun(runId)!.status).toBe("completed");
@@ -414,14 +425,19 @@ describe("cost", () => {
 
   it("records no billed cost when no turn had a generation id", async () => {
     supervisor = new RunSupervisor({ store, settings, models, costs: costsFrom(() => ({ status: 500 })) });
-    const runId = await runWith(fenced(minimalPacket()));
+    const runId = await runWith(recorded(minimalPacket()));
     expect((store.getRun(runId)!.usage as any).billed).toBeUndefined();
   });
 });
 
 describe("events", () => {
+  const recordThenSay = () => [
+    fauxAssistantMessage(recordCalls(minimalPacket()), { stopReason: "toolUse" }),
+    fauxAssistantMessage("Everything is recorded."),
+  ];
+
   it("emits the kinds the cockpit renders", async () => {
-    const runId = await runWith(fenced(minimalPacket()));
+    const runId = await runWith(recordThenSay());
     const kinds = store.listEvents(runId).map((e) => e.kind);
     expect(kinds[0]).toBe("run.started");
     expect(kinds).toContain("message.delta");
@@ -431,17 +447,18 @@ describe("events", () => {
   it("streams assistant text once, not once per update", async () => {
     // The agent re-emits the whole message on each update; appending deltas
     // blindly multiplies the output by the number of updates.
-    const runId = await runWith(fenced(minimalPacket()));
+    const runId = await runWith(recordThenSay());
     const deltas = store
       .listEvents(runId)
       .filter((e) => e.kind === "message.delta")
       .map((e) => String((e.payload as any).delta))
       .join("");
+    expect(deltas).toBe("Everything is recorded.");
     expect(deltas).toBe(store.getRun(runId)!.output);
   });
 
   it("replays every event to a subscriber that arrives late", async () => {
-    const runId = await runWith(fenced(minimalPacket()));
+    const runId = await runWith(recorded(minimalPacket()));
     expect(store.listEvents(runId).length).toBeGreaterThan(2);
     expect(supervisor.isLive(runId)).toBe(false);
   });
@@ -487,7 +504,7 @@ describe("judgements", () => {
       admission_reason: "rejected by policy",
       node: "competitors",
     });
-    await runWith(fenced(packet));
+    await runWith(recorded(packet));
     expect(store.listJudgements(Scope.everything).find((j) => j.id === judgement.id)!.applied_count).toBe(1);
   });
 
@@ -497,8 +514,9 @@ describe("judgements", () => {
       (context) => {
         const turn = JSON.stringify(context.messages);
         expect(turn).toContain("prefer UK sources");
-        return fauxAssistantMessage(fenced(minimalPacket()));
+        return recorded(minimalPacket())[0]!;
       },
+      recorded(minimalPacket())[1]!,
     ]);
     const runId = supervisor.start(request(), "admin");
     await supervisor.waitFor(runId);
@@ -525,7 +543,7 @@ describe("recovery", () => {
   });
 
   it("leaves finished runs alone", async () => {
-    const runId = await runWith(fenced(minimalPacket()));
+    const runId = await runWith(recorded(minimalPacket()));
     supervisor.recoverRunsKilledByRestart();
     expect(store.getRun(runId)!.status).toBe("completed");
   });
@@ -562,14 +580,14 @@ describe("stopping a run", () => {
 });
 
 describe("the LLM call trace", () => {
-  /** A two-turn run: a tool call, then the packet. */
+  /** A two-turn run: a tool call, then a closing reply. */
   function twoTurns() {
     faux.setResponses([
       fauxAssistantMessage(fauxToolCall("no_such_tool", { q: "x" }), {
         responseId: "gen-1",
         stopReason: "toolUse",
       }),
-      fauxAssistantMessage(fenced(minimalPacket()), { responseId: "gen-2" }),
+      fauxAssistantMessage("Nothing more to add.", { responseId: "gen-2" }),
     ]);
   }
 
@@ -587,7 +605,7 @@ describe("the LLM call trace", () => {
     expect(first.tools.map((t: any) => t.name)).toContain("web_fetch");
     expect(first.input).toHaveLength(1);
     expect(first.input[0].role).toBe("user");
-    expect(JSON.stringify(first.input[0].content)).toContain("## Output");
+    expect(JSON.stringify(first.input[0].content)).toContain("## Recording what you find");
     expect(first.output.content.some((c: any) => c.type === "toolCall")).toBe(true);
     expect(first.stop_reason).toBe("toolUse");
 
@@ -598,7 +616,7 @@ describe("the LLM call trace", () => {
     expect(second.context_reset).toBe(false);
     expect(second.context_messages).toBe(3);
     expect(second.input.map((m: any) => m.role)).toEqual(["assistant", "toolResult"]);
-    expect(second.output.content[0].text).toContain("```json");
+    expect(second.output.content[0].text).toBe("Nothing more to add.");
     expect(second.duration_ms).toBeGreaterThanOrEqual(0);
     expect(second.usage.totalTokens).toBeGreaterThan(0);
 
@@ -607,7 +625,7 @@ describe("the LLM call trace", () => {
     const summaryEvent = store.listEvents(runId).find((e) => e.kind === "llm.call")!;
     expect(summaryEvent.payload).toMatchObject({ seq: 1, tool_calls: 1, stop_reason: "toolUse" });
     // The prompt stays out of the event stream.
-    expect(JSON.stringify(summaryEvent.payload)).not.toContain("## Output");
+    expect(JSON.stringify(summaryEvent.payload)).not.toContain("## Recording");
   });
 
   it("leaves a tool result's details out, because the model never sees them", async () => {
@@ -649,11 +667,11 @@ describe("the LLM call trace", () => {
 
   it("tags each tool event with the id of the tool call that asked for it", async () => {
     faux.setResponses([
-      fauxAssistantMessage(fauxToolCall("validate_packet", { packet: minimalPacket() }), {
+      fauxAssistantMessage(fauxToolCall("record_source", { item: minimalPacket().sources[0] }), {
         responseId: "gen-1",
         stopReason: "toolUse",
       }),
-      fauxAssistantMessage(fenced(minimalPacket()), { responseId: "gen-2" }),
+      fauxAssistantMessage("Recorded.", { responseId: "gen-2" }),
     ]);
     const runId = supervisor.start(request(), "admin");
     await supervisor.waitFor(runId);
@@ -669,7 +687,7 @@ describe("the LLM call trace", () => {
     expect(answered).toBe(asked);
     expect(tagged).toEqual([asked, asked]);
     const completed = store.listEvents(runId).find((e) => e.kind === "tool.completed")!.payload as any;
-    expect(completed.inside.map((s: any) => s.name)).toContain("PacketCheckTool.tool.execute");
+    expect(completed.inside.map((s: any) => s.name)).toContain("RecordTool.tool.execute");
   });
 
   it("records a call the provider failed, with its error", async () => {
@@ -710,7 +728,7 @@ describe("a stream that drops mid-run", () => {
     // a socket that closed 98s into turn 6 (undici reports `terminated`).
     faux.setResponses([
       fauxAssistantMessage("", { stopReason: "error", errorMessage: "terminated" }),
-      fauxAssistantMessage(fenced(minimalPacket())),
+      ...recorded(minimalPacket()),
     ]);
     const runId = supervisor.start(request(), "admin");
     await supervisor.waitFor(runId);
@@ -730,7 +748,7 @@ describe("a stream that drops mid-run", () => {
       fauxAssistantMessage("", { stopReason: "error", errorMessage: "socket hang up" }),
       fauxAssistantMessage("", { stopReason: "error", errorMessage: "502 bad gateway" }),
       fauxAssistantMessage("", { stopReason: "error", errorMessage: "terminated, again" }),
-      fauxAssistantMessage(fenced(minimalPacket())), // never reached: budget is 3
+      recorded(minimalPacket())[0]!, // never reached: budget is 3
     ]);
     const runId = supervisor.start(request(), "admin");
     await supervisor.waitFor(runId);
@@ -747,7 +765,7 @@ describe("a stream that drops mid-run", () => {
     faux.setResponses([
       fauxAssistantMessage("", { stopReason: "error", errorMessage: "terminated" }),
       fauxAssistantMessage("", { stopReason: "error", errorMessage: "503 service unavailable" }),
-      fauxAssistantMessage(fenced(minimalPacket())),
+      ...recorded(minimalPacket()),
     ]);
     const runId = supervisor.start(request(), "admin");
     await supervisor.waitFor(runId);
@@ -790,26 +808,22 @@ describe("a stream that drops mid-run", () => {
     expect(Retries.isRetryable("")).toBe(false);
   });
 
-  it("asks for a packet from what it gathered when the retries run out", async () => {
-    // A run that fetched 30 pages and then lost the provider still holds the
-    // whole transcript; one tools-off ask is cheaper than losing all of it.
+  it("settles from what it recorded when the retries run out, with no extra ask", async () => {
+    // A run that recorded 30 pages' findings and then lost the provider has
+    // them in the ledger; nothing needs asking for again.
     faux.setResponses([
-      // A turn that did some work, so the transcript is worth salvaging.
-      fauxAssistantMessage(fauxToolCall("no_such_tool", { q: "x" }), { stopReason: "toolUse" }),
-      // Then the provider goes away for the whole retry budget.
+      fauxAssistantMessage(recordCalls(minimalPacket()), { stopReason: "toolUse" }),
       ...Array.from({ length: 4 }, () =>
         fauxAssistantMessage("", { stopReason: "error", errorMessage: "Upstream error from Relace" }),
       ),
-      // The tools-off ask that follows still lands.
-      fauxAssistantMessage(fenced(minimalPacket())),
     ]);
     const runId = supervisor.start(request(), "admin");
     await supervisor.waitFor(runId);
 
     const kinds = store.listEvents(runId).map((e) => e.kind);
     expect(kinds.filter((k) => k === "run.resumed")).toHaveLength(3);
-    expect(kinds).toContain("run.nudged");
     expect(store.getRun(runId)!.status).toBe("completed");
+    expect(store.listLlmCalls(runId)).toHaveLength(5);
   });
 
   it("does not retry an error that waiting cannot fix", async () => {
@@ -820,7 +834,7 @@ describe("a stream that drops mid-run", () => {
         stopReason: "error",
         errorMessage: "402 insufficient_quota: your account is out of credit",
       }),
-      fauxAssistantMessage(fenced(minimalPacket())),
+      recorded(minimalPacket())[0]!,
     ]);
     const runId = supervisor.start(request(), "admin");
     await supervisor.waitFor(runId);
@@ -836,7 +850,7 @@ describe("a stream that drops mid-run", () => {
         supervisor.stop(runId);
         return fauxAssistantMessage("", { stopReason: "error", errorMessage: "aborted" });
       },
-      fauxAssistantMessage(fenced(minimalPacket())),
+      recorded(minimalPacket())[0]!,
     ]);
     const runId = supervisor.start(request(), "admin");
     await supervisor.waitFor(runId);
@@ -856,7 +870,7 @@ describe("a run that covers part of the stage", () => {
           tools: getCurrentTools(context.messages).map((t) => t.name),
           prompt: JSON.stringify(context.messages.find((m) => m.role === "user")),
         };
-        return fauxAssistantMessage(fenced(minimalPacket()));
+        return fauxAssistantMessage("Nothing found.");
       },
     ]);
     // The token is set, so without the scope the review tools would be offered.
@@ -867,32 +881,42 @@ describe("a run that covers part of the stage", () => {
     expect(store.getRun(runId)!.nodes).toEqual(["product_data"]);
     expect(seen!.system).toMatch(/This run covers only `product_data`/);
     expect(seen!.prompt).toContain("## Scope of this run");
-    expect(seen!.tools).toEqual(["web_search", "web_fetch", "validate_packet"]);
+    expect(seen!.tools).toEqual([
+      "web_search",
+      "web_fetch",
+      "record_source",
+      "record_excerpt",
+      "record_measurement",
+      "record_attribute",
+      "record_saturation",
+      "record_node_status",
+      "record_gap",
+      "retract",
+      "finish",
+    ]);
     const started = store.listEvents(runId).find((e) => e.kind === "run.started")!;
     expect(started.payload.nodes).toEqual(["product_data"]);
   });
 
-  it("is invalid when its packet records other nodes", async () => {
+  it("refuses a row for another node of the stage, and keeps the rest", async () => {
     // A category_data entry in a product_data run: same stage, wrong node.
     const packet = minimalPacket();
     packet.gaps.push({ node: "category_data", missing: "no three-year trend" });
-    faux.setResponses([fauxAssistantMessage(fenced(packet))]);
-    const runId = supervisor.start(request({ nodes: ["product_data"] }), "admin");
-    await supervisor.waitFor(runId);
+    const runId = await runWith(recorded(packet), request({ nodes: ["product_data"] }));
+    expect(toolAnswer(runId, "record_gap")[1]).toMatch(/NOT RECORDED — this belongs to category_data, which is outside this run's scope \(product_data\)/);
     const run = store.getRun(runId)!;
-    expect(run.status).toBe("invalid");
-    expect(run.error).toMatch(/outside this run's scope \(product_data\)/);
+    expect(run.status).toBe("completed");
+    expect((run.packet as any).gaps).toHaveLength(1);
   });
 
-  it("is invalid when its packet belongs to the other stage", async () => {
-    // Review mining is stage 2 (2026-09-21). A stage-1 run that returns review
-    // excerpts has done a different run's work.
-    faux.setResponses([fauxAssistantMessage(fenced(reviewPacket()))]);
-    const runId = supervisor.start(request(), "admin");
-    await supervisor.waitFor(runId);
+  it("refuses every row of the other stage's work", async () => {
+    // Review mining is stage 2 (2026-09-21). A stage-1 run that records review
+    // excerpts is doing a different run's work.
+    const runId = await runWith([...recorded(reviewPacket()), fauxAssistantMessage("Done.")]);
+    expect(toolAnswer(runId, "record_excerpt")[0]).toMatch(/this belongs to review_mining, which is outside this run's scope/);
     const run = store.getRun(runId)!;
     expect(run.status).toBe("invalid");
-    expect(run.error).toMatch(/collected in stage 2, not stage 1 — that is a separate run/);
+    expect(store.findings.list(runId)).toHaveLength(0);
   });
 
   it("offers a competitors run Amazon search for discovery, but not the review tools", async () => {
@@ -900,79 +924,99 @@ describe("a run that covers part of the stage", () => {
     faux.setResponses([
       (context) => {
         tools = getCurrentTools(context.messages).map((t) => t.name);
-        return fauxAssistantMessage(fenced(minimalPacket()));
+        return fauxAssistantMessage("Nothing found.");
       },
     ]);
     supervisor = new RunSupervisor({ store, settings: { ...settings, apifyToken: "t" }, models });
     const runId = supervisor.start(request({ nodes: ["competitors"] }), "admin");
     await supervisor.waitFor(runId);
-    expect(tools).toEqual(["web_search", "web_fetch", "amazon_find_product", "validate_packet"]);
-  });
-
-  it("offers the review tools when review mining is in scope", async () => {
-    let tools: string[] = [];
-    faux.setResponses([
-      (context) => {
-        tools = getCurrentTools(context.messages).map((t) => t.name);
-        return fauxAssistantMessage(fenced(minimalPacket()));
-      },
-    ]);
-    supervisor = new RunSupervisor({ store, settings: { ...settings, apifyToken: "t" }, models });
-    const runId = supervisor.start(request({ nodes: ["review_mining"] }), "admin");
-    await supervisor.waitFor(runId);
-    expect(tools).toContain("amazon_reviews");
+    expect(tools.slice(0, 3)).toEqual(["web_search", "web_fetch", "amazon_find_product"]);
+    expect(tools).toContain("record_reference");
+    expect(tools).toContain("record_competitor");
+    expect(tools).not.toContain("mine_reviews");
   });
 });
 
-describe("review mining through the ledger", () => {
-  const LISTING = "https://www.amazon.com/dp/B0H2JVQ9GR";
-  const BANDS = ["oneStar", "twoStar", "threeStar", "fourStar", "fiveStar"];
-  const actorRunner = {
+describe("the Amazon listings of a completed stage-1 run", () => {
+  const brief = { product: "", url: "https://mullevia.com/products/mullein-drops", market: "", notes: "" };
+  const packet = () =>
+    minimalPacket({
+      brief,
+      sources: [{ ...minimalPacket().sources[0], node: "competitors" }],
+      attributes: [],
+      competitor_reference: { name: "Mullevia Mullein Drops", form: "liquid", actives: ["mullein"], source_id: "sha256:aaa" },
+      competitors: [
+        {
+          id: "c1", name: "Herb Pharm Mullein Blend", brand: "Herb Pharm", url: "https://herb-pharm.com/mullein",
+          relation: "direct", form: "liquid", shared_actives: ["mullein"], source_id: "sha256:aaa",
+          active_ingredients: [{ name_as_printed: "Mullein", name_normalised: "mullein" }],
+        },
+      ],
+      nodes: [{ node: "competitors", status: "incomplete", done_criterion_met: false, why: "one competitor" }],
+      gaps: [{ node: "competitors", missing: "no ad library entries" }],
+    });
+  const searches: string[] = [];
+  const actors = {
     async run(_actorId: string, input: Record<string, any>) {
-      const star = BANDS.indexOf(input.filterByRatings?.[0]) + 1;
+      const url: string = input.categoryUrls[0].url;
+      searches.push(url);
+      if (url.includes("fail")) throw new Error("Apify down");
+      const herb = url.includes("Herb");
       return {
         status: "SUCCEEDED",
-        items: [{ reviewDescription: `A ${star}-star review, verbatim.`, ratingScore: star, reviewId: `R${star}` }],
+        usageUsd: 0.01,
+        items: [
+          herb
+            ? { asin: "B000S86S3M", brand: "Herb Pharm", title: "Herb Pharm Mullein Blend Liquid Extract 1 oz" }
+            : { asin: "B00028LNAQ", brand: "Nature's Answer", title: "Nature's Answer Mullein Leaf Herbal Supplement - 1oz" },
+        ],
       };
     },
   };
-  const mine = () =>
-    fauxAssistantMessage(
-      fauxToolCall("mine_reviews", { listings: [{ target_id: "product", product_url: LISTING }] }),
-      { stopReason: "toolUse" },
-    );
+  const read: string[] = [];
+  const competitorsRun = async (steps: FauxResponseStep[]) => {
+    searches.length = 0;
+    read.length = 0;
+    await supervisor.close();
+    const pages = { scrape: async (url: string) => (read.push(url), { text: HUEL_PAGE, title: "" }) };
+    supervisor = new RunSupervisor({ store, settings, models, retry: FAST_RETRY, services: services(settings, actors, pages) });
+    return runWith(steps, request({ brief, nodes: ["competitors"] }));
+  };
 
-  beforeEach(() => {
-    supervisor = new RunSupervisor({ store, settings, models, retry: FAST_RETRY, actorRunner });
+  it("looks every target up once, stores the matches, and charges the run", async () => {
+    const runId = await competitorsRun(recorded(packet()));
+    expect(store.getRun(runId)!.status).toBe("completed");
+    expect(searches).toHaveLength(2);
+    const rows = store.listings.list(runId);
+    expect(rows.find((r) => r.target_id === "c1")).toMatchObject({ matches: true, mismatch: "" });
+    expect(rows.find((r) => r.target_id === "product")).toMatchObject({ matches: false, mismatch: "brand" });
+    const events = store.listEvents(runId);
+    expect(events.find((e) => e.kind === "packet.listings")!.payload).toEqual({ total: 2, matched: 1 });
+    expect(events.filter((e) => e.kind === "apify.charged")).toHaveLength(2);
   });
 
-  it("puts every fetched review in the packet without the model copying any", async () => {
-    faux.setResponses([mine(), fauxAssistantMessage(fenced(reviewPacket()))]);
-    const runId = supervisor.start(request({ nodes: ["review_mining"] }), "admin");
-    await supervisor.waitFor(runId);
-
-    const run = store.getRun(runId)!;
-    expect(run.status).toBe("completed");
-    const excerpts = (run.packet as any).excerpts as Array<{ id: string; text: string; star_rating: number }>;
-    // mine_reviews files pulls in the order it asks for them — 3, 1, 2, 4, 5 —
-    // however the fetches finish, so r1.1 is the 3-star review.
-    expect(excerpts.find((e) => e.id === "r1.1")).toMatchObject({ text: "A 3-star review, verbatim.", star_rating: 3 });
-    expect(excerpts.filter((e) => /^r\d+\.\d+$/.test(e.id))).toHaveLength(5);
-    expect(store.listRunReviews(runId)).toHaveLength(5);
+  it("reads the Trustpilot score only of a target that will be mined there", async () => {
+    // The champion has no matched listing and its own site, so stage 2 mines it on
+    // Trustpilot; c1 is matched on Amazon and is not read.
+    const runId = await competitorsRun(recorded(packet()));
+    expect(read).toEqual(["https://www.trustpilot.com/review/mullevia.com"]);
+    const rows = store.listings.list(runId);
+    expect(rows.find((r) => r.target_id === "product")!.trustpilot).toMatchObject({ domain: "mullevia.com", stars: 4.2, reviews: 29447, error: "" });
+    expect(rows.find((r) => r.target_id === "c1")!.trustpilot).toBeUndefined();
   });
 
-  it("keeps every fetched review even when the run ends invalid", async () => {
-    faux.setResponses([
-      mine(),
-      fauxAssistantMessage("no packet, only prose"),
-      fauxAssistantMessage("still no packet"),
-    ]);
-    const runId = supervisor.start(request({ nodes: ["review_mining"] }), "admin");
-    await supervisor.waitFor(runId);
-
+  it("looks nothing up for a run that ended invalid", async () => {
+    const runId = await competitorsRun([...recorded({ ...packet(), gaps: [] }), fauxAssistantMessage("Done.")]);
     expect(store.getRun(runId)!.status).toBe("invalid");
-    const kept = store.listRunReviews(runId);
-    expect(kept).toHaveLength(5);
-    expect(store.listEvents(runId).map((e) => e.kind)).toContain("reviews.saved");
+    expect(searches).toHaveLength(0);
+  });
+
+  it("stays completed when the lookup fails", async () => {
+    const failing = packet();
+    failing.competitors[0].name = "fail";
+    failing.competitor_reference.name = "fail too";
+    const runId = await competitorsRun(recorded(failing));
+    expect(store.getRun(runId)!.status).toBe("completed");
+    expect(store.listings.list(runId)).toHaveLength(0);
   });
 });
