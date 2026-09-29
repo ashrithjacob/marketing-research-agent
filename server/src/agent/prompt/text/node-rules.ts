@@ -37,10 +37,7 @@ export const NODE_RULES: Record<Node, string> = {
       ("<active> capsules", "<active> spray", "<active> gummies", "<active> tea",
       "best <active> <market>"), and \`amazon_find_product\` for the active if you
       have it. Then \`web_fetch\` each competitor's own product page — a search
-      result is not a competitor, the page you read is. A retailer, marketplace or
-      ad-library page is where you found a brand, not its evidence: cite the brand's own
-      product page, or drop the brand and gap where you saw it. The validator rejects a
-      page that other brands also cite unless its title names this one.
+      result is not a competitor, the page you read is.
    c. For each one, read off *its* page: form, actives, dose, price, and its
       positioning copy **verbatim** (the headline or tagline, character for
       character). \`market\` is the market that page sells in, copied exactly as the

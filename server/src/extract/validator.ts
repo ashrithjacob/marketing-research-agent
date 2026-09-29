@@ -13,7 +13,6 @@ import {
 import { PacketExtractor } from "./blocks.js";
 import { BriefCheck } from "./brief-check.js";
 import { MarketCheck } from "./market-check.js";
-import { CompetitorPageCheck } from "./competitor-page-check.js";
 import { ChampionCheck } from "./champion-check.js";
 import { CitationCheck } from "./citation-check.js";
 import { CompetitorCheck } from "./competitor-check.js";
@@ -66,7 +65,6 @@ export class PacketValidator {
       new CompletenessCheck(),
       new CompetitorCheck(),
       new MarketCheck(),
-      new CompetitorPageCheck(),
       new ChampionCheck(),
     ];
   }
