@@ -341,6 +341,28 @@ function checkPublishedPorts() {
   }
 }
 
+// --- 5b. a compose environment item is one string -------------------------
+//
+// YAML reads an unquoted `: ` as a key/value separator, so a list item such as
+// `- VAR=${VAR:?must be set: why}` becomes a map and `docker compose up`
+// refuses the whole file. The deploy ships the image first and fails at `up`,
+// so the VPS keeps the old container and nothing locally notices. Quote it.
+function checkComposeEnvStrings() {
+  for (const rel of ["docker-compose.yaml", "deploy/vps/docker-compose.yaml"]) {
+    const text = read(rel);
+    if (!text) continue;
+    text.split("\n").forEach((line, i) => {
+      const m = /^\s*-\s+([A-Za-z_][A-Za-z0-9_]*)=(.*)$/.exec(line);
+      if (!m || !/: /.test(m[2])) return;
+      fail(
+        rel, i + 1, "compose-env-quoted",
+        `the environment item for ${m[1]} contains ": ", which YAML reads as a map, so ` +
+        "`docker compose up` rejects the whole file. Quote the item: - \"NAME=value\".",
+      );
+    });
+  }
+}
+
 // --- 6. this app lives at marketing.vanis.ai -------------------------------
 //
 // It has been called research.vanis.ai and was once going to be a tab on
@@ -407,6 +429,7 @@ const checks = [
   ["sqlite-migration", checkSqliteMigrations],
   ["dist-rebuilt", checkDistRebuilt],
   ["no-published-ports", checkPublishedPorts],
+  ["compose-env-quoted", checkComposeEnvStrings],
   ["app-domain", checkAppDomain],
   ["no-secrets", checkSecrets],
 ];

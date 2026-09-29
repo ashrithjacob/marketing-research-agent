@@ -267,6 +267,31 @@ describe("no-published-ports", () => {
   });
 });
 
+describe("compose-env-quoted", () => {
+  it("catches an unquoted environment item whose value holds ': ' (it parses as a map)", () => {
+    // Shipped once: the deploy loaded the image, then `docker compose up` failed
+    // with "services.mra.environment.[1]: unexpected type map".
+    write("deploy/vps/docker-compose.yaml", [
+      "services:",
+      "  mra:",
+      "    environment:",
+      "      - MRA_APP_PASSWORD_HASH=${MRA_APP_PASSWORD_HASH:?must be set: it turns login on}",
+    ].join("\n"));
+    expect(rules()).toContain("compose-env-quoted");
+  });
+
+  it("allows the same item quoted, and plain :? guards", () => {
+    write("deploy/vps/docker-compose.yaml", [
+      "services:",
+      "  mra:",
+      "    environment:",
+      '      - "MRA_APP_PASSWORD_HASH=${MRA_APP_PASSWORD_HASH:?must be set: it turns login on}"',
+      "      - MRA_JWT_SECRET=${MRA_JWT_SECRET:?MRA_JWT_SECRET is not set}",
+    ].join("\n"));
+    expect(rules()).not.toContain("compose-env-quoted");
+  });
+});
+
 describe("the checker does not report its own fixtures", () => {
   // Every rule above is proved with a deliberately-bad fixture, so this file
   // holds one bad string per rule. Both `app-domain` and `no-secrets` used to
