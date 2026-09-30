@@ -1,7 +1,8 @@
 import type { Competitor, CompetitorReference, StagePacket } from "../domain/index.js";
 
 import type { PacketCheck, PacketContext } from "./check.js";
-import { Names, Relations } from "./names.js";
+import { Relations } from "./names.js";
+import { SharedActives } from "./shared-actives.js";
 import { Trace } from "../trace/index.js";
 
 /** Direct and indirect are measured against the product's own form and actives. */
@@ -23,7 +24,6 @@ export class CompetitorCheck implements PacketCheck {
       );
     }
 
-    const referenceActives = new Set((reference?.actives ?? []).map(Names.normalise));
     const kinds = new Map(packet.sources.map((source) => [source.id, source.kind]));
     const seen = new Set<string>();
 
@@ -35,7 +35,7 @@ export class CompetitorCheck implements PacketCheck {
         problems.push(`${label} cites source '${row.source_id}', which is not in the packet`);
       }
       problems.push(...this.adProblems(row, label, sourceIds, kinds));
-      problems.push(...this.activeProblems(row, label, reference, referenceActives));
+      if (reference) problems.push(...SharedActives.problems(label, row.shared_actives, reference.actives));
       if (reference) problems.push(...this.relationProblems(row, label, reference));
     }
     return problems;
@@ -54,31 +54,6 @@ export class CompetitorCheck implements PacketCheck {
       }
       if (kinds.get(adId) !== "ad_library") {
         return [`${label} links '${adId}' as an ad, but that source is ${kinds.get(adId)}`];
-      }
-      return [];
-    });
-  }
-
-  private activeProblems(
-    row: Competitor,
-    label: string,
-    reference: CompetitorReference | null,
-    referenceActives: ReadonlySet<string>,
-  ): string[] {
-    Trace.line(import.meta.url, "CompetitorCheck.activeProblems", { row, label, reference, referenceActives });
-    const ownActives = new Set(
-      row.active_ingredients.map((active) => Names.normalise(active.name_normalised)),
-    );
-    return row.shared_actives.map(Names.normalise).flatMap((shared) => {
-      if (!ownActives.has(shared)) {
-        return [`${label} lists '${shared}' as shared, but not among its own actives`];
-      }
-      if (reference && !referenceActives.has(shared)) {
-        return [
-          `${label} lists '${shared}' as shared, but the reference product's actives are ` +
-            `${[...referenceActives].join(", ")} — a brand with a different active is neither ` +
-            'direct nor indirect; gap it as "same problem, different active"',
-        ];
       }
       return [];
     });

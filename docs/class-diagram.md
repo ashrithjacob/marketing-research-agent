@@ -369,6 +369,9 @@ classDiagram
     class ScopeCheck {
       problems()
     }
+    class SharedActives {
+      problems()
+    }
     class TrustpilotDomain {
       of()
     }
@@ -845,6 +848,7 @@ classDiagram
     }
     class StageTwoHandoff {
       forBrief()
+      forRun()
     }
     class StageTwoListings {
       judged()
@@ -1254,6 +1258,7 @@ classDiagram
 | `extract` | `extract/packet-assembly.ts` | PacketAssembly |
 | `extract` | `extract/review-assembly.ts` | ReviewAssembly |
 | `extract` | `extract/scope-check.ts` | ScopeCheck |
+| `extract` | `extract/shared-actives.ts` | SharedActives |
 | `extract` | `extract/stage-two-offer.ts` | TrustpilotDomain, StageTwoOffer |
 | `extract` | `extract/stage-two-packet.ts` | PullFailure, StageTwoPacket |
 | `extract` | `extract/stage-two-roster.ts` | StageTwoRoster |

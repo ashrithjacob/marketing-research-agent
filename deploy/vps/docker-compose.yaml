@@ -56,6 +56,9 @@ services:
       - MRA_BACKUP_MODELS=${MRA_BACKUP_MODELS:-}
       - SEARXNG_URL=http://searxng:8080
       - FIRECRAWL_API_KEY=${FIRECRAWL_API_KEY:?FIRECRAWL_API_KEY is not set}
+      # Fallback page reader, used only when Firecrawl can fetch nothing at all
+      # (out of credits, key refused, or no key). Optional: blank disables it.
+      - CRAWL4AI_API_KEY=${CRAWL4AI_API_KEY:-}
       # Cheap pre-read gate over every fetch; empty disables. Fails open.
       - MRA_GATE_MODEL=${MRA_GATE_MODEL:-}
       - MRA_GATE_CHAR_LIMIT=${MRA_GATE_CHAR_LIMIT:-4000}

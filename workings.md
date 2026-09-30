@@ -447,7 +447,16 @@ last agent has ended:
      forms — **except where both are `other`**, the escape hatch for anything the
      supplement vocabulary does not cover, where the agent's label stands and
      `form_as_printed` is required on both sides as the evidence for it;
-     `shared_actives` must be in both the row's actives and the reference product's, `competitor_reference` must exist once any competitor does, and
+     `shared_actives` must be picks from the champion's `actives`, copied word for
+     word (`SharedActives`, checked when the row is recorded and again at `finish`
+     and settlement); the competitor's own actives keep its page's wording and are
+     not compared. *Superseded 2026-10-01:* `shared_actives` had to appear, after
+     lowercasing, in both the row's actives and the reference's. On runs `c0f14d91`
+     and `bb89e90a` the champion wrote "mullein leaf extract (wildcrafted mullein
+     leaf)" and every competitor page "mullein leaf extract": one run ended `invalid`,
+     the other passed only after the agent rewrote 30 competitors' actives into the
+     champion's label. Which of the champion's actives a product contains is now the
+     judgement of the agent that read its page; `competitor_reference` must exist once any competitor does, and
      `ad_source_ids` must point at `ad_library` sources.
 5. **Invalid** → status `invalid` with the reason, event `packet.invalid`.
    **Valid** → status `completed`, packet stored, judgement `applied_count`s bumped,

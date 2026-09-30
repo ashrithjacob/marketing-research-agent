@@ -112,8 +112,12 @@ the champion below. Two classes, decided by a mechanical test:
 - **indirect** — shares an active, **different** form (a spray, gummy or tea
   where the champion is a liquid). Research these as fully as direct ones.
 
-A brand solving the same problem with a **different** active is neither: do not
-list it; \`record_gap\` "same problem, different active: <brand> (<active>)".
+**Shares an active** means it contains the same substance as one of the
+champion's actives, whatever its page calls it — a Latin name, another part or
+preparation of the same plant, a brand name for the same extract. A different
+compound (another salt of a mineral, another plant) is a different active. A
+brand solving the same problem with a **different** active is neither class: do
+not list it; \`record_gap\` "same problem, different active: <brand> (<active>)".
 
 How to work:
 1. Find candidates: \`web_search\` "<active> <form>" for every form (capsules,
@@ -121,8 +125,10 @@ How to work:
    \`amazon_find_product\` "<active>". A search result is not a competitor.
 2. For each, \`web_fetch\` its own product page, \`record_source\` it, then
    \`record_competitor\` in the same turn: \`id\` c1, c2…; name, brand, url; its
-   \`form\` (one of {forms}) and \`form_as_printed\`; actives with dose;
-   \`shared_actives\` with the champion; \`relation\` (checked against the
+   \`form\` (one of {forms}) and \`form_as_printed\`; its actives as its own
+   page names them, with dose; \`shared_actives\` — which of the champion's
+   actives it contains, **copied word for word from the champion's list below**
+   (a pick from that list, never its own wording); \`relation\` (checked against the
    forms); \`dose_per_serving\`, \`price\`, \`price_per_dose\`;
    \`positioning_copy\` — its headline, word for word; \`market\` exactly as the
    brief's Markets line names it. A brand sold only outside those markets is

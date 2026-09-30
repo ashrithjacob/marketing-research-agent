@@ -460,10 +460,23 @@ describe("validation: competitors, direct and indirect", () => {
     expect(() => packets.validate(data)).toThrow(/is neither direct nor indirect/);
   });
 
-  it("rejects a shared active the competitor does not list itself", () => {
+  it("takes shared actives as picks from the champion's list, whatever the competitor's page calls them", () => {
+    // Runs c0f14d91 and bb89e90a: the champion wrote "mullein leaf extract (wildcrafted
+    // mullein leaf)", every competitor page said "mullein leaf extract", and an exact
+    // match on free text rejected all of them — once by failing the run, once by
+    // making the agent rewrite 30 competitors' actives into the champion's label.
     const data = withCompetitors();
-    data.competitors[0].shared_actives = ["magnesium citrate"];
-    expect(() => packets.validate(data)).toThrow(/'magnesium citrate' as shared, but not among its own actives/);
+    const champion = "mullein leaf extract (wildcrafted mullein leaf)";
+    data.competitor_reference.actives = [champion, "ginger", "bromelain", "cordyceps", "lemon peel"];
+    for (const row of data.competitors) {
+      row.active_ingredients = [{ name_as_printed: "Verbascum thapsus leaf", name_normalised: "mullein leaf extract" }];
+      row.shared_actives = [champion];
+    }
+    expect(() => packets.validate(data)).not.toThrow();
+    data.competitors[0].shared_actives = ["mullein leaf extract"];
+    expect(() => packets.validate(data)).toThrow(
+      /lists 'mullein leaf extract' as shared, but shared_actives must be copied word for word from the champion's actives: mullein leaf extract \(wildcrafted mullein leaf\), ginger/,
+    );
   });
 
   it("needs the reference product before it can classify anything", () => {

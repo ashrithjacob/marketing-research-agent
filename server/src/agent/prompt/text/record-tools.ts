@@ -46,11 +46,12 @@ export const RECORD_TOOLS = [
     kind: "competitor",
     description:
       "Record one competitor, read off its own page. `id` is yours: c1, c2, …; " + REPLACES +
-      " relation is checked against the champion's form. Example: " +
+      " relation is checked against the champion's form. shared_actives are picked from the champion's " +
+      "actives and copied word for word; the competitor's own actives keep its page's wording. Example: " +
       '{"id":"c1","name":"CalmWell Magnesium Glycinate","brand":"CalmWell",' +
       '"url":"https://calmwell.example/mg","relation":"direct","form":"capsule",' +
       '"form_as_printed":"60 capsules","active_ingredients":[{"name_as_printed":"Magnesium ' +
-      '(as glycinate)","name_normalised":"magnesium glycinate","dose":"400","unit":"mg",' +
+      '(as bisglycinate chelate)","name_normalised":"magnesium bisglycinate","dose":"400","unit":"mg",' +
       '"per":"2 capsules"}],"shared_actives":["magnesium glycinate"],"dose_per_serving":"400 mg",' +
       '"positioning_copy":"Sleep deeper, naturally.","price":"£14.99","price_per_dose":"£0.50",' +
       '"market":"UK","source_id":"sha256:5e21…","ad_source_ids":[]}',

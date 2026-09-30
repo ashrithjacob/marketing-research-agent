@@ -559,6 +559,25 @@ describe("the ledger tools", () => {
     expect(ledger.rows[0]!.source_id).toBe("sha256:ccc");
   });
 
+  it("refuses a shared active that is not a pick from the champion's list, on the turn it is recorded", async () => {
+    const ledger = new MemoryLedger();
+    const champion = ledgerTools("champion", { ledger });
+    const competitors = ledgerTools("competitors", { ledger });
+    const listed = "mullein leaf extract (wildcrafted mullein leaf)";
+    await champion.tool("record_reference").execute("0", {
+      item: { name: "Mullevia Mullein Drops", form: "liquid", actives: [listed, "ginger"], source_id: "sha256:aaa" },
+    });
+    const row = {
+      id: "c1", name: "HERBIFY Mullein Drops", url: "https://herbify.example", relation: "direct", form: "liquid",
+      active_ingredients: [{ name_as_printed: "Mullein Leaf Extract", name_normalised: "mullein leaf extract" }],
+      shared_actives: ["mullein leaf extract"], source_id: "sha256:ccc",
+    };
+    expect(text(await competitors.tool("record_competitor").execute("1", { item: row }))).toMatch(
+      /^NOT RECORDED — competitor 'HERBIFY Mullein Drops' lists 'mullein leaf extract' as shared, but shared_actives must be copied word for word from the champion's actives: mullein leaf extract \(wildcrafted mullein leaf\), ginger/,
+    );
+    expect(text(await competitors.tool("record_competitor").execute("2", { item: { ...row, shared_actives: [listed] } }))).toMatch(/^RECORDED co/);
+  });
+
   it("retracts a live row once, and says so when there is none", async () => {
     const { tool } = ledgerTools();
     await tool("record_gap").execute("1", { item: minimalPacket().gaps[0] });

@@ -1,5 +1,5 @@
 import { Findings, type Finding, type FindingKind, type FindingLedger, type Node } from "../domain/index.js";
-import { FindingCheck } from "../extract/index.js";
+import { FindingCheck, SharedActives } from "../extract/index.js";
 import { Trace } from "../trace/index.js";
 
 const NODE_ENTITY: Readonly<Record<Node, string>> = {
@@ -25,6 +25,8 @@ export class RunFindings {
     const checked = FindingCheck.check(kind, item, this.scope);
     if ("problems" in checked) return checked;
     const { payload } = checked;
+    const unlisted = kind === "competitor" ? this.unlistedShared(payload) : [];
+    if (unlisted.length > 0) return { problems: unlisted.join("; ") };
     const key = Findings.key(kind, payload);
     const earlier = key === null ? undefined : this.own().find((row) => row.kind === kind && Findings.key(kind, row.payload) === key);
     const recorded = this.ledger.append({
@@ -61,6 +63,15 @@ export class RunFindings {
   own(): Finding[] {
     Trace.line(import.meta.url, "RunFindings.own", { agentId: this.agentId });
     return this.live().filter((row) => row.agent_id === this.agentId);
+  }
+
+  /** Checked against the champion row already in the ledger, so a wrong pick is refused on the turn it is made. */
+  private unlistedShared(payload: Record<string, unknown>): string[] {
+    Trace.line(import.meta.url, "RunFindings.unlistedShared", { id: payload.id });
+    const champion = this.live().find((row) => row.kind === "competitor_reference");
+    if (!champion) return [];
+    const actives = (champion.payload.actives as string[] | undefined) ?? [];
+    return SharedActives.problems(`competitor '${String(payload.name ?? payload.id)}'`, (payload.shared_actives as string[] | undefined) ?? [], actives);
   }
 
   private static entityOf(kind: FindingKind, payload: Record<string, unknown>): string {

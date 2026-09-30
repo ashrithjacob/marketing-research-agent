@@ -296,6 +296,13 @@ describe("the competitors agent", () => {
     expect(text).toMatch(/same problem, different active/);
   });
 
+  it("has shared actives copied from the champion's list, and says once what sharing an active means", () => {
+    const text = build({}, "competitors");
+    expect(text).toMatch(/copied word for word from the champion's list below/);
+    expect(text).toMatch(/whatever its page calls it — a Latin name, another part or\s+preparation of the same plant/);
+    expect(text).toMatch(/A different\s+compound \(another salt of a mineral, another plant\) is a different active/);
+  });
+
   it("measures competitors against the champion instead of choosing one", () => {
     const text = build({}, "competitors");
     expect(text).toMatch(/measured against\s+the champion below/);
