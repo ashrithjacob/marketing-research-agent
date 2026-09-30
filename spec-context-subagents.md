@@ -422,6 +422,20 @@ ledger. A summary rendered from the ledger loses nothing and needs no model call
 
 ## 6. Parent and children
 
+> **Superseded 2026-09-30 by `workings_stage1.md`.** Phase 4 is not built as
+> written here. There is no parent agent that decides what to spawn, no `spawn` or
+> `wait` tool, no discovery child and no child per competitor. Stage 1 is a fixed
+> pipeline: a `champion` agent alone, then exactly three agents side by side —
+> `product`, `competitors`, `category` — each with its own task, on one shared
+> ledger. Why: a lead that plans its own children made stage 1 open-ended again,
+> which is the thing the redesign set out to remove. Two of product data,
+> competitors and category data are field-filling, so they need no planner, and
+> the one open-ended node (competitors) is one agent stopped by saturation. A
+> build of this section (lead prompt, spawn tools, child pool, per-child
+> completion check) existed uncommitted and was deleted rather than adapted. The
+> run order of §6.4 steps 1–2 — champion first, then the three in parallel —
+> survives; steps 3–7 do not.
+
 ### 6.1 Fork vs child
 
 A **fork** copies history into a new session that carries on with everything the

@@ -4,9 +4,19 @@ import { getCurrentSystemPrompt, getCurrentTools, type AssistantMessage, type Me
 import type { LlmCall, ResearchStore } from "../domain/index.js";
 import { Trace } from "../trace/index.js";
 
-/** Wraps a run's streamFn so every LLM call is stored as sent and as answered. */
+/** Numbers a run's LLM calls across all of its agents. */
+export class CallSequence {
+  private last = 0;
+
+  next(): number {
+    Trace.line(import.meta.url, "CallSequence.next", { last: this.last });
+    this.last += 1;
+    return this.last;
+  }
+}
+
+/** Wraps one agent's streamFn so every LLM call is stored as sent and as answered, under that agent's id. */
 export class LlmCallLog {
-  private seq = 0;
   private previous: readonly Message[] = [];
   private lastSystem: string | undefined;
   private lastTools: string | undefined;
@@ -14,6 +24,8 @@ export class LlmCallLog {
   constructor(
     private readonly options: {
       runId: string;
+      agentId: string;
+      sequence: CallSequence;
       store: ResearchStore;
       onCall?: (call: LlmCall) => void;
     },
@@ -22,7 +34,7 @@ export class LlmCallLog {
   wrap(inner: StreamFn): StreamFn {
     Trace.line(import.meta.url, "LlmCallLog.wrap", { inner });
     return async (model, context, streamOptions) => {
-      const n = ++this.seq;
+      const n = this.options.sequence.next();
       const started = Date.now();
 
       const messages = context.messages.filter((m) => m.role !== "system");
@@ -60,6 +72,7 @@ export class LlmCallLog {
           const call = this.options.store.addLlmCall({
             run_id: this.options.runId,
             seq: n,
+            agent_id: this.options.agentId,
             started_at: new Date(started).toISOString(),
             ended_at: new Date(ended).toISOString(),
             duration_ms: ended - started,

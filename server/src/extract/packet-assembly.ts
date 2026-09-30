@@ -40,11 +40,16 @@ export class PacketAssembly {
     };
   }
 
+  /** Two agents may record one thing under the same key, each on its own row; the packet carries it once, as last recorded. */
   private payloads(kind: FindingKind): Record<string, unknown>[] {
     Trace.line(import.meta.url, "PacketAssembly.payloads", { kind });
-    return this.live
-      .filter((row) => row.kind === kind)
-      .map((row) => (CODE_ID_KINDS.has(kind) ? { ...row.payload, id: row.id } : row.payload));
+    const byKey = new Map<string, Finding>();
+    for (const row of this.live.filter((r) => r.kind === kind)) {
+      const key = Findings.key(kind, row.payload);
+      if (key !== null) byKey.delete(key);
+      byKey.set(key ?? row.id, row);
+    }
+    return [...byKey.values()].map((row) => (CODE_ID_KINDS.has(kind) ? { ...row.payload, id: row.id } : row.payload));
   }
 
   /** A site brief names no product; the product's own `name` attribute, or the champion's name, does. */

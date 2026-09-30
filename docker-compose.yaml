@@ -99,6 +99,9 @@ services:
       # nothing but search snippets.
       - SEARXNG_URL=http://searxng:8080
       - FIRECRAWL_API_KEY=${FIRECRAWL_API_KEY}
+      # Fallback page reader: used only when Firecrawl can fetch nothing at all
+      # (out of credits, key refused, or no key). Blank disables the fallback.
+      - CRAWL4AI_API_KEY=${CRAWL4AI_API_KEY:-}
       # Cheap pre-read gate: every fetched page passes a small model before it
       # reaches the researcher's context. Empty disables the gate (tools then
       # behave as before). :free models cost nothing but can rate-limit; the

@@ -1,71 +1,12 @@
-import {
-  NODES,
-  STAGE_NODES,
-  Stages,
-  type Brief,
-  type Judgement,
-  type Node,
-  type Stage,
-} from "../../domain/index.js";
+import type { Brief, Judgement } from "../../domain/index.js";
 
-import { NODE_RULES } from "./text/node-rules.js";
 import { Trace } from "../../trace/index.js";
-
-export const STAGE_NAMES: Record<Stage, string> = {
-  1: "the product and its market",
-  2: "what customers said",
-};
 
 /** The parts of the instructions that depend on this run's scope and brief. */
 export class PromptBlocks {
   static code(names: readonly string[]): string {
     Trace.line(import.meta.url, "PromptBlocks.code", { names });
     return names.map((name) => `\`${name}\``).join(", ");
-  }
-
-  static nodes(nodes: readonly Node[]): string {
-    Trace.line(import.meta.url, "PromptBlocks.nodes", { nodes });
-    const stage = Stages.covering(nodes) ?? 1;
-    const heading = Stages.isPartial(nodes)
-      ? `### This run's ${nodes.length === 1 ? "node" : "nodes"}`
-      : `### Stage ${stage}${STAGE_NODES[stage].length > 1 ? "'s nodes" : "'s node"}`;
-    const researched = nodes.filter((node): node is keyof typeof NODE_RULES => node in NODE_RULES);
-    const items = researched.map((node, index) => `${index + 1}. ${NODE_RULES[node]}`);
-    return [heading, "", ...items].join("\n");
-  }
-
-  static gapNodes(nodes: readonly Node[]): string {
-    Trace.line(import.meta.url, "PromptBlocks.gapNodes", { nodes });
-    const listed = PromptBlocks.code(nodes);
-    const verb = nodes.length === 1 ? "is" : "are";
-    if (!Stages.isPartial(nodes)) {
-      const stage = Stages.covering(nodes) ?? 1;
-      const fallback = nodes[nodes.length - 1]!;
-      return `A run-level problem that is not one of this stage's nodes — a tool failing, a
-fetch path blocked, a site refusing to serve — still goes in this list. Attach it
-to the node it blocked; if it blocked nothing in particular, use
-\`node: "${fallback}"\`. Never invent a node name (\`all\`, \`general\`, \`run\`), and
-never use a node from another stage: only ${listed} ${verb} accepted in a stage-${stage} run, and a row recorded against anything else is refused.`;
-    }
-    return `A run-level problem — a tool failing, a fetch path blocked, a site refusing
-to serve — still goes in this list, attached to \`node: "${nodes[0]}"\`. Use no
-node name outside this run's scope, and never invent one (\`all\`, \`general\`,
-\`run\`): only ${listed} ${verb} accepted, and
-a row recorded against anything else is refused.`;
-  }
-
-  static scope(nodes: readonly Node[]): string {
-    Trace.line(import.meta.url, "PromptBlocks.scope", { nodes });
-    const listed = PromptBlocks.code(nodes);
-    return [
-      "## Scope of this run",
-      "",
-      `This run researches **only** ${listed}. The rest of stage 1 is out of`,
-      "scope: do not search for it, and record nothing against it. Every `node` field",
-      "you record — on sources, excerpts, measurements, attributes, saturation,",
-      `node statuses and gaps — must be one of ${listed}, and each of them gets one`,
-      "`record_node_status`. A row recorded against another node is refused.",
-    ].join("\n");
   }
 
   static judgements(judgements: readonly Judgement[]): string {
@@ -94,33 +35,29 @@ a row recorded against anything else is refused.`;
 
   private static subject(brief: Brief): string[] {
     Trace.line(import.meta.url, "PromptBlocks.subject", { brief });
-    if (!brief.product && brief.url) {
-      return [
-        `**Site:** ${brief.url}`,
-        "",
-        "The brief is this site, not a product name. Your first step is to fetch " +
-          "it and read what it sells. Then record the product's own name **as the " +
-          "site writes it** as the `product_data` attribute with key `name` — the " +
-          "name on the product page or in the site's title, with no description, " +
-          "no domain and no url appended. If the site sells a range, name the line " +
-          "the site leads with and say in a gap which others you left.",
-      ];
-    }
-    const lines = [`**Product:** ${brief.product}`];
-    if (brief.url) {
-      lines.push(`**Product URL:** ${brief.url}`);
-    } else {
-      lines.push(
-        "No product URL was supplied — finding it is part of the job. The name " +
-          "is a genre as much as a product: the **champion product** — the " +
-          "market's most-bought — is what the packet must land on, established " +
-          "by ranking the genre and picking the most-reviewed listing, never " +
-          "the first plausible match. Use web search to locate the reviews, " +
-          "competitors, ad-library entries and category data the " +
-          `${NODES.length} nodes need.`,
-      );
-    }
+    const lines = brief.product ? [`**Product:** ${brief.product}`] : [];
+    if (brief.url) lines.push(`**${brief.product ? "Product URL" : "Site"}:** ${brief.url}`);
     return lines;
+  }
+
+  static champion(reference: Record<string, unknown> | null, brief: Brief): string {
+    Trace.line(import.meta.url, "PromptBlocks.champion", { reference });
+    if (!reference) {
+      return [
+        "## The champion",
+        "",
+        `No champion was looked up for this run: the product is the one ${brief.url} sells.`,
+      ].join("\n");
+    }
+    return [
+      "## The champion",
+      "",
+      "Recorded in the ledger by the `champion` agent, as `competitor_reference`:",
+      "",
+      "```json",
+      JSON.stringify(reference, null, 2),
+      "```",
+    ].join("\n");
   }
 
   private static market(market: string): string[] {

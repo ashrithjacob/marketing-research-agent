@@ -5,14 +5,16 @@ import { Corpus } from "../../adapters/corpus.js";
 import { OpenRouterGate } from "../../adapters/fetch-gate.js";
 import type { ServiceClients } from "../../adapters/service-clients.js";
 import type { Settings } from "../../config/index.js";
-import type { Node } from "../../domain/index.js";
+import type { FindingKind } from "../../domain/index.js";
 
+import type { AgentRoster } from "../agent-roster.js";
+import type { DoneCheck } from "../done-check.js";
 import type { FetchRecord } from "./lanes.js";
-import type { LedgerPacket } from "../ledger-packet.js";
 import { RECORD_TOOLS } from "../prompt/text/record-tools.js";
 import type { RunFindings } from "../run-findings.js";
 
-import { FinishTool, type FinishHooks } from "./finish-tool.js";
+import { FinishTool } from "./finish-tool.js";
+import { ReadLedgerTool, WaitForTool } from "./ledger-read-tools.js";
 import { RecordTool, RetractTool } from "./ledger-tools.js";
 import { FindProductTool } from "./find-product-tool.js";
 import { WebFetchTool } from "./web-fetch-tool.js";
@@ -22,17 +24,19 @@ import type { ToolSteps } from "../tool-steps.js";
 import { Trace } from "../../trace/index.js";
 
 export interface LedgerOptions {
-  nodes: readonly Node[];
   findings: RunFindings;
-  packet: LedgerPacket;
-  hooks: FinishHooks;
+  records: readonly FindingKind[];
+  check: DoneCheck;
+  onChecked: (valid: boolean, problems: readonly string[]) => void;
+  roster?: AgentRoster;
+  pollMs?: number;
 }
 
 export interface ToolsetOptions {
   settings: Settings;
   runId: string;
   services: ServiceClients;
-  findings?: LedgerOptions;
+  ledger?: LedgerOptions;
   onFetch?: (record: FetchRecord) => void;
   onApifyCharge?: (charge: ActorCharge) => void;
   productSearch?: boolean;
@@ -41,7 +45,7 @@ export interface ToolsetOptions {
   steps?: ToolSteps;
 }
 
-/** The tools one stage-1 run gets. Amazon search is offered only to a competitors run, and only with an Apify runner: withheld, not stubbed. */
+/** The tools one stage-1 agent gets. Amazon search only where its spec allows and an Apify runner exists; wait_for only with a roster of agents to wait on: withheld, not stubbed. */
 export class ResearchToolset {
   constructor(private readonly options: ToolsetOptions) {}
 
@@ -69,12 +73,18 @@ export class ResearchToolset {
 
   private ledgerTools(): AgentTool<any>[] {
     Trace.line(import.meta.url, "ResearchToolset.ledgerTools");
-    const ledger = this.options.findings;
+    const ledger = this.options.ledger;
     if (!ledger) return [];
-    const competitors = ledger.nodes.includes("competitors");
-    const records = RECORD_TOOLS.filter(
-      (spec) => competitors || (spec.kind !== "competitor" && spec.kind !== "competitor_reference"),
-    ).map((spec) => new RecordTool(spec, ledger.findings).tool());
-    return [...records, new RetractTool(ledger.findings).tool(), new FinishTool(ledger.packet, ledger.hooks).tool()];
+    const records = RECORD_TOOLS.filter((spec) => ledger.records.includes(spec.kind)).map((spec) =>
+      new RecordTool(spec, ledger.findings).tool(),
+    );
+    const wait = ledger.roster ? [new WaitForTool(ledger.findings, ledger.roster, ledger.pollMs).tool()] : [];
+    return [
+      ...records,
+      new RetractTool(ledger.findings).tool(),
+      new ReadLedgerTool(ledger.findings).tool(),
+      ...wait,
+      new FinishTool(ledger.check, ledger.onChecked).tool(),
+    ];
   }
 }

@@ -1,6 +1,7 @@
 import type Database from "better-sqlite3";
 
 import { AccountTable } from "./account-table.js";
+import { CallLog } from "./call-log.js";
 import { FindingTable } from "./finding-table.js";
 import { PacketRowTable } from "./packet-row-table.js";
 import { ReviewAnalysisTable } from "./review-analysis-table.js";
@@ -19,6 +20,16 @@ const MIGRATIONS: ReadonlyArray<readonly [string, string, string]> = [
   ["research_runs", "workspace_id", "ALTER TABLE research_runs ADD COLUMN workspace_id TEXT NOT NULL DEFAULT 'admin'"],
   ["research_judgements", "workspace_id", "ALTER TABLE research_judgements ADD COLUMN workspace_id TEXT NOT NULL DEFAULT 'admin'"],
   ["research_llm_calls", "generation", "ALTER TABLE research_llm_calls ADD COLUMN generation TEXT"],
+  ["research_llm_calls", "agent_id", "ALTER TABLE research_llm_calls ADD COLUMN agent_id TEXT NOT NULL DEFAULT ''"],
+  [
+    "research_runs",
+    "source_run_id",
+    "ALTER TABLE research_runs ADD COLUMN source_run_id TEXT NOT NULL DEFAULT '';" +
+      " UPDATE research_runs SET source_run_id = COALESCE((SELECT s.id FROM research_runs s" +
+      " WHERE s.stage = 1 AND s.status = 'completed' AND s.product_id = research_runs.product_id" +
+      " AND s.workspace_id = research_runs.workspace_id AND s.created_at <= research_runs.created_at" +
+      " ORDER BY s.created_at DESC LIMIT 1), '') WHERE stage = 2",
+  ],
 ];
 
 /** CREATE TABLE IF NOT EXISTS never alters an existing table, so columns migrate here. */
@@ -27,6 +38,7 @@ export class SqliteSchema {
     Trace.line(import.meta.url, "SqliteSchema.apply", { db });
     db.exec(SqliteSchema.DDL);
     db.exec(AccountTable.DDL);
+    db.exec(CallLog.DDL);
     for (const [table, column, ddl] of MIGRATIONS) {
       const have = (db.pragma(`table_info(${table})`) as Array<{ name: string }>).map((row) => row.name);
       if (!have.includes(column)) db.exec(ddl);
@@ -71,29 +83,6 @@ CREATE TABLE IF NOT EXISTS research_events (
 );
 CREATE INDEX IF NOT EXISTS idx_research_events_run
     ON research_events(run_id, id);
-CREATE TABLE IF NOT EXISTS research_llm_calls (
-    id               INTEGER PRIMARY KEY AUTOINCREMENT,
-    run_id           TEXT NOT NULL REFERENCES research_runs(id) ON DELETE CASCADE,
-    seq              INTEGER NOT NULL,
-    started_at       TEXT NOT NULL,
-    ended_at         TEXT NOT NULL,
-    duration_ms      INTEGER NOT NULL,
-    model            TEXT NOT NULL DEFAULT '',
-    system_prompt    TEXT,
-    tools            TEXT,
-    context_reset    INTEGER NOT NULL DEFAULT 0,
-    context_messages INTEGER NOT NULL DEFAULT 0,
-    input            TEXT NOT NULL DEFAULT '[]',
-    output           TEXT NOT NULL DEFAULT '{}',
-    stop_reason      TEXT NOT NULL DEFAULT '',
-    error            TEXT NOT NULL DEFAULT '',
-    usage            TEXT NOT NULL DEFAULT '{}',
-    response_id      TEXT NOT NULL DEFAULT '',
-    billed_cost      REAL,
-    generation       TEXT
-);
-CREATE INDEX IF NOT EXISTS idx_research_llm_calls_run
-    ON research_llm_calls(run_id, seq);
 CREATE TABLE IF NOT EXISTS research_packet_checks (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
     run_id     TEXT NOT NULL REFERENCES research_runs(id) ON DELETE CASCADE,

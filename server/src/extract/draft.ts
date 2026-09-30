@@ -1,6 +1,6 @@
 import { Trace } from "../trace/index.js";
 
-/** Turns a validate_packet argument into a draft packet, or says it cannot. */
+/** Turns a record tool's `item` — an object, or the JSON string some models send — into a draft, or says it cannot. */
 export class PacketDraft {
   /** The packet arrives as an object or as its JSON in one string; either is the packet. */
   static coerce(

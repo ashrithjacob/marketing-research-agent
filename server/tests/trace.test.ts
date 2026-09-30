@@ -203,7 +203,7 @@ describe("the download", () => {
     expect(response.headers.get("content-disposition")).toBe(`attachment; filename="run-${id}-trace.log"`);
     const text = await response.text();
     expect(text.split("\n")[0]).toContain(`run ${id} product=MagnaCalm`);
-    expect(text).toContain("[agent/run-agent-factory.ts] RunAgentFactory.assemble");
+    expect(text).toContain("[agent/stage-one-agent-factory.ts] StageOneAgentFactory.build");
     expect(text.trim().split("\n").every((line) => /\[[\w./-]+\.ts\]/.test(line))).toBe(true);
     await app.close();
   });

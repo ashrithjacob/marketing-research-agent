@@ -41,6 +41,7 @@ export class Rows {
       nodes: Rows.json(row.nodes, []) as string[],
       packet: row.packet ? (Rows.json(row.packet, null) as Record<string, unknown> | null) : null,
       packet_source: row.packet_source ?? "",
+      source_run_id: row.source_run_id ?? "",
       error: row.error,
       output: row.output,
       usage: Rows.json(row.usage, {}) as Record<string, unknown>,

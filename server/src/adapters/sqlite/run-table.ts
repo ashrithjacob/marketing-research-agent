@@ -21,6 +21,7 @@ const COLUMNS = new Set([
   "usage",
   "ended_at",
   "packet_source",
+  "source_run_id",
 ]);
 
 const JSON_COLUMNS = new Set(["brief", "reject_kinds", "judgement_ids", "packet", "usage"]);

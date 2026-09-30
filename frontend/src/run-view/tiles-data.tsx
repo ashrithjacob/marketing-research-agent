@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { AttributeRecord, Excerpt, Gap, Measurement, Source, StagePacket } from '../api';
 import { Chip, Tile, TileGaps } from './tile';
 import { MeasurementBars } from './charts';
+import { FieldList } from './field-list';
 import { SourceRow } from './packet-sections';
 
 type Focus = 'facts' | 'sources' | 'gaps' | null;
@@ -69,6 +70,7 @@ export function ProductTile({
   runId,
   packet,
   attributes,
+  required,
   measurements,
   excerpts,
   sources,
@@ -77,6 +79,7 @@ export function ProductTile({
   runId: string;
   packet: StagePacket;
   attributes: AttributeRecord[];
+  required: string[];
   measurements: Measurement[];
   excerpts: Excerpt[];
   sources: Source[];
@@ -103,14 +106,7 @@ export function ProductTile({
     >
       {(focus === null || focus === 'facts') && (
         <>
-          <div className="kv">
-            {attributes.map((attribute) => (
-              <div key={attribute.id} className="kv-row">
-                <span className="k">{attribute.key.replace(/_/g, ' ')}</span>
-                <span className="v">{attribute.value}</span>
-              </div>
-            ))}
-          </div>
+          <FieldList attributes={attributes} required={required} />
           <MeasurementBars measurements={measurements} />
         </>
       )}
@@ -128,11 +124,15 @@ export function ProductTile({
 
 export function CategoryTile({
   runId,
+  attributes,
+  required,
   measurements,
   sources,
   gaps,
 }: {
   runId: string;
+  attributes: AttributeRecord[];
+  required: string[];
   measurements: Measurement[];
   sources: Source[];
   gaps: Gap[];
@@ -155,7 +155,7 @@ export function CategoryTile({
       sub="market size, demand, trend"
       open={focus !== null ? true : undefined}
       onToggle={focus !== null ? () => setFocus(null) : undefined}
-      chips={<FocusChips focus={focus} setFocus={setFocus} facts={`${measurements.length} figures`} sources={sources} gaps={gaps} />}
+      chips={<FocusChips focus={focus} setFocus={setFocus} facts={`${measurements.length + attributes.length} facts`} sources={sources} gaps={gaps} />}
       preview={
         <div className="tile-headline">
           {marketSize.length > 0 && (
@@ -176,17 +176,7 @@ export function CategoryTile({
         <>
           <MeasurementBars measurements={measurements} />
           <h3>Every figure, with its period</h3>
-          <div className="kv">
-            {measurements.map((m) => (
-              <div key={m.id} className="kv-row">
-                <span className="k">{m.metric.replace(/_/g, ' ')}</span>
-                <span className="v">
-                  {m.value} {m.unit}
-                  {m.period ? ` · ${m.period}` : ''}
-                </span>
-              </div>
-            ))}
-          </div>
+          <FieldList attributes={attributes} measurements={measurements} required={required} />
         </>
       )}
       {focus === 'sources' && <SourcesFocus runId={runId} sources={sources} />}

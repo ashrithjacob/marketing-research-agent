@@ -16,9 +16,8 @@ export class FindProductTool {
       label: "Find product on Amazon",
       description:
         "Search Amazon by product name and get back asin, title, stars and " +
-        "reviewsCount, most-reviewed first. Use this before amazon_reviews — it " +
-        "takes a url, not a name. Pick the product by reviewsCount: a listing " +
-        "with four reviews cannot support a review-mining node.",
+        "reviewsCount, most-reviewed first. The listing with the most reviews " +
+        "is the genre's most-bought.",
       parameters: findProductParameters,
       async execute(_id, params, signal) {
         Trace.line(import.meta.url, "FindProductTool.tool.execute", { params });

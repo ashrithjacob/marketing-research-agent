@@ -1,43 +1,6 @@
 import { Trace } from "../trace/index.js";
 
-export interface Settings {
-  appUser: string;
-  appPasswordHash: string;
-  jwtSecret: string;
-  sessionHours: number;
-  cookieSecure: boolean;
-
-  openrouterApiKey: string;
-  model: string;
-  backupModels: string[];
-
-  searxngUrl: string;
-  firecrawlApiKey: string;
-  firecrawlBaseUrl: string;
-  webTimeoutSeconds: number;
-  fetchCharLimit: number;
-  firecrawlConcurrency: number;
-  searchConcurrency: number;
-  gateModel: string;
-  gateCharLimit: number;
-  gateTimeoutSeconds: number;
-
-  apifyToken: string;
-  apifyMaxReviews: number;
-  apifyWaitSeconds: number;
-  apifyConcurrency: number;
-  apifyPullRetries: number;
-
-  corpusPath: string;
-
-  databasePath: string;
-  traceDir: string;
-  traceKeepDays: number;
-  traceMaxMb: number;
-  staticDir: string;
-  host: string;
-  port: number;
-}
+import type { Settings } from "./settings-shape.js";
 
 /** The only reader of process.env. Everything else is handed a Settings. */
 export class Env {
@@ -111,6 +74,9 @@ export class Env {
       searxngUrl: Env.text("SEARXNG_URL", "http://searxng:8080"),
       firecrawlApiKey: Env.text("FIRECRAWL_API_KEY", ""),
       firecrawlBaseUrl: Env.text("FIRECRAWL_BASE_URL", "https://api.firecrawl.dev"),
+      crawl4aiApiKey: Env.text("CRAWL4AI_API_KEY", ""),
+      crawl4aiBaseUrl: Env.text("CRAWL4AI_BASE_URL", "https://api.crawl4ai.com"),
+      crawl4aiConcurrency: Env.number("MRA_CRAWL4AI_CONCURRENCY", 2),
       webTimeoutSeconds: Env.number("MRA_WEB_TIMEOUT_SECONDS", 90),
       fetchCharLimit: Env.number("MRA_FETCH_CHAR_LIMIT", 25000),
       firecrawlConcurrency: Env.number("MRA_FIRECRAWL_CONCURRENCY", 2),

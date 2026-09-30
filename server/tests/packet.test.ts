@@ -110,10 +110,16 @@ describe("validation: the cross-object rules", () => {
     expect(() => packets.validate(data, REVIEW)).toThrow(/no 3-star excerpt/);
   });
 
-  it("requires a saturation curve for a complete stage-1 node", () => {
+  it("requires a saturation curve per class for complete competitors, the one open-ended node", () => {
     const data = minimalPacket();
-    data.nodes.push({ node: "category_data", status: "complete", done_criterion_met: true, why: "saturated" });
-    expect(() => packets.validate(data)).toThrow(/category_data is complete with no saturation curve/);
+    data.nodes.push({ node: "competitors", status: "complete", done_criterion_met: true, why: "saturated" });
+    expect(() => packets.validate(data)).toThrow(/competitors is complete with no direct saturation curve/);
+  });
+
+  it("treats category_data as a checklist too (workings_stage1.md)", () => {
+    const data = minimalPacket();
+    data.nodes.push({ node: "category_data", status: "complete", done_criterion_met: true, why: "trend, size and seasonality recorded" });
+    expect(() => packets.validate(data)).not.toThrow();
   });
 
   it("asks stage 2 for neither a curve nor a gap: it searches nothing, and no agent invents completeness", () => {

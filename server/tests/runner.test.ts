@@ -11,13 +11,13 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { createModels, getCurrentSystemPrompt, getCurrentTools, type JsonValue, type MutableModels } from "@earendil-works/pi-ai";
+import { createModels, getCurrentSystemPrompt, getCurrentTools, type AssistantMessage, type JsonValue, type MutableModels } from "@earendil-works/pi-ai";
 import { fauxAssistantMessage, fauxProvider, fauxToolCall, type FauxResponseStep } from "@earendil-works/pi-ai/providers/faux";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { OpenRouterPrices } from "../src/adapters/index.js";
 import { RunSupervisor } from "../src/agent/index.js";
-import { RejectKinds } from "../src/domain/index.js";
+import { RejectKinds, StageOnePlans } from "../src/domain/index.js";
 import { DEFAULT_RETRY, Retries } from "../src/agent/retry.js";
 import {
   type Judgement,
@@ -26,7 +26,7 @@ import {
 } from "../src/domain/index.js";
 import { SqliteResearchStore } from "../src/adapters/index.js";
 import { Env, type Settings } from "../src/config/index.js";
-import { minimalPacket, recordCalls, recorded, reviewPacket, services } from "./fixtures.js";
+import { minimalPacket, recordCalls, recorded, reviewPacket, services, productPacket } from "./fixtures.js";
 import { HUEL_PAGE } from "./trustpilot-pages.js";
 
 const MODEL_ID = "faux-model";
@@ -57,8 +57,13 @@ afterEach(async () => {
   rmSync(dir, { recursive: true, force: true });
 });
 
+/** A url brief scoped to product_data: no champion step, one agent, so a scripted run is deterministic. */
 function request(overrides: Partial<RunRequest> = {}): RunRequest {
-  return runRequestSchema.parse({ brief: { product: "MagnaCalm 400mg" }, ...overrides });
+  return runRequestSchema.parse({
+    brief: { product: "MagnaCalm 400mg", url: "https://magnacalm.example/products/glycinate-400" },
+    nodes: ["product_data"],
+    ...overrides,
+  });
 }
 
 /** Start a run scripted by `steps`, and wait for it to settle. */
@@ -78,21 +83,39 @@ function toolAnswer(runId: string, name: string): string[] {
     .map((m) => m.content.map((c: any) => c.text).join(""));
 }
 
+/** A run with a champion step: the champion agent records the source and the reference, then the competitors agent records the rest. */
+function championThen(packet: Record<string, any>): FauxResponseStep[] {
+  const { sources, competitor_reference, ...rest } = packet;
+  return [...recorded({ sources, competitor_reference }), ...recorded({ ...rest, sources: [] })];
+}
+
+/** Scripts keyed by agent, answered by whichever agent asks: the step-2 agents run side by side, so one shared queue would interleave. */
+function byAgent(scripts: Record<string, FauxResponseStep[]>): FauxResponseStep[] {
+  const total = Object.values(scripts).reduce((n, steps) => n + steps.length, 0);
+  const answer: FauxResponseStep = (context, options, state, model) => {
+    const agent = /You are the `(\w+)` agent/.exec(getCurrentSystemPrompt(context.messages) ?? "")?.[1] ?? "";
+    const next = scripts[agent]?.shift();
+    if (!next) return fauxAssistantMessage(`no script left for ${agent}`);
+    return typeof next === "function" ? next(context, options, state, model) : next;
+  };
+  return Array.from({ length: total }, () => answer);
+}
+
 describe("settling a run", () => {
   it("stores the packet assembled from the ledger and completes", async () => {
-    const runId = await runWith(recorded(minimalPacket()));
+    const runId = await runWith(recorded(productPacket()));
     const run = store.getRun(runId)!;
     expect(run.status).toBe("completed");
     expect((run.packet as any).attributes[0].key).toBe("dose_per_serving");
     expect(run.error).toBe("");
-    expect(run.packet_source).toBe("finish");
+    expect(run.packet_source).toBe("ledger");
     expect(store.listEvents(runId).map((e) => e.kind)).toContain("packet.ready");
   });
 
   it("marks a run whose ledger breaks the contract `invalid`, not `failed`", async () => {
     // The agent finished and produced something, and what it produced broke the
     // contract. That is the most informative failure there is.
-    const runId = await runWith([...recorded(minimalPacket({ gaps: [] })), fauxAssistantMessage("Done.")]);
+    const runId = await runWith([...recorded(productPacket({ gaps: [] })), fauxAssistantMessage("Done.")]);
     const run = store.getRun(runId)!;
     expect(run.status).toBe("invalid");
     expect(run.error).toMatch(/gap list is empty/);
@@ -110,7 +133,7 @@ describe("settling a run", () => {
     // A DeepSeek run at 208k input tokens wrote "let me write the JSON now" 56
     // times and ended its turn without it. Its findings are in the ledger now.
     const runId = await runWith([
-      fauxAssistantMessage(recordCalls(minimalPacket()), { stopReason: "toolUse" }),
+      fauxAssistantMessage(recordCalls(productPacket()), { stopReason: "toolUse" }),
       fauxAssistantMessage("I have enough. Let me finalize."),
     ]);
     const run = store.getRun(runId)!;
@@ -120,7 +143,7 @@ describe("settling a run", () => {
   });
 
   it("refuses a bad record on its own small turn, and records the corrected one", async () => {
-    const packet = minimalPacket();
+    const packet = productPacket();
     const bad = { ...packet.sources[0], kind: "marketplace" };
     const runId = await runWith([
       fauxAssistantMessage(fauxToolCall("record_source", { item: bad }), { stopReason: "toolUse" }),
@@ -142,7 +165,7 @@ describe("settling a run", () => {
       runner_up_name: null,
       runner_up_reviews: null,
     };
-    const packet = minimalPacket({
+    const packet = productPacket({
       competitor_reference: reference,
       gaps: [{ node: "competitors", missing: "no competitor researched", would_need: "time" }],
       nodes: [{ node: "competitors", status: "incomplete", done_criterion_met: false, why: "test" }],
@@ -150,7 +173,7 @@ describe("settling a run", () => {
     packet.sources[0].node = "competitors";
     delete packet.attributes;
     const runId = await runWith(
-      recorded(packet),
+      championThen(packet),
       request({ brief: { product: "", url: "https://mullevia.com/products/mullein-drops", market: "", notes: "" }, nodes: ["competitors"] }),
     );
     expect(toolAnswer(runId, "record_reference")[0]).toMatch(/^RECORDED ref\d+/);
@@ -161,13 +184,13 @@ describe("settling a run", () => {
   });
 
   it("takes the packet's brief from the run, not from the model", async () => {
-    const runId = await runWith(recorded(minimalPacket()), request({ brief: { product: "mullein", url: "", market: "", notes: "" } }));
+    const runId = await runWith(recorded(productPacket()), request({ brief: { product: "mullein", url: "https://x.example", market: "", notes: "" } }));
     expect((store.getRun(runId)!.packet as any).brief.product).toBe("mullein");
   });
 
   it("refuses a row recorded against a node outside the run's scope", async () => {
     const runId = await runWith(
-      [...recorded(minimalPacket()), fauxAssistantMessage("Done.")],
+      [...recorded(productPacket()), fauxAssistantMessage("Done.")],
       request({ nodes: ["category_data"] }),
     );
     expect(toolAnswer(runId, "record_source")[0]).toMatch(/NOT RECORDED — this belongs to product_data, which is outside this run's scope/);
@@ -176,7 +199,7 @@ describe("settling a run", () => {
   it("sums usage across every turn rather than reporting only the last", async () => {
     // §11 asks what a run costs; a run is dozens of turns and the final message
     // carries only its own.
-    const runId = await runWith(recorded(minimalPacket()));
+    const runId = await runWith(recorded(productPacket()));
     const usage = store.getRun(runId)!.usage as any;
     expect(usage.totalTokens).toBeGreaterThan(0);
   });
@@ -199,7 +222,7 @@ describe("settling a run", () => {
     supervisor = new RunSupervisor({ store, settings: { ...settings, backupModels: [backup] }, models, retry: FAST_RETRY });
     faux.setResponses([
       fauxAssistantMessage("", { stopReason: "error", errorMessage: "Upstream idle timeout exceeded" }),
-      ...recorded(minimalPacket()),
+      ...recorded(productPacket()),
     ]);
     const runId = supervisor.start(request(), "admin");
     await supervisor.waitFor(runId);
@@ -224,13 +247,13 @@ describe("settling a run", () => {
 });
 
 describe("finish", () => {
-  it("stores the packet the moment finish passes, and ends the loop there", async () => {
-    const runId = await runWith([...recorded(minimalPacket()), fauxAssistantMessage("never reached")]);
+  it("ends the agent the moment finish passes, and settles the run from the ledger", async () => {
+    const runId = await runWith([...recorded(productPacket()), fauxAssistantMessage("never reached")]);
     const run = store.getRun(runId)!;
     expect(run.status).toBe("completed");
-    expect(run.packet_source).toBe("finish");
-    const ready = store.listEvents(runId).find((e) => e.kind === "packet.ready")!;
-    expect(ready.payload.via).toBe("finish");
+    expect(run.packet_source).toBe("ledger");
+    const ended = store.listEvents(runId).find((e) => e.kind === "agent.ended")!;
+    expect(ended.payload).toMatchObject({ agent_id: "product", status: "complete" });
     expect(store.listLlmCalls(runId)).toHaveLength(2);
     expect(store.listPacketChecks(runId).map((c) => c.valid)).toEqual([true]);
   });
@@ -239,7 +262,7 @@ describe("finish", () => {
     // Run 8a02bed6 had its research in hand when the provider cut it at ~300s,
     // four times. The findings are the ledger's now, not the lost turn's.
     const runId = await runWith([
-      fauxAssistantMessage(recordCalls(minimalPacket()), { stopReason: "toolUse" }),
+      fauxAssistantMessage(recordCalls(productPacket()), { stopReason: "toolUse" }),
       ...Array.from({ length: 5 }, () =>
         fauxAssistantMessage("", { stopReason: "error", errorMessage: "terminated" }),
       ),
@@ -248,17 +271,17 @@ describe("finish", () => {
     expect(run.status).toBe("completed");
     expect(run.packet_source).toBe("ledger");
     const early = store.listEvents(runId).find((e) => e.kind === "run.ended_early")!;
-    expect(early.payload.error).toBe("terminated");
+    expect(early.payload.error).toBe("product: terminated");
   });
 
   it("hands back the problems, and the run carries on to a fixed finish", async () => {
-    const packet = minimalPacket();
+    const packet = productPacket();
     const runId = await runWith([
       ...recorded({ ...packet, gaps: [] }),
-      fauxAssistantMessage(fauxToolCall("record_gap", { item: packet.gaps[0] }), { stopReason: "toolUse" }),
+      fauxAssistantMessage(packet.gaps.map((item: JsonValue) => fauxToolCall("record_gap", { item })), { stopReason: "toolUse" }),
       fauxAssistantMessage(fauxToolCall("finish", {}), { stopReason: "toolUse" }),
     ]);
-    expect(toolAnswer(runId, "finish")[0]).toMatch(/^NOT FINISHED — 1 problem\. [\s\S]*1\. gap list is empty/);
+    expect(toolAnswer(runId, "finish")[0]).toMatch(/^NOT FINISHED — 10 problems\. [\s\S]*1\. `name` is neither recorded nor gapped[\s\S]*10\. gap list is empty/);
     const checks = store.listPacketChecks(runId);
     expect(checks.map((c) => c.valid)).toEqual([false, true]);
     expect(store.listEvents(runId).filter((e) => e.kind === "packet.checked")).toHaveLength(2);
@@ -270,7 +293,7 @@ describe("finish", () => {
     // whole context after every failed finish until it stopped of its own accord.
     const finishTurn = () => fauxAssistantMessage(fauxToolCall("finish", {}), { stopReason: "toolUse" });
     const runId = await runWith([
-      fauxAssistantMessage(recordCalls({ ...minimalPacket(), gaps: [] }), { stopReason: "toolUse" }),
+      fauxAssistantMessage(recordCalls({ ...productPacket(), gaps: [] }), { stopReason: "toolUse" }),
       ...Array.from({ length: 6 }, finishTurn),
       fauxAssistantMessage("never reached"),
     ]);
@@ -285,8 +308,8 @@ describe("finish", () => {
   });
 
   it("leaves a retracted row out of the packet", async () => {
-    const packet = minimalPacket();
-    const extra = { ...packet.attributes[0], key: "colour", value: "blue" };
+    const packet = productPacket();
+    const extra = { ...packet.attributes[0], key: "price", value: "£9.99" };
     const runId = await runWith([
       fauxAssistantMessage([fauxToolCall("record_attribute", { item: extra })], { stopReason: "toolUse" }),
       fauxAssistantMessage(fauxToolCall("retract", { id: "at1", why: "misread" }), { stopReason: "toolUse" }),
@@ -298,7 +321,7 @@ describe("finish", () => {
   });
 
   it("replaces a row recorded again under the same key", async () => {
-    const packet = minimalPacket();
+    const packet = productPacket();
     const runId = await runWith([
       fauxAssistantMessage(fauxToolCall("record_source", { item: { ...packet.sources[0], title: "old" } }), { stopReason: "toolUse" }),
       ...recorded(packet),
@@ -329,9 +352,9 @@ describe("cost", () => {
     faux.setResponses([
       (_context, _options, _state, model) => {
         seen = model.cost;
-        return recorded(minimalPacket())[0]!;
+        return recorded(productPacket())[0]!;
       },
-      recorded(minimalPacket())[1]!,
+      recorded(productPacket())[1]!,
     ]);
     const runId = supervisor.start(request(), "admin");
     await supervisor.waitFor(runId);
@@ -351,7 +374,7 @@ describe("cost", () => {
     faux.setResponses([
       // A tool call keeps the loop going; a text-only reply would end the run
       // after one turn.
-      fauxAssistantMessage(recordCalls(minimalPacket()), { responseId: "gen-1", stopReason: "toolUse" }),
+      fauxAssistantMessage(recordCalls(productPacket()), { responseId: "gen-1", stopReason: "toolUse" }),
       fauxAssistantMessage(fauxToolCall("finish", {}), { responseId: "gen-2", stopReason: "toolUse" }),
     ]);
     const runId = supervisor.start(request(), "admin");
@@ -393,7 +416,7 @@ describe("cost", () => {
     async function settledButLive(): Promise<{ runId: string; release: () => void }> {
       const { costs, release } = heldBilling();
       supervisor = new RunSupervisor({ store, settings, models, costs });
-      faux.setResponses(recorded(minimalPacket(), { responseId: "gen-1" }));
+      faux.setResponses(recorded(productPacket(), { responseId: "gen-1" }));
       const runId = supervisor.start(request(), "admin");
       while (store.getRun(runId)!.status === "running") await new Promise((r) => setTimeout(r, 5));
       expect(store.getRun(runId)!.status).toBe("completed");
@@ -425,14 +448,14 @@ describe("cost", () => {
 
   it("records no billed cost when no turn had a generation id", async () => {
     supervisor = new RunSupervisor({ store, settings, models, costs: costsFrom(() => ({ status: 500 })) });
-    const runId = await runWith(recorded(minimalPacket()));
+    const runId = await runWith(recorded(productPacket()));
     expect((store.getRun(runId)!.usage as any).billed).toBeUndefined();
   });
 });
 
 describe("events", () => {
   const recordThenSay = () => [
-    fauxAssistantMessage(recordCalls(minimalPacket()), { stopReason: "toolUse" }),
+    fauxAssistantMessage(recordCalls(productPacket()), { stopReason: "toolUse" }),
     fauxAssistantMessage("Everything is recorded."),
   ];
 
@@ -454,11 +477,11 @@ describe("events", () => {
       .map((e) => String((e.payload as any).delta))
       .join("");
     expect(deltas).toBe("Everything is recorded.");
-    expect(deltas).toBe(store.getRun(runId)!.output);
+    expect(store.getRun(runId)!.output).toBe(`[product]\n${deltas}`);
   });
 
   it("replays every event to a subscriber that arrives late", async () => {
-    const runId = await runWith(recorded(minimalPacket()));
+    const runId = await runWith(recorded(productPacket()));
     expect(store.listEvents(runId).length).toBeGreaterThan(2);
     expect(supervisor.isLive(runId)).toBe(false);
   });
@@ -495,14 +518,14 @@ describe("judgements", () => {
       text: "no listicles",
       rejects_kinds: ["seo_listicle"],
     });
-    const packet = minimalPacket();
+    const packet = productPacket();
     packet.sources.push({
       id: "sha256:ddd",
       url: "https://top10.example/best",
       kind: "seo_listicle",
       admitted: false,
       admission_reason: "rejected by policy",
-      node: "competitors",
+      node: "product_data",
     });
     await runWith(recorded(packet));
     expect(store.listJudgements(Scope.everything).find((j) => j.id === judgement.id)!.applied_count).toBe(1);
@@ -514,9 +537,9 @@ describe("judgements", () => {
       (context) => {
         const turn = JSON.stringify(context.messages);
         expect(turn).toContain("prefer UK sources");
-        return recorded(minimalPacket())[0]!;
+        return recorded(productPacket())[0]!;
       },
-      recorded(minimalPacket())[1]!,
+      recorded(productPacket())[1]!,
     ]);
     const runId = supervisor.start(request(), "admin");
     await supervisor.waitFor(runId);
@@ -543,7 +566,7 @@ describe("recovery", () => {
   });
 
   it("leaves finished runs alone", async () => {
-    const runId = await runWith(recorded(minimalPacket()));
+    const runId = await runWith(recorded(productPacket()));
     supervisor.recoverRunsKilledByRestart();
     expect(store.getRun(runId)!.status).toBe("completed");
   });
@@ -601,11 +624,12 @@ describe("the LLM call trace", () => {
     const [first, second] = calls as [any, any];
 
     // Call 1 carries the whole prompt: system, tools and the instructions.
-    expect(first.system_prompt).toMatch(/stage-1 researcher/);
+    expect(first.system_prompt).toMatch(/You are the `product` agent/);
+    expect(first.agent_id).toBe("product");
     expect(first.tools.map((t: any) => t.name)).toContain("web_fetch");
     expect(first.input).toHaveLength(1);
     expect(first.input[0].role).toBe("user");
-    expect(JSON.stringify(first.input[0].content)).toContain("## Recording what you find");
+    expect(JSON.stringify(first.input[0].content)).toContain("## Your task: the product's fact sheet");
     expect(first.output.content.some((c: any) => c.type === "toolCall")).toBe(true);
     expect(first.stop_reason).toBe("toolUse");
 
@@ -625,7 +649,7 @@ describe("the LLM call trace", () => {
     const summaryEvent = store.listEvents(runId).find((e) => e.kind === "llm.call")!;
     expect(summaryEvent.payload).toMatchObject({ seq: 1, tool_calls: 1, stop_reason: "toolUse" });
     // The prompt stays out of the event stream.
-    expect(JSON.stringify(summaryEvent.payload)).not.toContain("## Recording");
+    expect(JSON.stringify(summaryEvent.payload)).not.toContain("## Your task");
   });
 
   it("leaves a tool result's details out, because the model never sees them", async () => {
@@ -667,7 +691,7 @@ describe("the LLM call trace", () => {
 
   it("tags each tool event with the id of the tool call that asked for it", async () => {
     faux.setResponses([
-      fauxAssistantMessage(fauxToolCall("record_source", { item: minimalPacket().sources[0] }), {
+      fauxAssistantMessage(fauxToolCall("record_source", { item: productPacket().sources[0] }), {
         responseId: "gen-1",
         stopReason: "toolUse",
       }),
@@ -728,7 +752,7 @@ describe("a stream that drops mid-run", () => {
     // a socket that closed 98s into turn 6 (undici reports `terminated`).
     faux.setResponses([
       fauxAssistantMessage("", { stopReason: "error", errorMessage: "terminated" }),
-      ...recorded(minimalPacket()),
+      ...recorded(productPacket()),
     ]);
     const runId = supervisor.start(request(), "admin");
     await supervisor.waitFor(runId);
@@ -748,14 +772,14 @@ describe("a stream that drops mid-run", () => {
       fauxAssistantMessage("", { stopReason: "error", errorMessage: "socket hang up" }),
       fauxAssistantMessage("", { stopReason: "error", errorMessage: "502 bad gateway" }),
       fauxAssistantMessage("", { stopReason: "error", errorMessage: "terminated, again" }),
-      recorded(minimalPacket())[0]!, // never reached: budget is 3
+      recorded(productPacket())[0]!, // never reached: budget is 3
     ]);
     const runId = supervisor.start(request(), "admin");
     await supervisor.waitFor(runId);
 
     const run = store.getRun(runId)!;
     expect(run.status).toBe("failed");
-    expect(run.error).toBe("terminated, again");
+    expect(run.error).toBe("product: terminated, again");
     const resumed = store.listEvents(runId).filter((e) => e.kind === "run.resumed");
     expect(resumed).toHaveLength(3);
     expect(resumed.map((e) => e.payload.attempt)).toEqual([1, 2, 3]);
@@ -765,7 +789,7 @@ describe("a stream that drops mid-run", () => {
     faux.setResponses([
       fauxAssistantMessage("", { stopReason: "error", errorMessage: "terminated" }),
       fauxAssistantMessage("", { stopReason: "error", errorMessage: "503 service unavailable" }),
-      ...recorded(minimalPacket()),
+      ...recorded(productPacket()),
     ]);
     const runId = supervisor.start(request(), "admin");
     await supervisor.waitFor(runId);
@@ -812,7 +836,7 @@ describe("a stream that drops mid-run", () => {
     // A run that recorded 30 pages' findings and then lost the provider has
     // them in the ledger; nothing needs asking for again.
     faux.setResponses([
-      fauxAssistantMessage(recordCalls(minimalPacket()), { stopReason: "toolUse" }),
+      fauxAssistantMessage(recordCalls(productPacket()), { stopReason: "toolUse" }),
       ...Array.from({ length: 4 }, () =>
         fauxAssistantMessage("", { stopReason: "error", errorMessage: "Upstream error from Relace" }),
       ),
@@ -834,7 +858,7 @@ describe("a stream that drops mid-run", () => {
         stopReason: "error",
         errorMessage: "402 insufficient_quota: your account is out of credit",
       }),
-      recorded(minimalPacket())[0]!,
+      recorded(productPacket())[0]!,
     ]);
     const runId = supervisor.start(request(), "admin");
     await supervisor.waitFor(runId);
@@ -850,7 +874,7 @@ describe("a stream that drops mid-run", () => {
         supervisor.stop(runId);
         return fauxAssistantMessage("", { stopReason: "error", errorMessage: "aborted" });
       },
-      recorded(minimalPacket())[0]!,
+      recorded(productPacket())[0]!,
     ]);
     const runId = supervisor.start(request(), "admin");
     await supervisor.waitFor(runId);
@@ -879,19 +903,19 @@ describe("a run that covers part of the stage", () => {
     await supervisor.waitFor(runId);
 
     expect(store.getRun(runId)!.nodes).toEqual(["product_data"]);
-    expect(seen!.system).toMatch(/This run covers only `product_data`/);
-    expect(seen!.prompt).toContain("## Scope of this run");
+    expect(seen!.system).toMatch(/You are the `product` agent/);
+    expect(seen!.prompt).toContain("## Your task: the product's fact sheet");
+    expect(seen!.prompt).not.toContain("## Your task: the category's numbers");
     expect(seen!.tools).toEqual([
       "web_search",
       "web_fetch",
       "record_source",
-      "record_excerpt",
-      "record_measurement",
       "record_attribute",
-      "record_saturation",
       "record_node_status",
       "record_gap",
       "retract",
+      "read_ledger",
+      "wait_for",
       "finish",
     ]);
     const started = store.listEvents(runId).find((e) => e.kind === "run.started")!;
@@ -900,49 +924,160 @@ describe("a run that covers part of the stage", () => {
 
   it("refuses a row for another node of the stage, and keeps the rest", async () => {
     // A category_data entry in a product_data run: same stage, wrong node.
-    const packet = minimalPacket();
+    const packet = productPacket();
     packet.gaps.push({ node: "category_data", missing: "no three-year trend" });
     const runId = await runWith(recorded(packet), request({ nodes: ["product_data"] }));
-    expect(toolAnswer(runId, "record_gap")[1]).toMatch(/NOT RECORDED — this belongs to category_data, which is outside this run's scope \(product_data\)/);
+    expect(toolAnswer(runId, "record_gap").at(-1)).toMatch(/NOT RECORDED — this belongs to category_data, which is outside this run's scope \(product_data\)/);
     const run = store.getRun(runId)!;
     expect(run.status).toBe("completed");
-    expect((run.packet as any).gaps).toHaveLength(1);
+    expect((run.packet as any).gaps.every((gap: any) => gap.node === "product_data")).toBe(true);
   });
 
   it("refuses every row of the other stage's work", async () => {
-    // Review mining is stage 2 (2026-09-21). A stage-1 run that records review
-    // excerpts is doing a different run's work.
+    // Review mining is stage 2 (2026-09-21). A stage-1 agent has no excerpt tool
+    // at all since 2026-09-30, and a review source is outside its node.
     const runId = await runWith([...recorded(reviewPacket()), fauxAssistantMessage("Done.")]);
-    expect(toolAnswer(runId, "record_excerpt")[0]).toMatch(/this belongs to review_mining, which is outside this run's scope/);
+    expect(toolAnswer(runId, "record_excerpt")[0]).toMatch(/Tool record_excerpt not found/);
+    expect(toolAnswer(runId, "record_source")[0]).toMatch(/this belongs to review_mining, which is outside this run's scope/);
     const run = store.getRun(runId)!;
     expect(run.status).toBe("invalid");
     expect(store.findings.list(runId)).toHaveLength(0);
   });
 
-  it("offers a competitors run Amazon search for discovery, but not the review tools", async () => {
-    let tools: string[] = [];
-    faux.setResponses([
-      (context) => {
-        tools = getCurrentTools(context.messages).map((t) => t.name);
-        return fauxAssistantMessage("Nothing found.");
-      },
-    ]);
+  it("offers the champion and competitors agents Amazon search, and neither the review tools", async () => {
+    const tools: Record<string, string[]> = {};
+    const note = (agent: string): FauxResponseStep => (context) => {
+      tools[agent] = getCurrentTools(context.messages).map((t) => t.name);
+      return fauxAssistantMessage("Nothing found.");
+    };
+    faux.setResponses(byAgent({ champion: [note("champion")], competitors: [note("competitors")] }));
     supervisor = new RunSupervisor({ store, settings: { ...settings, apifyToken: "t" }, models });
     const runId = supervisor.start(request({ nodes: ["competitors"] }), "admin");
     await supervisor.waitFor(runId);
-    expect(tools.slice(0, 3)).toEqual(["web_search", "web_fetch", "amazon_find_product"]);
-    expect(tools).toContain("record_reference");
-    expect(tools).toContain("record_competitor");
-    expect(tools).not.toContain("mine_reviews");
+    expect(tools.champion!.slice(0, 3)).toEqual(["web_search", "web_fetch", "amazon_find_product"]);
+    expect(tools.champion).toContain("record_reference");
+    expect(tools.champion).not.toContain("wait_for");
+    expect(tools.competitors!.slice(0, 3)).toEqual(["web_search", "web_fetch", "amazon_find_product"]);
+    expect(tools.competitors).toContain("record_competitor");
+    expect(tools.competitors).not.toContain("record_reference");
+    expect(Object.values(tools).flat()).not.toContain("mine_reviews");
+  });
+});
+
+describe("the two steps of a stage-1 run", () => {
+  const genre = { product: "magnesium glycinate", url: "", market: "", notes: "" };
+  const championPart = () => ({
+    sources: [{ ...productPacket().sources[0], node: "product_data" }],
+    competitor_reference: { name: "MagnaCalm Glycinate", form: "capsule", actives: ["magnesium glycinate"], source_id: "sha256:aaa" },
+    gaps: [{ node: "product_data", missing: "champion ranking unavailable: no Amazon search in this test" }],
+  });
+  const categoryPart = () => ({
+    sources: [{ ...productPacket().sources[0], id: "sha256:cat", node: "category_data" }],
+    measurements: [{ node: "category_data", metric: "category_size: respiratory supplements", value: 2.1, unit: "USD billion", period: "2025", source_id: "sha256:cat" }],
+    nodes: [{ node: "category_data", status: "incomplete", done_criterion_met: false, why: "trend and seasonality gapped" }],
+    gaps: [
+      { node: "category_data", missing: "search_volume: no page publishes three years" },
+      { node: "category_data", missing: "seasonality: no source states a peak" },
+    ],
+  });
+
+  it("finds the champion first, then runs one agent per node side by side on the same ledger", async () => {
+    let productPrompt = "";
+    const product: FauxResponseStep[] = recorded(productPacket());
+    const first = product[0] as AssistantMessage;
+    product[0] = (context) => {
+      productPrompt = JSON.stringify(context.messages.find((m: { role: string }) => m.role === "user"));
+      return first;
+    };
+    const runId = await runWith(
+      byAgent({ champion: recorded(championPart()), product, category: recorded(categoryPart()) }),
+      request({ brief: genre, nodes: ["product_data", "category_data"] }),
+    );
+    const run = store.getRun(runId)!;
+    expect(run.status).toBe("completed");
+    const started = store.listEvents(runId).filter((e) => e.kind === "agent.started").map((e) => e.payload.agent_id);
+    expect(started).toEqual(["champion", "product", "category"]);
+    const championEnded = store.listEvents(runId).findIndex((e) => e.kind === "agent.ended" && e.payload.agent_id === "champion");
+    const productStarted = store.listEvents(runId).findIndex((e) => e.kind === "agent.started" && e.payload.agent_id === "product");
+    expect(championEnded).toBeLessThan(productStarted);
+    expect(productPrompt).toContain("MagnaCalm Glycinate");
+    const packet = run.packet as any;
+    expect(packet.competitor_reference.name).toBe("MagnaCalm Glycinate");
+    expect(packet.attributes.map((a: any) => a.key)).toEqual(["dose_per_serving"]);
+    expect(packet.measurements.map((m: any) => m.metric)).toEqual(["category_size: respiratory supplements"]);
+    expect(packet.sources.map((x: any) => x.id).sort()).toEqual(["sha256:aaa", "sha256:cat"]);
+    const agents = new Set(store.findings.list(runId).map((row) => row.agent_id));
+    expect([...agents].sort()).toEqual(["category", "champion", "product"]);
+    const calls = store.listLlmCalls(runId);
+    expect(calls.map((c) => c.seq)).toEqual(calls.map((_, i) => i + 1));
+    expect(new Set(calls.map((c) => c.agent_id))).toEqual(new Set(["champion", "product", "category"]));
+  });
+
+  it("skips the champion on a url brief without competitors, and runs it whenever competitors is in scope", () => {
+    const url = { product: "", url: "https://mullevia.com", market: "", notes: "" };
+    expect(StageOnePlans.of(url, ["product_data", "category_data"])).toEqual({ champion: false, parallel: ["product", "category"] });
+    expect(StageOnePlans.of(url, ["competitors"])).toEqual({ champion: true, parallel: ["competitors"] });
+    expect(StageOnePlans.of(genre, ["product_data"])).toEqual({ champion: true, parallel: ["product"] });
+    expect(StageOnePlans.of(genre, ["product_data", "competitors", "category_data"]).parallel).toEqual(["product", "competitors", "category"]);
+  });
+
+  it("settles invalid when one agent's part breaks the contract, and names which", async () => {
+    const runId = await runWith(
+      byAgent({
+        champion: recorded(championPart()),
+        product: recorded(productPacket()),
+        category: [...recorded({ ...categoryPart(), gaps: [] }), fauxAssistantMessage("Done.")],
+      }),
+      request({ brief: genre, nodes: ["product_data", "category_data"] }),
+    );
+    expect(store.getRun(runId)!.status).toBe("invalid");
+    expect(store.getRun(runId)!.error).toMatch(/gap list is empty/);
+    const ended = store.listEvents(runId).filter((e) => e.kind === "agent.ended").map((e) => [e.payload.agent_id, e.payload.status]);
+    expect(ended).toEqual(expect.arrayContaining([["product", "complete"], ["category", "incomplete"]]));
+  });
+
+  it("ends an agent at its turn limit and records what it left open as gaps", async () => {
+    // workings_stage1.md 14: a limit on model turns, then gaps rather than more tries.
+    const turn = () => fauxAssistantMessage(fauxToolCall("read_ledger", {}), { stopReason: "toolUse" });
+    const runId = await runWith([...Array.from({ length: 15 }, turn), fauxAssistantMessage("never reached")]);
+    expect(store.listLlmCalls(runId)).toHaveLength(15);
+    const limit = store.listEvents(runId).find((e) => e.kind === "agent.limit_reached")!.payload as any;
+    expect(limit).toMatchObject({ agent_id: "product", limit: 15 });
+    expect(limit.gapped).toHaveLength(10);
+    const run = store.getRun(runId)!;
+    expect(run.status).toBe("completed");
+    expect((run.packet as any).gaps.map((g: any) => g.missing)).toContain("price: not found within the 15-call limit");
+    expect((run.packet as any).nodes[0]).toMatchObject({ node: "product_data", status: "incomplete" });
+  });
+
+  it("stops every agent at once, and starts no step-2 agent after a stop", async () => {
+    let turnStarted!: () => void;
+    const started = new Promise<void>((r) => (turnStarted = r));
+    const hang: FauxResponseStep = async (_context, options) => {
+      turnStarted();
+      await new Promise<void>((resolve) => {
+        if (options?.signal?.aborted) return resolve();
+        options?.signal?.addEventListener("abort", () => resolve(), { once: true });
+      });
+      return fauxAssistantMessage("interrupted");
+    };
+    faux.setResponses(byAgent({ champion: [hang] }));
+    const runId = supervisor.start(request({ brief: genre, nodes: ["product_data"] }), "admin");
+    await started;
+    supervisor.stop(runId);
+    await supervisor.waitFor(runId);
+    expect(store.getRun(runId)!.status).toBe("cancelled");
+    const agents = store.listEvents(runId).filter((e) => e.kind === "agent.started").map((e) => e.payload.agent_id);
+    expect(agents).toEqual(["champion"]);
   });
 });
 
 describe("the Amazon listings of a completed stage-1 run", () => {
   const brief = { product: "", url: "https://mullevia.com/products/mullein-drops", market: "", notes: "" };
   const packet = () =>
-    minimalPacket({
+    productPacket({
       brief,
-      sources: [{ ...minimalPacket().sources[0], node: "competitors" }],
+      sources: [{ ...productPacket().sources[0], node: "competitors" }],
       attributes: [],
       competitor_reference: { name: "Mullevia Mullein Drops", form: "liquid", actives: ["mullein"], source_id: "sha256:aaa" },
       competitors: [
@@ -984,7 +1119,7 @@ describe("the Amazon listings of a completed stage-1 run", () => {
   };
 
   it("looks every target up once, stores the matches, and charges the run", async () => {
-    const runId = await competitorsRun(recorded(packet()));
+    const runId = await competitorsRun(championThen(packet()));
     expect(store.getRun(runId)!.status).toBe("completed");
     expect(searches).toHaveLength(2);
     const rows = store.listings.list(runId);
@@ -998,7 +1133,7 @@ describe("the Amazon listings of a completed stage-1 run", () => {
   it("reads the Trustpilot score only of a target that will be mined there", async () => {
     // The champion has no matched listing and its own site, so stage 2 mines it on
     // Trustpilot; c1 is matched on Amazon and is not read.
-    const runId = await competitorsRun(recorded(packet()));
+    const runId = await competitorsRun(championThen(packet()));
     expect(read).toEqual(["https://www.trustpilot.com/review/mullevia.com"]);
     const rows = store.listings.list(runId);
     expect(rows.find((r) => r.target_id === "product")!.trustpilot).toMatchObject({ domain: "mullevia.com", stars: 4.2, reviews: 29447, error: "" });
@@ -1006,7 +1141,7 @@ describe("the Amazon listings of a completed stage-1 run", () => {
   });
 
   it("looks nothing up for a run that ended invalid", async () => {
-    const runId = await competitorsRun([...recorded({ ...packet(), gaps: [] }), fauxAssistantMessage("Done.")]);
+    const runId = await competitorsRun([...championThen({ ...packet(), gaps: [] }), fauxAssistantMessage("Done.")]);
     expect(store.getRun(runId)!.status).toBe("invalid");
     expect(searches).toHaveLength(0);
   });
@@ -1015,7 +1150,7 @@ describe("the Amazon listings of a completed stage-1 run", () => {
     const failing = packet();
     failing.competitors[0].name = "fail";
     failing.competitor_reference.name = "fail too";
-    const runId = await competitorsRun(recorded(failing));
+    const runId = await competitorsRun(championThen(failing));
     expect(store.getRun(runId)!.status).toBe("completed");
     expect(store.listings.list(runId)).toHaveLength(0);
   });

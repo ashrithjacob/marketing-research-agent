@@ -22,7 +22,7 @@ import { RunSupervisor } from "../src/agent/index.js";
 import { Env, type Settings } from "../src/config/index.js";
 
 import { SqliteResearchStore } from "../src/adapters/index.js";
-import { minimalPacket, recordCalls, recorded, reviewPacket } from "./fixtures.js";
+import { genreRun, minimalPacket, recordCalls, recorded, reviewPacket, productPacket } from "./fixtures.js";
 
 const MODEL_ID = "faux-model";
 
@@ -81,8 +81,8 @@ const post = (path: string, body: unknown, init: RequestInit = {}) =>
 
 describe("runs", () => {
   it("starts a run and reads it back", async () => {
-    faux.setResponses(recorded(minimalPacket()));
-    const created = await post("/api/research/runs", { brief: { product: "MagnaCalm" } });
+    faux.setResponses(genreRun());
+    const created = await post("/api/research/runs", { brief: { product: "MagnaCalm" }, nodes: ["product_data"] });
     expect(created.status).toBe(200);
     const { id } = (await created.json()) as { id: string };
 
@@ -133,9 +133,9 @@ describe("runs", () => {
   });
 
   it("replays the whole run over SSE", async () => {
-    faux.setResponses(recorded(minimalPacket()));
+    faux.setResponses(genreRun());
     const { id } = (await (
-      await post("/api/research/runs", { brief: { product: "MagnaCalm" } })
+      await post("/api/research/runs", { brief: { product: "MagnaCalm" }, nodes: ["product_data"] })
     ).json()) as { id: string };
     await app.supervisor.waitFor(id);
 
@@ -204,6 +204,9 @@ describe("config", () => {
     expect(missing.corpus_mounted).toBe(false);
     expect(missing.default_reject_kinds).toContain("seo_listicle");
     expect(missing.model).toBe(MODEL_ID);
+    // The run view splits each tile into these fields and "Also found" (workings_stage1.md 13, 15).
+    expect(missing.required_fields.product_data).toEqual(expect.arrayContaining(["name", "price", "coa_present"]));
+    expect(missing.required_fields.category_data).toEqual(["seasonality", "search_volume", "category_size"]);
 
     mkdirSync(settings.corpusPath, { recursive: true });
     const present = (await (await get("/api/research/config")).json()) as any;
@@ -314,8 +317,13 @@ describe("review mining config", () => {
 });
 
 describe("per-node runs and the LLM call log", () => {
+  /** One agent by default — a url brief scoped to product_data — so a scripted run is deterministic. */
   async function finishedRun(body: Record<string, unknown> = {}) {
-    const created = await post("/api/research/runs", { brief: { product: "MagnaCalm" }, ...body });
+    const created = await post("/api/research/runs", {
+      brief: { product: "MagnaCalm", url: "https://magnacalm.example/products/glycinate-400" },
+      nodes: ["product_data"],
+      ...body,
+    });
     expect(created.status).toBe(200);
     const run = (await created.json()) as { id: string; nodes: string[] };
     await app.supervisor.waitFor(run.id);
@@ -341,7 +349,7 @@ describe("per-node runs and the LLM call log", () => {
     expect(((await blocked.json()) as any).detail).toMatch(/run stage 1 for this brief first/);
 
     // A stage-1 run for a *different* brief does not unlock it.
-    faux.setResponses(recorded(minimalPacket()));
+    faux.setResponses(genreRun());
     await finishedRun({ brief: { product: "Something else" } });
     const still = await post("/api/research/runs", {
       brief: { product: "MagnaCalm" },
@@ -350,7 +358,7 @@ describe("per-node runs and the LLM call log", () => {
     expect(still.status).toBe(409);
 
     // Its own completed stage 1 does, and the match survives spelling drift.
-    faux.setResponses(recorded(minimalPacket()));
+    faux.setResponses(genreRun());
     await finishedRun({ brief: { product: "MagnaCalm" } });
     faux.setResponses(recorded(reviewPacket()));
     const allowed = await post("/api/research/runs", {
@@ -362,8 +370,8 @@ describe("per-node runs and the LLM call log", () => {
   });
 
   it("reports a whole-stage run as covering stage 1's three nodes", async () => {
-    faux.setResponses(recorded(minimalPacket()));
-    const run = await finishedRun();
+    faux.setResponses(Array.from({ length: 4 }, () => fauxAssistantMessage("Nothing found.")));
+    const run = await finishedRun({ brief: { product: "MagnaCalm" }, nodes: undefined });
     expect(run.nodes).toEqual(["product_data", "competitors", "category_data"]);
   });
 
@@ -377,7 +385,7 @@ describe("per-node runs and the LLM call log", () => {
 
   it("serves every call with its prompt, answer and the run's totals", async () => {
     faux.setResponses([
-      fauxAssistantMessage([fauxToolCall("no_such_tool", {}), ...recordCalls(minimalPacket())], { stopReason: "toolUse" }),
+      fauxAssistantMessage([fauxToolCall("no_such_tool", {}), ...recordCalls(productPacket())], { stopReason: "toolUse" }),
       fauxAssistantMessage(fauxToolCall("finish", {}), { stopReason: "toolUse" }),
     ]);
     const run = await finishedRun();
@@ -387,18 +395,19 @@ describe("per-node runs and the LLM call log", () => {
 
     expect(body.run.status).toBe("completed");
     expect(body.calls.map((c: any) => c.seq)).toEqual([1, 2]);
-    expect(body.calls[0].system_prompt).toMatch(/stage-1 researcher/);
+    expect(body.calls[0].system_prompt).toMatch(/You are the `product` agent/);
+    expect(body.calls[0].agent_id).toBe("product");
     expect(body.calls[1].output.content[0].name).toBe("finish");
     expect(body.stats.llm_calls).toBe(2);
     expect(body.stats.tokens.total).toBeGreaterThan(0);
     expect(body.stats.llm_time_ms).toBeGreaterThanOrEqual(0);
     expect(body.stats.wall_time_ms).toBeGreaterThanOrEqual(0);
-    expect(body.stats.tool_calls).toBe(6); // the unknown tool, four records, finish
+    expect(body.stats.tool_calls).toBe(14); // the unknown tool, twelve records (nine of them field gaps), finish
     expect(body.stats.tool_errors).toBe(1); // the unknown tool comes back as an error
   });
 
   it("returns only later calls after a given seq, with totals for the whole run", async () => {
-    faux.setResponses(recorded(minimalPacket()));
+    faux.setResponses(recorded(productPacket()));
     const run = await finishedRun();
     const body = (await (await get(`/api/research/runs/${run.id}/calls?after=1`)).json()) as any;
     expect(body.calls.map((c: any) => c.seq)).toEqual([2]);

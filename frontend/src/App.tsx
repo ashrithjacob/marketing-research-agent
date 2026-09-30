@@ -170,6 +170,7 @@ export default function App() {
           runs={runs}
           nav={<ProductRuns product={product} runs={runs} activeId={activeId} showWorkspace={!!who?.is_admin} />}
           judgementsRev={judgementsRev}
+          requiredFields={config?.required_fields ?? {}}
           onSelectRun={(id) => navigate(paths.run(product.id, id))}
           onChanged={reload}
           onRunNode={(node) => setStartNodes([node])}

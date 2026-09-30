@@ -18,14 +18,6 @@ export class Frames {
     if (toolName === "web_search") return String(fields.query ?? "");
     if (toolName === "web_fetch") return String(fields.url ?? "");
     if (toolName === "amazon_find_product") return String(fields.query ?? "");
-    if (toolName === "amazon_reviews") {
-      const star = fields.star != null ? ` · ${fields.star}★` : "";
-      return `${String(fields.product_url ?? "")}${star}`;
-    }
-    if (toolName === "trustpilot_reviews") {
-      const star = fields.star != null ? ` · ${fields.star}★` : "";
-      return `${String(fields.domain ?? "")}${star}`;
-    }
     return "";
   }
 
@@ -51,6 +43,7 @@ export class Frames {
     const content = (call.output as { content?: Array<{ type?: string }> }).content ?? [];
     return {
       seq: call.seq,
+      agent_id: call.agent_id,
       duration_ms: call.duration_ms,
       input_tokens: usage.input ?? 0,
       output_tokens: usage.output ?? 0,

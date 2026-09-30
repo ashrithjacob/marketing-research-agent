@@ -9,8 +9,6 @@ import { Trace } from "../trace/index.js";
 
 /** Decides what a finished run is: completed, invalid, failed or cancelled. */
 export class RunSettlement {
-  private validated: StagePacket | null = null;
-
   constructor(
     private readonly store: ResearchStore,
     private readonly runs: LiveRuns,
@@ -18,28 +16,11 @@ export class RunSettlement {
     private readonly packet: LedgerPacket,
   ) {}
 
-  keepValidated(packet: StagePacket): void {
-    Trace.line(import.meta.url, "RunSettlement.keepValidated", { packet });
-    if (this.validated) return;
-    this.validated = packet;
-    this.store.updateRun(this.runId, { packet, packet_source: "finish", error: "" });
-    this.runs.emit(this.runId, "packet.ready", {
-      sources: packet.sources.length,
-      excerpts: packet.excerpts.length,
-      gaps: packet.gaps.length,
-      via: "finish",
-    });
-  }
-
-  settle(output: string, usage: Usage & { pricing: Pricing }, errorMessage?: string): void {
-    Trace.line(import.meta.url, "RunSettlement.settle", { output, usage, errorMessage });
+  settle(output: string, usage: Usage & { pricing: Pricing }, errorMessage?: string, partProblems: readonly string[] = []): void {
+    Trace.line(import.meta.url, "RunSettlement.settle", { output, usage, errorMessage, partProblems });
     const stopping = this.store.getRun(this.runId)?.status === "stopping";
     this.store.updateRun(this.runId, { output, usage, ended_at: Clock.nowIso() });
 
-    if (this.validated && !stopping) {
-      this.complete(this.validated, usage, errorMessage);
-      return;
-    }
     if (stopping) {
       this.store.updateRun(this.runId, { status: "cancelled", error: errorMessage || "stopped by the operator" });
       this.runs.emit(this.runId, "run.cancelled", errorMessage ? { error: errorMessage } : {});
@@ -49,13 +30,15 @@ export class RunSettlement {
       this.fail(errorMessage);
       return;
     }
-    this.settleFromLedger(usage, errorMessage);
+    this.settleFromLedger(usage, partProblems, errorMessage);
   }
 
-  /** The agent never called finish: finish is run on its behalf, and only a failing ledger is invalid. */
-  private settleFromLedger(usage: Usage & { pricing: Pricing }, errorMessage?: string): void {
-    Trace.line(import.meta.url, "RunSettlement.settleFromLedger", { errorMessage });
-    const result = this.packet.assemble();
+  /** Every agent has ended: the packet is built from the whole ledger, and only a failing ledger is invalid. */
+  private settleFromLedger(usage: Usage & { pricing: Pricing }, partProblems: readonly string[], errorMessage?: string): void {
+    Trace.line(import.meta.url, "RunSettlement.settleFromLedger", { errorMessage, partProblems });
+    const assembled = this.packet.assemble();
+    const problems = [...partProblems, ...("problems" in assembled ? assembled.problems : [])];
+    const result = problems.length > 0 ? { problems } : assembled;
     if ("problems" in result) {
       if (errorMessage) {
         this.fail(errorMessage);

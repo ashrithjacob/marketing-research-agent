@@ -12,6 +12,7 @@ import { nowPanel, runStage } from './run-view/now';
 import { RailColumn, subjectProgress } from './run-view/rail';
 import { StageOneTiles } from './run-view/stage-one-tiles';
 import { useRunStream } from './run-view/use-run-stream';
+import { OutdatedVoice } from './run-view/outdated-voice';
 import { VoiceAnalysis } from './run-view/voice/VoiceAnalysis';
 
 export default function RunView({
@@ -19,6 +20,7 @@ export default function RunView({
   runs,
   nav,
   judgementsRev,
+  requiredFields,
   onSelectRun,
   onChanged,
   onRunNode,
@@ -27,6 +29,7 @@ export default function RunView({
   runs: RunSummary[];
   nav: ReactNode;
   judgementsRev: number;
+  requiredFields: Record<string, string[]>;
   onSelectRun: (id: string) => void;
   onChanged: () => void;
   onRunNode: (node: ResearchNode) => void;
@@ -143,14 +146,23 @@ export default function RunView({
 
         {packet && runStage(run) === 1 && (
           <div className="tiles">
-            <StageOneTiles runId={runId} packet={packet} nodes={nodesInRun} listings={run?.listings ?? []} />
+            <StageOneTiles runId={runId} packet={packet} nodes={nodesInRun} listings={run?.listings ?? []} requiredFields={requiredFields} />
           </div>
         )}
-        {nodesInRun.has('review_mining') && (
-          <div className="voice-tile">
-            <VoiceAnalysis runId={runId} finished={!live} />
-          </div>
-        )}
+        {nodesInRun.has('review_mining') &&
+          (progress.newerStageOne ? (
+            <OutdatedVoice
+              runId={runId}
+              finished={!live}
+              minedAt={runs.find((r) => r.id === run.source_run_id)?.created_at ?? ''}
+              newerAt={progress.newerStageOne.created_at}
+              onRunNode={onRunNode}
+            />
+          ) : (
+            <div className="voice-tile">
+              <VoiceAnalysis runId={runId} finished={!live} />
+            </div>
+          ))}
 
         {run.status === 'invalid' && (
           <section>

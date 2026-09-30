@@ -117,11 +117,20 @@ not a broken button.
 
 A stage header (**Stage 1 · Raw material**, **Stage 2 · Review mining**) opens
 that stage's run for the same subject, via `onSelectRun`. The header of the
-stage the shown run collects is not clickable. Stage 1 opens the run a stage-2
-run mined from (`stageOneRunFor` in `run-view/rail.tsx`: the newest completed
-stage-1 run for the subject that started before it). Stage 2 opens the live
-stage-2 run, else the newest completed one, else the newest. The ▶ buttons
-start runs; the headers only navigate.
+stage the shown run collects is not clickable. **Stage 2 belongs to one stage-1
+run** (`subjectProgress` in `run-view/rail.tsx`): on a stage-1 run, the stage-2
+state and header count only review mining whose `source_run_id` is that run —
+the live one, else the newest completed, else the newest — so a new stage 1 shows
+stage 2 as *ready*, with **Start stage 2 →**, even when an older stage 1's
+competitors were mined. On a stage-2 run, the stage-1 header opens its
+`source_run_id`. **A stage-2 run whose stage 1 has since been rerun** (a completed stage-1
+run newer than its `source_run_id`) shows stage 2 as *ready — stage 1 was
+rerun* with **Start stage 2 →**, a banner naming both stage-1 dates
+(`run-view/outdated-voice.tsx`), and its customer voice folded behind **Show the
+older customer voice**: it mined competitors the current stage 1 no longer names. *Superseded 2026-10-01:* any completed stage-2 run of the
+product counted, and a stage-2 run's stage 1 was guessed by date
+(`stageOneRunFor`), so a new stage-1 run showed another run's mining as its own
+stage 2. The ▶ buttons start runs; the headers only navigate.
 
 A node greyed with the tooltip `not in this run` was simply not in the run's
 `nodes`. `—` where a sparkline should be means no curve data, which is normal
@@ -227,6 +236,13 @@ Header `research cockpit · activity log`, the brief and `Stage N · <scope>` as
 chips, a row of stat cards, then a **vertical timeline** — one box per agent
 action, joined by a line, top to bottom.
 
+- **Agent tabs** (`logs/AgentTabs.tsx`, `.agent-tabs`; model in `logs/agents.ts`):
+  a stage-1 run has up to four agents working at once, so the timeline is split
+  on each event's `agent_id` — one tab per agent that has started (`champion`,
+  `product`, `competitors`, `category`) with its status mark (… running,
+  ✓ complete, ◐ incomplete, ✗ failed, ■ cancelled) and tool count, plus a `run`
+  tab of milestones: each agent's start and end, each `finish` check, the
+  run's own events. Opens on the first agent. Hidden until an agent has started.
 - **Turn cards** (`logs/TurnCard.tsx`, badge **MODEL**): each `llm.call` is
   one pass through the agent loop, in four numbered sections:
   1. **Sent to the model** — tokens in and cached, and each message new in this

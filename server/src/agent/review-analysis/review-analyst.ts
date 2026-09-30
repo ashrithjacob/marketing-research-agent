@@ -6,7 +6,6 @@ import {
   Briefs,
   briefSchema,
   Clock,
-  Scope,
   type ResearchRun,
   type ResearchStore,
   type ReviewAnalysis,
@@ -59,7 +58,7 @@ export class ReviewAnalyst {
     const resolved = ModelChain.resolve([this.settings.model, ...this.settings.backupModels], this.models, new ModelPricing(this.costs));
     if ("unknown" in resolved) throw new RunError(`unknown model ${JSON.stringify(resolved.unknown)} for provider openrouter`);
     const brief = Briefs.normalise(briefSchema.parse(run.brief));
-    const source = this.handoff.forBrief(brief, Scope.of(run.workspace_id));
+    const source = this.handoff.forRun(run);
     const roster = source ? StageTwoRoster.of(source.packet) : [];
     const pending = ReviewAnalyst.pending(run.id, this.settings.model);
     this.store.saveReviewAnalysis(pending);

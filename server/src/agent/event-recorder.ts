@@ -9,12 +9,12 @@ import type { ToolSteps } from "./tool-steps.js";
 import { TOOL_LANES } from "./tools/index.js";
 import { Trace } from "../trace/index.js";
 
-interface TurnEnd {
+export interface TurnEnd {
   usage?: Usage;
   responseId?: string;
 }
 
-/** Turns one run's agent events into cockpit frames and the run's assistant text. */
+/** Turns one agent's events into cockpit frames tagged with its id, and keeps its assistant text. */
 export class AgentEventRecorder {
   private readonly messageText = new Map<string, string>();
   private readonly output: string[] = [];
@@ -22,6 +22,7 @@ export class AgentEventRecorder {
   constructor(
     private readonly runs: LiveRuns,
     private readonly runId: string,
+    private readonly agentId: string,
     private readonly onTurnEnd: (message: TurnEnd) => void,
     private readonly steps?: ToolSteps,
   ) {}
@@ -42,7 +43,7 @@ export class AgentEventRecorder {
         if (text.length > already.length) {
           const delta = text.slice(already.length);
           this.messageText.set(key, text);
-          if (delta) this.runs.emit(this.runId, "message.delta", { delta });
+          if (delta) this.runs.emit(this.runId, "message.delta", { agent_id: this.agentId, delta });
         }
         if (event.type === "message_end") {
           this.output.push(this.messageText.get(key) ?? text);
@@ -53,13 +54,14 @@ export class AgentEventRecorder {
             .map((c: any) => c.thinking ?? c.text ?? "")
             .join("");
           if (thinking.trim()) {
-            this.runs.emit(this.runId, "reasoning.available", { text: thinking });
+            this.runs.emit(this.runId, "reasoning.available", { agent_id: this.agentId, text: thinking });
           }
         }
         return;
       }
       case "tool_execution_start":
         this.runs.emit(this.runId, "tool.started", {
+          agent_id: this.agentId,
           tool: event.toolName,
           tool_call_id: event.toolCallId,
           preview: Frames.toolPreview(event.toolName, event.args),
@@ -68,6 +70,7 @@ export class AgentEventRecorder {
         return;
       case "tool_execution_end":
         this.runs.emit(this.runId, "tool.completed", {
+          agent_id: this.agentId,
           tool: event.toolName,
           tool_call_id: event.toolCallId,
           error: Boolean(event.isError),

@@ -131,6 +131,17 @@ describe("what stage 2 mines each target from", () => {
     await supervisor.close();
   });
 
+  it("records the stage-1 run it mined, so a later stage 1 does not claim it", async () => {
+    // A newer stage-1 run showed the old mining as its own "complete" stage 2.
+    const source = seedStageOne();
+    const { runId, supervisor } = await mine();
+    await supervisor.waitFor(runId);
+    expect(store.getRun(runId)!.source_run_id).toBe(source);
+    seedStageOne();
+    expect(store.getRun(runId)!.source_run_id).toBe(source);
+    await supervisor.close();
+  });
+
   it("asks Apify for MRA_APIFY_MAX_REVIEWS per pull, and sizes the spend cap from it", async () => {
     seedStageOne();
     const { runId, supervisor } = await mine();

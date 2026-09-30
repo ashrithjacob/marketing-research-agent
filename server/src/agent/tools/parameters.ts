@@ -31,3 +31,13 @@ export const findProductParameters = Type.Object({
     Type.Number({ description: "How many products to return (default 5, max 20)." }),
   ),
 });
+
+export const readLedgerParameters = Type.Object({
+  agent: Type.Optional(Type.String({ description: "Only this agent's rows: champion, product, competitors or category." })),
+  kind: Type.Optional(Type.String({ description: "Only rows of this kind, e.g. competitor_reference, attribute." })),
+});
+
+export const waitForParameters = Type.Object({
+  agent: Type.String({ description: "The agent whose row you need: champion, product, competitors or category." }),
+  kind: Type.String({ description: "The kind of row you need, e.g. attribute." }),
+});

@@ -2,7 +2,7 @@ import { Briefs, ProductFolders, stagePacketSchema, type Brief, type ResearchRun
 import { PacketDraft } from "../extract/index.js";
 import { Trace } from "../trace/index.js";
 
-/** Finds the stage-1 run for a brief, inside one scope, whose packet can name stage 2's targets. */
+/** Finds the stage-1 run whose packet names stage 2's targets: the newest for a brief when stage 2 starts, and afterwards the one it was started from. */
 export class StageTwoHandoff {
   constructor(private readonly store: ResearchStore) {}
 
@@ -14,11 +14,24 @@ export class StageTwoHandoff {
     for (const id of ProductFolders.runIds(heads, product.id)) {
       const run = this.store.getRun(id);
       if (!run) continue;
-      const draft = PacketDraft.coerce(run.packet);
-      if ("unparseable" in draft) continue;
-      const parsed = stagePacketSchema.safeParse(draft.draft);
-      if (!parsed.success || parsed.data.stage !== 1) continue;
-      return { run, packet: parsed.data };
+      const packet = StageTwoHandoff.packetOf(run);
+      if (packet) return { run, packet };
     }
     return null;
+  }
+
+  /** The stage-1 run a stage-2 run recorded as its source; null for a run from before the link was recorded. */
+  forRun(stageTwo: ResearchRun): { run: ResearchRun; packet: StagePacket } | null {
+    Trace.line(import.meta.url, "StageTwoHandoff.forRun", { runId: stageTwo.id, source: stageTwo.source_run_id });
+    const run = stageTwo.source_run_id ? this.store.getRun(stageTwo.source_run_id) : null;
+    const packet = run ? StageTwoHandoff.packetOf(run) : null;
+    return run && packet ? { run, packet } : null;
+  }
+
+  private static packetOf(run: ResearchRun): StagePacket | null {
+    Trace.line(import.meta.url, "StageTwoHandoff.packetOf", { runId: run.id });
+    const draft = PacketDraft.coerce(run.packet);
+    if ("unparseable" in draft) return null;
+    const parsed = stagePacketSchema.safeParse(draft.draft);
+    return parsed.success && parsed.data.stage === 1 ? parsed.data : null;
   }}

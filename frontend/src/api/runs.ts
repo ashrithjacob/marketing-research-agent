@@ -76,6 +76,8 @@ export interface RunSummary {
   id: string;
   workspace_id: string;
   product_id: string;
+  /** A stage-2 run's stage-1 run: the one whose competitors it mined. Empty on stage 1. */
+  source_run_id: string;
   status: RunStatus;
   /** 1 collects the product, its competitors and its category; 2 is review mining. */
   stage: number;

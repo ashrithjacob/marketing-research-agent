@@ -12,7 +12,9 @@ deploy steps are about **agentchat**, a different app. Use the ones below.
 - Container `mra` (app and agent in one process) plus `mra-searxng`, compose
   stack `~/mra-compose`, on its own `edge` network.
 - The agent runs in-process through `pi-agent-core`. No hermes.
-- Ops: `../setup.md` §5a. How a run works, end to end: `workings.md`.
+- Ops: `../setup.md` §5a. How a run works, end to end: `workings.md`. Why
+  stage 1 is four agents (champion, then product/competitors/category side by
+  side): `workings_stage1.md`.
   What is on the screen and what it calls: `FEATURE_MAP.md`.
 - Older specs (`spec.md`, `cockpit-spec.md`) still describe hermes as the engine.
   That is superseded by `pi-agent-core`. Trust `setup.md`.
@@ -65,12 +67,15 @@ it does not mean your change is on it. Only `deploy/vps/deploy.sh` does that.
 **5. Never start a run that spends Apify money without asking first.** Apify is
 billed to the user per run. That covers any stage-2 run (a code pipeline since
 2026-09-30: Amazon review pulls, Trustpilot where a target has no Amazon listing),
-and any stage-1 run with the `competitors` node: its agent can call
-`amazon_find_product`, and **when it completes, code looks up the Amazon listing of
-the champion and every competitor automatically**, about $0.01 each
-(`spec-stage-2-pipeline.md` §3a).
-To see a change work, run `product_data` alone (`mra run "<brief>" product_data`),
-which only uses web search and page fetches. If the change can only be seen
+and **every stage-1 run except a url brief without `competitors`**: its step-1
+`champion` agent calls `amazon_find_product` (`workings_stage1.md`). With
+`competitors` in scope that agent can call it too, and **when the run completes,
+code looks up the Amazon listing of the champion and every competitor
+automatically**, about $0.01 each (`spec-stage-2-pipeline.md` §3a).
+To see a change work, run a url brief on `product_data` and/or `category_data`
+(`mra run "https://…" product_data,category_data`), which skips the champion and
+only uses web search and page fetches. A genre brief runs the champion, even on
+`product_data` alone. If the change can only be seen
 through an Apify tool, ask first and say what the run will cost. One run is
 enough to verify something; don't rerun to polish.
 

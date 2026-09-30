@@ -32,14 +32,22 @@ Before the HTTP response even returns (`RunSupervisor.start()`, which hands off 
    `seo_listicle`, `review_roundup`, `ai_generated`).
 2. A run row is written (`queued`), the model is looked up and priced from
    OpenRouter's live rates (unknown model → row is `failed`, endpoint 502).
-3. The prompt is built: system prompt naming only the tools this run gets, and
-   a user turn of rules → judgements → brief → how to record findings. Each
-   `record_*` tool's description carries one example item (invented values).
-4. A pi-agent-core `Agent` runs in-process; its `streamFn` is wrapped so every
-   LLM call is logged (`research_llm_calls`). Row becomes `running`, SSE opens,
-   the browser follows `GET /runs/:id/events?after=0`.
+3. `StageOnePlans.of` picks the agents. **Step 1:** `champion`, alone — unless
+   the brief is a url and `competitors` is out of scope. **Step 2:** one agent per
+   node in scope, side by side — `product`, `competitors`, `category`
+   (`workings_stage1.md`).
+4. `StageOneRun` starts; each agent is built when its step starts, with its own
+   system prompt (tools it has, the shared ledger), its own task
+   (`agent/prompt/text/tasks.ts`: fields, where to look, when to stop), and — for
+   step 2 — the champion row copied in. Product and category record only their
+   fixed fields (`domain/node-fields.ts`), refused otherwise. Every LLM call is logged under its `agent_id`,
+   `seq` numbered across the run. Row becomes `running`, SSE opens, the browser
+   follows `GET /runs/:id/events?after=0`.
 
 ## The agent loop, turn by turn
+
+Each agent runs this loop on its own transcript; the numbers below are from a
+run measured when one agent did all three nodes, before 2026-09-30.
 
 One **LLM call** = one turn: the whole transcript so far is sent, the model
 answers with text, thinking, and/or tool calls, tools execute, results append
@@ -100,23 +108,27 @@ itself complete only with a saturation curve behind it.
 Since 2026-09-29 the model never writes the packet. It records each finding as
 it goes with a `record_*` tool, into the run ledger (`research_findings`); each
 row is checked against its section's schema and the run's scope when written,
-and a bad one comes back `NOT RECORDED — <problem>` on that small turn. `finish`
-has `PacketAssembly` build the packet from the live rows (brief from the run)
-and runs the cross-object rules: cited source_ids exist, complete nodes have
-saturation, competitor relations recomputed from forms, gaps non-empty, scope
-respected. A pass ends the run (`packet.ready` `via: "finish"`); a failure
-returns the numbered problems and the run carries on. A run that stops without
-calling `finish` is settled from its ledger (`via: "ledger"`).
+and a bad one comes back `NOT RECORDED — <problem>` on that small turn. Every
+row carries the `agent_id` that wrote it; an agent reads every row
+(`read_ledger`, `wait_for`) but replaces or retracts only its own. An agent's
+`finish` checks **its own part** — `ChampionDone`, or its rows against its node
+(competitors' with the champion's) — and a pass ends that agent only. When the
+last agent ends, each agent's check runs again and `PacketAssembly` builds the
+packet from every live row for the run-wide rules: cited source_ids exist,
+complete competitors have both curves, relations recomputed from forms, gaps
+non-empty, scope respected (`packet.ready` `via: "ledger"`).
 
 ## Outcome-first debug table
 
 | You observed | Mechanism | Look at |
 |---|---|---|
 | `completed`, thin packet | Schema was satisfied; nodes may be `incomplete`, saturation never reached. Thin = agent stopped early or rejected most sources. | packet `nodes[].status`, `counts`, gaps list |
-| `invalid` | The agent ended; the packet assembled from its ledger failed the cross-object rules. Most informative failure there is. | `packet.invalid` payload names the rule; `research_packet_checks` for each `finish` the agent tried; `mra calls <id>` for the last turns |
+| `invalid` | Every agent ended; an agent's own part, or the packet assembled from the ledger, failed the rules. A problem prefixed `category:` is that agent's part. Most informative failure there is. | `packet.invalid` payload names the rule; `research_packet_checks` for each `finish` the agent tried; `mra calls <id>` for the last turns |
 | Many `NOT RECORDED` tool results | The model keeps sending a row the schema refuses; the reason is in the tool result. | the `record_*` tool results in `mra calls <id>` |
 | `failed` | A crash: stream died past 3 retries (deny-list retries, 2/4/8s ± jitter), bad model, restart killed it. | `error` on the run row; `run.resumed` count in events |
 | `cancelled` | You pressed Stop, or a Stop landed in the ~30s billing window. | — |
+| One agent tab ◐ `incomplete` | That agent never passed its `finish`; its problems are in its `packet.checked` events, and the run is `invalid` with them. | `agent.ended`, `packet.checked {agent_id}` |
+| Step-2 agents' prompts lack a champion | Step 1 was skipped (url brief, no competitors) or the champion recorded no reference. | `agent.started` order; `read_ledger` of `champion` |
 | `completed` but `ended_early` | The stream died, but the ledger already made a valid packet. The packet stands. | `run.ended_early` payload |
 | Lots of red tool rows | Firecrawl 4xx / SearXNG down / Apify 402 — handed to the model as errors, run continues. | `tool.completed` payloads with `error` |
 | `succeeded`-looking run with wrong product | Research about the wrong subject: the brief is copied from the run now, so look at what the rows are about, not `brief.product`. | the sources' urls; the `name` attribute on a site brief |

@@ -11,12 +11,12 @@ const NODE_ENTITY: Readonly<Record<Node, string>> = {
 
 export type Recorded = { recorded: Finding; replaced: string | null } | { problems: string };
 
-/** One agent's hand on the run ledger: every row checked as it is written, and a newer row replacing the one it supersedes. */
+/** One agent's hand on the shared run ledger: it reads every agent's rows, writes under its own id, and replaces or retracts only rows it wrote. */
 export class RunFindings {
   constructor(
     private readonly ledger: FindingLedger,
     readonly runId: string,
-    private readonly agentId: string,
+    readonly agentId: string,
     private readonly scope: readonly Node[],
   ) {}
 
@@ -26,7 +26,7 @@ export class RunFindings {
     if ("problems" in checked) return checked;
     const { payload } = checked;
     const key = Findings.key(kind, payload);
-    const earlier = key === null ? undefined : this.live().find((row) => row.kind === kind && Findings.key(kind, row.payload) === key);
+    const earlier = key === null ? undefined : this.own().find((row) => row.kind === kind && Findings.key(kind, row.payload) === key);
     const recorded = this.ledger.append({
       run_id: this.runId,
       kind,
@@ -39,9 +39,13 @@ export class RunFindings {
     return { recorded, replaced: earlier?.id ?? null };
   }
 
-  retract(id: string, why: string): Finding | null {
+  retract(id: string, why: string): { retracted: Finding } | { refused: string } {
     Trace.line(import.meta.url, "RunFindings.retract", { id, why });
-    return this.ledger.retract(this.runId, id, why);
+    const row = this.live().find((r) => r.id === id);
+    if (!row) return { refused: `no live row with id ${id} in this run's ledger` };
+    if (row.agent_id !== this.agentId) return { refused: `${id} was recorded by agent ${row.agent_id}; an agent retracts only its own rows` };
+    const retracted = this.ledger.retract(this.runId, id, why);
+    return retracted ? { retracted } : { refused: `${id} could not be retracted` };
   }
 
   rows(): Finding[] {
@@ -54,9 +58,14 @@ export class RunFindings {
     return Findings.live(this.rows());
   }
 
+  own(): Finding[] {
+    Trace.line(import.meta.url, "RunFindings.own", { agentId: this.agentId });
+    return this.live().filter((row) => row.agent_id === this.agentId);
+  }
+
   private static entityOf(kind: FindingKind, payload: Record<string, unknown>): string {
     Trace.line(import.meta.url, "RunFindings.entityOf", { kind });
-    if (kind === "competitor" || kind === "candidate") return String(payload.id ?? "");
+    if (kind === "competitor") return String(payload.id ?? "");
     const node = payload.node as Node | undefined;
     return (node && NODE_ENTITY[node]) || "product";
   }

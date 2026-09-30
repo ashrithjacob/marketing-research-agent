@@ -61,9 +61,8 @@ export class ScopeCheck implements PacketCheck {
         if (!allowed.has(node)) outside.set(node, (outside.get(node) ?? 0) + 1);
       }
     }
-    const competitorRows = packet.competitors.length + (packet.competitor_reference ? 1 : 0);
-    if (competitorRows > 0 && !allowed.has("competitors")) {
-      outside.set("competitors", (outside.get("competitors") ?? 0) + competitorRows);
+    if (packet.competitors.length > 0 && !allowed.has("competitors")) {
+      outside.set("competitors", (outside.get("competitors") ?? 0) + packet.competitors.length);
     }
 
     const problems = [...outside].map(

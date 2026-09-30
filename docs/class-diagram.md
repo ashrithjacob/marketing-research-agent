@@ -110,6 +110,15 @@ classDiagram
     class LlmCall {
       <<interface>>
     }
+    class NodeFieldSet {
+      <<interface>>
+    }
+    class NodeFields {
+      of()
+      all()
+      fieldOf()
+      missing()
+    }
     class Stages {
       of()
       covering()
@@ -258,10 +267,23 @@ classDiagram
     class ServiceReports {
       is()
     }
+    class StageOneAgentSpec {
+      <<interface>>
+    }
+    class StageOnePlan {
+      <<interface>>
+    }
+    class StageOnePlans {
+      of()
+      nodeOf()
+    }
     class BestsellerRank {
       <<interface>>
     }
     class AmazonListing {
+      <<interface>>
+    }
+    class TrustpilotSummary {
       <<interface>>
     }
     class TargetListing {
@@ -275,6 +297,8 @@ classDiagram
     }
     class FetchedPage {
       <<interface>>
+    }
+    class FetcherUnavailableError {
     }
   }
   namespace config {
@@ -428,6 +452,15 @@ classDiagram
     }
     class Corpus {
       write()
+    }
+    class Crawl4aiPayload {
+      <<interface>>
+    }
+    class Crawl4ai {
+      scrape()
+    }
+    class FallbackPageFetcher {
+      scrape()
     }
     class OpenRouterGate {
       admit()
@@ -595,9 +628,33 @@ classDiagram
     class ThrottledActorRunner {
       run()
     }
+    class TrustpilotProfiles {
+      read()
+      parse()
+    }
   }
   namespace agent {
+    class AgentOutcome {
+      <<interface>>
+    }
+    class AgentDriver {
+      drive()
+    }
+    class AgentRoster {
+      end()
+      hasEnded()
+    }
     class BilledCosts {
+    }
+    class DoneCheck {
+      <<interface>>
+      problems()
+    }
+    class NodeDone {
+      problems()
+    }
+    class ChampionDone {
+      problems()
     }
     class RunError {
     }
@@ -642,6 +699,9 @@ classDiagram
       has()
       waitFor()
     }
+    class CallSequence {
+      next()
+    }
     class LlmCallLog {
       wrap()
     }
@@ -656,11 +716,12 @@ classDiagram
     }
     class PromptBlocks {
       code()
-      nodes()
-      gapNodes()
-      scope()
       judgements()
       brief()
+      champion()
+    }
+    class AgentInstructions {
+      <<interface>>
     }
     class PromptBuilder {
       system()
@@ -743,20 +804,17 @@ classDiagram
     class ReviewPuller {
       pullAll()
     }
-    class RunAgentFactory {
-      assemble()
-    }
     class RunFindings {
       record()
       retract()
       rows()
       live()
+      own()
     }
     class RunLauncher {
       launch()
     }
     class RunSettlement {
-      keepValidated()
       settle()
     }
     class RunSupervisor {
@@ -766,11 +824,24 @@ classDiagram
       stop()
       close()
     }
-    class RunWatch {
-      run()
+    class RunWrapUp {
+      lookUpListings()
+      recordBilling()
+    }
+    class StageOneRunContext {
+      <<interface>>
+    }
+    class BuiltAgent {
+      <<interface>>
+    }
+    class StageOneAgentFactory {
+      build()
     }
     class StageOneListings {
       lookUp()
+    }
+    class StageOneRun {
+      start()
     }
     class StageTwoHandoff {
       forBrief()
@@ -805,14 +876,20 @@ classDiagram
     class FindProductTool {
       tool()
     }
-    class FinishHooks {
-      <<interface>>
-    }
     class FinishTool {
       tool()
     }
     class FetchRecord {
       <<interface>>
+    }
+    class LedgerRows {
+      render()
+    }
+    class ReadLedgerTool {
+      tool()
+    }
+    class WaitForTool {
+      tool()
     }
     class RecordTool {
       tool()
@@ -828,6 +905,9 @@ classDiagram
     }
     class WebSearchTool {
       tool()
+    }
+    class TurnBudget {
+      close()
     }
     class UsageTotals {
       empty()
@@ -914,6 +994,8 @@ classDiagram
   AmazonProducts --> ActorRunner
   MeteredActorRunner --> ActorRunner
   TrustpilotReviews --> ActorRunner
+  Crawl4ai --> Settings
+  FallbackPageFetcher --> PageFetcher
   OpenRouterGate --> Settings
   Firecrawl --> Settings
   RunBilling --> OpenRouterPrices
@@ -932,11 +1014,18 @@ classDiagram
   ThrottledWebSearch --> ServiceQueue
   ThrottledActorRunner --> ActorRunner
   ThrottledActorRunner --> ServiceQueue
+  TrustpilotProfiles --> PageFetcher
+  AgentDriver --> ResearchStore
+  AgentDriver --> LiveRuns
+  AgentDriver --> RetryPolicy
+  AgentDriver --> ModelChain
   BilledCosts --> ResearchStore
   BilledCosts --> LiveRuns
+  NodeDone --> RunFindings
+  ChampionDone --> RunFindings
   AgentEventRecorder --> LiveRuns
   AgentEventRecorder --> ToolSteps
-  LedgerPacket --> RunFindings
+  LedgerPacket --> FindingLedger
   LiveRuns --> ResearchStore
   ModelChain --> Pricing
   ModelPricing --> OpenRouterPrices
@@ -954,35 +1043,41 @@ classDiagram
   ReviewMiningJob --> Settings
   ReviewMiningJob --> ActorRunner
   ReviewPuller --> PullEvents
-  RunAgentFactory --> Settings
-  RunAgentFactory --> ResearchStore
-  RunAgentFactory --> LiveRuns
-  RunAgentFactory --> OpenRouterPrices
-  RunAgentFactory --> RetryPolicy
-  RunAgentFactory --> PromptBuilder
-  RunAgentFactory --> ServiceClients
   RunFindings --> FindingLedger
   RunLauncher --> ResearchStore
   RunLauncher --> Settings
   RunLauncher --> OpenRouterPrices
   RunLauncher --> LiveRuns
-  RunLauncher --> RunAgentFactory
+  RunLauncher --> RetryPolicy
+  RunLauncher --> StageOneAgentFactory
+  RunLauncher --> StageOneListings
   RunLauncher --> ReviewMiningJob
   RunSettlement --> ResearchStore
   RunSettlement --> LiveRuns
   RunSettlement --> LedgerPacket
+  RunWrapUp --> ResearchStore
+  RunWrapUp --> LiveRuns
+  RunWrapUp --> StageOneListings
+  StageOneAgentFactory --> Settings
+  StageOneAgentFactory --> ResearchStore
+  StageOneAgentFactory --> ServiceClients
+  StageOneAgentFactory --> PromptBuilder
   StageOneListings --> TargetListings
   StageOneListings --> ActorRunner
+  StageOneListings --> PageFetcher
   StageTwoHandoff --> ResearchStore
   StageTwoListings --> TargetListings
   StageTwoListings --> AmazonListingSource
+  StageTwoListings --> TrustpilotProfiles
   StageTwoSettlement --> ResearchStore
   StageTwoSettlement --> LiveRuns
   StageTwoSettlement --> ReviewLedger
   ResearchToolset --> ToolsetOptions
   FindProductTool --> AmazonProducts
-  FinishTool --> LedgerPacket
-  FinishTool --> FinishHooks
+  FinishTool --> DoneCheck
+  ReadLedgerTool --> RunFindings
+  WaitForTool --> RunFindings
+  WaitForTool --> AgentRoster
   RecordTool --> RunFindings
   RetractTool --> RunFindings
   WebFetchTool --> Settings
@@ -1038,6 +1133,8 @@ classDiagram
 | `adapters` | `adapters/apify/trustpilot-reviews.ts` | TrustpilotReviews |
 | `adapters` | `adapters/apify/types.ts` | ReviewExcerpt, ReviewResult, AmazonProduct |
 | `adapters` | `adapters/corpus.ts` | Corpus |
+| `adapters` | `adapters/crawl4ai.ts` | Crawl4aiPayload, Crawl4ai |
+| `adapters` | `adapters/fallback-fetcher.ts` | FallbackPageFetcher |
 | `adapters` | `adapters/fetch-gate.ts` | OpenRouterGate |
 | `adapters` | `adapters/firecrawl.ts` | FirecrawlPayload, Firecrawl |
 | `adapters` | `adapters/http.ts` | Http |
@@ -1069,18 +1166,22 @@ classDiagram
 | `adapters` | `adapters/sqlite/tables.ts` | SqliteTables |
 | `adapters` | `adapters/sqlite/target-listing-table.ts` | TargetListingTable |
 | `adapters` | `adapters/throttled.ts` | ThrottledPageFetcher, ThrottledWebSearch, ThrottledActorRunner |
+| `adapters` | `adapters/trustpilot-profiles.ts` | TrustpilotProfiles |
+| `agent` | `agent/agent-driver.ts` | AgentOutcome, AgentDriver |
+| `agent` | `agent/agent-roster.ts` | AgentRoster |
 | `agent` | `agent/billed-costs.ts` | BilledCosts |
+| `agent` | `agent/done-check.ts` | DoneCheck, NodeDone, ChampionDone |
 | `agent` | `agent/errors.ts` | RunError |
 | `agent` | `agent/event-recorder.ts` | TurnEnd, AgentEventRecorder |
 | `agent` | `agent/frames.ts` | EventFrame, Frames |
 | `agent` | `agent/ledger-packet.ts` | LedgerPacket |
 | `agent` | `agent/listing-match.ts` | ListingMatch |
 | `agent` | `agent/live-runs.ts` | RunControl, Live, LiveRuns |
-| `agent` | `agent/llm-call-log.ts` | LlmCallLog |
+| `agent` | `agent/llm-call-log.ts` | CallSequence, LlmCallLog |
 | `agent` | `agent/model-chain.ts` | ModelChain |
 | `agent` | `agent/pricing.ts` | ModelPricing |
 | `agent` | `agent/prompt/blocks.ts` | PromptBlocks |
-| `agent` | `agent/prompt/builder.ts` | PromptBuilder |
+| `agent` | `agent/prompt/builder.ts` | AgentInstructions, PromptBuilder |
 | `agent` | `agent/prompt/messages.ts` | AgentMessages |
 | `agent` | `agent/retry.ts` | RetryPolicy, Retries |
 | `agent` | `agent/review-analysis/analysis-prompts.ts` | AnalysisPrompts |
@@ -1096,13 +1197,14 @@ classDiagram
 | `agent` | `agent/review-ledger.ts` | ReviewLedger |
 | `agent` | `agent/review-mining-job.ts` | ReviewMiningJob |
 | `agent` | `agent/review-puller.ts` | PullJob, PullEvents, ReviewPuller |
-| `agent` | `agent/run-agent-factory.ts` | RunAgentFactory |
 | `agent` | `agent/run-findings.ts` | RunFindings |
 | `agent` | `agent/run-launcher.ts` | RunLauncher |
 | `agent` | `agent/run-settlement.ts` | RunSettlement |
 | `agent` | `agent/run-supervisor.ts` | RunSupervisor |
-| `agent` | `agent/run-watch.ts` | RunWatch |
+| `agent` | `agent/run-wrap-up.ts` | RunWrapUp |
+| `agent` | `agent/stage-one-agent-factory.ts` | StageOneRunContext, BuiltAgent, StageOneAgentFactory |
 | `agent` | `agent/stage-one-listings.ts` | StageOneListings |
+| `agent` | `agent/stage-one-run.ts` | StageOneRun |
 | `agent` | `agent/stage-two-handoff.ts` | StageTwoHandoff |
 | `agent` | `agent/stage-two-listings.ts` | StageTwoListings |
 | `agent` | `agent/stage-two-plan.ts` | StageTwoPlanner |
@@ -1110,18 +1212,22 @@ classDiagram
 | `agent` | `agent/tool-steps.ts` | ToolSteps |
 | `agent` | `agent/tools/factory.ts` | LedgerOptions, ToolsetOptions, ResearchToolset |
 | `agent` | `agent/tools/find-product-tool.ts` | FindProductTool |
-| `agent` | `agent/tools/finish-tool.ts` | FinishHooks, FinishTool |
+| `agent` | `agent/tools/finish-tool.ts` | FinishTool |
 | `agent` | `agent/tools/lanes.ts` | FetchRecord |
+| `agent` | `agent/tools/ledger-read-tools.ts` | LedgerRows, ReadLedgerTool, WaitForTool |
 | `agent` | `agent/tools/ledger-tools.ts` | RecordTool, RetractTool |
 | `agent` | `agent/tools/traced-tool.ts` | TracedTool |
 | `agent` | `agent/tools/web-fetch-tool.ts` | WebFetchTool |
 | `agent` | `agent/tools/web-search-tool.ts` | WebSearchTool |
+| `agent` | `agent/turn-budget.ts` | TurnBudget |
 | `agent` | `agent/usage.ts` | UsageTotals |
-| `config` | `config/settings.ts` | Settings, Env |
+| `config` | `config/settings-shape.ts` | Settings |
+| `config` | `config/settings.ts` | Env |
 | `domain` | `domain/accounts.ts` | Workspace, Account, AccountListing, Principal, Scope |
 | `domain` | `domain/brief.ts` | Briefs |
 | `domain` | `domain/findings.ts` | FindingDraft, Finding, Findings |
 | `domain` | `domain/logs.ts` | RunEvent, Judgement, PacketCheck, RunUpdate, LlmCallRecord, Generation, LlmCall |
+| `domain` | `domain/node-fields.ts` | NodeFieldSet, NodeFields |
 | `domain` | `domain/nodes.ts` | Stages |
 | `domain` | `domain/packet-rows.ts` | PacketRowSet, PacketRows |
 | `domain` | `domain/ports.ts` | ProductCatalog, AccountDirectory, AmazonListingSource, TargetListings, FindingLedger, PageFetcher, WebSearch, ResearchStore, GateVerdict, FetchGate |
@@ -1131,8 +1237,9 @@ classDiagram
 | `domain` | `domain/review-analysis.ts` | AnalysedReview, CleaningTally, IssueQuote, ProductIssue, ProductVoice, RankedIssue, IssueSlice, ReviewAnalysis |
 | `domain` | `domain/reviews.ts` | LedgerPull, LedgerReview, ReviewLedgerSnapshot, StoredRunReview |
 | `domain` | `domain/service-report.ts` | ServicePart, ServiceReport, ServiceReports |
-| `domain` | `domain/stage-two.ts` | BestsellerRank, AmazonListing, TargetListing |
-| `domain` | `domain/web.ts` | SearchHit, SearchPage, FetchedPage |
+| `domain` | `domain/stage-one-agents.ts` | StageOneAgentSpec, StageOnePlan, StageOnePlans |
+| `domain` | `domain/stage-two.ts` | BestsellerRank, AmazonListing, TrustpilotSummary, TargetListing |
+| `domain` | `domain/web.ts` | SearchHit, SearchPage, FetchedPage, FetcherUnavailableError |
 | `extract` | `extract/brief-check.ts` | BriefCheck |
 | `extract` | `extract/champion-check.ts` | ChampionCheck |
 | `extract` | `extract/check.ts` | PacketContext, PacketCheck |

@@ -1,5 +1,5 @@
 import type { Settings } from "../config/index.js";
-import type { FetchedPage, PageFetcher } from "../domain/index.js";
+import { FetcherUnavailableError, type FetchedPage, type PageFetcher } from "../domain/index.js";
 
 import { Http } from "./http.js";
 import { RateLimitWait } from "./rate-limit-wait.js";
@@ -11,7 +11,7 @@ interface FirecrawlPayload {
   data?: { markdown?: string; metadata?: { title?: string } };
 }
 
-/** Reads one page as markdown, waiting out a rate limit when Firecrawl says how long. Throws rather than returning an empty body. */
+/** Reads one page as markdown, waiting out a rate limit when Firecrawl says how long. Throws rather than returning an empty body; an account that can fetch nothing (no key, no credits) throws FetcherUnavailableError. */
 export class Firecrawl implements PageFetcher {
   static readonly RATE_LIMIT_RETRIES = 2;
 
@@ -23,7 +23,7 @@ export class Firecrawl implements PageFetcher {
   ): Promise<FetchedPage> {
     Trace.line(import.meta.url, "Firecrawl.scrape", { url });
     if (!this.settings.firecrawlApiKey) {
-      throw new Error("FIRECRAWL_API_KEY is not set — web_fetch cannot read pages");
+      throw new FetcherUnavailableError("firecrawl", "FIRECRAWL_API_KEY is not set");
     }
     const deadline = Date.now() + this.settings.webTimeoutSeconds * 1000;
     for (let retry = 0; ; retry++) {
@@ -31,6 +31,7 @@ export class Firecrawl implements PageFetcher {
       const payload = (await response.json().catch(() => ({}))) as FirecrawlPayload;
       if (response.ok && payload.success !== false) return Firecrawl.page(payload);
       const error = `Firecrawl returned ${response.status}: ${payload.error ?? "no body"}`.slice(0, 300);
+      if (response.status === 401 || response.status === 402) throw new FetcherUnavailableError("firecrawl", error);
       const asked = response.status === 429 ? RateLimitWait.askedMs(response.headers, payload.error ?? "") : null;
       const waitMs = asked === null ? null : RateLimitWait.withMarginMs(asked);
       if (waitMs === null || retry >= Firecrawl.RATE_LIMIT_RETRIES || Date.now() + waitMs > deadline) {

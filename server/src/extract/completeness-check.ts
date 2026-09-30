@@ -24,36 +24,19 @@ export class CompletenessCheck implements PacketCheck {
     return [...problems, ...this.saturationProblems(packet, complete)];
   }
 
+  /** Only competitors is open-ended, so only it is done by saturation; product and category are done by their checklists. */
   private saturationProblems(packet: StagePacket, complete: ReadonlySet<Node>): string[] {
     Trace.line(import.meta.url, "CompletenessCheck.saturationProblems", { packet, complete });
-    const curves = new Set(
-      packet.saturation.filter((entry) => entry.curve.length > 0).map((entry) => entry.node),
+    if (!complete.has("competitors")) return [];
+    return COMPETITOR_RELATIONS.filter(
+      (relation) =>
+        !packet.saturation.some(
+          (entry) => entry.node === "competitors" && entry.class === relation && entry.curve.length > 0,
+        ),
+    ).map(
+      (relation) =>
+        `competitors is complete with no ${relation} saturation curve — discovery ` +
+        "saturates per class, so each class needs its own",
     );
-    const problems: string[] = [];
-    for (const node of complete) {
-      if (node === "product_data") continue;
-      if (node === "competitors") {
-        for (const relation of COMPETITOR_RELATIONS) {
-          const has = packet.saturation.some(
-            (entry) =>
-              entry.node === "competitors" && entry.class === relation && entry.curve.length > 0,
-          );
-          if (!has) {
-            problems.push(
-              `competitors is complete with no ${relation} saturation curve — discovery ` +
-                "saturates per class, so each class needs its own",
-            );
-          }
-        }
-        continue;
-      }
-      if (!curves.has(node)) {
-        problems.push(
-          `node ${node} is complete with no saturation curve — 'done' has to be a ` +
-            "measurement, not an assertion",
-        );
-      }
-    }
-    return problems;
   }
 }

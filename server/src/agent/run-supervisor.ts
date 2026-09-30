@@ -17,7 +17,8 @@ import { Trace } from "../trace/index.js";
 import { LiveRuns, type Subscriber } from "./live-runs.js";
 import { AgentMessages, PromptBuilder } from "./prompt/index.js";
 import { DEFAULT_RETRY, type RetryPolicy } from "./retry.js";
-import { RunAgentFactory } from "./run-agent-factory.js";
+import { StageOneAgentFactory } from "./stage-one-agent-factory.js";
+import { StageOneListings } from "./stage-one-listings.js";
 import { ReviewMiningJob } from "./review-mining-job.js";
 import { RunError } from "./errors.js";
 import { RunLauncher } from "./run-launcher.js";
@@ -47,18 +48,20 @@ export class RunSupervisor {
     this.costs = options.costs ?? new OpenRouterPrices({ apiKey: options.settings.openrouterApiKey });
     this.models = options.models ?? RunSupervisor.defaultModels();
     const services = options.services ?? ServiceClients.forSettings(options.settings);
-    const factory = new RunAgentFactory(
-      this.settings,
+    const factory = new StageOneAgentFactory(this.settings, this.store, this.models, services, new PromptBuilder());
+    const listings = new StageOneListings(this.store.listings, services.actors, services.pages, this.settings.apifyConcurrency);
+    const mining = new ReviewMiningJob(this.store, this.runs, this.settings, services.actors, options.pullRetryDelayMs);
+    this.launcher = new RunLauncher(
       this.store,
-      this.runs,
+      this.settings,
       this.models,
       this.costs,
+      this.runs,
       options.retry ?? DEFAULT_RETRY,
-      new PromptBuilder(),
-      services,
+      factory,
+      listings,
+      mining,
     );
-    const mining = new ReviewMiningJob(this.store, this.runs, this.settings, services.actors, options.pullRetryDelayMs);
-    this.launcher = new RunLauncher(this.store, this.settings, this.models, this.costs, this.runs, factory, mining);
   }
 
   readonly subscribe = (runId: string, subscriber: Subscriber): (() => void) | null => {

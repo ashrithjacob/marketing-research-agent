@@ -3,7 +3,7 @@ import { stat } from "node:fs/promises";
 import type { Hono } from "hono";
 
 import type { Settings } from "../config/index.js";
-import { DEFAULT_REJECTED_KINDS } from "../domain/index.js";
+import { DEFAULT_REJECTED_KINDS, NodeFields } from "../domain/index.js";
 import type { ApiEnv } from "./api-env.js";
 import { Trace } from "../trace/index.js";
 
@@ -25,6 +25,10 @@ export class ConfigRoute {
         model: this.settings.model,
         corpus_path: this.settings.corpusPath,
         corpus_mounted: corpusMounted,
+        required_fields: {
+          product_data: NodeFields.all("product_data"),
+          category_data: NodeFields.all("category_data"),
+        },
         review_mining: {
           configured: Boolean(this.settings.apifyToken),
           max_reviews: this.settings.apifyMaxReviews,

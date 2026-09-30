@@ -12,9 +12,7 @@ export class ChampionCheck implements PacketCheck {
     const reference = packet.competitor_reference;
     if (!reference || !ChampionCheck.isGenreBrief(brief)) return [];
     if (
-      packet.gaps.some(
-        (gap) => gap.node === "competitors" && ChampionCheck.RANKING_GAP.test(gap.missing),
-      )
+      packet.gaps.some((gap) => ChampionCheck.RANKING_GAP.test(gap.missing))
     ) {
       return [];
     }

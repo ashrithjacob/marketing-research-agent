@@ -138,11 +138,11 @@ export default function StartRun({
             but nothing is archived and every source becomes a gap.
           </p>
         )}
-        {partial && (
+        {!nodes.includes('review_mining') && (
           <p className="muted small">
-            {nodes.includes('competitors')
-              ? 'Amazon product search is offered for finding competitors (Apify, about $0.012 a result). The paid review tools are not.'
-              : 'The paid review tools (Amazon, Trustpilot) are not offered to this run.'}
+            {isUrl && partial && !nodes.includes('competitors')
+              ? 'No Apify: a site brief without competitors needs no Amazon search for its champion.'
+              : 'Step 1 finds the champion on Amazon (Apify, about $0.012 a result).'}
           </p>
         )}
         {error && <p className="error small">{error}</p>}

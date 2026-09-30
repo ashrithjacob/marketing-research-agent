@@ -3,36 +3,27 @@ import { api, TERMINAL_STATUSES, type Judgement, type ResearchNode, type RunDeta
 import StageRail, { scopeLabel, type StageProgress } from '../StageRail';
 import { billedText, pricingNote, runStage } from './now';
 
-/** Where `run`'s product stands across `runs`, every run of that product. */
+/** Where `run` stands: a stage-1 run counts only the review mining started from it, never another stage-1 run's. */
 export function subjectProgress(runs: RunSummary[], run: RunSummary): StageProgress {
   const stageTwo = runs
-    .filter((r) => runStage(r) === 2)
+    .filter((r) => runStage(r) === 2 && (runStage(run) === 2 ? r.id === run.id : r.source_run_id === run.id))
     .sort((a, b) => b.created_at.localeCompare(a.created_at));
   const stageTwoRun =
     stageTwo.find((r) => !TERMINAL_STATUSES.has(r.status)) ??
     stageTwo.find((r) => r.status === 'completed') ??
     stageTwo[0];
-  return {
-    stageOneDone: runs.some((r) => r.status === 'completed' && runStage(r) === 1),
-    stageTwoDone: runs.some((r) => r.status === 'completed' && runStage(r) === 2),
-    stageTwoLive: runs.some((r) => runStage(r) === 2 && !TERMINAL_STATUSES.has(r.status)),
-    runIds: {
-      1: runStage(run) === 1 ? run.id : stageOneRunFor(runs, run)?.id,
-      2: runStage(run) === 2 ? run.id : stageTwoRun?.id,
-    },
-  };
-}
-
-/** The stage-1 run a stage-2 run mined from, which its rail's stage-1 header opens: the newest completed one of its product's `runs` that predates it. Mirrors `StageTwoHandoff` in `server/src/agent/stage-two-handoff.ts`. */
-export function stageOneRunFor(runs: RunSummary[], run: RunSummary): RunSummary | undefined {
-  return runs
-    .filter(
-      (r) =>
-        runStage(r) === 1 &&
-        r.status === 'completed' &&
-        r.created_at <= run.created_at,
-    )
+  const stageOneRun = runStage(run) === 1 ? run : runs.find((r) => r.id === run.source_run_id);
+  const newestStageOne = runs
+    .filter((r) => runStage(r) === 1 && r.status === 'completed')
     .sort((a, b) => b.created_at.localeCompare(a.created_at))[0];
+  const superseded = runStage(run) === 2 && !!newestStageOne && newestStageOne.id !== run.source_run_id;
+  return {
+    stageOneDone: stageOneRun?.status === 'completed',
+    stageTwoDone: stageTwo.some((r) => r.status === 'completed'),
+    stageTwoLive: stageTwo.some((r) => !TERMINAL_STATUSES.has(r.status)),
+    runIds: { 1: stageOneRun?.id, 2: stageTwoRun?.id },
+    ...(superseded ? { newerStageOne: newestStageOne } : {}),
+  };
 }
 
 export function RailColumn({

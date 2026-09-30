@@ -10,6 +10,8 @@ import {
 } from './api';
 import { formatTokens } from './format';
 import { scopeLabel } from './StageRail';
+import { AgentTabs } from './logs/AgentTabs';
+import { RUN_TAB, agentTabs, eventsFor } from './logs/agents';
 import { Stat, duration } from './logs/parts';
 import { buildSteps } from './logs/steps';
 import { Timeline } from './logs/timeline';
@@ -24,6 +26,7 @@ export default function LogsPage({ runId }: { runId: string }) {
   const [events, setEvents] = useState<RunEvent[]>([]);
   const [error, setError] = useState('');
   const [reconnecting, setReconnecting] = useState('');
+  const [picked, setPicked] = useState<string | null>(null);
   const [, setTick] = useState(0);
 
   const lastSeq = useRef(0);
@@ -108,7 +111,9 @@ export default function LogsPage({ runId }: { runId: string }) {
     }
   }, [events.length, live]);
 
-  const steps = useMemo(() => buildSteps(events), [events]);
+  const tabs = useMemo(() => agentTabs(events), [events]);
+  const selected = picked ?? tabs[1]?.id ?? RUN_TAB;
+  const steps = useMemo(() => buildSteps(eventsFor(events, selected)), [events, selected]);
 
   const wallMs = run
     ? run.live
@@ -173,6 +178,8 @@ export default function LogsPage({ runId }: { runId: string }) {
               sub={stats.tool_errors ? `${stats.tool_errors} failed` : ''} />
           </div>
         )}
+
+        {run && tabs.length > 1 && <AgentTabs tabs={tabs} selected={selected} onSelect={setPicked} />}
 
         {run && steps.length === 0 && (
           <p className="muted">

@@ -55,11 +55,9 @@ export class RetractTool {
       parameters: retractParameters,
       async execute(_id, params) {
         Trace.line(import.meta.url, "RetractTool.tool.execute", { id: params.id });
-        const retracted = findings.retract(params.id, params.why);
-        const text = retracted
-          ? `RETRACTED ${retracted.id}`
-          : `NOT RETRACTED — no live row with id ${params.id} in this run's ledger`;
-        return { content: [{ type: "text", text }], details: { retracted: retracted !== null, id: params.id } };
+        const result = findings.retract(params.id, params.why);
+        const text = "retracted" in result ? `RETRACTED ${params.id}` : `NOT RETRACTED — ${result.refused}`;
+        return { content: [{ type: "text", text }], details: { retracted: "retracted" in result, id: params.id } };
       },
     };
   }

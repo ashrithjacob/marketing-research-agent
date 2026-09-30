@@ -20,17 +20,8 @@ export const FINDING_KINDS = [
   "saturation",
   "node_status",
   "gap",
-  "candidate",
 ] as const;
 export type FindingKind = (typeof FINDING_KINDS)[number];
-
-export const candidateSchema = z
-  .object({
-    id: z.string(),
-    name: z.string(),
-    url: z.string(),
-  })
-  .strict();
 
 /** Kinds whose packet `id` is the ledger row's id, so the agent never invents one. */
 export const CODE_ID_KINDS: ReadonlySet<FindingKind> = new Set(["excerpt", "measurement", "attribute"]);
@@ -45,7 +36,6 @@ export const FINDING_SCHEMAS: Readonly<Record<FindingKind, z.ZodTypeAny>> = {
   saturation: saturationSchema,
   node_status: nodeStatusSchema,
   gap: gapSchema,
-  candidate: candidateSchema,
 };
 
 const ROW_PREFIX: Readonly<Record<FindingKind, string>> = {
@@ -58,7 +48,6 @@ const ROW_PREFIX: Readonly<Record<FindingKind, string>> = {
   saturation: "sat",
   node_status: "ns",
   gap: "gap",
-  candidate: "cand",
 };
 
 export interface FindingDraft {
@@ -91,7 +80,6 @@ export class Findings {
     switch (kind) {
       case "source":
       case "competitor":
-      case "candidate":
         return String(payload.id ?? "");
       case "competitor_reference":
         return "reference";
@@ -99,6 +87,10 @@ export class Findings {
         return String(payload.node ?? "");
       case "saturation":
         return `${String(payload.node ?? "")}:${String(payload.class ?? "")}`;
+      case "attribute":
+        return `${String(payload.node ?? "")}:${String(payload.key ?? "")}`;
+      case "measurement":
+        return `${String(payload.node ?? "")}:${String(payload.metric ?? "")}:${String(payload.period ?? "")}`;
       default:
         return null;
     }

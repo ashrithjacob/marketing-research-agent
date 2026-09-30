@@ -1,0 +1,48 @@
+import type { RunBilling } from "../adapters/index.js";
+import { stagePacketSchema, type Node, type ResearchStore } from "../domain/index.js";
+import { Trace } from "../trace/index.js";
+
+import type { LiveRuns } from "./live-runs.js";
+import type { StageOneListings } from "./stage-one-listings.js";
+
+/** What follows a settled stage-1 run: the Amazon listings of what it found, and its billed cost. */
+export class RunWrapUp {
+  constructor(
+    private readonly store: ResearchStore,
+    private readonly runs: LiveRuns,
+    private readonly runId: string,
+    private readonly listings?: StageOneListings,
+  ) {}
+
+  /** After a completed competitors run, never before: an Apify search can wait minutes, and must not hold the run's status. */
+  async lookUpListings(nodes: readonly Node[]): Promise<void> {
+    Trace.line(import.meta.url, "RunWrapUp.lookUpListings", { nodes });
+    const { store, runs, runId, listings } = this;
+    if (!listings?.available || !nodes.includes("competitors")) return;
+    const run = store.getRun(runId);
+    const packet = stagePacketSchema.safeParse(run?.packet);
+    if (run?.status !== "completed" || !packet.success) return;
+    try {
+      const rows = await listings.lookUp(runId, packet.data, (charge) =>
+        runs.emit(runId, "apify.charged", { actor: charge.actor, usd: charge.usd, status: charge.status }),
+      );
+      runs.emit(runId, "packet.listings", { total: rows.length, matched: rows.filter((row) => row.matches).length });
+    } catch (error) {
+      runs.emit(runId, "packet.listings", { error: error instanceof Error ? error.message : String(error) });
+    }
+  }
+
+  async recordBilling(billing: RunBilling): Promise<void> {
+    Trace.line(import.meta.url, "RunWrapUp.recordBilling", { billing });
+    const { store, runs, runId } = this;
+    try {
+      const billed = await billing.settle();
+      if (!billed) return;
+      const usage = store.getRun(runId)?.usage ?? {};
+      store.updateRun(runId, { usage: { ...usage, billed } });
+      runs.emit(runId, "run.billed", { billed });
+    } catch (error) {
+      console.error(`research run ${runId}: recording the billed cost failed`, error);
+    }
+  }
+}

@@ -27,14 +27,17 @@ import {
   ResearchToolset,
   WebFetchTool,
 } from "../src/agent/tools/index.js";
-import { LedgerPacket, RunFindings } from "../src/agent/index.js";
+import { AgentRoster, ChampionDone, NodeDone, RunFindings } from "../src/agent/index.js";
 import { ServiceClients } from "../src/adapters/index.js";
 import {
   STAGE_NODES,
+  STAGE_ONE_AGENT_SPECS,
+  StageOnePlans,
   locatorSchema,
   type Node,
+  type StageOneAgent,
 } from "../src/domain/index.js";
-import { MemoryLedger, minimalPacket, reviewPacket, services } from "./fixtures.js";
+import { MemoryLedger, minimalPacket, productPacket, reviewPacket, services } from "./fixtures.js";
 
 let dir: string;
 let settings: Settings;
@@ -427,36 +430,52 @@ describe("the fetch gate", () => {
 });
 
 describe("the ledger tools", () => {
-  const ledgerTools = (nodes: readonly Node[] = STAGE_NODES[1], brief = { product: "MagnaCalm 400mg", url: "", market: "", notes: "" }) => {
-    const ledger = new MemoryLedger();
-    const findings = new RunFindings(ledger, "run-l", "parent", nodes);
-    const packet = new LedgerPacket(findings, { brief, nodes });
-    const valid: any[] = [];
+  const MAGNACALM = { product: "MagnaCalm 400mg", url: "", market: "", notes: "" };
+  const ledgerTools = (
+    agent: StageOneAgent = "product",
+    options: { nodes?: readonly Node[]; brief?: typeof MAGNACALM; ledger?: MemoryLedger; roster?: AgentRoster; pollMs?: number } = {},
+  ) => {
+    const nodes = options.nodes ?? STAGE_NODES[1];
+    const brief = options.brief ?? MAGNACALM;
+    const ledger = options.ledger ?? new MemoryLedger();
+    const node = StageOnePlans.nodeOf(agent, nodes);
+    const findings = new RunFindings(ledger, "run-l", agent, [node]);
+    const check =
+      agent === "champion"
+        ? new ChampionDone(findings, brief)
+        : new NodeDone(findings, { brief, node, champion: agent === "competitors" ? "champion" : null });
     const checked: Array<{ valid: boolean; problems: readonly string[] }> = [];
     const list = new ResearchToolset({
       settings,
       runId: "run-l",
       services: services(settings),
-      findings: {
-        nodes,
+      ledger: {
         findings,
-        packet,
-        hooks: { onValid: (p) => valid.push(p), onChecked: (v, problems) => checked.push({ valid: v, problems }) },
+        records: STAGE_ONE_AGENT_SPECS[agent].records,
+        check,
+        onChecked: (v, problems) => checked.push({ valid: v, problems }),
+        ...(options.roster ? { roster: options.roster } : {}),
+        ...(options.pollMs !== undefined ? { pollMs: options.pollMs } : {}),
       },
     }).build();
     const tool = (name: string) => list.find((t) => t.name === name)!;
-    return { ledger, tool, names: list.map((t) => t.name), valid, checked };
+    return { ledger, tool, names: list.map((t) => t.name), checked };
   };
   const text = (result: any) => result.content[0].text as string;
 
-  it("are offered only to a run that has a ledger, and competitor records only with competitors in scope", () => {
+  it("gives each agent only its own record kinds, and wait_for only with a roster", () => {
     const bare = new ResearchToolset({ settings, runId: "r", services: services(settings) }).build().map((t) => t.name);
     expect(bare).not.toContain("finish");
-    expect(ledgerTools().names).toContain("record_competitor");
-    const productOnly = ledgerTools(["product_data"]).names;
-    expect(productOnly).toContain("finish");
-    expect(productOnly).not.toContain("record_competitor");
-    expect(productOnly).not.toContain("record_reference");
+    const product = ledgerTools("product").names;
+    expect(product).toEqual(expect.arrayContaining(["record_attribute", "record_node_status", "read_ledger", "finish"]));
+    expect(product).not.toContain("record_competitor");
+    expect(product).not.toContain("record_reference");
+    expect(product).not.toContain("wait_for");
+    expect(ledgerTools("competitors").names).toContain("record_competitor");
+    const champion = ledgerTools("champion").names;
+    expect(champion).toContain("record_reference");
+    expect(champion).not.toContain("record_node_status");
+    expect(ledgerTools("category", { roster: new AgentRoster() }).names).toContain("wait_for");
   });
 
   it("names the one problem with a record, and records nothing", async () => {
@@ -470,6 +489,13 @@ describe("the ledger tools", () => {
     expect(ledger.rows).toHaveLength(0);
   });
 
+  it("refuses a row filed under another agent's node", async () => {
+    const { ledger, tool } = ledgerTools("product");
+    const attribute = { node: "category_data", key: "seasonality", value: "winter", source_id: "sha256:aaa" };
+    expect(text(await tool("record_attribute").execute("1", { item: attribute }))).toMatch(/^NOT RECORDED — this belongs to category_data/);
+    expect(ledger.rows).toHaveLength(0);
+  });
+
   it("takes the item as one JSON string as well as an object", async () => {
     // A live glm run stringified the packet on every one of six calls.
     const { tool } = ledgerTools();
@@ -478,16 +504,51 @@ describe("the ledger tools", () => {
     expect(text(await tool("record_gap").execute("2", { item: '{"node": "product_data"' }))).toMatch(/^NOT RECORDED — the item did not decode/);
   });
 
-  it("assigns an excerpt's id itself, whatever the model sent", async () => {
+  it("assigns an attribute's id itself, and files the row under the agent that wrote it", async () => {
     const { ledger, tool } = ledgerTools();
-    const excerpt = { id: "sha256:bbb", source_id: "sha256:aaa", text: "Wake up rested.", node: "product_data" };
-    expect(text(await tool("record_excerpt").execute("1", { item: excerpt }))).toBe("RECORDED ex1");
+    const attribute = { id: "sha256:bbb", source_id: "sha256:aaa", key: "price", value: "£9.99", node: "product_data" };
+    expect(text(await tool("record_attribute").execute("1", { item: attribute }))).toBe("RECORDED at1");
     expect(ledger.rows[0]!.payload).not.toHaveProperty("id");
     expect(ledger.rows[0]!.entity).toBe("product");
+    expect(ledger.rows[0]!.agent_id).toBe("product");
+  });
+
+  it("keeps a product or category fact outside the required fields", async () => {
+    // workings_stage1.md 13 and 15: each agent tries for its required fields and may keep more.
+    const product = ledgerTools("product");
+    const extra = { node: "product_data", key: "third_party_lab_tested", value: "yes", source_id: "sha256:aaa" };
+    expect(text(await product.tool("record_attribute").execute("1", { item: extra }))).toMatch(/^RECORDED at1/);
+    const category = ledgerTools("category");
+    const mood = { node: "category_data", key: "consumer_mood", value: "worried", source_id: "sha256:aaa" };
+    expect(text(await category.tool("record_attribute").execute("0", { item: mood }))).toMatch(/^RECORDED at/);
+    const monthly = { node: "category_data", metric: "search_volume_monthly", value: 1, unit: "searches", period: "2025", source_id: "sha256:aaa" };
+    expect(text(await category.tool("record_measurement").execute("2", { item: monthly }))).toMatch(/^RECORDED me/);
+    const segmented = { ...monthly, metric: "category_size: respiratory supplements", unit: "USD billion" };
+    expect(text(await category.tool("record_measurement").execute("3", { item: segmented }))).toMatch(/^RECORDED me/);
+    expect(product.names).not.toContain("record_excerpt");
+    expect(category.names).not.toContain("record_excerpt");
+  });
+
+  it("replaces a field recorded again, rather than keeping both", async () => {
+    const { ledger, tool } = ledgerTools();
+    const price = { node: "product_data", key: "price", value: "£9.99", source_id: "sha256:aaa" };
+    await tool("record_attribute").execute("1", { item: price });
+    expect(text(await tool("record_attribute").execute("2", { item: { ...price, value: "£8.99" } }))).toBe("RECORDED at2 (replaces at1)");
+    expect(ledger.rows.filter((row) => row.retracted_at === "")).toHaveLength(1);
+  });
+
+  it("names every category field still open, and wants three years for a trend", async () => {
+    const { tool } = ledgerTools("category", { nodes: ["category_data"] });
+    const row = { node: "category_data", metric: "search_volume", value: 100, unit: "searches", source_id: "sha256:aaa" };
+    for (const period of ["2023", "2024"]) await tool("record_measurement").execute(period, { item: { ...row, period } });
+    const answer = text(await tool("finish").execute("f", {}));
+    expect(answer).toMatch(/`search_volume` needs rows for at least 3 different years/);
+    expect(answer).toMatch(/`category_size` is neither recorded nor gapped/);
+    expect(answer).toMatch(/`seasonality` is neither recorded nor gapped/);
   });
 
   it("files a competitor under its own id", async () => {
-    const { ledger, tool } = ledgerTools();
+    const { ledger, tool } = ledgerTools("competitors");
     const competitor = {
       id: "c3", name: "HERBIFY Mullein", url: "https://herbify.example", relation: "direct", form: "liquid",
       active_ingredients: [{ name_as_printed: "Mullein", name_normalised: "mullein" }],
@@ -505,9 +566,64 @@ describe("the ledger tools", () => {
     expect(text(await tool("retract").execute("3", { id: "gap1", why: "again" }))).toMatch(/^NOT RETRACTED/);
   });
 
-  it("finishes a complete ledger, ends the loop, and hands the packet over", async () => {
-    const { tool, valid, checked } = ledgerTools(["product_data"]);
-    const packet = minimalPacket();
+  it("lets an agent replace and retract only its own rows", async () => {
+    // workings_stage1.md: an agent may overwrite its own data, and only read another's.
+    const ledger = new MemoryLedger();
+    const product = ledgerTools("product", { ledger });
+    const category = ledgerTools("category", { ledger });
+    const source = minimalPacket().sources[0];
+    await product.tool("record_source").execute("1", { item: source });
+    expect(text(await category.tool("record_source").execute("2", { item: { ...source, node: "category_data" } }))).toBe("RECORDED src2");
+    expect(ledger.rows.filter((row) => row.retracted_at === "")).toHaveLength(2);
+    expect(text(await product.tool("record_source").execute("3", { item: source }))).toBe("RECORDED src3 (replaces src1)");
+    expect(text(await category.tool("retract").execute("4", { id: "src3", why: "not mine" }))).toMatch(
+      /^NOT RETRACTED — src3 was recorded by agent product; an agent retracts only its own rows/,
+    );
+  });
+
+  it("reads every agent's rows, or one agent's, or one kind's", async () => {
+    const ledger = new MemoryLedger();
+    const product = ledgerTools("product", { ledger });
+    const category = ledgerTools("category", { ledger });
+    await product.tool("record_source").execute("1", { item: minimalPacket().sources[0] });
+    await category.tool("record_gap").execute("2", { item: { ...minimalPacket().gaps[0], node: "category_data" } });
+    const all = text(await category.tool("read_ledger").execute("3", {}));
+    expect(all).toContain("src1 [product] source:");
+    expect(all).toContain("gap2 [category] gap:");
+    expect(text(await category.tool("read_ledger").execute("4", { agent: "product" }))).not.toContain("gap2");
+    expect(text(await category.tool("read_ledger").execute("5", { kind: "attribute" }))).toBe("No live rows match.");
+  });
+
+  it("waits for another agent's row, polling the ledger, and hands it over", async () => {
+    const ledger = new MemoryLedger();
+    const roster = new AgentRoster();
+    const waiter = ledgerTools("competitors", { ledger, roster, pollMs: 5 });
+    const product = ledgerTools("product", { ledger });
+    const waiting = waiter.tool("wait_for").execute("1", { agent: "product", kind: "attribute" });
+    await new Promise((resolve) => setTimeout(resolve, 12));
+    await product.tool("record_attribute").execute("2", { item: minimalPacket().attributes[0] });
+    const result = await waiting;
+    expect(text(result)).toMatch(/^READY — product has recorded attribute:\nat1 \[product\] attribute:/);
+    expect((result.details as any).polls).toBeGreaterThan(1);
+  });
+
+  it("stops waiting when the other agent has ended without the row", async () => {
+    const roster = new AgentRoster();
+    roster.end("product");
+    const { tool } = ledgerTools("competitors", { roster, pollMs: 5 });
+    const result = await tool("wait_for").execute("1", { agent: "product", kind: "attribute" });
+    expect(text(result)).toMatch(/^NOT AVAILABLE — product has ended without recording attribute/);
+  });
+
+  it("gives up waiting after its checks, so two agents waiting on each other both go on", async () => {
+    const { tool } = ledgerTools("competitors", { roster: new AgentRoster(), pollMs: 0 });
+    const result = await tool("wait_for").execute("1", { agent: "category", kind: "measurement" });
+    expect(text(result)).toMatch(/^NOT AVAILABLE — category recorded no measurement in 40 checks/);
+  });
+
+  it("finishes an agent whose own rows pass its node, and ends its loop", async () => {
+    const { tool, checked } = ledgerTools("product", { nodes: ["product_data"] });
+    const packet = productPacket();
     for (const [name, items] of [
       ["record_source", packet.sources],
       ["record_attribute", packet.attributes],
@@ -519,33 +635,70 @@ describe("the ledger tools", () => {
     const result = await tool("finish").execute("f", {});
     expect(text(result)).toMatch(/^FINISHED/);
     expect(result.terminate).toBe(true);
-    expect(valid).toHaveLength(1);
-    expect(valid[0].brief.product).toBe("MagnaCalm 400mg");
-    expect(valid[0].attributes[0].id).toBe("at2");
     expect(checked).toEqual([{ valid: true, problems: [] }]);
   });
 
-  it("hands back every cross-field problem, numbered, and keeps the run going", async () => {
-    const { tool, valid, checked } = ledgerTools(["product_data"]);
+  it("checks an agent's own rows only, not the rows other agents have not finished", async () => {
+    const ledger = new MemoryLedger();
+    const product = ledgerTools("product", { ledger });
+    const category = ledgerTools("category", { ledger });
+    await category.tool("record_attribute").execute("0", { item: { node: "category_data", key: "seasonality", value: "winter", source_id: "sha256:nowhere" } });
+    const packet = productPacket();
+    for (const [name, items] of [
+      ["record_source", packet.sources],
+      ["record_attribute", packet.attributes],
+      ["record_node_status", packet.nodes],
+      ["record_gap", packet.gaps],
+    ] as const) {
+      for (const item of items) await product.tool(name).execute("r", { item });
+    }
+    expect(text(await product.tool("finish").execute("f", {}))).toMatch(/^FINISHED/);
+  });
+
+  it("hands back every cross-field problem, numbered, and keeps the agent going", async () => {
+    const { tool, checked } = ledgerTools("product", { nodes: ["product_data"] });
     const orphan = { node: "product_data", key: "dose_per_serving", value: "400 mg", source_id: "sha256:nowhere" };
     await tool("record_attribute").execute("1", { item: orphan });
     const result = await tool("finish").execute("f", {});
-    expect(text(result)).toMatch(/^NOT FINISHED — 3 problems/);
-    expect(text(result)).toContain("2. attribute 'at1' cites source 'sha256:nowhere', which is not in the packet");
-    expect(text(result)).toContain("3. gap list is empty; real research always has holes");
+    expect(text(result)).toMatch(/^NOT FINISHED — 12 problems/);
+    expect(text(result)).toContain("1. `name` is neither recorded nor gapped");
+    expect(text(result)).toContain("attribute 'at1' cites source 'sha256:nowhere', which is not in the packet");
+    expect(text(result)).toContain("12. gap list is empty; real research always has holes");
     expect(result.terminate).toBeUndefined();
-    expect(valid).toHaveLength(0);
-    expect(checked[0]!.problems).toHaveLength(3);
+    expect(checked[0]!.problems).toHaveLength(12);
+  });
+
+  it("finishes the champion once its reference is recorded with its ranking", async () => {
+    const { tool } = ledgerTools("champion");
+    expect(text(await tool("finish").execute("0", {}))).toContain("1. no champion is recorded");
+    const source = { ...minimalPacket().sources[0], node: "competitors" };
+    await tool("record_source").execute("1", { item: source });
+    const reference = { name: "MagnaCalm Glycinate", form: "capsule", actives: ["magnesium glycinate"], source_id: "sha256:aaa" };
+    await tool("record_reference").execute("2", { item: reference });
+    expect(text(await tool("finish").execute("3", {}))).toMatch(/carries no popularity evidence/);
+    await tool("record_reference").execute("4", {
+      item: { ...reference, reviews_count: 900, runner_up_name: "CalmWell", runner_up_reviews: 400, amazon_url: "https://www.amazon.com/dp/B0X" },
+    });
+    expect(text(await tool("finish").execute("5", {}))).toMatch(/^FINISHED/);
+  });
+
+  it("needs no ranking from the champion of a url brief", async () => {
+    const { tool } = ledgerTools("champion", { brief: { ...MAGNACALM, product: "", url: "https://magnacalm.example" } });
+    await tool("record_source").execute("1", { item: { ...minimalPacket().sources[0], node: "competitors" } });
+    await tool("record_reference").execute("2", {
+      item: { name: "MagnaCalm", form: "capsule", actives: ["magnesium glycinate"], source_id: "sha256:aaa" },
+    });
+    expect(text(await tool("finish").execute("3", {}))).toMatch(/^FINISHED/);
   });
 
   it("refuses a sixth check without spending anything, and ends the loop", async () => {
-    const { tool, checked } = ledgerTools(["product_data"]);
+    const { tool, checked } = ledgerTools("product", { nodes: ["product_data"] });
     for (let i = 1; i <= 5; i++) {
       expect(text(await tool("finish").execute(String(i), {}))).toContain(`Checks used: ${i} of 5.`);
     }
     for (const call of ["6", "7"]) {
       const refused = await tool("finish").execute(call, {});
-      expect(text(refused)).toMatch(/^NOT CHECKED — the 5 checks for this run are spent/);
+      expect(text(refused)).toMatch(/^NOT CHECKED — your 5 checks are spent/);
       expect(refused.terminate).toBe(true);
     }
     expect(checked).toHaveLength(5);

@@ -68,6 +68,7 @@ export const competitorReferenceSchema = z
     reviews_count: z.number().int().min(0).default(0),
     runner_up_name: z.string().nullable().default(null),
     runner_up_reviews: z.number().int().min(0).nullable().default(null),
+    amazon_url: z.string().default(""),
   })
   .strict();
 export type CompetitorReference = z.infer<typeof competitorReferenceSchema>;

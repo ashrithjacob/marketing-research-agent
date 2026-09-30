@@ -13,31 +13,20 @@ export const RECORD_TOOLS = [
       '"archived":true,"node":"product_data"}',
   },
   {
-    name: "record_excerpt",
-    kind: "excerpt",
-    description:
-      "Record one verbatim excerpt, character for character, from a recorded source. The id is " +
-      "assigned for you. star_rating and axis are for review text only; posted_at is a string, " +
-      'never null. Example: {"source_id":"sha256:1c9d…","text":"Wake up without the 3am slump.",' +
-      '"locator":{"kind":"char_range","start":120,"end":151},"node":"product_data",' +
-      '"star_rating":null,"posted_at":"","axis":null,"themes":["sleep maintenance"]}',
-  },
-  {
     name: "record_measurement",
     kind: "measurement",
     description:
       "Record one number a source states, with its unit and period. The id is assigned for you. " +
-      'Example: {"node":"category_data","metric":"search_volume_monthly","value":12100,' +
+      'Example: {"node":"category_data","metric":"search_volume","value":12100,' +
       '"unit":"searches","period":"2025-09","source_id":"sha256:9c04…"}',
   },
   {
     name: "record_attribute",
     kind: "attribute",
     description:
-      "Record one field read off a page. The key is yours to name when the checklist has no " +
-      "field for the fact. For the product's own name as the site writes it, use key `name`. " +
-      'The id is assigned for you. Example: {"node":"product_data","key":"third_party_lab_tested",' +
-      '"value":"Yes — Eurofins, batch 2291","source_id":"sha256:1c9d…"}',
+      "Record one field read off a page: your task's keys first, then any other fact under a key you name. " +
+      REPLACES + ' The id is assigned for you. Example: {"node":"product_data","key":"dose_per_serving",' +
+      '"value":"400 mg per 2 capsules","source_id":"sha256:1c9d…"}',
   },
   {
     name: "record_reference",
@@ -45,10 +34,12 @@ export const RECORD_TOOLS = [
     description:
       "Record the champion product every competitor is measured against. There is one; " +
       "recording it again replaces it. With a url brief the champion is that site's product and " +
-      "there is no ranking: runner_up_name and runner_up_reviews are null. Example: " +
+      "there is no ranking: runner_up_name and runner_up_reviews are null. amazon_url is the " +
+      "champion's Amazon listing, or \"\" when it has none. Example: " +
       '{"name":"MagnaCalm Glycinate 400mg","form":"capsule","form_as_printed":"90 vegan capsules",' +
       '"actives":["magnesium glycinate"],"source_id":"sha256:1c9d…","reviews_count":18234,' +
-      '"runner_up_name":"CalmWell Glycinate","runner_up_reviews":9120}',
+      '"runner_up_name":"CalmWell Glycinate","runner_up_reviews":9120,' +
+      '"amazon_url":"https://www.amazon.com/dp/B0EXAMPLE1"}',
   },
   {
     name: "record_competitor",
@@ -97,7 +88,17 @@ export const RETRACT_DESCRIPTION =
   "a retracted row stays in the ledger and leaves the packet.";
 
 export const FINISH_DESCRIPTION =
-  "Build the packet from everything recorded and check it against the contract. Call it alone, " +
-  "once every node in scope has its status and its gaps. It answers FINISHED, which ends the " +
-  "run, or the numbered problems to fix with record_* or retract before calling it again. " +
-  "Five checks per run; after the fifth the run ends and is settled from the ledger as it stands.";
+  "Check your part of the ledger against the contract. Call it alone, once your task is " +
+  "recorded with its status and its gaps. It answers FINISHED, which ends your work, or the " +
+  "numbered problems to fix with record_* or retract before calling it again. Five checks; " +
+  "after the fifth you end with what the ledger holds.";
+
+export const READ_LEDGER_DESCRIPTION =
+  "Read the run's shared ledger: every agent's live rows, or only one agent's (`agent`) or one " +
+  "kind's (`kind`). Agents are champion, product, competitors and category. You can read any " +
+  "row; you can replace or retract only rows you recorded.";
+
+export const WAIT_FOR_DESCRIPTION =
+  "Wait until another agent has recorded a row of `kind` in the ledger, checking every 15 " +
+  "seconds, then get those rows back. Use it only when you cannot go on without that row. It " +
+  "returns early if that agent has ended without recording one.";

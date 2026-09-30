@@ -54,6 +54,7 @@ export class ReviewMiningJob {
     if (!this.actors) throw new Error("APIFY_TOKEN is not set, so no review can be pulled");
     const source = new StageTwoHandoff(this.store).forBrief(request.brief, Scope.of(request.workspaceId));
     if (!source) throw new Error("no completed stage-1 run for this brief names the targets to mine");
+    this.store.updateRun(runId, { source_run_id: source.run.id });
     const runner = new MeteredActorRunner(this.actors, (charge) =>
       this.runs.emit(runId, "apify.charged", { actor: charge.actor, usd: charge.usd, status: charge.status }),
     );

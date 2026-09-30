@@ -61,12 +61,14 @@ export interface RunUpdate {
   output?: string;
   usage?: unknown;
   ended_at?: string;
-  packet_source?: "finish" | "ledger" | "pipeline" | "";
+  packet_source?: "ledger" | "pipeline" | "";
+  source_run_id?: string;
 }
 
 export interface LlmCallRecord {
   run_id: string;
   seq: number;
+  agent_id: string;
   started_at: string;
   ended_at: string;
   duration_ms: number;

@@ -9,9 +9,8 @@ import { Trace } from "../trace/index.js";
 import { PacketDraft } from "./draft.js";
 import { ZodProblems } from "./validator.js";
 
-const COMPETITOR_KINDS: ReadonlySet<FindingKind> = new Set(["competitor", "competitor_reference", "candidate"]);
 
-/** One record, checked when it is written: its section's schema, and a node this run covers. */
+/** One record, checked when it is written: its section's schema, a node this run covers. The champion belongs to every stage-1 run. */
 export class FindingCheck {
   static check(
     kind: FindingKind,
@@ -28,7 +27,8 @@ export class FindingCheck {
     const parsed = FINDING_SCHEMAS[kind].safeParse(draft);
     if (!parsed.success) return { problems: ZodProblems.readable(parsed.error) };
     const payload = parsed.data as Record<string, unknown>;
-    const node = COMPETITOR_KINDS.has(kind) ? "competitors" : String(payload.node ?? "");
+    if (kind === "competitor_reference") return { payload };
+    const node = kind === "competitor" ? "competitors" : String(payload.node ?? "");
     if (!scope.includes(node as Node)) {
       return {
         problems: `this belongs to ${node}, which is outside this run's scope (${scope.join(", ")})`,

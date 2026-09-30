@@ -13,11 +13,13 @@ export function StageOneTiles({
   packet,
   nodes,
   listings,
+  requiredFields,
 }: {
   runId: string;
   packet: StagePacket;
   nodes: ReadonlySet<string>;
   listings: TargetListing[];
+  requiredFields: Record<string, string[]>;
 }) {
   const byNode = useMemo(() => {
     const map: Record<string, Rows> = {};
@@ -44,6 +46,7 @@ export function StageOneTiles({
           runId={runId}
           packet={packet}
           attributes={product.attributes}
+          required={requiredFields.product_data ?? []}
           measurements={product.measurements}
           excerpts={product.excerpts}
           sources={product.sources}
@@ -64,6 +67,8 @@ export function StageOneTiles({
       {nodes.has('category_data') && (
         <CategoryTile
           runId={runId}
+          attributes={category.attributes}
+          required={requiredFields.category_data ?? []}
           measurements={category.measurements}
           sources={category.sources}
           gaps={category.gaps}

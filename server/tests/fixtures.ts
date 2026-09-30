@@ -2,7 +2,7 @@ import type { AssistantMessage, ToolCall } from "@earendil-works/pi-ai";
 import { fauxAssistantMessage, fauxToolCall } from "@earendil-works/pi-ai/providers/faux";
 
 import { ServiceClients } from "../src/adapters/index.js";
-import { Findings, type Finding, type FindingDraft, type FindingLedger, type PageFetcher } from "../src/domain/index.js";
+import { Findings, PRODUCT_ATTRIBUTES, type Finding, type FindingDraft, type FindingLedger, type PageFetcher } from "../src/domain/index.js";
 import type { ActorRunner } from "../src/adapters/apify/index.js";
 import type { Settings } from "../src/config/index.js";
 
@@ -151,6 +151,25 @@ export function recorded(packet: Record<string, any>, options: { responseId?: st
     fauxAssistantMessage(recordCalls(packet), { stopReason: "toolUse" }),
     fauxAssistantMessage(fauxToolCall("finish", {}), { stopReason: "toolUse", ...options }),
   ];
+}
+
+/** A product_data part the product agent can finish: dose recorded, the other nine checklist fields gapped. */
+export function productPacket(overrides: Record<string, unknown> = {}): Record<string, any> {
+  const gaps = PRODUCT_ATTRIBUTES.filter((key) => key !== "dose_per_serving").map((key) => ({
+    node: "product_data",
+    missing: `${key}: not published on the product page`,
+  }));
+  return minimalPacket({ gaps, ...overrides });
+}
+
+/** A genre brief scoped to product_data: the champion agent records its pick, gapping the ranking no test can do, then the product agent records `packet`. */
+export function genreRun(packet: Record<string, any> = productPacket()): AssistantMessage[] {
+  const champion = {
+    sources: [{ ...minimalPacket().sources[0], node: "product_data" }],
+    competitor_reference: { name: "MagnaCalm Glycinate", form: "capsule", actives: ["magnesium glycinate"], source_id: "sha256:aaa" },
+    gaps: [{ node: "product_data", missing: "champion ranking unavailable: no Amazon search in tests" }],
+  };
+  return [...recorded(champion), ...recorded(packet)];
 }
 
 /** The shared service clients, with a stand-in Apify runner when a test needs one. */

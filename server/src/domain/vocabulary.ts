@@ -73,18 +73,6 @@ export const FORMS = [
 export type Form = (typeof FORMS)[number];
 export const formSchema = z.enum(FORMS);
 
-export const FORM_NOTES: ReadonlyArray<readonly [Form, string]> = [
-  ["capsule", "including softgel and veg cap"],
-  ["tablet", "including chewable and effervescent"],
-  ["gummy", ""],
-  ["powder", ""],
-  ["liquid", "drops, tincture, syrup, shot"],
-  ["spray", ""],
-  ["tea", ""],
-  ["topical", "cream, balm, oil or patch on the skin"],
-  ["other", ""],
-] as const;
-
 export const COMPETITOR_RELATIONS = ["direct", "indirect"] as const;
 export type CompetitorRelation = (typeof COMPETITOR_RELATIONS)[number];
 export const relationSchema = z.enum(COMPETITOR_RELATIONS);

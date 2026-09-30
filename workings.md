@@ -25,7 +25,7 @@ browser (React, frontend/src)
    ▼
 mra container — one Node process (server/src, layered — see CLAUDE.md)
    ├─ http/         App (auth, the SPA), ResearchApi (/api/research/*)
-   ├─ agent/        RunSupervisor: one pi-agent-core Agent per run, in-process
+   ├─ agent/        RunSupervisor: up to four pi-agent-core Agents per stage-1 run, in-process
    │                LlmCallLog wraps the streamFn: every call, prompt and answer
    │                prompt/   brief + scope + rules + judgements → instructions
    │                tools/    the only things the agent can do (below)
@@ -162,50 +162,111 @@ All of this happens **before the HTTP response is sent**:
    The model is then **priced**: `costs.price()` writes OpenRouter's current list
    rates onto its `cost`, so pi-ai's per-turn arithmetic uses them rather than the
    snapshot bundled in the package (see §2a).
-5. **Instructions** — `agent/prompt/`'s `PromptBuilder` builds two things:
-   - the **system prompt**: "you are the stage-1 researcher", the tool list, and
-     what to do if the review tools are absent;
-   - the **user turn**, in this order: the rules (gather, never conclude; the four
-     nodes; done = saturation; admission; how source ids work; the gap list is
-     required) → standing judgements → the brief (with a line telling the agent no
-     URL was supplied and finding one is its job) → the output contract and a worked
-     example packet, framed as shape only — its product is invented, and a packet
-     about it is rejected (step 4).
-6. **Agent** — a `pi-agent-core` `Agent` is created in this process with that
-   system prompt, the model, session id `research-<runId>` and the tools from
-   `createResearchTools()`. Its `streamFn` — the one function that sends a request
-   to the model — is wrapped by `LlmCallLog` (`agent/llm-call-log.ts`), so every call is
-   logged exactly as sent and answered (§2b).
-7. The row becomes `running`, a `run.started {model, nodes}` event is written, and
-   `watch()` is started **without awaiting it**. The endpoint returns the run summary.
+5. **The plan** — `StageOnePlans.of(brief, nodes)` (`domain/stage-one-agents.ts`)
+   decides which agents run. **Step 1** is the `champion` agent, alone: it runs
+   unless the brief is a url *and* `competitors` is out of scope (then the product
+   is the one the url sells, and there is nothing to rank). **Step 2** is one agent
+   per node in scope — `product` (`product_data`), `competitors`, `category`
+   (`category_data`) — all at once. Decided 2026-09-30, `workings_stage1.md`.
+6. **`StageOneRun`** (`agent/stage-one-run.ts`) is created and started **without
+   awaiting it**. The row becomes `running`, `run.started {model, nodes}` is
+   written, and the endpoint returns the run summary. Each agent is built when its
+   step starts, by `StageOneAgentFactory` (`agent/stage-one-agent-factory.ts`):
+   - a `pi-agent-core` `Agent`, session id `research-<runId>-<agent>`, the run's
+     model (step 4);
+   - its **system prompt** (`PromptBuilder.system`): who it is, that four agents
+     share one ledger, and only the tools it has. `category` has its own system
+     prompt; the other three share one;
+   - its **user turn** (`PromptBuilder.instructions`): the shared gathering rules
+     with *its own* task in them → standing judgements → the brief → for a step-2
+     agent, **the champion row as the ledger holds it** (or "no champion was looked
+     up") → recording notes;
+   - its tools (below), its `finish` check, and a `streamFn` wrapped by
+     `LlmCallLog` under its `agent_id`, numbered by one `CallSequence` per run so
+     `seq` stays unique across agents (§2b).
 
-### Step 4 — the browser starts following
+### Step 4 — the browser starts following### Step 4 — the browser starts following
 
 `App.tsx` closes the modal, reloads the run list and selects the new run.
 `RunView.tsx` fetches `GET /runs/:id` and opens `GET /runs/:id/events?after=0`
 (SSE). Every event with a kind starting `run.` or `packet.` makes it re-fetch the run,
 which is how the status chip and counters change.
 
-### Step 5 — the agent works (`agent/run-watch.ts` `run()`)
+### Step 5 — the agents work (`agent/stage-one-run.ts`, `agent/agent-driver.ts`)
 
-`agent.prompt(instructions)` runs the loop: model turn → tool calls → model turn →
-… until the model stops calling tools. The tools are the agent's entire surface:
+`StageOneRun.start()` drives the champion to its end, then starts the step-2
+agents together and waits for all of them (`Promise.all`). `AgentDriver.drive()`
+runs one agent's loop — model turn → tool calls → model turn → … — emits
+`agent.started` and `agent.ended {status}`, and retries a dropped stream (step 6,
+0a) for that agent alone. An agent ends `complete` (its `finish` passed),
+`incomplete`, `failed` (it errored) or `cancelled` (Stop). The run is settled once,
+after the last one ends (step 6).
+
+**The agents' tasks** (`agent/prompt/text/tasks.ts`). Each agent's user prompt is
+its own task — the fields, where to look, how to work, when to stop — then a short
+shared `## Sources` block (`text/sources.ts`: fetch before citing, the source kinds,
+the rejected kinds), standing judgements, the brief, and for step 2 the champion.
+
+| Agent | Records | Task | Done when |
+|---|---|---|---|
+| `champion` | source, reference, gap | genre brief: `amazon_find_product` with the genre, the most-reviewed listing is the champion and the next is the runner-up; read its page, `record_reference` with the ranking and `amazon_url`. Url brief: fetch the site, then `amazon_find_product` for its Amazon listing | `ChampionDone`: a reference citing a source it recorded, and for a genre brief the ranking `ChampionCheck` demands (or a "champion ranking unavailable" gap) |
+| `product` | source, attribute, node status, gap | the ten `PRODUCT_ATTRIBUTES`, one attribute each, from the product page, its Shopify `.json`, FAQ and policy pages; other facts may follow as attributes with their own key, never instead of the ten | `NodeDone`: every one of the ten recorded or gapped as "<key>: <why>", and its rows pass the contract for `product_data` |
+| `competitors` | source, competitor, saturation, node status, gap | the direct/indirect search of §2c, measured against the champion row | `NodeDone` over its own rows **plus the champion's**: both saturation curves |
+| `category` | source, measurement, attribute, node status, gap | `search_volume` (rows for three or more years), `category_size: <segment>`, `seasonality`; two failed routes to a field and it is gapped; other category facts may follow, never instead of the three | `NodeDone`: all three recorded or gapped, the trend three distinct years |
+
+**The required fields are enforced, not only asked for** (`domain/node-fields.ts`).
+`finish` names every required field that has neither a row nor a gap starting with
+its name, and the turn limit (below) gaps them if the agent runs out. Other keys
+are kept: both agents try for their required fields first and may record other
+facts after them (decided 2026-10-01; refusing them, decision 11, was reversed the
+same day). `finish` names every field
+that has neither a row nor a gap starting with its name.
+
+**Each agent has a turn limit** (`maxTurns` in `STAGE_ONE_AGENT_SPECS`: champion
+10, product 15, category 15, competitors 20 — one turn is one model reply; set by
+the operator 2026-10-01). The
+prompt states it. `TurnBudget` counts turns through pi-agent-core's own
+`finishTurn` hook, which ends the agent loop after the last one. If the agent had
+not passed `finish` by then, code records under its id a gap for every field
+still open (`"<field>: not found within the 15-call limit"`) and an incomplete
+status, and emits `agent.limit_reached {agent_id, limit, gapped}`. The champion
+is not closed this way: a missing champion cannot be gapped into existence. The
+first limits (category 20, competitors 40) were set from run `4035e2b6`, where
+product finished in 10 turns and category in 22.
+
+**Superseded 2026-10-01: the shared rules and the open record.** Every agent used
+to get the same long rules text (`rules.ts`, `recording.ts`, `node-rules.ts`,
+deleted) with its task set inside it, and a fact with no field was "an attribute
+with a key you name". Run `0dc7e23c` showed the cost: told that excerpts "are what
+you're here for", the product agent recorded 61 excerpts and 31 measurements of
+marketing copy on top of its ten fields, and its answers took 610 of its 628 s.
+The category agent spent 18 of its 50 turns chasing a three-year trend through
+Google Trends, which refused every route, before gapping it. No stage-1 agent
+records excerpts now.
+
+**Superseded 2026-09-30: `category_data` done by saturation.** A complete
+`category_data` needed a saturation curve. `workings_stage1.md` makes it
+field-filling like `product_data`; only `competitors`, the one open-ended node, is
+done by saturation now (`CompletenessCheck`).
 
 | Tool | Backed by | What it returns to the model | Side effect |
 |---|---|---|---|
 | `web_search` | SearXNG `GET /search?format=json` | numbered titles, urls, snippets (default 10, max 25) | none |
 | `web_fetch` | Firecrawl `POST /v2/scrape` (markdown, main content) | header (`source_id`, url, title, `archived`) + the page text, cut at `MRA_FETCH_CHAR_LIMIT` (25 000; was 60 000 until a run's context reached 208k tokens) | body written to `/corpus/runs/<runId>/sources/<sha256>` |
 | `amazon_find_product` | Apify `junglee/free-amazon-product-scraper` | asin, stars, `reviewsCount`, title, url — most-reviewed first | none |
-| `record_source`, `record_excerpt`, `record_measurement`, `record_attribute`, `record_saturation`, `record_node_status`, `record_gap`; with `competitors` in scope also `record_reference`, `record_competitor` | the **run ledger** (`research_findings`, one SQLite row per finding, written at once) | `RECORDED <row id>` (`src3`, `ex14`, …), `(replaces <id>)` when it supersedes an earlier row with the same key, or `NOT RECORDED — <problem>` | the row is checked against its section's zod schema and the run's scope *before* it is written (`extract/finding-check.ts`); a refused row writes nothing |
-| `retract` | the run ledger | `RETRACTED <id>`, or `NOT RETRACTED` | marks the row retracted with the reason; rows are never deleted |
-| `finish` | `extract/`'s `PacketAssembly` then `PacketValidator` — the same pair `RunSettlement` runs | `FINISHED` + counts, or `NOT FINISHED — N problems` numbered and `Checks used: N of 5`; past five checks (`FINISH_BUDGET`), `NOT CHECKED — … spent` with `terminate: true`, and the run is settled from its ledger (Step 6, 3) | on a pass: the packet is written to the run row with `packet_source = "finish"`, `packet.ready` fires, and the result carries pi's `terminate: true`, which ends the agent loop. Declared `executionMode: "sequential"`, so a `finish` sent in the same turn as records runs after them |
+| `record_*` — the kinds in the agent's spec (`STAGE_ONE_AGENT_SPECS`): the champion gets `record_source`, `record_reference`, `record_gap`; product `record_source`, `record_attribute`, `record_node_status`, `record_gap`; category those and `record_measurement`; competitors `record_source`, `record_competitor`, `record_saturation`, `record_node_status`, `record_gap` | the **run ledger** (`research_findings`, one SQLite row per finding, written at once, tagged with the writer's `agent_id`) | `RECORDED <row id>` (`src3`, `ex14`, …), `(replaces <id>)` when it supersedes the agent's *own* earlier row with the same key, or `NOT RECORDED — <problem>` | the row is checked against its section's zod schema and the agent's node *before* it is written (`extract/finding-check.ts`); a refused row writes nothing. The champion row belongs to every stage-1 run, so it is never out of scope |
+| `retract` | the run ledger | `RETRACTED <id>`, or `NOT RETRACTED — <why>` | marks the row retracted with the reason; rows are never deleted. **Only the agent that wrote a row may retract it** |
+| `read_ledger` | the run ledger | every agent's live rows, one line each as `<id> [<agent>] <kind>: <payload>`, filterable by `agent` and `kind`, the newest 60 | none |
+| `wait_for` — step-2 agents only | the run ledger, polled every 15 s (`LEDGER_POLL_MS`) | `READY` with the rows once the named agent has recorded a row of that kind; `NOT AVAILABLE` if that agent has ended without one, the run is stopping, or 40 checks (10 min) pass — the cap that keeps two agents waiting on each other from waiting forever | none |
+| `finish` | the agent's `DoneCheck` (`agent/done-check.ts`): `ChampionDone`, or `NodeDone` — `PacketAssembly` then `PacketValidator` over the agent's own rows, scoped to its node | `FINISHED`, or `NOT FINISHED — N problems` numbered and `Checks used: N of 5`; past five checks (`FINISH_BUDGET`), `NOT CHECKED — … spent` with `terminate: true` | a `packet.checked {agent_id, valid, problems}` event; on a pass pi's `terminate: true` ends **that agent's** loop. Declared `executionMode: "sequential"`, so a `finish` sent in the same turn as records runs after them. *Superseded 2026-09-30:* a passing `finish` used to write the run's packet (`packet_source = "finish"`); with four agents no one agent holds the packet, so it is always built from the ledger at the end |
 
 **These are stage 1's tools.** Stage 2 has no agent and no tools since 2026-09-30
 (`spec-stage-2-pipeline.md`): `mine_reviews`, `amazon_reviews` and
 `trustpilot_reviews` are retired, and their pull logic lives in `ReviewPuller`
-(§2d). `amazon_find_product` is offered only to a run that covers `competitors`.
+(§2d). `amazon_find_product` is offered only to the `champion` and `competitors`
+agents, and only with an Apify token.
 
-**When a competitors run completes**, `RunWatch.lookUpListings` looks up the Amazon
+**When a competitors run completes**, `RunWrapUp.lookUpListings` looks up the Amazon
 listing of the champion and every competitor (`StageOneListings`, one search each,
 about $0.01, charged to the run as `apify.charged`), matches each with
 `ListingMatch` (brand, one of its actives, and its form named in the title — a
@@ -218,12 +279,19 @@ competitor's Amazon link or "not on Amazon".
 
 **The model never writes the packet** (since 2026-09-29, `spec-context-subagents.md`
 §4). Each tool's description carries one example item; `PacketAssembly` builds the
-packet from the live ledger rows — `brief` is the run's own, and a site brief's
+packet from the live ledger rows of every agent — `brief` is the run's own, and a site brief's
 product name is the `product_data` attribute with key `name`, else the champion's
 name. Code assigns the ids of excerpts, measurements and attributes. A kind with a
 natural key — a source's id, a competitor's id, the one reference, one status per
-node, one saturation curve per node and class — is replaced by a newer row with the
-same key; the older row is retracted, not deleted.
+node, one saturation curve per node and class, an attribute's node and key, a
+measurement's node, metric and period — is replaced by a newer row with the
+same key **from the same agent**; the older row is retracted, not deleted. Two
+agents that record the same thing (both fetched one page) each keep their row, and
+the packet carries it once, as last recorded (`PacketAssembly.payloads`).
+
+**A page fetch falls back to Crawl4AI** when Firecrawl can read no page at all
+(out of credits, key refused, or no key) and `CRAWL4AI_API_KEY` is set
+(`adapters/fallback-fetcher.ts`, `adapters/crawl4ai.ts`; `../setup.md` §5a).
 
 **Every outside call goes through one queue per service**, shared by every run in
 the process (`adapters/service-queue.ts`, wrapped round the adapter behind its port
@@ -266,24 +334,28 @@ events into cockpit events and `emit()` writes each one to `research_events`
 
 | Agent event | Cockpit event | Payload |
 |---|---|---|
-| assistant text grows | `message.delta` | `{delta}` — only the new characters |
-| assistant message ends, with thinking | `reasoning.available` | `{text}` |
-| tool starts | `tool.started` | `{tool, tool_call_id, preview, lane}` — preview is the query or url; lane is `search`/`fetch`/`other` |
-| tool ends | `tool.completed` | `{tool, tool_call_id, error, lane, inside, service?}` — `tool_call_id` is the id on the model's `toolCall` block and on the `toolResult` that answers it, so the three can be joined; `inside` is every trace line the call wrote (§2e); `service` is what the outside service said beyond its HTTP status (below) |
+| an agent starts / ends | `agent.started` / `agent.ended` | `{agent_id}` / `{agent_id, status, error?}` |
+| assistant text grows | `message.delta` | `{agent_id, delta}` — only the new characters |
+| assistant message ends, with thinking | `reasoning.available` | `{agent_id, text}` |
+| tool starts | `tool.started` | `{agent_id, tool, tool_call_id, preview, lane}` — preview is the query or url; lane is `search`/`fetch`/`other` |
+| tool ends | `tool.completed` | `{agent_id, tool, tool_call_id, error, lane, inside, service?}` — `tool_call_id` is the id on the model's `toolCall` block and on the `toolResult` that answers it, so the three can be joined; `inside` is every trace line the call wrote (§2e); `service` is what the outside service said beyond its HTTP status (below) |
 
-At each message end, the message's text is appended to the run's output and its token
+Every agent event carries the `agent_id` of the agent it came from; the activity
+log splits on it into one tab per agent (`frontend/src/logs/agents.ts`).
+
+At each message end, the message's text is appended to the agent's output (the
+run's `output` is each agent's, under a `[<agent>]` header) and its token
 usage is added to a running total (the last turn alone would understate cost by an
 order of magnitude). Its `responseId` — OpenRouter's `gen-…` id — starts a billed-cost
 lookup in the background, so by the end of the run only the last turn's is pending.
 
 ### Step 6 — the run is settled (`agent/run-settlement.ts` `settle()`)
 
-**The short path first.** If the agent's `finish` passed, the run already has its
-deliverable: status `completed`, nothing re-checked. A Stop still wins.
+*Superseded 2026-09-30: the short path.* A passing `finish` used to settle the run
+at once. Now each `finish` only ends its agent, and the run is settled when the
+last agent has ended:
 
-Otherwise, when the agent goes idle:
-
-0a. **Retry, up to three times** (`watch()`, `shouldRetry()`, `backoffMs()`): if the
+0a. **Retry, up to three times, per agent** (`AgentDriver.resumeDropped()`, `backoffMs()`): if the
    agent ended with an `errorMessage`, you did not press Stop, and pi-ai's
    `isRetryableAssistantError` calls it transient, the run waits and is prompted to
    carry on — the message says the last turn's connection dropped and that the tool
@@ -330,9 +402,14 @@ Otherwise, when the agent goes idle:
 1. `output` (all assistant text, in order), `usage` and `ended_at` are saved.
 2. **Stop:** `cancelled` (with the error, if there was one). **Error with an empty
    ledger** (no live row and no review pulled): `failed`.
-3. **Settle from the ledger** — `finish` run on the agent's behalf
-   (`settleFromLedger()`): `PacketAssembly` builds the packet from the live rows and
-   `PacketValidator` checks it. A pass is `completed` with `packet_source =
+3. **Settle from the ledger** (`settleFromLedger()`): **every agent's own
+   `DoneCheck` runs again** on the final ledger, its problems prefixed with the
+   agent (`category: gap list is empty; …`), and `PacketAssembly` builds the packet
+   from every live row, which `PacketValidator` checks against the run's scope.
+   The first is there because the second alone let a broken part through: a
+   category agent that recorded no gap still settled `completed`, because the
+   product agent's gaps made the packet's gap list non-empty (found by the test
+   "settles invalid when one agent's part breaks the contract"). A pass is `completed` with `packet_source =
    "ledger"`; if the agent had also errored, `run.ended_early {error}` records it —
    the artefact is valid even though the turn was not. A failure is `invalid` with
    the problems, or `failed` if the agent had errored (a crash that left an
@@ -363,9 +440,9 @@ Otherwise, when the agent goes idle:
    - an admitted `ad_library` source with no `first_seen` needs a `competitors` gap;
    - `review_mining` marked complete needs at least one 3★ excerpt;
    - `gaps` must not be empty;
-   - every node marked complete, except `product_data`, needs a saturation curve —
-     and `competitors` needs two, one with `class: "direct"` and one with
-     `class: "indirect"` (§2c);
+   - `competitors` marked complete needs two saturation curves, one with
+     `class: "direct"` and one with `class: "indirect"` (§2c). `product_data` and
+     `category_data` are checklists and need none (since 2026-09-30);
    - competitor rows obey the §2.2 test (§2c): `relation` is recomputed from the
      forms — **except where both are `other`**, the escape hatch for anything the
      supplement vocabulary does not cover, where the agent's label stands and
@@ -431,14 +508,14 @@ Neither includes Apify, which bills separately per event.
 **A run on one node** (or any subset) differs from a whole-stage run in four places,
 all keyed off the run's `nodes`:
 
-- **Prompt** (`agent/prompt/`). Only the covered nodes' rules are included, under
-  "This run's node". A `## Scope of this run` section says to research nothing
-  else, and the system prompt's "work through the four nodes" becomes "this run
-  covers only …". Run-level gaps are attached to the first covered node, not
-  `category_data`. A whole-stage run's prompt is unchanged, byte for byte.
-- **Tools.** The Apify review tools are offered only if `review_mining` is covered;
-  `amazon_find_product` alone also if `competitors` is. The system prompt describes
-  exactly the tools offered.
+- **Agents** (`StageOnePlans.of`). Only the covered nodes' agents start. The
+  champion starts too unless the brief is a url and `competitors` is not covered —
+  so `mra run "<url>" product_data` (or `category_data`) is the run that spends
+  nothing on Apify. *Superseded 2026-09-30:* one agent covered every node in scope,
+  and its prompt carried a `## Scope of this run` section. Each agent now has one
+  node and is told only that node's task.
+- **Tools.** `amazon_find_product` is offered to the `champion` and `competitors`
+  agents only. The system prompt describes exactly the tools offered.
 - **Validation** (`extract/`). Any source, excerpt, measurement, attribute,
   saturation curve, node or gap recorded against a node outside the scope fails the
   packet (`invalid`, naming the node and the count). So does a covered node with no
@@ -447,7 +524,7 @@ all keyed off the run's `nodes`:
 - **Display.** The stage rail greys out the nodes a run did not cover, the run list
   labels a partial run, and the results column shows that run's packet as usual.
 
-**The call log.** `recordLlmCalls()` wraps the agent's `streamFn` — the one place
+**The call log.** `LlmCallLog` wraps each agent's `streamFn` — the one place
 that sees the context handed to pi-ai and the exact message returned, error
 responses included. The context is recorded *before* pi-ai converts it for the
 provider, and that conversion drops one kind of message: an assistant answer that
@@ -457,14 +534,15 @@ the retry's logged input includes the failed answer, but the model never receive
 it. Measured on run `72c65135` (2026-09-27): call 16's input held call 15's
 65,132-character failed answer, and call 16 rebuilt the same plan from scratch in
 99,418 characters. The activity page marks such a message "dropped by pi-ai, not
-sent to the model". Each call becomes a `research_llm_calls` row: start/end
-time, duration, model, stop reason, error, usage (tokens and calculated cost), the
+sent to the model". Each call becomes a `research_llm_calls` row: the
+`agent_id` that made it, `seq` numbered across the whole run by one `CallSequence`
+(a per-agent count would give four calls `seq` 1), start/end time, duration, model, stop reason, error, usage (tokens and calculated cost), the
 `gen-…` id, and — once `/generation` answers — `billed_cost` and `generation`
 (§2a: time to first token, generation time, reasoning tokens, provider). The logs
 page shows the time to the first token on each row, and the rest on an
 "OpenRouter:" line under the answer.
 
-Storage is **incremental**. The agent only appends to its context, and pi-agent-core's
+Storage is **incremental**, per agent. Each agent only appends to its own context, and pi-agent-core's
 default `convertToLlm` filters the transcript without copying it, so each row stores
 only the messages new since the previous call (checked by object identity). The
 system prompt and tool list are stored only on the call where they changed — in
@@ -482,7 +560,8 @@ there is a new call to fetch.
 
 **The logs page** is `/runs/<id>/logs`, opened from **Logs ↗** on a run in a new
 tab. It shows the run's totals (LLM calls, time taken, tokens, calculated and billed
-cost, tool calls), then one row per call: expand it for the prompt (what is new, or
+cost, tool calls), then **one tab per agent** plus a `run` tab of milestones
+(`logs/agents.ts`), opened on the first agent; under the tab, one row per call: expand it for the prompt (what is new, or
 **Show full prompt**) and the answer (thinking, text, tool calls with arguments,
 token counts, cost). It follows the event stream and fetches only calls it has not
 got (`?after=<seq>`), then refetches everything once `run.billed` lands, because the
@@ -545,7 +624,12 @@ things it showed:
 ### §2d — stage 2: a pipeline, and a review ledger no model copies from
 
 **Since 2026-09-30 stage 2 has no model** (`spec-stage-2-pipeline.md`).
-`RunLauncher` hands a `review_mining` run to `ReviewMiningJob`:
+`RunLauncher` hands a `review_mining` run to `ReviewMiningJob`, which first
+records on the run the stage-1 run whose competitors it mines
+(`research_runs.source_run_id`, from `StageTwoHandoff.forBrief`: the newest
+completed stage-1 run for the brief). The review analysis and the run page read
+that link (`StageTwoHandoff.forRun`); nothing re-derives it later, so a newer
+stage-1 run never adopts older mining.
 
 1. The stage-1 roster (`StageTwoRoster`) and its listings, re-judged
    (`StageTwoListings.ensure`, which looks up only what stage 1 did not).

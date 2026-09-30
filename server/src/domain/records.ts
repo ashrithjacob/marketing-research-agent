@@ -32,6 +32,7 @@ export interface ResearchRun {
   nodes: string[];
   packet: Record<string, unknown> | null;
   packet_source: string;
+  source_run_id: string;
   error: string;
   output: string;
   usage: Record<string, unknown>;
@@ -44,6 +45,7 @@ export interface RunSummary {
   id: string;
   workspace_id: string;
   product_id: string;
+  source_run_id: string;
   status: string;
   stage: number;
   model: string;
@@ -75,6 +77,7 @@ export class Runs {
       id: run.id,
       workspace_id: run.workspace_id,
       product_id: run.product_id,
+      source_run_id: run.source_run_id,
       status: run.status,
       stage: run.stage,
       model: run.model,

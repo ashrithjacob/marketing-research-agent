@@ -16,7 +16,4 @@ export const TOOL_LANES: Record<string, ToolLane> = {
   web_search: "search",
   web_fetch: "fetch",
   amazon_find_product: "search",
-  amazon_reviews: "fetch",
-  trustpilot_reviews: "fetch",
-  mine_reviews: "fetch",
 };

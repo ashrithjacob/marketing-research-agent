@@ -144,10 +144,40 @@ describe("migration", () => {
   });
 });
 
+describe("stage-2 runs and their stage-1 run", () => {
+  it("backfills each old stage-2 run with the stage-1 run it mined, never a later one", () => {
+    const path = join(dir, "before-source-run.db");
+    const first = new SqliteResearchStore(path);
+    const brief = { product: "", url: "https://mullevia.com/p" };
+    const run = (stage: number, at: string) => {
+      const r = first.createRun({ workspaceId: "admin", brief, model: "m", rejectKinds: [], judgementIds: [], stage });
+      first.updateRun(r.id, { status: "completed" });
+      return { id: r.id, at };
+    };
+    const older = run(1, "2026-09-29T10:00:00.000Z");
+    const mining = run(2, "2026-09-29T11:00:00.000Z");
+    const newer = run(1, "2026-09-30T10:00:00.000Z");
+    first.close();
+    const raw = new Database(path);
+    for (const r of [older, mining, newer]) raw.prepare("UPDATE research_runs SET created_at = ? WHERE id = ?").run(r.at, r.id);
+    raw.exec("ALTER TABLE research_runs DROP COLUMN source_run_id");
+    raw.close();
+
+    const migrated = new SqliteResearchStore(path);
+    try {
+      expect(migrated.getRun(mining.id)!.source_run_id).toBe(older.id);
+      expect(migrated.getRun(newer.id)!.source_run_id).toBe("");
+    } finally {
+      migrated.close();
+    }
+  });
+});
+
 describe("llm calls", () => {
   const call = (runId: string, seq: number, responseId: string) => ({
     run_id: runId,
     seq,
+    agent_id: seq === 1 ? "champion" : "product",
     started_at: "2026-09-18T10:00:00.000Z",
     ended_at: "2026-09-18T10:00:02.000Z",
     duration_ms: 2000,
@@ -164,7 +194,7 @@ describe("llm calls", () => {
     response_id: responseId,
   });
 
-  it("adds the generation column to a call log that predates it", () => {
+  it("adds the generation and agent_id columns to a call log that predates them", () => {
     const path = join(dir, "calls-before-generation.db");
     const old = new Database(path);
     old.exec(`
@@ -200,6 +230,7 @@ describe("llm calls", () => {
         provider: "Parasail",
       });
       expect(migrated.listLlmCalls(run.id)[0]!.generation?.latency_ms).toBe(949);
+      expect(migrated.listLlmCalls(run.id)[0]!.agent_id).toBe("champion");
     } finally {
       migrated.close();
     }
@@ -211,6 +242,7 @@ describe("llm calls", () => {
     store.addLlmCall(call(run.id, 1, "gen-1"));
     const calls = store.listLlmCalls(run.id);
     expect(calls.map((c) => c.seq)).toEqual([1, 2]);
+    expect(calls.map((c) => c.agent_id)).toEqual(["champion", "product"]);
     expect(calls[0]!.system_prompt).toBe("you are the researcher");
     expect(calls[0]!.tools).toEqual([{ name: "web_search" }]);
     expect(calls[1]!.system_prompt).toBeNull();

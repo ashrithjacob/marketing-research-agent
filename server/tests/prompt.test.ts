@@ -17,9 +17,10 @@ import {
   PRODUCT_ATTRIBUTES,
   SOURCE_KINDS,
   STAGE_NODES,
+  STAGE_ONE_AGENT_SPECS,
   briefSchema,
 } from "../src/domain/index.js";
-import type { Judgement } from "../src/domain/index.js";
+import type { Judgement, StageOneAgent } from "../src/domain/index.js";
 import { AgentMessages, PromptBuilder } from "../src/agent/prompt/index.js";
 import { RECORD_TOOLS } from "../src/agent/prompt/text/record-tools.js";
 
@@ -36,13 +37,21 @@ const exampleOf = (name: string): Record<string, any> => {
 const brief = (overrides: Record<string, unknown> = {}) =>
   briefSchema.parse({ product: "MagnaCalm", ...overrides });
 
-const build = (overrides: Parameters<PromptBuilder["instructions"]>[0] | Record<string, unknown> = {}) =>
-  prompts.instructions({
+const CHAMPION = { name: "MagnaCalm Glycinate", form: "capsule", actives: ["magnesium glycinate"] };
+
+const build = (overrides: Record<string, unknown> = {}, agent: StageOneAgent = "product") =>
+  prompts.instructions(agent, {
     brief: brief(),
+    nodes: STAGE_NODES[1],
     rejectKinds: [],
     judgements: [],
+    champion: CHAMPION,
     ...(overrides as Record<string, never>),
   });
+
+const AGENTS = ["champion", "product", "competitors", "category"] as const;
+
+const system = (agent: StageOneAgent, options = { amazon: true, waits: true }) => prompts.system(agent, options);
 
 describe("the record examples", () => {
   it("are each a record the ledger accepts", () => {
@@ -54,96 +63,100 @@ describe("the record examples", () => {
   });
 });
 
-describe("what the instructions must state", () => {
+describe("what every agent is told about sources", () => {
   it("names every source kind the validator accepts", () => {
     // The first live run invented seven kinds that were not in the enum and the
     // whole packet was rejected for it.
-    const text = build();
-    for (const kind of SOURCE_KINDS) expect(text).toContain(`\`${kind}\``);
+    for (const agent of AGENTS) for (const kind of SOURCE_KINDS) expect(build({}, agent)).toContain(`\`${kind}\``);
   });
 
-  it("tells the agent to cite the source_id web_fetch hands back", () => {
-    const text = build();
-    expect(text).toMatch(/source_id/);
-    expect(text).toMatch(/verbatim/);
-  });
-
-  it("says an empty posted_at is a string, never null", () => {
-    expect(build()).toMatch(/Never `null`/);
-  });
-
-  it("names the open channels: facts with no field are attributes, not invented keys", () => {
-    // Two live glm runs invented packet fields (`theme`, `text_verbatim`,
-    // `axis: "efficacy"`) because nothing said where the open record lives.
-    const text = build();
-    expect(text).toMatch(/attribute with a key you name/);
-    expect(text).toMatch(/`themes: \[\]`/);
-    expect(text).toMatch(/axis[\s\S]*?stays `null`/);
-    expect(text).toMatch(/never invent a[\s\S]*packet field/);
-  });
-
-  it("presents the product checklist as a floor, not a ceiling", () => {
-    const text = build();
-    expect(text).toMatch(/floor, not the ceiling/);
-    expect(text).toMatch(/attribute with a key you name/);
-  });
-
-  it("shows a custom-key attribute in the record_attribute example", () => {
-    // The example is the shape the model copies; the open channel is taught by
-    // showing one, or every packet copies only the ten checklist keys.
-    expect(PRODUCT_ATTRIBUTES).not.toContain(exampleOf("record_attribute").key);
-  });
-
-  it("says the worked example is not the brief", () => {
-    // A run once anchored on the example's product and researched it instead of
-    // the product it was given. The disclaimer is what stands between runs and
-    // that happening again at the model's initiative.
-    const text = build();
-    expect(text).toMatch(/shape only/);
-    expect(text).toMatch(/their products and values are invented/);
-  });
-
-  it("refuses an invented gap node, and a node from the other stage", () => {
-    const text = build();
-    expect(text).toMatch(/Never invent a node name/);
-    expect(text).toMatch(/`all`, `general`, `run`/);
-    expect(text).toMatch(/never use a node from another stage/);
-    // Stage 1's packet may not file a gap against review mining.
-    expect(text).not.toMatch(/accepted in a stage-1 packet[\s\S]{0,80}review_mining/);
-  });
-
-  it("states that the gap list may not be empty", () => {
-    expect(build()).toMatch(/A run with no gaps fails/);
+  it("tells the agent to cite the source_id web_fetch hands back, verbatim", () => {
+    expect(build()).toMatch(/`id` is the `source_id`\s+the fetch returned, verbatim/);
+    expect(build()).toMatch(/Never record\s+or cite a search snippet/);
   });
 
   it("lists this run's rejected kinds", () => {
-    expect(build({ rejectKinds: ["ai_generated"] })).toContain("- `ai_generated`");
+    expect(build({ rejectKinds: ["ai_generated"] })).toContain("  - `ai_generated`");
+  });
+
+  it("files every row under the agent's own node", () => {
+    expect(build()).toContain('Every row you record carries `node: "product_data"`');
+    expect(build({}, "category")).toContain('Every row you record carries `node: "category_data"`');
+    expect(build({}, "competitors")).toContain('Every row you record carries `node: "competitors"`');
+  });
+
+  it("files the champion under competitors, or under the run's first node without it", () => {
+    expect(build({}, "champion")).toContain('carries `node: "competitors"`');
+    expect(build({ nodes: ["product_data"] }, "champion")).toContain('carries `node: "product_data"`');
+  });
+
+  it("states that a step-2 agent's part needs a gap", () => {
+    for (const agent of ["product", "competitors", "category"] as const) expect(build({}, agent)).toMatch(/At least one gap is\s+required/);
+  });
+});
+
+describe("the product agent", () => {
+  it("is given its ten fields first, and may keep other facts after them", () => {
+    const text = build();
+    for (const key of PRODUCT_ATTRIBUTES) expect(text).toContain(`| \`${key}\` |`);
+    expect(text).toMatch(/after the ten, never instead of them/);
+  });
+
+  it("tells every agent its turn limit, and what happens when it runs out", () => {
+    const turns = (agent: StageOneAgent) => STAGE_ONE_AGENT_SPECS[agent].maxTurns;
+    expect(build()).toMatch(new RegExp(`You have ${turns("product")} turns[\\s\\S]*every field still open is recorded as a gap for you`));
+    expect(build({}, "category")).toContain(`You have ${turns("category")} turns`);
+    expect(build({}, "competitors")).toContain(`You have ${turns("competitors")} turns`);
+    expect(build({}, "champion")).toMatch(new RegExp(`You have ${turns("champion")} turns[\\s\\S]*you stop, with what you have recorded`));
+  });
+
+  it("is told where to look, to record as it reads, and to search only for what is missing", () => {
+    const text = build();
+    expect(text).toMatch(/Shopify `\.json`/);
+    expect(text).toMatch(/Record as you read: in the same turn as a fetch you use/);
+    expect(text).toMatch(/Search only for fields still missing/);
+    expect(text).toMatch(/`record_gap` with missing "<key>: <why>"/);
+  });
+
+  it("gets none of the generic rules it used to carry", () => {
+    // Run 0dc7e23c: told "excerpts are what you're here for", the product agent
+    // recorded 61 excerpts of marketing copy and spent most of its 10 minutes on them.
+    const text = build();
+    expect(text).not.toMatch(/excerpt/i);
+    expect(text).not.toMatch(/saturation/i);
+  });
+});
+
+describe("the category agent", () => {
+  it("is given its three fields first, a three-year trend, and where to find them", () => {
+    const text = build({}, "category");
+    expect(text).toMatch(/after the three, never instead\s+of them/);
+    for (const field of ["search_volume", "category_size", "seasonality"]) expect(text).toContain(`| \`${field}\` |`);
+    expect(text).toMatch(/at least three different years/);
+    expect(text).toMatch(/Exploding Topics/);
+    expect(text).not.toMatch(/excerpt/i);
+  });
+
+  it("stops chasing a field after two failed routes", () => {
+    // Run 0dc7e23c: 18 of the category agent's 50 turns chased a three-year trend
+    // through Google Trends, which refused every route, before gapping it.
+    const text = build({}, "category");
+    expect(text).toMatch(/Two failed routes to a field is enough/);
+    expect(text).toMatch(/Google Trends\s+blocks automated reads: try it once at most/);
   });
 });
 
 describe("the brief block", () => {
-  it("sends the agent searching when no url was supplied", () => {
-    // Without this line a careful agent stalls asking for a URL it was never
-    // going to get.
-    expect(build()).toMatch(/No product URL was supplied/);
-  });
-
-  it("asks for the name when the brief is a site and nothing else", () => {
-    // The old shape printed "**Product:** <url>" above "No product URL was
-    // supplied — finding it is part of the job", and a run spent a turn on the
+  it("names a site brief as a site, never as a product", () => {
+    // The old shape printed "**Product:** <url>", and a run spent a turn on the
     // contradiction before inventing a name that failed validation.
     const text = build({ brief: brief({ product: "", url: "https://thedropletco.co.uk/" }) });
     expect(text).toContain("**Site:** https://thedropletco.co.uk/");
     expect(text).not.toMatch(/\*\*Product:\*\*/);
-    expect(text).not.toMatch(/No product URL was supplied/);
-    expect(text).toMatch(/as the site writes it/);
-    expect(text).toMatch(/no domain and no url appended/);
   });
 
-  it("skips the search instruction when a url was supplied", () => {
-    const text = build({ brief: brief({ url: "https://magnacalm.example" }) });
-    expect(text).toContain("https://magnacalm.example");
-    expect(text).not.toMatch(/No product URL was supplied/);
+  it("asks the product agent for the name as its own page writes it", () => {
+    expect(build()).toMatch(/the name as the product's own page writes it, nothing appended/);
   });
 
   it("carries the market and notes when given", () => {
@@ -207,78 +220,93 @@ describe("standing judgements", () => {
 
 describe("the system prompt", () => {
   it("names both tools and says a snippet is not a source", () => {
-    const text = prompts.system();
+    const text = system("product");
     expect(text).toContain("web_search");
     expect(text).toContain("web_fetch");
-    expect(text).toMatch(/never cite a url you have only seen in search results/);
+    expect(text).toMatch(/A snippet is never a source/);
+  });
+
+  it("tells each agent who it is, its own role, and that the ledger is shared", () => {
+    const roles = new Set<string>();
+    for (const agent of AGENTS) {
+      const text = system(agent);
+      expect(text).toMatch(new RegExp(`^You are the \`${agent}\` agent\\. `));
+      expect(text).toMatch(/You read every row and\s+change only your own/);
+      expect(text).toContain("`read_ledger`");
+      roles.add(text.split("\n")[0]!);
+    }
+    expect(roles.size).toBe(4);
+  });
+
+  it("names wait_for only to an agent that has it", () => {
+    expect(system("product")).toContain("`wait_for`");
+    expect(system("champion", { amazon: true, waits: false })).not.toContain("`wait_for`");
   });
 });
 
-describe("a run that covers part of the stage", () => {
-  const scoped = (nodes: string[]) => build({ nodes });
-
-  it("describes only the nodes it covers", () => {
-    const text = scoped(["product_data"]);
-    expect(text).toContain("### This run's node");
-    expect(text).toContain("**product_data** — the checklist below is the floor");
-    expect(text).not.toContain("**review_mining** —");
-    expect(text).not.toContain("amazon_find_product");
-    expect(text).not.toContain("### The four nodes");
+describe("each agent gets only its own task", () => {
+  it("sends the champion agent ranking the genre on Amazon when the brief names no url", () => {
+    // The brief names a genre; "the first plausible match" is not the champion.
+    const text = build({}, "champion");
+    expect(text).toMatch(/The listing with the highest\s+`reviewsCount` is the champion/);
+    expect(text).toMatch(/`runner_up_name`, `runner_up_reviews`/);
+    expect(text).toMatch(/champion ranking unavailable/);
+    expect(text).not.toContain("## The champion\n");
   });
 
-  it("states the scope", () => {
-    const text = scoped(["competitors", "category_data"]);
-    expect(text).toContain("## Scope of this run");
-    expect(text).toMatch(/researches \*\*only\*\* `competitors`, `category_data`/);
+  it("sends the champion agent to the brief's site, then to its Amazon listing, on a url brief", () => {
+    const text = build({ brief: brief({ product: "", url: "https://mullevia.com/products/drops" }) }, "champion");
+    expect(text).toMatch(/The \*\*champion\*\* is the product it sells/);
+    expect(text).toMatch(/`amazon_find_product` with the brand and product name/);
+    expect(text).toMatch(/`amazon_url` is "" and `reviews_count` is 0/);
   });
 
-  it("sends a run-level gap to a node in scope, not to category_data", () => {
-    const text = scoped(["product_data"]);
-    expect(text).toContain('attached to `node: "product_data"`');
-    expect(text).not.toContain('use\n`node: "category_data"`');
+  it("hands every step-2 agent the champion as the ledger holds it", () => {
+    for (const agent of ["product", "competitors", "category"] as const) {
+      const text = build({}, agent);
+      expect(text).toContain("## The champion");
+      expect(text).toContain('"name": "MagnaCalm Glycinate"');
+    }
   });
 
-  it("keeps a whole-stage run's instructions as they were", () => {
-    expect(build({ nodes: [...STAGE_NODES[1]] })).toBe(build());
-    expect(build()).not.toContain("## Scope of this run");
+  it("says when no champion was looked up", () => {
+    const text = build({ brief: brief({ product: "", url: "https://x.example" }), champion: null });
+    expect(text).toMatch(/No champion was looked up for this run: the product is the one https:\/\/x\.example sells/);
   });
 
-  it("scopes the system prompt too", () => {
-    expect(prompts.system(["competitors"])).toMatch(/This run covers only `competitors`/);
-    expect(prompts.system()).toMatch(/Work through this stage's nodes methodically/);
+  it("stops competitors on saturation, and product and category on their fields", () => {
+    expect(build({}, "competitors")).toMatch(/three sources in a row surface no new\s+brand of that class/);
+    expect(build()).toMatch(/When all ten are recorded or gapped/);
+    expect(build({}, "category")).toMatch(/When all three are recorded or gapped/);
   });
 
-  it("tells each stage which stage it is", () => {
-    expect(prompts.system()).toMatch(/You are the stage-1 researcher of a six-stage/);
-    expect(prompts.system(["review_mining"])).toMatch(/You are the stage-2 researcher of a six-stage/);
-    // A whole stage is not a partial run, whichever stage it is.
-    expect(prompts.system(["review_mining"])).not.toMatch(/This run covers only/);
-    expect(build({ nodes: ["review_mining"] })).toMatch(/## Stage 2 — what customers said/);
+  it("keeps each agent to its own task", () => {
+    expect(build()).not.toContain("## Your task: the competitors");
+    expect(build({}, "category")).not.toContain("## Your task: the product's fact sheet");
+    expect(build({}, "competitors")).not.toContain("## Your task: the category's numbers");
   });
 });
 
-describe("the competitors node", () => {
+describe("the competitors agent", () => {
   it("states the mechanical test and the per-class saturation", () => {
-    const text = build({ nodes: ["competitors"] });
-    expect(text).toMatch(/\*\*direct\*\* — shares an active ingredient with the product \*\*and\*\* has the\s+same form/);
-    expect(text).toMatch(/\*\*indirect\*\* — shares an active ingredient, \*\*different\*\* form/);
-    expect(text).toMatch(/Saturate each class \*\*separately\*\*/);
+    const text = build({}, "competitors");
+    expect(text).toMatch(/\*\*direct\*\* — shares an active with the champion \*\*and\*\* has the same form/);
+    expect(text).toMatch(/\*\*indirect\*\* — shares an active, \*\*different\*\* form/);
+    expect(text).toMatch(/`record_saturation` twice, `class` "direct" and\s+"indirect"/);
     expect(text).toMatch(/same problem, different active/);
   });
 
-  it("sends the agent ranking the genre to pick the champion product", () => {
-    // The brief names a genre; "the first plausible match" is not the champion.
-    // The ranking must be recorded, because a runner-up that out-reviews the
-    // pick is exactly the champion check's reject.
-    const text = build({ nodes: ["competitors"] });
-    expect(text).toMatch(/\*\*champion product\*\* is the listing with the\s+highest `reviewsCount`/);
-    expect(text).toMatch(/`reviews_count`, and the runner-up listing's name and count/);
-    expect(text).toMatch(/champion ranking unavailable/);
+  it("measures competitors against the champion instead of choosing one", () => {
+    const text = build({}, "competitors");
+    expect(text).toMatch(/measured against\s+the champion below/);
+    expect(text).not.toMatch(/highest\s+`reviewsCount`/);
   });
 
   it("names every form the validator accepts", () => {
-    const text = build();
-    for (const form of FORMS) expect(text).toContain(`\`${form}\``);
+    for (const agent of ["competitors", "champion"] as const) {
+      const text = build({}, agent);
+      for (const form of FORMS) expect(text).toContain(`\`${form}\``);
+    }
   });
 
   it("shows the champion's ranking evidence in the example", () => {
@@ -291,28 +319,33 @@ describe("the competitors node", () => {
   });
 });
 
-describe("the system prompt names only the tools a run is given", () => {
+describe("the system prompt names only the tools an agent is given", () => {
   // The first competitors-only run gapped "amazon_reviews was not available" —
   // told about tools it did not have, it reported their absence as a finding.
-  it("gives a product-data run web search and fetch, and the ledger", () => {
-    const text = prompts.system(["product_data"]);
+  it("gives the product agent web search and fetch, and its own four record tools", () => {
+    const text = system("product", { amazon: false, waits: true });
     expect(text).toContain("web_fetch");
     expect(text).not.toMatch(/amazon_|trustpilot_/);
-    // Cutting the review tools out of the text must not cut the ledger's with them.
-    expect(text).toContain("`record_gap` — write one finding");
-    expect(text).toContain("`finish` — build the packet");
-    expect(text).not.toContain("record_competitor");
+    expect(text).toContain("`record_source`, `record_attribute`, `record_node_status`, `record_gap` — write one row");
+    expect(text).toContain("`finish` — check your part of the ledger");
   });
 
-  it("gives a competitors run Amazon search as discovery, and no review tools", () => {
-    const text = prompts.system(["competitors"]);
+  it("gives the category agent measurements and one attribute, no excerpts", () => {
+    expect(system("category")).toContain("`record_source`, `record_measurement`, `record_attribute`, `record_node_status`, `record_gap`");
+    expect(system("category")).not.toContain("record_excerpt");
+  });
+
+  it("gives the competitors agent Amazon search and competitor rows, and no review tools", () => {
+    const text = system("competitors");
     expect(text).toMatch(/`amazon_find_product` — .*a way to find competitors/);
-    expect(text).not.toMatch(/amazon_reviews|trustpilot_reviews|mine_reviews|may be absent. If they are/);
+    expect(text).toContain("`record_competitor`");
+    expect(text).not.toMatch(/amazon_reviews|trustpilot_reviews|mine_reviews|record_excerpt/);
   });
 
-  it("names no review tool to a whole stage-1 run (run 99002ee8 gapped their absence)", () => {
-    const text = prompts.system();
-    expect(text).not.toMatch(/mine_reviews|amazon_reviews|trustpilot_reviews/);
-    expect(text).toContain("`amazon_find_product` —");
+  it("gives the champion agent the reference and not the node records", () => {
+    const text = system("champion", { amazon: true, waits: false });
+    expect(text).toContain("`record_reference`");
+    expect(text).not.toContain("record_node_status");
+    expect(text).not.toContain("record_competitor");
   });
 });

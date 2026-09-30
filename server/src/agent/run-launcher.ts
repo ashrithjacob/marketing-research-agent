@@ -9,10 +9,13 @@ import { RunError } from "./errors.js";
 import type { LiveRuns } from "./live-runs.js";
 import { ModelChain } from "./model-chain.js";
 import { ModelPricing } from "./pricing.js";
+import type { RetryPolicy } from "./retry.js";
 import type { ReviewMiningJob } from "./review-mining-job.js";
-import type { RunAgentFactory } from "./run-agent-factory.js";
+import type { StageOneAgentFactory } from "./stage-one-agent-factory.js";
+import type { StageOneListings } from "./stage-one-listings.js";
+import { StageOneRun } from "./stage-one-run.js";
 
-/** Starts one run: records it, and hands LiveRuns either a stage-1 agent, with its models resolved and priced, or the stage-2 pipeline. */
+/** Starts one run: records it, and hands LiveRuns either the stage-1 agents, with their models resolved and priced, or the stage-2 pipeline. */
 export class RunLauncher {
   constructor(
     private readonly store: ResearchStore,
@@ -20,7 +23,9 @@ export class RunLauncher {
     private readonly models: Models,
     private readonly costs: OpenRouterPrices,
     private readonly runs: LiveRuns,
-    private readonly factory: RunAgentFactory,
+    private readonly retry: RetryPolicy,
+    private readonly factory: StageOneAgentFactory,
+    private readonly listings: StageOneListings,
     private readonly mining: ReviewMiningJob,
   ) {}
 
@@ -55,26 +60,14 @@ export class RunLauncher {
     }
 
     const header = { product: request.brief.product, url: request.brief.url, model: modelId, nodes };
-    const { agent, done } = Trace.within(run.id, header, () =>
-      this.factory.assemble(run.id, {
-        workspaceId,
-        brief: request.brief,
-        nodes,
-        rejectKinds,
-        judgements,
-        chain: resolved.chain,
-      }),
+    const stageOne = new StageOneRun(
+      { store: this.store, runs: this.runs, costs: this.costs, retry: this.retry, factory: this.factory, listings: this.listings },
+      { runId: run.id, brief: request.brief, nodes, rejectKinds, judgements, chain: resolved.chain },
     );
     this.store.updateRun(run.id, { agent_run_id: run.id, session_id: `research-${run.id}`, status: "running" });
     this.runs.emit(run.id, "run.started", { model: modelId, nodes });
-    this.runs.add(run.id, {
-      control: {
-        abort: () => agent.abort(),
-        steer: (text) => agent.steer({ role: "user", content: [{ type: "text", text }], timestamp: Date.now() }),
-      },
-      subscribers: new Set(),
-      done,
-    });
+    const done = Trace.within(run.id, header, () => stageOne.start());
+    this.runs.add(run.id, { control: { abort: stageOne.abort, steer: stageOne.steer }, subscribers: new Set(), done });
     return run.id;
   }
 

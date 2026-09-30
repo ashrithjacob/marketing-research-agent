@@ -89,6 +89,8 @@ export interface StageProgress {
   stageTwoLive: boolean;
   /** The run each collecting stage opens when its header is clicked. */
   runIds?: Partial<Record<1 | 2, string>>;
+  /** On a stage-2 run: a completed stage-1 run newer than the one it mined, so its customer voice is out of date. */
+  newerStageOne?: { id: string; created_at: string };
 }
 
 export default function StageRail({
@@ -124,8 +126,9 @@ export default function StageRail({
       {STAGES.map((stage) => {
         const collects = 'nodes' in stage ? (stage.nodes as 1 | 2) : null;
         const shown = collects !== null && scope.length > 0 && stageOfNode(scope[0]) === collects;
+        const rerun = shown && collects === 2 && progress?.newerStageOne ? { cls: 'ready', label: 'ready — stage 1 was rerun' } : null;
         const state =
-          shown && status ? runState(status) : collects !== null ? standing(collects, progress) : null;
+          rerun ?? (shown && status ? runState(status) : collects !== null ? standing(collects, progress) : null);
         const ready = collects === 2 && state?.cls === 'ready';
         const target = collects !== null && !shown ? progress?.runIds?.[collects] : undefined;
         const open = target && onSelectRun ? () => onSelectRun(target) : undefined;
