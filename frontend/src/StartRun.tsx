@@ -93,7 +93,7 @@ export default function StartRun({
         <p className="lede">
           {partial
             ? `Stage 1, ${scopeLabel(nodes)} only. The agent researches just this and records nothing for the rest of the stage.`
-            : "Stage 1 gathers the champion product, its competitors and its category. Name the genre of product and pick the markets — the agent champions the genre's most-bought product and finds the URLs itself, by search and page fetch. Review mining is stage 2, started from the rail once this finishes."}
+            : "Stage 1 gathers the champion product, its competitors and its category. Name the genre of product and pick the markets — the agent champions the genre's most-bought product and finds the URLs itself, by search and page fetch. Product truth (stage 2) and then review mining (stage 3) start from the rail once this finishes."}
         </p>
         <input
           autoFocus

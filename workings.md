@@ -39,7 +39,8 @@ mra container — one Node process (server/src, layered — see CLAUDE.md)
         ├──▶ OpenRouter            the model (MRA_MODEL); /models prices; /generation cost
         ├──▶ searxng:8080          web_search (container on the same network)
         ├──▶ api.firecrawl.dev     web_fetch
-        ├──▶ Apify                 amazon_find_product; the listing lookup after stage 1; stage 2's review pulls
+        ├──▶ api.parallel.ai       product truth's search and page reads (stage 2, §2f)
+        ├──▶ Apify                 amazon_find_product; the listing lookup after stage 1; review mining's pulls (stage 3)
         └──▶ /corpus               every fetched body, content-addressed (volume corpus)
 ```
 
@@ -51,16 +52,26 @@ Host port `127.0.0.1:8080` maps to the container's `8000`.
 
 ### Step 1 — the modal
 
-**Stage 1 is three nodes now.** Review mining became **stage 2** on 2026-09-21
-(`STAGE_NODES` in `domain/nodes.ts`): stage 1 collects `product_data`, `competitors` and
-`category_data`; stage 2 collects `review_mining`. A run covers one stage, its packet
-carries `stage: 1` or `stage: 2`, and the validator rejects a packet holding another
-stage's nodes — that is a separate run. Downstream the compartment is six stages:
-1 raw material · 2 review mining · 3 product truth · 4 market truth · viability gate ·
-5 customer truth · 6 synthesis.
+**Three collecting stages** (`STAGE_NODES` in `domain/nodes.ts`): stage 1 collects
+`product_data`, `competitors` and `category_data`; stage 2, product truth, collects
+`mechanism`, `dose_vs_study`, `claim_limits` and `cogs_refills` (§2f); stage 3
+collects `review_mining`. A run covers one stage, and the validator rejects a packet
+holding another stage's nodes — that is a separate run. The compartment reads
+1 raw material · 2 product truth · 3 review mining · market truth · viability gate ·
+customer truth · synthesis. *Superseded 2026-10-01:* review mining was stage 2
+(from 2026-09-21) and product truth an empty slot after it; it moved behind
+product truth because the operator wants the product assessed before its
+reviews are bought, and the stored rows were renumbered by a one-time data
+migration (`adapters/sqlite/migrations.ts`). The `StageTwo*` classes were
+renamed `ReviewMining*` at the same time — numbers in names are what made the
+rename necessary.
 
-**Stage 2 is gated.** `POST /runs` with `nodes: ["review_mining"]` returns **409**
-unless a stage-1 run for the same product has completed. Products are matched with
+**Later stages are gated.** `POST /runs` for stage 2 or 3 returns **409** unless a
+stage-1 run for the same product has **completed**, and for review mining also
+unless product truth has completed on that same stage-1 run
+(`StageOneHandoff.hasCompleted`). *Fixed 2026-10-01:* the hand-off took the
+newest stage-1 run with a packet whatever its status, which became wrong once
+invalid runs kept their packet; it now takes only completed ones. Products are matched with
 `Briefs.key` (`server/src/domain/brief.ts`): for a URL, the page — host without
 `www.` plus path, lowercased, with scheme, port, trailing slash, `?query` and
 `#fragment` ignored; else the product name reduced to lowercase letters and digits,
@@ -638,9 +649,13 @@ things it showed:
   from tools it was never meant to have. It now describes only the tools the run
   is given (`systemPrompt(nodes)`).
 
-### §2d — stage 2: a pipeline, and a review ledger no model copies from
+### §2d — stage 3, review mining: a pipeline, and a review ledger no model copies from
 
-**Since 2026-09-30 stage 2 has no model** (`spec-stage-2-pipeline.md`).
+Review mining was stage 2 until 2026-10-01 and is stage 3 since; the class
+names below are the ones from before the rename (`StageTwoX` is now
+`ReviewMiningX`, `StageTwoHandoff` is `StageOneHandoff`).
+
+**Since 2026-09-30 review mining has no model** (`spec-stage-2-pipeline.md`).
 `RunLauncher` hands a `review_mining` run to `ReviewMiningJob`, which first
 records on the run the stage-1 run whose competitors it mines
 (`research_runs.source_run_id`, from `StageTwoHandoff.forBrief`: the newest
@@ -808,6 +823,62 @@ as `Class.method`. Nested object-literal methods are named after their owner, e.
 `WebFetchTool.tool.execute`. Callbacks passed inline (`.map((r) => …)`) are not
 covered, and neither are route handlers. `App.request` writes one line per HTTP
 request in their place.
+
+### §2f — stage 2, product truth: five agents, and code that does the arithmetic
+
+Plan and decisions: `spec-stage-2-product-truth.md` (§10 is where the build
+departs from the plan). A stage-2 request (any of `mechanism`, `dose_vs_study`,
+`claim_limits`, `cogs_refills`; it always expands to all four) goes to
+`RunLauncher`, which asks `StageOneHandoff.forBrief` for the newest **completed**
+stage-1 run of the brief (409 at the route if there is none), records it as
+`source_run_id`, and starts `ProductTruthRun`.
+
+1. **The operator's inputs go into the ledger first** (`agent/operator-inputs.ts`,
+   `agent_id: "operator"`): landed cost and currency, MOQ, lead time, as typed,
+   a gap for each one left blank, and any prices added as `price_point` rows
+   citing `"operator"`.
+2. **Five agents on one ledger**, each started by `AgentTeam` once the agents in
+   its `after` list have ended (`domain/product-truth-agents.ts`): `formula`
+   (actives with amounts, and the regimen) → `mechanism` beside `dose_vs_study`
+   → `claim_limits` after `dose_vs_study`, `cogs_refills` after `mechanism`. Each
+   gets the stage-1 fact sheet in its prompt; the later ones also get the actives,
+   and `claim_limits` gets the dose classes, computed when it is built
+   (`agent/prompt/truth-builder.ts`). Their tools are Parallel-backed
+   (`setup.md` §5c): `web_search` returns archived, citable excerpts.
+3. **Rows are checked when written**: the row's schema, a recorded active or a
+   brief's market for a pick, and the label's unit for a studied dose
+   (`extract/row-picks.ts`).
+4. **`finish` checks open items** (`extract/product-truth-coverage.ts`): each
+   item is closed by its row or by a gap whose `missing` starts with the item's
+   key, plus every row citing a recorded source. At the turn limit, every open
+   item is gapped for the agent (`agent/truth-limit-close.ts`).
+5. **Settlement** (`agent/product-truth-settlement.ts`) re-runs every agent's
+   check, retracts rows citing nothing read into gaps (`RowRepair`), marks each
+   node complete when every item of its agents is recorded or gapped, and builds
+   the packet (`extract/product-truth-assembly.ts`). Code computes the dose class
+   (`extract/dose-bands.ts`: ours per day = amount per serving × servings per
+   day; ≥ 0.8 at dose, ≥ 0.5 partial, else under dose; blend, no amount, no study,
+   no human study or unknown servings ⇒ unassessable, each with its reason),
+   days of supply, the churn flag (a carrier active's time to effect longer than
+   a container lasts), and margins (`extract/product-economics.ts`). The packet
+   is stored whether the run completes or ends invalid.
+
+**Measured on run `8d3842e0`** (local, 2026-10-01, Mullevia on stage-1 run
+`c0f14d91`, markets US, UK, Australia, New Zealand, Canada, no operator inputs,
+model `z-ai/glm-5.3-flash`): `completed`, all four nodes complete, in
+**18 min 34 s** (11:24:15 → 11:42:49 UTC). 39 model turns: formula 7,
+mechanism 11, dose_vs_study 2, claim_limits 11, cogs_refills 8, none at its
+limit. 2.26M tokens; **billed $0.1611** by OpenRouter (39 of 39 turns resolved,
+31 s after the run ended). Parallel: **22 searches and 49 extracts**, counted
+from `ParallelApi.post` in the trace; no fallback to SearXNG or Crawl4AI. At
+Parallel's listed $1–5 per 1,000 searches and $1 per 1,000 extracts, that is
+about **$0.07–0.16**, under the spec's $0.35–0.70 estimate. What it found:
+5 actives, all in a blend with no amount stated, so all 5 **unassessable**;
+2 servings a day, servings per container gapped, so days of supply and the
+churn flag are not assessable; mullein recorded as the carrier, with no time to
+effect any source states; 10 of 10 market × platform claim limits; 15 prices
+(1, 3 and 5 bottles in 5 currencies), with every margin gapped for want of a
+landed cost; 39 sources, 17 gaps.
 
 ### Step 7 — the screen fills in
 

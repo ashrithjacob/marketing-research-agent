@@ -30,7 +30,7 @@ export function StarSpread({ products }: { products: ProductVoice[] }) {
         );
       })}
       <p className="muted">
-        Share of each product's kept reviews at each star rating. Stage 2 asks for a fixed number
+        Share of each product's kept reviews at each star rating. Review mining asks for a fixed number
         per star, so this is the spread of what was mined, not of the listing.
       </p>
     </div>

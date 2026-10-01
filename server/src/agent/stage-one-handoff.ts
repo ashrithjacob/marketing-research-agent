@@ -10,7 +10,7 @@ export class StageOneHandoff {
     Trace.line(import.meta.url, "StageOneHandoff.forBrief", { brief, scope });
     const product = this.store.products.byKey(Briefs.key(brief));
     if (!product) return null;
-    const heads = this.store.products.runHeads(scope).filter((head) => head.stage === 1);
+    const heads = this.store.products.runHeads(scope).filter((head) => head.stage === 1 && head.status === "completed");
     for (const id of ProductFolders.runIds(heads, product.id)) {
       const run = this.store.getRun(id);
       if (!run) continue;

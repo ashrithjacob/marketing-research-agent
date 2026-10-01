@@ -17,9 +17,9 @@ export function ClaimsTile({ runId, packet, gaps }: { runId: string; packet: Pro
       {packet.claim_limits.map((c) => (
         <div key={`${c.market}-${c.platform}`} className="pt-claims">
           <h3>
-            {c.market} · {PLATFORM[c.platform] ?? c.platform}{' '}
-            {c.source_ids.map((id) => <Cite key={id} runId={runId} id={id} sources={packet.sources} />)}
+            {c.market} · {PLATFORM[c.platform] ?? c.platform}
           </h3>
+          <div className="small">Sources: {c.source_ids.map((id) => <Cite key={id} runId={runId} id={id} sources={packet.sources} />)}</div>
           {c.disclaimers.length > 0 && <div className="small muted">Disclaimers: {c.disclaimers.join(' · ')}</div>}
           <div className="small muted">Evidence standard: {c.evidence_standard}</div>
           <div className="pt-columns">

@@ -135,6 +135,10 @@ cmd_run() {
   if [ -n "${MARKET:-}" ]; then
     payload=$(printf '%s' "$payload" | jq -c --arg m "$MARKET" '.brief.market = $m')
   fi
+  if [ -n "${INPUTS:-}" ]; then
+    payload=$(printf '%s' "$payload" | jq -c --argjson i "$INPUTS" '.inputs = $i') \
+      || die "INPUTS is not JSON: $INPUTS"
+  fi
   if [ -n "$nodes" ]; then
     payload=$(printf '%s' "$payload" | jq -c --arg n "$nodes" \
       '.nodes = ($n | split(","))')
@@ -216,7 +220,12 @@ mra — drive and inspect the research cockpit
   run "<brief>" [nodes]    start a run. A brief starting with http goes to
                            brief.url, never brief.product. MARKET="US, UK"
                            sets brief.market (unset: no market scope).
-                           nodes: product_data,competitors,review_mining,category_data
+                           nodes: product_data,competitors,category_data (stage 1);
+                           mechanism (stage 2, product truth — always runs
+                           all four of its nodes; needs a completed stage 1;
+                           INPUTS='{"landed_unit_cost":4.1,"currency":"USD"}'
+                           sets the operator's costs); review_mining (stage 3,
+                           needs product truth complete)
   watch [runId]            poll until the run settles, then print the totals
   calls [runId]            the LLM call log, one line per turn
   trace [runId] [file]     download the run's trace: one line per function

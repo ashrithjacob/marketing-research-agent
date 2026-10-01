@@ -1,7 +1,8 @@
 # Stage 2 · Product truth — plan
 
-Status: **plan, 2026-10-01. Nothing built.** The decisions in §9 were taken
-with the operator the same day.
+Status: **built 2026-10-01, steps 1–6 of §8; not deployed.** The decisions in §9
+were taken with the operator the same day. Where the build departs from this
+plan, §10 says how and why; §1–§7 are left as planned.
 
 Product truth turns the stage-1 dossier into assessments of the product **in
 isolation** — no market comparison. It becomes **stage 2** in the app, and
@@ -163,3 +164,59 @@ Four tiles on the stage-2 run page:
 | 3 | Platforms for claim limits | **Meta and Google Ads**; markets from the brief | TikTok, Amazon (not now) |
 | 4 | Order | **Review mining needs product truth complete** for the same stage-1 run | only stage 1, as today |
 | 5 | Candidate prices | *Not asked; default:* stage 1's listed prices and subscription price. Others can be added when starting stage 2 | — |
+
+## 10. As built, 2026-10-01
+
+Where the build differs from §1–§8, and why. File paths are under `server/src`.
+
+1. **`formula` reads the regimen, not `cogs_refills`.** §3 had `cogs_refills`
+   read servings per day off the label. The dose class needs our *daily* dose
+   (amount per serving × servings per day), and `claim_limits` needs the dose
+   classes, so servings per day has to exist before step 3. `formula` is already
+   reading the label, so it records `regimen` (servings per day and per
+   container). `cogs_refills` records every price instead: decision 5's default
+   (stage 1's prices) re-read off the product page, because stage 1 records
+   price as free text ("1 Bottle: 47.00 SGD; 2+1 Bottles…") and code computes
+   nothing from free text.
+2. **Order is a dependency graph, not barriers.** `claim_limits` starts when
+   `dose_vs_study` ends and `cogs_refills` when `mechanism` ends, as §3's diagram
+   draws it (`PRODUCT_TRUTH_AGENT_SPECS.after`). The team mechanics stage 1 had
+   inline (`StageOneRun`) moved into `agent/agent-team.ts`, which both stages
+   use; stage 1's "champion, then the rest" is the same graph with one edge per
+   agent. All 451 existing tests passed unchanged after the move.
+3. **"Done" is a list of open items, each closed by a row or a gap whose
+   `missing` starts with the item's key** (`extract/product-truth-coverage.ts`),
+   the convention stage 1's `NodeFields` already uses. Keys: `actives`,
+   `servings_per_day`, `servings_per_container`; `mechanism: <active>`,
+   `time_to_effect: <active>`, `carrier`; `dose: <active>` (only actives with an
+   amount, outside a blend); `claims: <market> / <platform>` (`claims: market`
+   when the brief names none); `prices`. Node status is computed by code at
+   settlement from these, so no agent records `node_status`.
+4. **Picks are checked when written** (`extract/row-picks.ts`): a mechanism or
+   dose study must name a recorded active, a claim limit a market of the brief's,
+   and a studied dose must be in the label's unit for that active. This is
+   stage 1's shared-actives check generalised; `SharedActives` is called from
+   the same place.
+5. **Search excerpts are citable.** Parallel Search returns text it read off each
+   page, so `agent/tools/evidence-search-tool.ts` archives each result under its
+   sha256 and returns a `source_id`, the same as `web_fetch`. Bare SearXNG
+   snippets (the fallback) are marked not citable. `domains` on the tool becomes
+   `advanced_settings.source_policy.include_domains` (measured: at the top level
+   it is a 422). The fetch relevance gate is off for product truth: it would
+   filter a regulator's page as off-topic.
+6. **Turn limits were chosen in the build, not by the operator:** `formula` 10,
+   `mechanism` 15, `dose_vs_study` 15, `claim_limits` 20, `cogs_refills` 8. They
+   live in `domain/product-truth-agents.ts`.
+7. **Product truth always runs whole.** Any stage-2 node in a request expands to
+   all four (`Stages.expand`), because each node needs what another found.
+8. **The renumbering migration is a named data migration**
+   (`adapters/sqlite/migrations.ts`, `research_migrations`), since the existing
+   migrations only add columns.
+9. **Margins are per unit**: (price ÷ units in the price − landed cost) ÷ (price
+   ÷ units). A price in another currency than the landed cost gets no margin,
+   with the reason, rather than a conversion.
+10. **Found while building:** `StageOneHandoff.forBrief` (was `StageTwoHandoff`)
+    handed over the newest stage-1 run with a packet whatever its status, which
+    became wrong once invalid runs kept their packet. It now takes only
+    completed runs; regression test in `tests/review-mining-plan.test.ts`.
+

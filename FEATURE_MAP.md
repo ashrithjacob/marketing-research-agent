@@ -81,12 +81,25 @@ Submitting calls `POST /api/research/runs` with `{brief, nodes}`.
 > packet names a product that is not yours, check `brief` first, before the
 > prompt.
 
-### The stage-2 go-ahead (`StageTwoPlan.tsx`)
+### Product truth's start (`ProductTruthStart.tsx`)
 
-Opened by **Start stage 2 →** or the review-mining ▶. Lists what stage 2 can
-mine (`plan.offered`, from `POST /stage2/plan`) with checkboxes and the Apify
+Opened by **Start stage 2 →** (rail or the Now panel's next-stage strip) or any
+stage-2 ▶ — product truth always runs all four of its nodes. Fields: landed cost
+per unit and its currency, MOQ, lead time in days, and **Add a price** rows
+(label, amount, currency, units, subscription). Every field may stay blank: a
+blank cost is written to the ledger as a gap (`agent/operator-inputs.ts`), and
+the margins it would feed show `—` with "no landed unit cost was entered", never
+an estimate. Submitting sends `POST /api/research/runs` with
+`{brief, nodes: [the four], inputs}`. A 409 here means no completed stage 1 for
+this brief.
+
+### The review-mining go-ahead (`ReviewMiningPlan.tsx`)
+
+Opened by **Start stage 3 →** or the review-mining ▶. It says *not ready* until
+product truth has completed on the same stage-1 run. Lists what review mining can
+mine (`plan.offered`, from `POST /review-mining/plan`) with checkboxes and the Apify
 estimate. Each target shows its brand-site link and, under it
-(`stage-two/ListingLine.tsx`), either its matched Amazon listing — stars, review
+(`review-mining/ListingLine.tsx`), either its matched Amazon listing — stars, review
 count, share of 3★, "bought in past month", best-seller rank, price, Amazon's
 Choice, a link — or, for a target mined on Trustpilot, its Trustpilot score and
 review count ("★ 4.4 · 12 Trustpilot reviews", "no Trustpilot reviews yet", or
@@ -95,8 +108,8 @@ two others collided on shows why it is not mined on Amazon. **A target with no
 matched listing and no domain of its own is not listed at all** (since 2026-09-30,
 `spec-stage-2-pipeline.md` §3a). The listings are normally looked up when stage 1
 completes; if they were not (an older run, or no token then), the first open runs
-`POST /stage2/listings`, about $0.01 per target. Approving starts the stage-2
-pipeline, which calls no model.
+`POST /review-mining/listings`, about $0.01 per target. Approving starts the
+review-mining pipeline, which calls no model.
 
 ### The stage rail — left column (`StageRail.tsx`)
 
@@ -108,29 +121,40 @@ a sparkline (`Curve`), and a **▶** button.
 | `product_data` | Product data | 1 |
 | `competitors` | Competitors | 1 |
 | `category_data` | Category data | 1 |
-| `review_mining` | Review mining | 2 |
+| `mechanism` | Mechanism | 2 |
+| `dose_vs_study` | Dose vs study | 2 |
+| `claim_limits` | Claim limits | 2 |
+| `cogs_refills` | COGS & refills | 2 |
+| `review_mining` | Review mining | 3 |
 
 **▶** runs that node on its own — `POST /api/research/runs` with a one-element
-`nodes` array. It is disabled for stage 2 with the tooltip *"Stage 2 mines what
-stage 1 found — run stage 1 for this brief first"*; that is the intended state,
-not a broken button.
+`nodes` array — except in stage 2, where any ▶ opens product truth's start and
+runs all four. A stage's ▶ is disabled until the stage before it is complete on
+the same stage-1 run, with the tooltip *"Stage N builds on stage N−1 — complete
+that first"*; that is the intended state, not a broken button. The labels, node
+lists and `scopeLabel` live in `stages.ts`; the rail is `StageRail.tsx`.
 
-A stage header (**Stage 1 · Raw material**, **Stage 2 · Review mining**) opens
+A stage header (**Stage 1 · Raw material**, **Stage 2 · Product truth**,
+**Stage 3 · Review mining**) opens
 that stage's run for the same subject, via `onSelectRun`. The header of the
-stage the shown run collects is not clickable. **Stage 2 belongs to one stage-1
-run** (`subjectProgress` in `run-view/rail.tsx`): on a stage-1 run, the stage-2
-state and header count only review mining whose `source_run_id` is that run —
+stage the shown run collects is not clickable. **Stages 2 and 3 belong to one
+stage-1 run** (`subjectProgress` in `run-view/rail.tsx`): on a stage-1 run, their
+state and headers count only runs whose `source_run_id` is that run —
 the live one, else the newest completed, else the newest — so a new stage 1 shows
-stage 2 as *ready*, with **Start stage 2 →**, even when an older stage 1's
-competitors were mined. On a stage-2 run, the stage-1 header opens its
-`source_run_id`. **A stage-2 run whose stage 1 has since been rerun** (a completed stage-1
-run newer than its `source_run_id`) shows stage 2 as *ready — stage 1 was
-rerun* with **Start stage 2 →**, a banner naming both stage-1 dates
-(`run-view/outdated-voice.tsx`), and its customer voice folded behind **Show the
-older customer voice**: it mined competitors the current stage 1 no longer names. *Superseded 2026-10-01:* any completed stage-2 run of the
-product counted, and a stage-2 run's stage 1 was guessed by date
-(`stageOneRunFor`), so a new stage-1 run showed another run's mining as its own
-stage 2. The ▶ buttons start runs; the headers only navigate.
+stage 2 as *ready*, with **Start stage 2 →**, even when an older stage 1 was
+assessed and mined. Stage 3 shows *ready* only once stage 2 is complete on that
+same stage-1 run. On a stage-2 or stage-3 run, the stage-1 header opens its
+`source_run_id`. **A stage-2 or stage-3 run whose stage 1 has since been rerun**
+(a completed stage-1 run newer than its `source_run_id`) shows its own stage as
+*ready — stage 1 was rerun*. A product-truth run adds a warning above its tiles;
+a review-mining run adds a banner naming both stage-1 dates with **Start stage
+2 →** (product truth on the new stage 1 comes first;
+`run-view/outdated-voice.tsx`), and folds its customer voice behind **Show the
+older customer voice**: it mined competitors the current stage 1 no longer names.
+*Superseded 2026-10-01:* any completed review-mining run of the product counted,
+and its stage 1 was guessed by date (`stageOneRunFor`), so a new stage-1 run
+showed another run's mining as its own. The ▶ buttons start runs; the headers
+only navigate.
 
 A node greyed with the tooltip `not in this run` was simply not in the run's
 `nodes`. `—` where a sparkline should be means no curve data, which is normal
@@ -180,10 +204,16 @@ generic gaps table:
 | Product data (open by default) | attributes, SVG bars for numeric measurements, excerpts, gaps | packet rows with `node: 'product_data'` |
 | Competitors | direct/indirect groups, each competitor's site link and its Amazon listing or "not on Amazon — <why>" (`run-view/amazon-link.tsx`, also on the champion line), social-proof review-count chart, excerpts, gaps | `packet.competitors`, `measurements`, `listings` on `GET /runs/:id` (re-judged by today's matcher on each read) |
 | Category data | market-size/CAGR bar charts, every figure with its period, gaps | `measurements` with `node: 'category_data'` |
-| Customer voice (stage 2, `run-view/voice/`) | reviews cleaned (duplicates, under three words, off-product), issues ranked worst and best with quotes, product × issue grid, star spread — all filtered by source (all / Amazon / other sites) and group (all / your product / direct / indirect), or one product. Started by **Analyse reviews**; LLM calls only, no Apify | `GET`/`POST /runs/:id/review-analysis`, `agent/review-analysis/` |
+| Ingredients (stage 2, `run-view/truth/IngredientsTile.tsx`) | one card per active: amount on the label (or "no amount stated"), pathway, time to effect, magnitude, a `carrier` badge on the actives the story rests on | `packet.actives`, `packet.mechanisms` |
+| Dose vs study (stage 2) | active · ours per day · studied per day · ratio · class · form match · study; an unassessable row says why | `packet.doses`, computed by `extract/dose-bands.ts` |
+| Claim limits (stage 2) | the guard ("not legal advice…"), then per market × Meta / Google Ads: disclaimers, evidence standard, permitted and forbidden claims side by side | `packet.claim_limits` |
+| Economics (stage 2) | days of supply, each carrier's time to effect (red when the container runs out first), the churn flag, the operator's costs, the margin at every price | `packet.economics`, computed by `extract/product-economics.ts` |
+| Customer voice (stage 3, `run-view/voice/`) | reviews cleaned (duplicates, under three words, off-product), issues ranked worst and best with quotes, product × issue grid, star spread — all filtered by source (all / Amazon / other sites) and group (all / your product / direct / indirect), or one product. Started by **Analyse reviews**; LLM calls only, no Apify | `GET`/`POST /runs/:id/review-analysis`, `agent/review-analysis/` |
 
-A run's view shows only its own packet. A stage-2 run shows Customer voice
-alone; its stage-1 tiles are one click away on the rail's stage-1 header.
+A run's view shows only its own packet. A product-truth run shows its four
+tiles; a review-mining run shows Customer voice alone; the stage-1 tiles are one
+click away on the rail's stage-1 header. A stage-2 or stage-3 run whose stage 1
+has since been rerun says so above its tiles.
 
 Charts are hand-rolled SVG (`run-view/charts.tsx` `BarList`) — no chart
 library. Stage-1 packet rows are grouped per node in `run-view/stage-one-tiles.tsx` (`byNode`); a

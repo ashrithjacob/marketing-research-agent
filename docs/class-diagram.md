@@ -99,6 +99,7 @@ classDiagram
       rowId()
       key()
       identity()
+      name()
       live()
     }
     class RunEvent {
@@ -203,6 +204,9 @@ classDiagram
       <<interface>>
       admit()
     }
+    class ProductTruthAgentSpec {
+      <<interface>>
+    }
     class RunHead {
       <<interface>>
     }
@@ -258,6 +262,18 @@ classDiagram
     class ReviewAnalysis {
       <<interface>>
     }
+    class BestsellerRank {
+      <<interface>>
+    }
+    class AmazonListing {
+      <<interface>>
+    }
+    class TrustpilotSummary {
+      <<interface>>
+    }
+    class TargetListing {
+      <<interface>>
+    }
     class LedgerPull {
       <<interface>>
     }
@@ -289,28 +305,22 @@ classDiagram
       of()
       nodeOf()
     }
-    class BestsellerRank {
-      <<interface>>
-    }
-    class AmazonListing {
-      <<interface>>
-    }
-    class TrustpilotSummary {
-      <<interface>>
-    }
-    class TargetListing {
-      <<interface>>
-    }
     class SearchHit {
       <<interface>>
     }
     class SearchPage {
       <<interface>>
     }
+    class SearchScope {
+      <<interface>>
+    }
     class FetchedPage {
       <<interface>>
     }
-    class FetcherUnavailableError {
+    class ServiceUnavailableError {
+    }
+    class Domains {
+      within()
     }
   }
   namespace config {
@@ -350,6 +360,10 @@ classDiagram
     class CompletenessCheck {
       problems()
     }
+    class DoseBands {
+      classOf()
+      assess()
+    }
     class PacketDraft {
       coerce()
     }
@@ -357,6 +371,9 @@ classDiagram
     }
     class FindingCheck {
       check()
+    }
+    class LatestRows {
+      payloads()
     }
     class MarketCheck {
       problems()
@@ -375,8 +392,48 @@ classDiagram
     class PacketAssembly {
       draft()
     }
+    class ProductEconomics {
+      of()
+      churn()
+      margin()
+    }
+    class NodeReport {
+      <<interface>>
+    }
+    class ProductTruthAssembly {
+      draft()
+    }
+    class OpenItem {
+      <<interface>>
+    }
+    class Item {
+      <<interface>>
+    }
+    class ProductTruthCoverage {
+      open()
+      actives()
+    }
     class ReviewAssembly {
       expand()
+    }
+    class TrustpilotDomain {
+      of()
+    }
+    class ReviewMiningOffer {
+      of()
+    }
+    class PullFailure {
+      <<interface>>
+    }
+    class ReviewMiningPacket {
+      draft()
+    }
+    class ReviewMiningRoster {
+      of()
+      select()
+    }
+    class RowPicks {
+      problems()
     }
     class ScopeCheck {
       problems()
@@ -384,21 +441,8 @@ classDiagram
     class SharedActives {
       problems()
     }
-    class TrustpilotDomain {
-      of()
-    }
-    class StageTwoOffer {
-      of()
-    }
-    class PullFailure {
-      <<interface>>
-    }
-    class StageTwoPacket {
-      draft()
-    }
-    class StageTwoRoster {
-      of()
-      select()
+    class TruthCitations {
+      problems()
     }
     class ZodProblems {
       readable()
@@ -478,6 +522,9 @@ classDiagram
     class FallbackPageFetcher {
       scrape()
     }
+    class FallbackWebSearch {
+      find()
+    }
     class OpenRouterGate {
       admit()
       parse()
@@ -501,6 +548,24 @@ classDiagram
       ratesFor()
       generation()
       stop()
+    }
+    class ParallelApi {
+      post()
+    }
+    class ExtractResult {
+      <<interface>>
+    }
+    class ExtractError {
+      <<interface>>
+    }
+    class ParallelExtract {
+      scrape()
+    }
+    class ParallelResult {
+      <<interface>>
+    }
+    class ParallelSearch {
+      find()
     }
     class RateLimitWait {
       askedMs()
@@ -526,6 +591,9 @@ classDiagram
     }
     class Searxng {
       find()
+    }
+    class EvidenceServices {
+      <<interface>>
     }
     class ServiceClients {
       forSettings()
@@ -570,6 +638,9 @@ classDiagram
       add()
       delete()
       bump()
+    }
+    class SqliteMigrations {
+      apply()
     }
     class PacketRowTable {
       replace()
@@ -660,6 +731,14 @@ classDiagram
       end()
       hasEnded()
     }
+    class TeamMember {
+      <<interface>>
+    }
+    class AgentTeam {
+      run()
+      partProblems()
+      output()
+    }
     class BilledCosts {
     }
     class DoneCheck {
@@ -739,11 +818,33 @@ classDiagram
       failover()
       withFallbacks()
     }
+    class OperatorInputs {
+      record()
+    }
     class ModelPricing {
       apply()
     }
+    class ProductTruthRunContext {
+      <<interface>>
+    }
+    class ProductTruthAgentFactory {
+      build()
+    }
+    class ProductTruthDone {
+      problems()
+    }
+    class ProductTruthBrief {
+      <<interface>>
+    }
+    class ProductTruthRun {
+      start()
+    }
+    class ProductTruthSettlement {
+      settle()
+    }
     class PromptBlocks {
       code()
+      sources()
       judgements()
       brief()
       champion()
@@ -758,6 +859,18 @@ classDiagram
     class AgentMessages {
       steer()
       resume()
+    }
+    class TruthBlocks {
+      stageOne()
+      actives()
+      doses()
+    }
+    class TruthInstructions {
+      <<interface>>
+    }
+    class ProductTruthPrompts {
+      system()
+      instructions()
     }
     class RetryPolicy {
       <<interface>>
@@ -821,6 +934,20 @@ classDiagram
     class ReviewMiningJob {
       start()
     }
+    class ReviewMiningListings {
+      judged()
+      ensure()
+      marketplace()
+      strategy()
+      query()
+    }
+    class ReviewMiningPlanner {
+      plan()
+    }
+    class ReviewMiningSettlement {
+      settle()
+      fail()
+    }
     class PullJob {
       <<interface>>
     }
@@ -841,6 +968,9 @@ classDiagram
       rows()
       live()
       own()
+    }
+    class RunKinds {
+      <<interface>>
     }
     class RunLauncher {
       launch()
@@ -870,33 +1000,23 @@ classDiagram
     class StageOneAgentFactory {
       build()
     }
+    class StageOneHandoff {
+      forBrief()
+      forRun()
+      hasCompleted()
+    }
     class StageOneListings {
       lookUp()
     }
     class StageOneRun {
       start()
     }
-    class StageTwoHandoff {
-      forBrief()
-      forRun()
-    }
-    class StageTwoListings {
-      judged()
-      ensure()
-      marketplace()
-      strategy()
-      query()
-    }
-    class StageTwoPlanner {
-      plan()
-    }
-    class StageTwoSettlement {
-      settle()
-      fail()
-    }
     class ToolSteps {
       start()
       take()
+    }
+    class EvidenceSearchTool {
+      tool()
     }
     class LedgerOptions {
       <<interface>>
@@ -939,6 +1059,9 @@ classDiagram
     }
     class WebSearchTool {
       tool()
+    }
+    class TruthLimitClose {
+      close()
     }
     class TurnBudget {
     }
@@ -996,6 +1119,9 @@ classDiagram
     class ReviewAnalysisRoutes {
       register()
     }
+    class ReviewMiningRoutes {
+      register()
+    }
     class RunRoutes {
       register()
     }
@@ -1010,9 +1136,6 @@ classDiagram
       resolve()
       revoke()
       local()
-    }
-    class StageTwoRoutes {
-      register()
     }
     class TokenService {
       issue()
@@ -1029,13 +1152,18 @@ classDiagram
   TrustpilotReviews --> ActorRunner
   Crawl4ai --> Settings
   FallbackPageFetcher --> PageFetcher
+  FallbackWebSearch --> WebSearch
   OpenRouterGate --> Settings
   Firecrawl --> Settings
+  ParallelApi --> Settings
+  ParallelExtract --> ParallelApi
+  ParallelSearch --> ParallelApi
   RunBilling --> OpenRouterPrices
   Searxng --> Settings
   ServiceClients --> PageFetcher
   ServiceClients --> WebSearch
   ServiceClients --> ActorRunner
+  ServiceClients --> EvidenceServices
   ProductBackfill --> ProductTable
   ProductBackfill --> PacketRowTable
   SqliteProductCatalog --> ProductTable
@@ -1052,6 +1180,8 @@ classDiagram
   AgentDriver --> LiveRuns
   AgentDriver --> RetryPolicy
   AgentDriver --> ModelChain
+  AgentTeam --> RetryPolicy
+  AgentTeam --> ModelChain
   BilledCosts --> ResearchStore
   BilledCosts --> LiveRuns
   NodeDone --> RunFindings
@@ -1066,7 +1196,17 @@ classDiagram
   LimitClose --> DoneCheck
   LiveRuns --> ResearchStore
   ModelChain --> Pricing
+  OperatorInputs --> FindingLedger
   ModelPricing --> OpenRouterPrices
+  ProductTruthAgentFactory --> Settings
+  ProductTruthAgentFactory --> ResearchStore
+  ProductTruthAgentFactory --> ServiceClients
+  ProductTruthAgentFactory --> ProductTruthPrompts
+  ProductTruthDone --> RunFindings
+  ProductTruthRun --> ProductTruthAgentFactory
+  ProductTruthRun --> ProductTruthBrief
+  ProductTruthSettlement --> ResearchStore
+  ProductTruthSettlement --> LiveRuns
   IssueSlices --> IssueTally
   NewIssueMerge --> StructuredAsk
   ReviewAnalysisJob --> StructuredAsk
@@ -1080,6 +1220,12 @@ classDiagram
   ReviewMiningJob --> LiveRuns
   ReviewMiningJob --> Settings
   ReviewMiningJob --> ActorRunner
+  ReviewMiningListings --> TargetListings
+  ReviewMiningListings --> AmazonListingSource
+  ReviewMiningListings --> TrustpilotProfiles
+  ReviewMiningSettlement --> ResearchStore
+  ReviewMiningSettlement --> LiveRuns
+  ReviewMiningSettlement --> ReviewLedger
   ReviewPuller --> PullEvents
   RowRepair --> FindingLedger
   RunFindings --> FindingLedger
@@ -1088,9 +1234,7 @@ classDiagram
   RunLauncher --> OpenRouterPrices
   RunLauncher --> LiveRuns
   RunLauncher --> RetryPolicy
-  RunLauncher --> StageOneAgentFactory
-  RunLauncher --> StageOneListings
-  RunLauncher --> ReviewMiningJob
+  RunLauncher --> RunKinds
   RunSettlement --> ResearchStore
   RunSettlement --> LiveRuns
   RunSettlement --> LedgerPacket
@@ -1102,16 +1246,12 @@ classDiagram
   StageOneAgentFactory --> ResearchStore
   StageOneAgentFactory --> ServiceClients
   StageOneAgentFactory --> PromptBuilder
+  StageOneHandoff --> ResearchStore
   StageOneListings --> TargetListings
   StageOneListings --> ActorRunner
   StageOneListings --> PageFetcher
-  StageTwoHandoff --> ResearchStore
-  StageTwoListings --> TargetListings
-  StageTwoListings --> AmazonListingSource
-  StageTwoListings --> TrustpilotProfiles
-  StageTwoSettlement --> ResearchStore
-  StageTwoSettlement --> LiveRuns
-  StageTwoSettlement --> ReviewLedger
+  EvidenceSearchTool --> WebSearch
+  EvidenceSearchTool --> Corpus
   ResearchToolset --> ToolsetOptions
   FindProductTool --> AmazonProducts
   FinishTool --> DoneCheck
@@ -1125,11 +1265,16 @@ classDiagram
   WebFetchTool --> Corpus
   WebFetchTool --> FetchGate
   WebSearchTool --> WebSearch
+  TruthLimitClose --> RunFindings
+  TruthLimitClose --> RowRepair
+  TruthLimitClose --> DoneCheck
   PacketError --> CheckProblem
   PacketAssembly --> Finding
+  ProductTruthAssembly --> Finding
+  ProductTruthCoverage --> Finding
   ReviewAssembly --> ReviewLedgerSnapshot
-  StageTwoPacket --> ReviewLedgerSnapshot
-  StageTwoPacket --> PullFailure
+  ReviewMiningPacket --> ReviewLedgerSnapshot
+  ReviewMiningPacket --> PullFailure
   PacketValidator --> ReviewLedgerSnapshot
   AccountCommands --> AccountDirectory
   App --> AmazonListingSource
@@ -1146,16 +1291,16 @@ classDiagram
   ReviewAnalysisRoutes --> ResearchStore
   ReviewAnalysisRoutes --> RunSupervisor
   ReviewAnalysisRoutes --> ReviewAnalyst
+  ReviewMiningRoutes --> StageOneHandoff
+  ReviewMiningRoutes --> Settings
+  ReviewMiningRoutes --> ReviewMiningListings
   RunRoutes --> ResearchStore
   RunRoutes --> RunSupervisor
-  RunRoutes --> StageTwoHandoff
-  RunRoutes --> StageTwoListings
+  RunRoutes --> StageOneHandoff
+  RunRoutes --> ReviewMiningListings
   ScopeGuard --> ResearchStore
   Sessions --> AccountDirectory
   Sessions --> Settings
-  StageTwoRoutes --> StageTwoHandoff
-  StageTwoRoutes --> Settings
-  StageTwoRoutes --> StageTwoListings
   TraceRoute --> TraceFile
   TraceFile --> TraceLimits
 ```
@@ -1176,16 +1321,20 @@ classDiagram
 | `adapters` | `adapters/corpus.ts` | Corpus |
 | `adapters` | `adapters/crawl4ai.ts` | Crawl4aiPayload, Crawl4ai |
 | `adapters` | `adapters/fallback-fetcher.ts` | FallbackPageFetcher |
+| `adapters` | `adapters/fallback-search.ts` | FallbackWebSearch |
 | `adapters` | `adapters/fetch-gate.ts` | OpenRouterGate |
 | `adapters` | `adapters/firecrawl.ts` | FirecrawlPayload, Firecrawl |
 | `adapters` | `adapters/http.ts` | Http |
 | `adapters` | `adapters/openrouter-generation.ts` | OpenRouterGeneration |
 | `adapters` | `adapters/openrouter-prices.ts` | OpenRouterPrices |
+| `adapters` | `adapters/parallel-api.ts` | ParallelApi |
+| `adapters` | `adapters/parallel-extract.ts` | ExtractResult, ExtractError, ParallelExtract |
+| `adapters` | `adapters/parallel-search.ts` | ParallelResult, ParallelSearch |
 | `adapters` | `adapters/rate-limit-wait.ts` | RateLimitWait |
 | `adapters` | `adapters/rates.ts` | Rates, Pricing, Billed, Money |
 | `adapters` | `adapters/run-billing.ts` | RunBilling |
 | `adapters` | `adapters/searxng.ts` | Searxng |
-| `adapters` | `adapters/service-clients.ts` | ServiceClients |
+| `adapters` | `adapters/service-clients.ts` | EvidenceServices, ServiceClients |
 | `adapters` | `adapters/service-queue.ts` | Waiter, ServiceQueue |
 | `adapters` | `adapters/sqlite/account-table.ts` | AccountTable |
 | `adapters` | `adapters/sqlite/call-log.ts` | CallLog |
@@ -1193,6 +1342,7 @@ classDiagram
 | `adapters` | `adapters/sqlite/event-log.ts` | EventLog |
 | `adapters` | `adapters/sqlite/finding-table.ts` | FindingTable |
 | `adapters` | `adapters/sqlite/judgement-table.ts` | JudgementTable |
+| `adapters` | `adapters/sqlite/migrations.ts` | SqliteMigrations |
 | `adapters` | `adapters/sqlite/packet-row-table.ts` | PacketRowTable |
 | `adapters` | `adapters/sqlite/product-backfill.ts` | ProductBackfill |
 | `adapters` | `adapters/sqlite/product-catalog.ts` | SqliteProductCatalog |
@@ -1210,6 +1360,7 @@ classDiagram
 | `adapters` | `adapters/trustpilot-profiles.ts` | TrustpilotProfiles |
 | `agent` | `agent/agent-driver.ts` | AgentOutcome, AgentDriver |
 | `agent` | `agent/agent-roster.ts` | AgentRoster |
+| `agent` | `agent/agent-team.ts` | TeamMember, AgentTeam |
 | `agent` | `agent/billed-costs.ts` | BilledCosts |
 | `agent` | `agent/done-check.ts` | DoneCheck, NodeDone, ChampionDone, DoneChecks |
 | `agent` | `agent/errors.ts` | RunError |
@@ -1222,10 +1373,17 @@ classDiagram
 | `agent` | `agent/live-runs.ts` | RunControl, Live, LiveRuns |
 | `agent` | `agent/llm-call-log.ts` | CallSequence, LlmCallLog |
 | `agent` | `agent/model-chain.ts` | ModelChain |
+| `agent` | `agent/operator-inputs.ts` | OperatorInputs |
 | `agent` | `agent/pricing.ts` | ModelPricing |
+| `agent` | `agent/product-truth-agent-factory.ts` | ProductTruthRunContext, ProductTruthAgentFactory |
+| `agent` | `agent/product-truth-done.ts` | ProductTruthDone |
+| `agent` | `agent/product-truth-run.ts` | ProductTruthBrief, ProductTruthRun |
+| `agent` | `agent/product-truth-settlement.ts` | ProductTruthSettlement |
 | `agent` | `agent/prompt/blocks.ts` | PromptBlocks |
 | `agent` | `agent/prompt/builder.ts` | AgentInstructions, PromptBuilder |
 | `agent` | `agent/prompt/messages.ts` | AgentMessages |
+| `agent` | `agent/prompt/truth-blocks.ts` | TruthBlocks |
+| `agent` | `agent/prompt/truth-builder.ts` | TruthInstructions, ProductTruthPrompts |
 | `agent` | `agent/retry.ts` | RetryPolicy, Retries |
 | `agent` | `agent/review-analysis/analysis-prompts.ts` | AnalysisPrompts |
 | `agent` | `agent/review-analysis/issue-slices.ts` | IssueSlices |
@@ -1239,21 +1397,22 @@ classDiagram
 | `agent` | `agent/review-filing.ts` | PullLabel, ReviewFiling |
 | `agent` | `agent/review-ledger.ts` | ReviewLedger |
 | `agent` | `agent/review-mining-job.ts` | ReviewMiningJob |
+| `agent` | `agent/review-mining-listings.ts` | ReviewMiningListings |
+| `agent` | `agent/review-mining-plan.ts` | ReviewMiningPlanner |
+| `agent` | `agent/review-mining-settlement.ts` | ReviewMiningSettlement |
 | `agent` | `agent/review-puller.ts` | PullJob, PullEvents, ReviewPuller |
 | `agent` | `agent/row-repair.ts` | RowRepair |
 | `agent` | `agent/run-findings.ts` | RunFindings |
-| `agent` | `agent/run-launcher.ts` | RunLauncher |
+| `agent` | `agent/run-launcher.ts` | RunKinds, RunLauncher |
 | `agent` | `agent/run-settlement.ts` | RunSettlement |
 | `agent` | `agent/run-supervisor.ts` | RunSupervisor |
 | `agent` | `agent/run-wrap-up.ts` | RunWrapUp |
 | `agent` | `agent/stage-one-agent-factory.ts` | StageOneRunContext, BuiltAgent, StageOneAgentFactory |
+| `agent` | `agent/stage-one-handoff.ts` | StageOneHandoff |
 | `agent` | `agent/stage-one-listings.ts` | StageOneListings |
 | `agent` | `agent/stage-one-run.ts` | StageOneRun |
-| `agent` | `agent/stage-two-handoff.ts` | StageTwoHandoff |
-| `agent` | `agent/stage-two-listings.ts` | StageTwoListings |
-| `agent` | `agent/stage-two-plan.ts` | StageTwoPlanner |
-| `agent` | `agent/stage-two-settlement.ts` | StageTwoSettlement |
 | `agent` | `agent/tool-steps.ts` | ToolSteps |
+| `agent` | `agent/tools/evidence-search-tool.ts` | EvidenceSearchTool |
 | `agent` | `agent/tools/factory.ts` | LedgerOptions, ToolsetOptions, ResearchToolset |
 | `agent` | `agent/tools/find-product-tool.ts` | FindProductTool |
 | `agent` | `agent/tools/finish-tool.ts` | FinishTool |
@@ -1263,6 +1422,7 @@ classDiagram
 | `agent` | `agent/tools/traced-tool.ts` | TracedTool |
 | `agent` | `agent/tools/web-fetch-tool.ts` | WebFetchTool |
 | `agent` | `agent/tools/web-search-tool.ts` | WebSearchTool |
+| `agent` | `agent/truth-limit-close.ts` | TruthLimitClose |
 | `agent` | `agent/turn-budget.ts` | TurnBudget |
 | `agent` | `agent/usage.ts` | UsageTotals |
 | `config` | `config/settings-shape.ts` | Settings |
@@ -1276,33 +1436,41 @@ classDiagram
 | `domain` | `domain/nodes.ts` | Stages |
 | `domain` | `domain/packet-rows.ts` | PacketRowSet, PacketRows |
 | `domain` | `domain/ports.ts` | ProductCatalog, AccountDirectory, AmazonListingSource, TargetListings, FindingLedger, PageFetcher, WebSearch, ResearchStore, GateVerdict, FetchGate |
+| `domain` | `domain/product-truth-agents.ts` | ProductTruthAgentSpec |
 | `domain` | `domain/products.ts` | RunHead, Product, ProductSummary, ProductFolders |
 | `domain` | `domain/records.ts` | Clock, Ids, ResearchRun, RunSummary, Runs |
 | `domain` | `domain/reject-kinds.ts` | RejectKinds |
 | `domain` | `domain/review-analysis.ts` | AnalysedReview, CleaningTally, IssueQuote, ProductIssue, ProductVoice, RankedIssue, IssueSlice, ReviewAnalysis |
+| `domain` | `domain/review-mining.ts` | BestsellerRank, AmazonListing, TrustpilotSummary, TargetListing |
 | `domain` | `domain/reviews.ts` | LedgerPull, LedgerReview, ReviewLedgerSnapshot, StoredRunReview |
 | `domain` | `domain/service-report.ts` | ServicePart, ServiceReport, ServiceReports |
 | `domain` | `domain/stage-one-agents.ts` | StageOneAgentSpec, StageOnePlan, StageOnePlans |
-| `domain` | `domain/stage-two.ts` | BestsellerRank, AmazonListing, TrustpilotSummary, TargetListing |
-| `domain` | `domain/web.ts` | SearchHit, SearchPage, FetchedPage, FetcherUnavailableError |
+| `domain` | `domain/web.ts` | SearchHit, SearchPage, SearchScope, FetchedPage, ServiceUnavailableError, Domains |
 | `extract` | `extract/brief-check.ts` | BriefCheck |
 | `extract` | `extract/champion-check.ts` | ChampionCheck |
 | `extract` | `extract/check.ts` | PacketContext, PacketCheck |
 | `extract` | `extract/citation-check.ts` | CitationCheck |
 | `extract` | `extract/competitor-check.ts` | CompetitorCheck |
 | `extract` | `extract/completeness-check.ts` | CompletenessCheck |
+| `extract` | `extract/dose-bands.ts` | DoseBands |
 | `extract` | `extract/draft.ts` | PacketDraft |
 | `extract` | `extract/errors.ts` | PacketError |
 | `extract` | `extract/finding-check.ts` | FindingCheck |
+| `extract` | `extract/latest-rows.ts` | LatestRows |
 | `extract` | `extract/market-check.ts` | MarketCheck |
 | `extract` | `extract/names.ts` | Names, BrandLabels, Relations |
 | `extract` | `extract/packet-assembly.ts` | PacketAssembly |
+| `extract` | `extract/product-economics.ts` | ProductEconomics |
+| `extract` | `extract/product-truth-assembly.ts` | NodeReport, ProductTruthAssembly |
+| `extract` | `extract/product-truth-coverage.ts` | OpenItem, Item, ProductTruthCoverage |
 | `extract` | `extract/review-assembly.ts` | ReviewAssembly |
+| `extract` | `extract/review-mining-offer.ts` | TrustpilotDomain, ReviewMiningOffer |
+| `extract` | `extract/review-mining-packet.ts` | PullFailure, ReviewMiningPacket |
+| `extract` | `extract/review-mining-roster.ts` | ReviewMiningRoster |
+| `extract` | `extract/row-picks.ts` | RowPicks |
 | `extract` | `extract/scope-check.ts` | ScopeCheck |
 | `extract` | `extract/shared-actives.ts` | SharedActives |
-| `extract` | `extract/stage-two-offer.ts` | TrustpilotDomain, StageTwoOffer |
-| `extract` | `extract/stage-two-packet.ts` | PullFailure, StageTwoPacket |
-| `extract` | `extract/stage-two-roster.ts` | StageTwoRoster |
+| `extract` | `extract/truth-citations.ts` | TruthCitations |
 | `extract` | `extract/validator.ts` | ZodProblems, PacketValidator |
 | `http` | `http/account-commands.ts` | AccountCommands |
 | `http` | `http/app.ts` | App |
@@ -1318,11 +1486,11 @@ classDiagram
 | `http` | `http/product-routes.ts` | ProductRoutes |
 | `http` | `http/research-api.ts` | ResearchApi |
 | `http` | `http/review-analysis-routes.ts` | ReviewAnalysisRoutes |
+| `http` | `http/review-mining-routes.ts` | ReviewMiningRoutes |
 | `http` | `http/run-routes.ts` | RunRoutes |
 | `http` | `http/scope-guard.ts` | ScopeGuard |
 | `http` | `http/secret-prompt.ts` | SecretPrompt |
 | `http` | `http/sessions.ts` | Sessions |
-| `http` | `http/stage-two-routes.ts` | StageTwoRoutes |
 | `http` | `http/token-service.ts` | TokenService |
 | `http` | `http/trace-route.ts` | TraceRoute |
 | `trace` | `trace/trace-file.ts` | TraceLimits, TraceFile |

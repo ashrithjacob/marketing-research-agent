@@ -159,7 +159,7 @@ export default function LogsPage({ runId }: { runId: string }) {
               sub={`${duration(stats.llm_time_ms)} waiting on the model`} />
             <Stat label="Tokens" value={formatTokens(stats.tokens.total)}
               sub={`${formatTokens(stats.tokens.input)} in · ${formatTokens(stats.tokens.cache_read)} cached · ${formatTokens(stats.tokens.output)} out`} />
-            {run.stage === 2 ? (
+            {run.stage === 3 ? (
               <Stat label="Apify crawler costs"
                 value={stats.apify?.runs ? `$${stats.apify.total.toFixed(4)}` : '—'}
                 sub={stats.apify?.runs

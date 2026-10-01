@@ -6,9 +6,9 @@ export function milestoneText(event: RunEvent): { text: string; cls: string } {
   switch (event.kind) {
     case 'run.started': {
       const nodes = (p.nodes as string[] | undefined) ?? [];
-      return nodes.includes('review_mining')
-        ? { text: 'Run started — stage 2, review mining', cls: '' }
-        : { text: 'Run started — stage 1, gather only', cls: '' };
+      if (nodes.includes('review_mining')) return { text: 'Run started — stage 3, review mining', cls: '' };
+      if (nodes.includes('mechanism')) return { text: 'Run started — stage 2, product truth', cls: '' };
+      return { text: 'Run started — stage 1, gather only', cls: '' };
     }
     case 'agent.started':
       return { text: `${p.agent_id} agent started`, cls: '' };

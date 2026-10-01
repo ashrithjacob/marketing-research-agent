@@ -21,7 +21,7 @@ export function nowPanel(
       case 'completed':
         return {
           title: `Stage ${stage} complete`,
-          sub: `packet accepted — ${run.counts.sources} sources, ${run.counts.excerpts} excerpts, ${run.counts.gaps} gaps`,
+          sub: `packet accepted — ${run.counts.sources} sources, ${stage === 2 ? '' : `${run.counts.excerpts} excerpts, `}${run.counts.gaps} gaps`,
         };
       case 'invalid':
         return { title: 'Packet rejected', sub: run.error };
@@ -43,7 +43,7 @@ export function nowPanel(
   }
   return {
     title: `Stage ${stage} · ${where}`,
-    sub: 'gathering only — no conclusions drawn here',
+    sub: stage === 2 ? 'the product in isolation — code computes every number' : 'gathering only — no conclusions drawn here',
   };
 }
 

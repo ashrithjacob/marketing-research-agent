@@ -100,7 +100,7 @@ export default function ReviewMiningPlan({
             <p className="lede">
               Stage 1 chose <b>{plan.plan.subject.name}</b> ({plan.plan.subject.form};{' '}
               {plan.plan.subject.actives.join(', ')}) as the champion product — the genre's
-              most-bought — plus the brands that share its active ingredient. Stage 2 mines
+              most-bought — plus the brands that share its active ingredient. Review mining mines
               verbatim customer reviews for the approved targets: on Amazon, per star band,
               where the target has a matched listing, and on its own Trustpilot page where it
               does not. A target with neither is not listed.

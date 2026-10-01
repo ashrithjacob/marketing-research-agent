@@ -271,6 +271,22 @@ describe("the hand-off", () => {
     expect(handoff.forBrief({ product: "Nobody", url: "", market: "", notes: "" }, Scope.everything)).toBeNull();
   });
 
+  it("hands over only a completed stage-1 run, never a newer invalid one that kept its packet", async () => {
+    const completed = await seedStageOne();
+    const invalid = store.createRun({
+      workspaceId: "admin",
+      brief: { product: "MagnaCalm 400mg", url: "", market: "UK", notes: "" },
+      model: "faux-model",
+      rejectKinds: [],
+      judgementIds: [],
+      nodes: ["product_data", "competitors", "category_data"],
+      stage: 1,
+    });
+    store.updateRun(invalid.id, { status: "invalid", packet: rosterPacket() });
+    const handoff = new StageOneHandoff(store);
+    expect(handoff.forBrief({ product: "MagnaCalm 400mg", url: "", market: "", notes: "" }, Scope.everything)?.run.id).toBe(completed);
+  });
+
   it("refuses a review-mining packet posing as stage 1", async () => {
     const run = store.createRun({
       workspaceId: "admin",

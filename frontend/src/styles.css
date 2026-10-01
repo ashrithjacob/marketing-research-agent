@@ -205,7 +205,7 @@ h3 .n { color: var(--faint); text-transform: none; letter-spacing: 0.02em; font-
 .stage.linked { cursor: pointer; }
 .stage.linked:hover { background: var(--accent-soft); }
 .stage.linked:hover .stage-t { text-decoration: underline; }
-/* Stage 2 once stage 1 is in: the obvious next step, not a dimmed placeholder. */
+/* The next stage once the one before is in: the obvious next step, not a dimmed placeholder. */
 .stage.ready { background: var(--accent-soft); outline: 1px dashed var(--accent); outline-offset: -1px; }
 .stage.ready .dot { background: #fff; border: 2px solid var(--accent); width: 7px; height: 7px; }
 .stage.ready .stage-s { color: var(--accent); }
@@ -846,3 +846,19 @@ details.tl-tool.lane[open] > summary { border-bottom: 1px solid var(--line); }
 .listing-line a { margin-left: 2px; }
 .listing-line.mismatch .listing-facts { color: var(--faint); }
 .listing-warn { color: var(--warn); }
+
+.pt-cards { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); margin-top: 10px; }
+.pt-card { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+.pt-card-head { display: flex; gap: 6px; align-items: center; margin-bottom: 6px; }
+.pt-card .kv-row .k { min-width: 110px; }
+.pt-table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 13px; }
+.pt-table th { text-align: left; color: var(--faint); font-weight: 500; padding: 4px 6px; border-bottom: 1px solid var(--line); }
+.pt-table td { padding: 6px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.pt-claims { border-top: 1px solid var(--line); margin-top: 10px; }
+.pt-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 6px; }
+.pt-columns ul { margin: 4px 0 0; padding-left: 18px; }
+.pt-col-head { font-size: 11.5px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+.pt-col-head.ok { color: var(--ok); }
+.pt-col-head.bad { color: var(--bad); }
+.churn-bad { color: var(--bad); font-weight: 600; }
+.cite { font-size: 12px; margin-left: 4px; }

@@ -59,7 +59,17 @@ without the operator re-explaining. Read `CLAUDE.md` first (its six rules and th
    `AgentTabs.tsx`); `agent_id` on every LLM call and event; required-field split
    via `GET /config` → `required_fields`.
 
-## Next job: Stage 2 · Product truth
+## Done since (same day, not committed, not deployed): Stage 2 · Product truth
+
+Built steps 1–6 of `spec-stage-2-product-truth.md` §8. Its §10 lists where the
+build departs from the plan, and `workings.md` §2f has the mechanism and the
+measured run (`8d3842e0`, local: completed, 18 min 34 s, $0.1611 billed,
+22 Parallel searches + 49 extracts). Review mining is stage 3 and needs product
+truth complete on the same stage-1 run. VPS: run the deploy only when told;
+`PARALLEL_API_KEY` is not in the VPS `.env` yet, and the first start renumbers
+the 6 stored review-mining runs to stage 3.
+
+## Was next: Stage 2 · Product truth
 
 Full plan: **`spec-stage-2-product-truth.md`** (decisions taken with the operator
 in its §9). In one line: a new stage between stage 1 and review mining, four

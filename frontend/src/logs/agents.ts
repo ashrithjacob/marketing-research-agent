@@ -17,6 +17,11 @@ const DETAIL: Record<string, string> = {
   product: 'step 2 · product_data',
   competitors: 'step 2 · competitors',
   category: 'step 2 · category_data',
+  formula: 'step 1 · the label as one row per active',
+  mechanism: 'step 2 · how each active works',
+  dose_vs_study: 'step 2 · our dose against the studies',
+  claim_limits: 'step 3 · what it may claim, per market and platform',
+  cogs_refills: 'step 3 · prices, for margins and days of supply',
 };
 
 function agentOf(event: RunEvent): string {

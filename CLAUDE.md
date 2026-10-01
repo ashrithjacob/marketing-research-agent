@@ -65,7 +65,7 @@ quote it. A healthy `/api/health` on the live site means the container is up —
 it does not mean your change is on it. Only `deploy/vps/deploy.sh` does that.
 
 **5. Never start a run that spends Apify money without asking first.** Apify is
-billed to the user per run. That covers any stage-2 run (a code pipeline since
+billed to the user per run. That covers any review-mining run (stage 3 since 2026-10-01; a code pipeline since
 2026-09-30: Amazon review pulls, Trustpilot where a target has no Amazon listing),
 and **every stage-1 run except a url brief without `competitors`**: its step-1
 `champion` agent calls `amazon_find_product` (`workings_stage1.md`). With
