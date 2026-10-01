@@ -15,12 +15,15 @@ import {
 import { Trace } from "../trace/index.js";
 
 import { LiveRuns, type Subscriber } from "./live-runs.js";
-import { AgentMessages, PromptBuilder } from "./prompt/index.js";
+import { AgentMessages, ProductTruthPrompts, PromptBuilder } from "./prompt/index.js";
+import { ProductTruthAgentFactory } from "./product-truth-agent-factory.js";
+import { StageOneHandoff } from "./stage-one-handoff.js";
 import { DEFAULT_RETRY, type RetryPolicy } from "./retry.js";
 import { StageOneAgentFactory } from "./stage-one-agent-factory.js";
 import { StageOneListings } from "./stage-one-listings.js";
 import { ReviewMiningJob } from "./review-mining-job.js";
 import { RunError } from "./errors.js";
+import { InvalidRunResettle } from "./invalid-run-resettle.js";
 import { RunLauncher } from "./run-launcher.js";
 
 /** Owns a research run for its whole life: one Agent per run, in this process. */
@@ -48,20 +51,13 @@ export class RunSupervisor {
     this.costs = options.costs ?? new OpenRouterPrices({ apiKey: options.settings.openrouterApiKey });
     this.models = options.models ?? RunSupervisor.defaultModels();
     const services = options.services ?? ServiceClients.forSettings(options.settings);
-    const factory = new StageOneAgentFactory(this.settings, this.store, this.models, services, new PromptBuilder());
-    const listings = new StageOneListings(this.store.listings, services.actors, services.pages, this.settings.apifyConcurrency);
-    const mining = new ReviewMiningJob(this.store, this.runs, this.settings, services.actors, options.pullRetryDelayMs);
-    this.launcher = new RunLauncher(
-      this.store,
-      this.settings,
-      this.models,
-      this.costs,
-      this.runs,
-      options.retry ?? DEFAULT_RETRY,
-      factory,
-      listings,
-      mining,
-    );
+    this.launcher = new RunLauncher(this.store, this.settings, this.models, this.costs, this.runs, options.retry ?? DEFAULT_RETRY, {
+      stageOne: new StageOneAgentFactory(this.settings, this.store, this.models, services, new PromptBuilder()),
+      listings: new StageOneListings(this.store.listings, services.actors, services.pages, this.settings.apifyConcurrency),
+      truth: new ProductTruthAgentFactory(this.settings, this.store, this.models, services, new ProductTruthPrompts()),
+      handoff: new StageOneHandoff(this.store),
+      mining: new ReviewMiningJob(this.store, this.runs, this.settings, services.actors, options.pullRetryDelayMs),
+    });
   }
 
   readonly subscribe = (runId: string, subscriber: Subscriber): (() => void) | null => {
@@ -97,10 +93,16 @@ export class RunSupervisor {
     }
   }
 
+  /** Settles again the invalid runs from before rows were repaired, so a refresh shows what they found. */
+  resettleInvalidRuns(): string[] {
+    Trace.line(import.meta.url, "RunSupervisor.resettleInvalidRuns");
+    return new InvalidRunResettle(this.store, this.runs).resettleAll();
+  }
+
   steer(runId: string, judgement: Judgement): void {
     Trace.line(import.meta.url, "RunSupervisor.steer", { runId, judgement });
     const live = this.runs.controllable(runId);
-    if (!live.control.steer) throw new RunError(`run ${runId} is a stage-2 pipeline: there is no agent to steer`);
+    if (!live.control.steer) throw new RunError(`run ${runId} is the review-mining pipeline: there is no agent to steer`);
     live.control.steer(AgentMessages.steer(judgement));
     this.runs.emit(runId, "run.steered", { judgement_id: judgement.id, text: judgement.text });
   }

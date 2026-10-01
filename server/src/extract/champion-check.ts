@@ -1,4 +1,4 @@
-import { Briefs, type StagePacket } from "../domain/index.js";
+import { CheckProblems, Briefs, type CheckProblem, type StagePacket } from "../domain/index.js";
 
 import type { PacketCheck, PacketContext } from "./check.js";
 import { Trace } from "../trace/index.js";
@@ -7,8 +7,13 @@ import { Trace } from "../trace/index.js";
 export class ChampionCheck implements PacketCheck {
   private static readonly RANKING_GAP = /champion ranking unavailable/i;
 
-  problems(packet: StagePacket, { brief }: PacketContext): string[] {
+  problems(packet: StagePacket, context: PacketContext): CheckProblem[] {
     Trace.line(import.meta.url, "ChampionCheck.problems", { packet });
+    return this.texts(packet, context).map(CheckProblems.of);
+  }
+
+  private texts(packet: StagePacket, { brief }: PacketContext): string[] {
+    Trace.line(import.meta.url, "ChampionCheck.texts", { packet });
     const reference = packet.competitor_reference;
     if (!reference || !ChampionCheck.isGenreBrief(brief)) return [];
     if (

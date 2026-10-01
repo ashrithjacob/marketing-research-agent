@@ -22,7 +22,7 @@ import { RunSupervisor } from "../src/agent/index.js";
 import { Env, type Settings } from "../src/config/index.js";
 
 import { SqliteResearchStore } from "../src/adapters/index.js";
-import { genreRun, minimalPacket, recordCalls, recorded, reviewPacket, productPacket } from "./fixtures.js";
+import { genreRun, minimalPacket, recordCalls, recorded, reviewPacket, productPacket, completeProductTruth } from "./fixtures.js";
 
 const MODEL_ID = "faux-model";
 
@@ -339,7 +339,7 @@ describe("per-node runs and the LLM call log", () => {
   });
 
   it("gates review mining behind a completed stage-1 run for the same brief", async () => {
-    // Stage 2 mines the listings stage 1 found. Without stage 1 there is no
+    // Review mining mines the listings stage 1 found. Without stage 1 there is no
     // product name, no site and no competitor set to mine against.
     const blocked = await post("/api/research/runs", {
       brief: { product: "MagnaCalm" },
@@ -359,14 +359,20 @@ describe("per-node runs and the LLM call log", () => {
 
     // Its own completed stage 1 does, and the match survives spelling drift.
     faux.setResponses(genreRun());
-    await finishedRun({ brief: { product: "MagnaCalm" } });
+    const stageOne = await finishedRun({ brief: { product: "MagnaCalm" } });
+    const early = await post("/api/research/runs", { brief: { product: "magna calm" }, nodes: ["review_mining"] });
+    expect(early.status).toBe(409);
+    expect(((await early.json()) as any).detail).toMatch(/once product truth \(stage 2\) has completed/);
+
+    // Review mining is stage 3: product truth on that same stage-1 run comes first.
+    completeProductTruth(store, stageOne.id);
     faux.setResponses(recorded(reviewPacket()));
     const allowed = await post("/api/research/runs", {
       brief: { product: "magna calm" },
       nodes: ["review_mining"],
     });
     expect(allowed.status).toBe(200);
-    expect(((await allowed.json()) as any).stage).toBe(2);
+    expect(((await allowed.json()) as any).stage).toBe(3);
   });
 
   it("reports a whole-stage run as covering stage 1's three nodes", async () => {

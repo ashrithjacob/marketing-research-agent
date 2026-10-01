@@ -22,12 +22,12 @@ import {
   TRUSTPILOT_ACTOR,
   type ActorRun,
 } from "../src/adapters/apify/index.js";
-import { RunSupervisor, StageTwoListings } from "../src/agent/index.js";
+import { RunSupervisor, ReviewMiningListings } from "../src/agent/index.js";
 import { Env, type Settings } from "../src/config/index.js";
 import { runRequestSchema, stagePacketSchema, type AmazonListing, type MiningTarget, type TargetListing } from "../src/domain/index.js";
-import { StageTwoOffer, StageTwoRoster, TrustpilotDomain } from "../src/extract/index.js";
+import { ReviewMiningOffer, ReviewMiningRoster, TrustpilotDomain } from "../src/extract/index.js";
 
-import { minimalPacket, services } from "./fixtures.js";
+import { minimalPacket, services, completeProductTruth } from "./fixtures.js";
 
 const BANDS = ["oneStar", "twoStar", "threeStar", "fourStar", "fiveStar"];
 
@@ -73,8 +73,8 @@ function seedStageOne(extra: Array<ReturnType<typeof competitor>> = [], rows: Ta
       ],
     }),
   });
-  const roster = StageTwoRoster.of(stagePacketSchema.parse(store.getRun(run.id)!.packet));
-  const strategy = (id: string) => StageTwoListings.strategy(roster.find((t) => t.id === id)!);
+  const roster = ReviewMiningRoster.of(stagePacketSchema.parse(store.getRun(run.id)!.packet));
+  const strategy = (id: string) => ReviewMiningListings.strategy(roster.find((t) => t.id === id)!);
   const row = (target_id: string, found: AmazonListing | null, matches: boolean): TargetListing => ({
     source_run_id: run.id, target_id, query: "", strategy: strategy(target_id), listing: found, matches, mismatch: matches ? "" : "brand", error: "", fetched_at: "",
   });
@@ -85,6 +85,7 @@ function seedStageOne(extra: Array<ReturnType<typeof competitor>> = [], rows: Ta
     row("c3", null, false),
     ...rows.map((x) => ({ ...x, source_run_id: run.id, strategy: strategy(x.target_id) })),
   ]) store.listings.save(r);
+  completeProductTruth(store, run.id);
   return run.id;
 }
 
@@ -272,7 +273,7 @@ describe("the offer", () => {
   });
 
   it("drops a target with neither a matched listing nor its own domain", () => {
-    const offered = StageTwoOffer.of([target("c7", "https://www.chemistwarehouse.com.au/buy/1", "Wanderlust")], []);
+    const offered = ReviewMiningOffer.of([target("c7", "https://www.chemistwarehouse.com.au/buy/1", "Wanderlust")], []);
     expect(offered).toEqual([]);
   });
 });

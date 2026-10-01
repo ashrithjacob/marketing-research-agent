@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
-import { api, RELATION_LABEL, type Brief, type RunSummary, type StageTwoPlanResponse, type TargetListing } from './api';
-import { ListingLine } from './stage-two/ListingLine';
+import { api, RELATION_LABEL, type Brief, type RunSummary, type ReviewMiningPlanResponse, type TargetListing } from './api';
+import { ListingLine } from './review-mining/ListingLine';
 
-/** The stage-2 go-ahead: the roster stage 1 found, what is approved, and what it costs. */
-export default function StageTwoPlan({
+/** The review-mining go-ahead: the roster stage 1 found, what is approved, and what it costs. */
+export default function ReviewMiningPlan({
   brief,
   onStarted,
   onFailed,
@@ -14,7 +14,7 @@ export default function StageTwoPlan({
   onFailed: () => Promise<void>;
   onClose: () => void;
 }) {
-  const [plan, setPlan] = useState<StageTwoPlanResponse | null>(null);
+  const [plan, setPlan] = useState<ReviewMiningPlanResponse | null>(null);
   const [selected, setSelected] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -25,7 +25,7 @@ export default function StageTwoPlan({
   useEffect(() => {
     let cancelled = false;
     api
-      .stageTwoPlan(brief, selected)
+      .reviewMiningPlan(brief, selected)
       .then((response) => {
         if (cancelled) return;
         setPlan(response);
@@ -46,7 +46,7 @@ export default function StageTwoPlan({
     if (!lookupNeeded || looking) return;
     setLooking(true);
     api
-      .stageTwoListings(brief)
+      .reviewMiningListings(brief)
       .then(({ listings: found }) => {
         setListings(found);
         setSelected([]);

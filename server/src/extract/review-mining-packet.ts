@@ -14,21 +14,21 @@ export interface PullFailure {
 
 type Row = Record<string, unknown>;
 
-/** The stage-2 packet, computed from what the pulls brought back: no model writes any of it. Reviews are added by ReviewAssembly. */
-export class StageTwoPacket {
+/** The review-mining packet, computed from what the pulls brought back: no model writes any of it. Reviews are added by ReviewAssembly. */
+export class ReviewMiningPacket {
   constructor(
     private readonly targets: readonly MiningTarget[],
     private readonly ledger: ReviewLedgerSnapshot,
     private readonly failures: readonly PullFailure[],
   ) {
-    Trace.line(import.meta.url, "StageTwoPacket.constructor", { targets: targets.length });
+    Trace.line(import.meta.url, "ReviewMiningPacket.constructor", { targets: targets.length });
   }
 
   draft(runId: string, brief: Brief): Record<string, unknown> {
-    Trace.line(import.meta.url, "StageTwoPacket.draft", { runId });
+    Trace.line(import.meta.url, "ReviewMiningPacket.draft", { runId });
     return {
       contract_version: CONTRACT_VERSION,
-      stage: 2,
+      stage: 3,
       run_id: runId,
       brief,
       measurements: this.measurements(),
@@ -38,7 +38,7 @@ export class StageTwoPacket {
   }
 
   private status(): Row {
-    Trace.line(import.meta.url, "StageTwoPacket.status");
+    Trace.line(import.meta.url, "ReviewMiningPacket.status");
     const mined = this.targets.filter((t) => t.amazon_url || t.trustpilot);
     const pullsOf = (id: string) => new Set(this.ledger.pulls.filter((p) => p.target_id === id).map((p) => p.handle));
     const without = mined.filter((t) => {
@@ -59,7 +59,7 @@ export class StageTwoPacket {
   }
 
   private measurements(): Row[] {
-    Trace.line(import.meta.url, "StageTwoPacket.measurements");
+    Trace.line(import.meta.url, "ReviewMiningPacket.measurements");
     const seen = new Set<string>();
     return this.ledger.pulls.flatMap((pull) => {
       if (seen.has(pull.listing) || (pull.total_reviews === null && pull.total_ratings === null)) return [];
@@ -74,7 +74,7 @@ export class StageTwoPacket {
   }
 
   private gaps(): Row[] {
-    Trace.line(import.meta.url, "StageTwoPacket.gaps");
+    Trace.line(import.meta.url, "ReviewMiningPacket.gaps");
     const gap = (missing: string, would_need: string): Row => ({ node: "review_mining", missing, would_need, blocking: false });
     return [
       ...this.targets.filter((t) => t.note).map((t) => gap(`${t.id}: ${t.note}`, "a listing that only this target matches")),

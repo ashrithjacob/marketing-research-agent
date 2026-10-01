@@ -173,6 +173,35 @@ describe("stage-2 runs and their stage-1 run", () => {
   });
 });
 
+describe("review mining moving to stage 3", () => {
+  it("renumbers every stored review-mining run and its packet once, and never a stage-2 run made after", () => {
+    const path = join(dir, "before-stage-3.db");
+    const first = new SqliteResearchStore(path);
+    const brief = { product: "", url: "https://mullevia.com/p" };
+    const mining = first.createRun({ workspaceId: "admin", brief, model: "", rejectKinds: [], judgementIds: [], nodes: ["review_mining"], stage: 2 });
+    first.updateRun(mining.id, { status: "completed", packet: { stage: 2, run_id: mining.id } });
+    const unpacked = first.createRun({ workspaceId: "admin", brief, model: "", rejectKinds: [], judgementIds: [], nodes: ["review_mining"], stage: 2 });
+    first.close();
+    const raw = new Database(path);
+    raw.exec("DELETE FROM research_migrations");
+    raw.close();
+
+    const migrated = new SqliteResearchStore(path);
+    const later = migrated.createRun({ workspaceId: "admin", brief, model: "", rejectKinds: [], judgementIds: [], stage: 2 });
+    migrated.close();
+    const reopened = new SqliteResearchStore(path);
+    try {
+      expect(reopened.getRun(mining.id)!.stage).toBe(3);
+      expect(reopened.getRun(mining.id)!.packet!.stage).toBe(3);
+      expect(reopened.getRun(unpacked.id)!.stage).toBe(3);
+      expect(reopened.getRun(unpacked.id)!.packet).toBeNull();
+      expect(reopened.getRun(later.id)!.stage).toBe(2);
+    } finally {
+      reopened.close();
+    }
+  });
+});
+
 describe("llm calls", () => {
   const call = (runId: string, seq: number, responseId: string) => ({
     run_id: runId,

@@ -1,4 +1,4 @@
-import { FetcherUnavailableError, type FetchedPage, type PageFetcher } from "../domain/index.js";
+import { ServiceUnavailableError, type FetchedPage, type PageFetcher } from "../domain/index.js";
 import { Trace } from "../trace/index.js";
 
 /** Fetches through the primary service, and through the fallback only when the primary can fetch nothing at all; a page the primary failed on is that page's failure. */
@@ -13,12 +13,12 @@ export class FallbackPageFetcher implements PageFetcher {
     try {
       return await this.primary.scrape(url, signal);
     } catch (error) {
-      if (!(error instanceof FetcherUnavailableError)) throw error;
+      if (!(error instanceof ServiceUnavailableError)) throw error;
       return this.fallBack(url, error, signal);
     }
   }
 
-  private fallBack(url: string, error: FetcherUnavailableError, signal?: AbortSignal): Promise<FetchedPage> {
+  private fallBack(url: string, error: ServiceUnavailableError, signal?: AbortSignal): Promise<FetchedPage> {
     Trace.line(import.meta.url, "FallbackPageFetcher.fallBack", { url, service: error.service, reason: error.message });
     return this.fallback.scrape(url, signal);
   }

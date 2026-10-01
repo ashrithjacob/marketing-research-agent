@@ -1,30 +1,30 @@
-import type { StagePacket } from "../domain/index.js";
+import { CheckProblems, type CheckProblem, type StagePacket } from "../domain/index.js";
 
 import type { PacketCheck, PacketContext } from "./check.js";
 import { Trace } from "../trace/index.js";
 
 /** Everything recorded must cite a source the packet actually carries. */
 export class CitationCheck implements PacketCheck {
-  problems(packet: StagePacket, { sourceIds }: PacketContext): string[] {
+  problems(packet: StagePacket, { sourceIds }: PacketContext): CheckProblem[] {
     Trace.line(import.meta.url, "CitationCheck.problems", { packet });
-    const problems: string[] = [];
+    const problems: CheckProblem[] = [];
 
     for (const excerpt of packet.excerpts) {
       if (!sourceIds.has(excerpt.source_id)) {
         problems.push(
-          `excerpt '${excerpt.id}' cites source '${excerpt.source_id}', which is not in the packet`,
+          CheckProblems.at("excerpt", excerpt, `excerpt '${excerpt.id}' cites source '${excerpt.source_id}', which is not in the packet`),
         );
       }
     }
 
-    for (const [label, items] of [
+    for (const [kind, items] of [
       ["measurement", packet.measurements],
       ["attribute", packet.attributes],
     ] as const) {
       for (const item of items) {
         if (!sourceIds.has(item.source_id)) {
           problems.push(
-            `${label} '${item.id}' cites source '${item.source_id}', which is not in the packet`,
+            CheckProblems.at(kind, item, `${kind} '${item.id}' cites source '${item.source_id}', which is not in the packet`),
           );
         }
       }
@@ -34,14 +34,18 @@ export class CitationCheck implements PacketCheck {
       for (const point of entry.curve) {
         if (!sourceIds.has(point.source_id)) {
           problems.push(
-            `saturation curve for ${entry.node} cites source '${point.source_id}', ` +
-              "which is not in the packet",
+            CheckProblems.at(
+              "saturation",
+              entry,
+              `saturation curve for ${entry.node} cites source '${point.source_id}', ` +
+                "which is not in the packet",
+            ),
           );
         }
       }
     }
 
-    return [...problems, ...this.adLibraryProblems(packet)];
+    return [...problems, ...this.adLibraryProblems(packet).map(CheckProblems.of)];
   }
 
   private adLibraryProblems(packet: StagePacket): string[] {

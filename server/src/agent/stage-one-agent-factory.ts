@@ -17,10 +17,12 @@ import {
 import { Trace } from "../trace/index.js";
 
 import type { AgentRoster } from "./agent-roster.js";
-import { ChampionDone, NodeDone, type DoneCheck } from "./done-check.js";
+import { DoneChecks, type DoneCheck } from "./done-check.js";
+import { LimitClose, type LimitClosed } from "./limit-close.js";
 import { CallSequence, LlmCallLog } from "./llm-call-log.js";
 import type { ModelChain } from "./model-chain.js";
 import type { PromptBuilder } from "./prompt/index.js";
+import { RowRepair } from "./row-repair.js";
 import { RunFindings } from "./run-findings.js";
 import { ToolSteps } from "./tool-steps.js";
 import { TurnBudget } from "./turn-budget.js";
@@ -47,7 +49,7 @@ export interface BuiltAgent {
   steps: ToolSteps;
   check: DoneCheck;
   budget: TurnBudget;
-  closeOnLimit: (() => string[]) | null;
+  closeOnLimit: (() => LimitClosed) | null;
 }
 
 /** Builds one stage-1 agent: its spec's tools and record kinds, its own prompt, its calls logged under its id. */
@@ -68,7 +70,7 @@ export class StageOneAgentFactory {
     const amazon = spec.amazon && this.services.actors !== null;
     const waits = id !== "champion";
     const steps = new ToolSteps();
-    const check = this.check(id, findings, run);
+    const check = DoneChecks.of(id, findings, run.brief, run.nodes);
     const budget = new TurnBudget(spec.maxTurns);
     const node = StageOnePlans.nodeOf(id, run.nodes);
     const streamFn = new LlmCallLog({
@@ -103,14 +105,7 @@ export class StageOneAgentFactory {
       finishTurn: budget.finishTurn,
     });
     const instructions = this.prompts.instructions(id, { ...run, champion });
-    const closeOnLimit = id === "champion" ? null : () => budget.close(findings, node);
+    const closeOnLimit = id === "champion" ? null : () => new LimitClose(findings, new RowRepair(this.store.findings, run.runId, run.nodes), check, node, spec.maxTurns).close();
     return { agent, instructions, steps, check, budget, closeOnLimit };
-  }
-
-  private check(id: StageOneAgent, findings: RunFindings, run: StageOneRunContext): DoneCheck {
-    Trace.line(import.meta.url, "StageOneAgentFactory.check", { id });
-    if (id === "champion") return new ChampionDone(findings, run.brief);
-    const node = StageOnePlans.nodeOf(id, run.nodes);
-    return new NodeDone(findings, { brief: run.brief, node, champion: id === "competitors" ? "champion" : null });
   }
 }

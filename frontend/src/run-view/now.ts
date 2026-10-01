@@ -1,10 +1,11 @@
-import type { Billed, Pricing, RunDetail, RunEvent } from '../api';
-import { STAGE_NODES, scopeLabel } from '../StageRail';
+import type { Billed, Pricing, ResearchNode, RunDetail, RunEvent } from '../api';
+import { STAGE_NAMES, STAGE_NODES, scopeLabel, stageOfNode, type CollectingStage } from '../stages';
 
 /** The stage a run collects: the server's record, else inferred from its nodes. */
-export function runStage(run: { stage?: number; nodes?: readonly string[] }): 1 | 2 {
-  if (run.stage === 1 || run.stage === 2) return run.stage;
-  return (run.nodes ?? []).includes('review_mining') ? 2 : 1;
+export function runStage(run: { stage?: number; nodes?: readonly ResearchNode[] }): CollectingStage {
+  if (run.stage === 1 || run.stage === 2 || run.stage === 3) return run.stage;
+  const first = (run.nodes ?? [])[0];
+  return first ? stageOfNode(first) : 1;
 }
 
 /** The "Now" panel: one glance, what is the run doing. */
@@ -32,12 +33,7 @@ export function nowPanel(
         return { title: run.status, sub: '' };
     }
   }
-  const where =
-    stage === 2
-      ? 'Review mining'
-      : nodes.length > 0 && nodes.length < STAGE_NODES[1].length
-        ? scopeLabel(nodes)
-        : 'Raw material';
+  const where = stage === 1 && nodes.length > 0 && nodes.length < STAGE_NODES[1].length ? scopeLabel(nodes) : STAGE_NAMES[stage];
   if (lastTool) {
     const p = lastTool.payload as Record<string, string>;
     return {

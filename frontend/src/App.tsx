@@ -15,7 +15,9 @@ import ProductsPage from './ProductsPage';
 import { Link, navigate, paths, useRoute } from './route';
 import RunView from './RunView';
 import StartRun from './StartRun';
-import StageTwoPlan from './StageTwoPlan';
+import ProductTruthStart from './ProductTruthStart';
+import ReviewMiningPlan from './ReviewMiningPlan';
+import { stageOfNode } from './stages';
 import StepIn from './StepIn';
 import { useProduct, useProducts } from './use-products';
 
@@ -177,15 +179,23 @@ export default function App() {
         />
       )}
 
-      {startNodes && startNodes.includes('review_mining') && (
-        <StageTwoPlan
+      {startNodes && startNodes.some((node) => stageOfNode(node) === 2) && (
+        <ProductTruthStart
           brief={activeRun?.brief ?? { product: '', url: '', market: '', notes: '' }}
           onStarted={async (run) => showStarted(run)}
           onFailed={async () => reload()}
           onClose={() => setStartNodes(null)}
         />
       )}
-      {startNodes && !startNodes.includes('review_mining') && (
+      {startNodes && startNodes.includes('review_mining') && (
+        <ReviewMiningPlan
+          brief={activeRun?.brief ?? { product: '', url: '', market: '', notes: '' }}
+          onStarted={async (run) => showStarted(run)}
+          onFailed={async () => reload()}
+          onClose={() => setStartNodes(null)}
+        />
+      )}
+      {startNodes && startNodes.every((node) => stageOfNode(node) === 1) && (
         <StartRun
           config={config}
           nodes={startNodes}

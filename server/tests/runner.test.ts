@@ -17,8 +17,12 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { OpenRouterPrices } from "../src/adapters/index.js";
 import { RunSupervisor } from "../src/agent/index.js";
-import { RejectKinds, StageOnePlans } from "../src/domain/index.js";
+import { CheckProblems, RejectKinds, StageOnePlans } from "../src/domain/index.js";
 import { DEFAULT_RETRY, Retries } from "../src/agent/retry.js";
+import { NodeDone } from "../src/agent/done-check.js";
+import { LimitClose } from "../src/agent/limit-close.js";
+import { RowRepair } from "../src/agent/row-repair.js";
+import { RunFindings } from "../src/agent/run-findings.js";
 import {
   type Judgement,
   type RunRequest,
@@ -120,6 +124,30 @@ describe("settling a run", () => {
     expect(run.status).toBe("invalid");
     expect(run.error).toMatch(/gap list is empty/);
     expect(store.listEvents(runId).map((e) => e.kind)).toContain("packet.invalid");
+  });
+
+  it("keeps and shows the packet of an `invalid` run, so what passed is not lost to what did not", async () => {
+    const runId = await runWith([...recorded(productPacket({ gaps: [] })), fauxAssistantMessage("Done.")]);
+    const run = store.getRun(runId)!;
+    expect(run.status).toBe("invalid");
+    expect((run.packet as any).attributes.map((a: any) => a.key)).toEqual(["dose_per_serving"]);
+    expect(run.packet_source).toBe("ledger");
+  });
+
+  it("at settlement, retracts a row that breaks the contract into a gap and completes with the rest", async () => {
+    const stray = { node: "product_data", key: "price", value: "£14.99", source_id: "sha256:never-recorded" };
+    const runId = await runWith([
+      fauxAssistantMessage(recordCalls(productPacket({ attributes: [...minimalPacket().attributes, stray] })), { stopReason: "toolUse" }),
+      fauxAssistantMessage("Done."),
+    ]);
+    const run = store.getRun(runId)!;
+    expect(run.status).toBe("completed");
+    const price = store.findings.list(runId).find((row) => row.kind === "attribute" && row.payload.key === "price")!;
+    expect(price.retracted_at).not.toBe("");
+    expect((run.packet as any).attributes.map((a: any) => a.key)).toEqual(["dose_per_serving"]);
+    expect((run.packet as any).gaps.map((g: any) => g.missing)).toContainEqual(
+      expect.stringMatching(new RegExp(`^attribute ${price.id} retracted when the run settled: .*sha256:never-recorded`)),
+    );
   });
 
   it("marks a prose-only run invalid", async () => {
@@ -1048,6 +1076,77 @@ describe("the two steps of a stage-1 run", () => {
     expect(run.status).toBe("completed");
     expect((run.packet as any).gaps.map((g: any) => g.missing)).toContain("price: not found within the 15-call limit");
     expect((run.packet as any).nodes[0]).toMatchObject({ node: "product_data", status: "incomplete" });
+  });
+
+  it("at the turn limit, retracts the agent's rows that fail its check and keeps the rest, instead of rejecting the part", async () => {
+    const stray = { node: "product_data", key: "price", value: "£14.99", source_id: "sha256:never-recorded" };
+    const recordAll = fauxAssistantMessage(recordCalls(productPacket({ attributes: [...minimalPacket().attributes, stray] })), {
+      stopReason: "toolUse",
+    });
+    const turn = () => fauxAssistantMessage(fauxToolCall("read_ledger", {}), { stopReason: "toolUse" });
+    const runId = await runWith([recordAll, ...Array.from({ length: 14 }, turn), fauxAssistantMessage("never reached")]);
+    const limit = store.listEvents(runId).find((e) => e.kind === "agent.limit_reached")!.payload as any;
+    const price = store.findings.list(runId).find((row) => row.kind === "attribute" && row.payload.key === "price")!;
+    expect(limit.retracted).toEqual([price.id]);
+    expect(price.retracted_at).not.toBe("");
+    const run = store.getRun(runId)!;
+    expect(run.status).toBe("completed");
+    const packet = run.packet as any;
+    expect(packet.attributes.map((a: any) => a.key)).toEqual(["dose_per_serving"]);
+    expect(packet.gaps.map((g: any) => g.missing)).toContainEqual(
+      expect.stringMatching(new RegExp(`^attribute ${price.id} retracted at the 15-turn limit: .*sha256:never-recorded`)),
+    );
+  });
+
+  it("at the turn limit, also retracts a `complete` status that a retracted row was holding up", async () => {
+    const statusRow = { node: "competitors", status: "complete", done_criterion_met: true, why: "both classes saturated" };
+    const curve = (cls: string) => ({
+      node: "competitors",
+      class: cls,
+      curve: [{ source_id: "sha256:never-recorded", new_themes: 0, cumulative_themes: 1 }],
+    });
+    const runId = store.createRun({ workspaceId: "admin", brief: genre, model: "m", rejectKinds: [], judgementIds: [] }).id;
+    const findings = new RunFindings(store.findings, runId, "competitors", ["competitors"]);
+    findings.record("saturation", curve("direct"));
+    findings.record("saturation", curve("indirect"));
+    findings.record("node_status", statusRow);
+    const check = new NodeDone(findings, { brief: genre, node: "competitors", champion: "champion" });
+    const closed = new LimitClose(findings, new RowRepair(store.findings, runId, ["competitors"]), check, "competitors", 20).close();
+    expect(closed.retracted.map((id) => id.replace(/\d+$/, ""))).toEqual(["sat", "sat", "ns"]);
+    expect(findings.own().find((row) => row.kind === "node_status")!.payload).toMatchObject({ status: "incomplete" });
+    expect(CheckProblems.texts(check.problems()).filter((p) => /saturation|complete with no/.test(p))).toEqual([]);
+  });
+
+  it("puts an incomplete status in place of a retracted one, so a repaired node is never left unreported", () => {
+    const runId = store.createRun({ workspaceId: "admin", brief: genre, model: "m", rejectKinds: [], judgementIds: [] }).id;
+    const findings = new RunFindings(store.findings, runId, "competitors", ["competitors"]);
+    findings.record("saturation", { node: "competitors", class: "direct", curve: [{ source_id: "sha256:never-recorded", new_themes: 0, cumulative_themes: 1 }] });
+    findings.record("node_status", { node: "competitors", status: "complete", done_criterion_met: true, why: "saturated" });
+    const check = new NodeDone(findings, { brief: genre, node: "competitors", champion: "champion" });
+    new RowRepair(store.findings, runId, ["competitors"]).repair(() => check.problems(), "when the run settled");
+    expect(findings.own().filter((row) => row.kind === "node_status").map((row) => row.payload)).toEqual([
+      expect.objectContaining({ status: "incomplete", why: "its status was retracted when the run settled" }),
+    ]);
+  });
+
+  it("re-settles an old invalid run with no packet from its ledger, so a refresh shows what it found", () => {
+    const runId = store.createRun({ workspaceId: "admin", brief: { product: "MagnaCalm 400mg", url: "https://x", market: "UK", notes: "" }, model: "m", rejectKinds: [], judgementIds: [], nodes: ["product_data"] }).id;
+    const product = new RunFindings(store.findings, runId, "product", ["product_data"]);
+    const stray = { node: "product_data", key: "price", value: "£14.99", source_id: "sha256:never-recorded" };
+    const packet = productPacket({ attributes: [...minimalPacket().attributes, stray] });
+    for (const kind of ["source", "attribute", "node_status", "gap"] as const) {
+      for (const item of packet[{ source: "sources", attribute: "attributes", node_status: "nodes", gap: "gaps" }[kind]]) product.record(kind, item);
+    }
+    store.updateRun(runId, { status: "invalid", error: "attribute cites source 'sha256:never-recorded', which is not in the packet" });
+    expect(store.getRun(runId)!.packet).toBeNull();
+    const empty = store.createRun({ workspaceId: "admin", brief: genre, model: "m", rejectKinds: [], judgementIds: [] }).id;
+    store.updateRun(empty, { status: "invalid", error: "from before the ledger", output: "the raw output is all it has" });
+    expect(supervisor.resettleInvalidRuns()).toEqual([runId]);
+    expect(store.getRun(empty)!).toMatchObject({ status: "invalid", packet: null });
+    const run = store.getRun(runId)!;
+    expect(run.status).toBe("completed");
+    expect((run.packet as any).attributes.map((a: any) => a.key)).toEqual(["dose_per_serving"]);
+    expect(supervisor.resettleInvalidRuns()).toEqual([]);
   });
 
   it("stops every agent at once, and starts no step-2 agent after a stop", async () => {

@@ -1,5 +1,6 @@
 import {
   CODE_ID_KINDS,
+  FINDING_NODES,
   FINDING_SCHEMAS,
   type FindingKind,
   type Node,
@@ -28,7 +29,7 @@ export class FindingCheck {
     if (!parsed.success) return { problems: ZodProblems.readable(parsed.error) };
     const payload = parsed.data as Record<string, unknown>;
     if (kind === "competitor_reference") return { payload };
-    const node = kind === "competitor" ? "competitors" : String(payload.node ?? "");
+    const node = FINDING_NODES[kind] ?? String(payload.node ?? "");
     if (!scope.includes(node as Node)) {
       return {
         problems: `this belongs to ${node}, which is outside this run's scope (${scope.join(", ")})`,

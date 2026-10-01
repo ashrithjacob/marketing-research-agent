@@ -3,46 +3,20 @@ import type Database from "better-sqlite3";
 import { AccountTable } from "./account-table.js";
 import { CallLog } from "./call-log.js";
 import { FindingTable } from "./finding-table.js";
+import { SqliteMigrations } from "./migrations.js";
 import { PacketRowTable } from "./packet-row-table.js";
 import { ReviewAnalysisTable } from "./review-analysis-table.js";
 import { TargetListingTable } from "./target-listing-table.js";
 import { Trace } from "../../trace/index.js";
 
-const MIGRATIONS: ReadonlyArray<readonly [string, string, string]> = [
-  ["research_runs", "output", "ALTER TABLE research_runs ADD COLUMN output TEXT NOT NULL DEFAULT ''"],
-  ["research_runs", "judgement_ids", "ALTER TABLE research_runs ADD COLUMN judgement_ids TEXT NOT NULL DEFAULT '[]'"],
-  ["research_runs", "usage", "ALTER TABLE research_runs ADD COLUMN usage TEXT NOT NULL DEFAULT '{}'"],
-  ["research_runs", "agent_run_id", "ALTER TABLE research_runs ADD COLUMN agent_run_id TEXT NOT NULL DEFAULT ''"],
-  ["research_runs", "nodes", "ALTER TABLE research_runs ADD COLUMN nodes TEXT NOT NULL DEFAULT '[]'"],
-  ["research_runs", "packet_source", "ALTER TABLE research_runs ADD COLUMN packet_source TEXT NOT NULL DEFAULT ''"],
-  ["research_runs", "product_id", "ALTER TABLE research_runs ADD COLUMN product_id TEXT NOT NULL DEFAULT ''"],
-  ["research_run_reviews", "product_id", "ALTER TABLE research_run_reviews ADD COLUMN product_id TEXT NOT NULL DEFAULT ''"],
-  ["research_runs", "workspace_id", "ALTER TABLE research_runs ADD COLUMN workspace_id TEXT NOT NULL DEFAULT 'admin'"],
-  ["research_judgements", "workspace_id", "ALTER TABLE research_judgements ADD COLUMN workspace_id TEXT NOT NULL DEFAULT 'admin'"],
-  ["research_llm_calls", "generation", "ALTER TABLE research_llm_calls ADD COLUMN generation TEXT"],
-  ["research_llm_calls", "agent_id", "ALTER TABLE research_llm_calls ADD COLUMN agent_id TEXT NOT NULL DEFAULT ''"],
-  [
-    "research_runs",
-    "source_run_id",
-    "ALTER TABLE research_runs ADD COLUMN source_run_id TEXT NOT NULL DEFAULT '';" +
-      " UPDATE research_runs SET source_run_id = COALESCE((SELECT s.id FROM research_runs s" +
-      " WHERE s.stage = 1 AND s.status = 'completed' AND s.product_id = research_runs.product_id" +
-      " AND s.workspace_id = research_runs.workspace_id AND s.created_at <= research_runs.created_at" +
-      " ORDER BY s.created_at DESC LIMIT 1), '') WHERE stage = 2",
-  ],
-];
-
-/** CREATE TABLE IF NOT EXISTS never alters an existing table, so columns migrate here. */
+/** The tables, then their migrations, then the indexes that need the migrated columns. */
 export class SqliteSchema {
   static apply(db: Database.Database): void {
     Trace.line(import.meta.url, "SqliteSchema.apply", { db });
     db.exec(SqliteSchema.DDL);
     db.exec(AccountTable.DDL);
     db.exec(CallLog.DDL);
-    for (const [table, column, ddl] of MIGRATIONS) {
-      const have = (db.pragma(`table_info(${table})`) as Array<{ name: string }>).map((row) => row.name);
-      if (!have.includes(column)) db.exec(ddl);
-    }
+    SqliteMigrations.apply(db);
     db.exec(SqliteSchema.INDEXES);
     for (const ddl of [PacketRowTable.DDL, ReviewAnalysisTable.DDL, TargetListingTable.DDL, FindingTable.DDL]) db.exec(ddl);
   }

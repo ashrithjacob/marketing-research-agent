@@ -102,6 +102,9 @@ services:
       # Fallback page reader: used only when Firecrawl can fetch nothing at all
       # (out of credits, key refused, or no key). Blank disables the fallback.
       - CRAWL4AI_API_KEY=${CRAWL4AI_API_KEY:-}
+      # Product truth (stage 2) searches and reads through Parallel. Blank falls
+      # back to SearXNG for search and Crawl4AI for reading.
+      - PARALLEL_API_KEY=${PARALLEL_API_KEY:-}
       # Cheap pre-read gate: every fetched page passes a small model before it
       # reaches the researcher's context. Empty disables the gate (tools then
       # behave as before). :free models cost nothing but can rate-limit; the

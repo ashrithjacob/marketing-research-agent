@@ -1,4 +1,4 @@
-import type { Node, Stage, StagePacket } from "../domain/index.js";
+import type { CheckProblem, Node, Stage, StagePacket } from "../domain/index.js";
 
 export interface PacketContext {
   scope: readonly Node[];
@@ -8,5 +8,5 @@ export interface PacketContext {
 }
 
 export interface PacketCheck {
-  problems(packet: StagePacket, context: PacketContext): string[];
+  problems(packet: StagePacket, context: PacketContext): CheckProblem[];
 }

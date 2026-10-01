@@ -1,10 +1,12 @@
 import type { z } from "zod";
 
 import {
+  CheckProblems,
   EMPTY_LEDGER,
   STAGE_NODES,
   Stages,
   stagePacketSchema,
+  type CheckProblem,
   type Node,
   type ReviewLedgerSnapshot,
   type StagePacket,
@@ -82,13 +84,25 @@ export class PacketValidator {
     scope: readonly Node[] = STAGE_NODES[1],
     brief?: { product?: unknown; url?: unknown; market?: unknown },
   ): StagePacket {
-    Trace.line(import.meta.url, "PacketValidator.validate", { data, scope, brief });
+    Trace.line(import.meta.url, "PacketValidator.validate", { scope, brief });
+    const { packet, problems } = this.inspect(data, scope, brief);
+    if (!packet || problems.length > 0) throw new PacketError(problems);
+    return packet;
+  }
+
+  /** The packet as parsed, with every problem the checks find in it; the packet is null only when it does not parse at all. */
+  inspect(
+    data: unknown,
+    scope: readonly Node[] = STAGE_NODES[1],
+    brief?: { product?: unknown; url?: unknown; market?: unknown },
+  ): { packet: StagePacket | null; problems: CheckProblem[] } {
+    Trace.line(import.meta.url, "PacketValidator.inspect", { data, scope, brief });
     const assembled =
       data && typeof data === "object" && !Array.isArray(data)
         ? this.assembly.expand(data as Record<string, unknown>)
         : data;
     const parsed = stagePacketSchema.safeParse(assembled);
-    if (!parsed.success) throw new PacketError(ZodProblems.list(parsed.error));
+    if (!parsed.success) return { packet: null, problems: ZodProblems.list(parsed.error).map(CheckProblems.of) };
     const packet = parsed.data;
 
     const context: PacketContext = {
@@ -97,8 +111,6 @@ export class PacketValidator {
       sourceIds: new Set(packet.sources.map((source) => source.id)),
       brief,
     };
-    const problems = this.checks.flatMap((check) => check.problems(packet, context));
-    if (problems.length > 0) throw new PacketError(problems);
-    return packet;
+    return { packet, problems: this.checks.flatMap((check) => check.problems(packet, context)) };
   }
 }

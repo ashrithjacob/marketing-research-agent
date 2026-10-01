@@ -162,7 +162,7 @@ describe("workspace isolation", () => {
     const runId = await startRun(await cookieFor("client"));
     expect(store.getRun(runId)!.status).toBe("completed");
     const plan = async (username: string) => {
-      const response = await call("/api/research/stage2/plan", {
+      const response = await call("/api/research/review-mining/plan", {
         method: "POST",
         cookie: await cookieFor(username),
         body: JSON.stringify({ brief: { product: "MagnaCalm 400mg" } }),

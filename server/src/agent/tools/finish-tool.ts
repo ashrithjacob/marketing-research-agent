@@ -1,5 +1,6 @@
 import type { AgentTool } from "@earendil-works/pi-agent-core";
 
+import { CheckProblems } from "../../domain/index.js";
 import type { DoneCheck } from "../done-check.js";
 import { FINISH_DESCRIPTION } from "../prompt/text/record-tools.js";
 import { Trace } from "../../trace/index.js";
@@ -42,7 +43,7 @@ export class FinishTool {
           };
         }
         tool.spent += 1;
-        const problems = check.problems();
+        const problems = CheckProblems.texts(check.problems());
         onChecked(problems.length === 0, problems);
         if (problems.length === 0) {
           return {

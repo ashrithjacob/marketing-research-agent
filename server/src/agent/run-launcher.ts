@@ -2,20 +2,31 @@ import type { Models } from "@earendil-works/pi-ai";
 
 import type { OpenRouterPrices } from "../adapters/index.js";
 import type { Settings } from "../config/index.js";
-import { Clock, RejectKinds, type Node, type ResearchStore, type RunRequest, Scope, Stages } from "../domain/index.js";
+import { Clock, RejectKinds, Scope, Stages, productTruthInputsSchema, type ResearchRun, type ResearchStore, type RunRequest, type StagePacket } from "../domain/index.js";
 import { Trace } from "../trace/index.js";
 
 import { RunError } from "./errors.js";
 import type { LiveRuns } from "./live-runs.js";
 import { ModelChain } from "./model-chain.js";
 import { ModelPricing } from "./pricing.js";
+import type { ProductTruthAgentFactory } from "./product-truth-agent-factory.js";
+import { ProductTruthRun } from "./product-truth-run.js";
 import type { RetryPolicy } from "./retry.js";
 import type { ReviewMiningJob } from "./review-mining-job.js";
 import type { StageOneAgentFactory } from "./stage-one-agent-factory.js";
+import type { StageOneHandoff } from "./stage-one-handoff.js";
 import type { StageOneListings } from "./stage-one-listings.js";
 import { StageOneRun } from "./stage-one-run.js";
 
-/** Starts one run: records it, and hands LiveRuns either the stage-1 agents, with their models resolved and priced, or the stage-2 pipeline. */
+export interface RunKinds {
+  stageOne: StageOneAgentFactory;
+  listings: StageOneListings;
+  truth: ProductTruthAgentFactory;
+  handoff: StageOneHandoff;
+  mining: ReviewMiningJob;
+}
+
+/** Starts one run: records it, and hands LiveRuns the stage-1 agents or the product-truth agents, with their models resolved and priced, or the review-mining pipeline. */
 export class RunLauncher {
   constructor(
     private readonly store: ResearchStore,
@@ -24,76 +35,71 @@ export class RunLauncher {
     private readonly costs: OpenRouterPrices,
     private readonly runs: LiveRuns,
     private readonly retry: RetryPolicy,
-    private readonly factory: StageOneAgentFactory,
-    private readonly listings: StageOneListings,
-    private readonly mining: ReviewMiningJob,
+    private readonly kinds: RunKinds,
   ) {}
 
   launch(request: RunRequest, workspaceId: string): string {
     Trace.line(import.meta.url, "RunLauncher.launch", { request, workspaceId });
     const judgements = this.store.listJudgements(Scope.of(workspaceId), true);
     const rejectKinds = RejectKinds.effective(request, judgements);
-    const modelId = this.settings.model;
     const nodes = Stages.expand(request.nodes);
-    if (Stages.covering(nodes) === 2) return this.launchPipeline(request, workspaceId, nodes, judgements.map((j) => j.id), rejectKinds);
-
+    const stage = Stages.covering(nodes) ?? 1;
     const run = this.store.createRun({
       workspaceId,
       brief: request.brief as unknown as Record<string, unknown>,
-      model: modelId,
+      model: stage === 3 ? "" : this.settings.model,
       rejectKinds,
       judgementIds: judgements.map((j) => j.id),
       nodes,
-      stage: Stages.covering(nodes) ?? 1,
+      stage,
     });
-
-    const resolved = ModelChain.resolve(
-      [modelId, ...this.settings.backupModels],
-      this.models,
-      new ModelPricing(this.costs),
-    );
-    if ("unknown" in resolved) {
-      const error = `unknown model ${JSON.stringify(resolved.unknown)} for provider openrouter`;
-      this.store.updateRun(run.id, { status: "failed", error, ended_at: Clock.nowIso() });
-      this.runs.emit(run.id, "run.failed", { error });
-      throw new RunError(error);
-    }
-
-    const header = { product: request.brief.product, url: request.brief.url, model: modelId, nodes };
-    const stageOne = new StageOneRun(
-      { store: this.store, runs: this.runs, costs: this.costs, retry: this.retry, factory: this.factory, listings: this.listings },
-      { runId: run.id, brief: request.brief, nodes, rejectKinds, judgements, chain: resolved.chain },
-    );
+    const header = { product: request.brief.product, url: request.brief.url, model: stage === 3 ? "pipeline" : this.settings.model, nodes };
+    if (stage === 3) return this.launchPipeline(run, request, workspaceId, header);
+    const chain = this.chain(run.id);
+    const { store, runs, costs, retry, kinds } = this;
+    const deps = { store, runs, costs, retry };
+    const brief = { runId: run.id, brief: request.brief, rejectKinds, judgements, chain };
+    const team = stage === 2
+      ? new ProductTruthRun({ ...deps, factory: kinds.truth }, { ...brief, ...this.source(run, request, workspaceId), inputs: productTruthInputsSchema.parse(request.inputs ?? {}) })
+      : new StageOneRun({ ...deps, factory: kinds.stageOne, listings: kinds.listings }, { ...brief, nodes });
     this.store.updateRun(run.id, { agent_run_id: run.id, session_id: `research-${run.id}`, status: "running" });
-    this.runs.emit(run.id, "run.started", { model: modelId, nodes });
-    const done = Trace.within(run.id, header, () => stageOne.start());
-    this.runs.add(run.id, { control: { abort: stageOne.abort, steer: stageOne.steer }, subscribers: new Set(), done });
+    this.runs.emit(run.id, "run.started", { model: this.settings.model, nodes });
+    const done = Trace.within(run.id, header, () => team.start());
+    this.runs.add(run.id, { control: { abort: team.abort, steer: team.steer }, subscribers: new Set(), done });
     return run.id;
   }
 
-  private launchPipeline(
-    request: RunRequest,
-    workspaceId: string,
-    nodes: Node[],
-    judgementIds: string[],
-    rejectKinds: string[],
-  ): string {
+  /** The configured model and its backups, priced; a model the provider does not know fails the run before anything starts. */
+  private chain(runId: string): ModelChain {
+    Trace.line(import.meta.url, "RunLauncher.chain", { runId });
+    const resolved = ModelChain.resolve([this.settings.model, ...this.settings.backupModels], this.models, new ModelPricing(this.costs));
+    if (!("unknown" in resolved)) return resolved.chain;
+    const error = `unknown model ${JSON.stringify(resolved.unknown)} for provider openrouter`;
+    this.store.updateRun(runId, { status: "failed", error, ended_at: Clock.nowIso() });
+    this.runs.emit(runId, "run.failed", { error });
+    throw new RunError(error);
+  }
+
+  /** The completed stage-1 run product truth reads, recorded on the run so a newer stage 1 shows this one as out of date. */
+  private source(run: ResearchRun, request: RunRequest, workspaceId: string): { sourceRunId: string; stageOne: StagePacket } {
+    Trace.line(import.meta.url, "RunLauncher.source", { runId: run.id });
+    const found = this.kinds.handoff.forBrief(request.brief, Scope.of(workspaceId));
+    if (!found) {
+      const error = "product truth reads a completed stage-1 run, and this brief has none";
+      this.store.updateRun(run.id, { status: "failed", error, ended_at: Clock.nowIso() });
+      throw new RunError(error);
+    }
+    this.store.updateRun(run.id, { source_run_id: found.run.id });
+    return { sourceRunId: found.run.id, stageOne: found.packet };
+  }
+
+  private launchPipeline(run: ResearchRun, request: RunRequest, workspaceId: string, header: Record<string, unknown>): string {
     Trace.line(import.meta.url, "RunLauncher.launchPipeline", { workspaceId, targets: request.targets });
-    const run = this.store.createRun({
-      workspaceId,
-      brief: request.brief as unknown as Record<string, unknown>,
-      model: "",
-      rejectKinds,
-      judgementIds,
-      nodes,
-      stage: 2,
-    });
-    const header = { product: request.brief.product, url: request.brief.url, model: "pipeline", nodes };
     const job = Trace.within(run.id, header, () =>
-      this.mining.start(run.id, { brief: request.brief, targets: request.targets ?? [], workspaceId }),
+      this.kinds.mining.start(run.id, { brief: request.brief, targets: request.targets ?? [], workspaceId }),
     );
     this.store.updateRun(run.id, { status: "running" });
-    this.runs.emit(run.id, "run.started", { model: "", nodes });
+    this.runs.emit(run.id, "run.started", { model: "", nodes: run.nodes });
     this.runs.add(run.id, { control: { abort: job.abort }, subscribers: new Set(), done: job.done });
     return run.id;
   }

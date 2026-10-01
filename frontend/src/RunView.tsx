@@ -5,15 +5,31 @@ import {
   type Judgement,
   type ResearchNode,
   type RunDetail,
+  type ProductTruthPacket,
   type RunSummary,
+  type StagePacket,
 } from './api';
 import { ChatText } from './FileBox';
 import { nowPanel, runStage } from './run-view/now';
 import { RailColumn, subjectProgress } from './run-view/rail';
 import { StageOneTiles } from './run-view/stage-one-tiles';
+import { ProductTruthTiles } from './run-view/truth/ProductTruthTiles';
 import { useRunStream } from './run-view/use-run-stream';
 import { OutdatedVoice } from './run-view/outdated-voice';
 import { VoiceAnalysis } from './run-view/voice/VoiceAnalysis';
+
+const NEXT_STAGE: Record<2 | 3, { name: string; sub: string; node: ResearchNode }> = {
+  2: {
+    name: 'Product truth',
+    sub: 'Stage 1 is in. Assess the product in isolation — its formula, doses, claim limits and economics. You enter its landed cost first.',
+    node: 'mechanism',
+  },
+  3: {
+    name: 'Review mining',
+    sub: 'Product truth is in. Mine verbatim customer language from the reviews of the product stage 1 found — you approve the plan before anything runs.',
+    node: 'review_mining',
+  },
+};
 
 export default function RunView({
   runId,
@@ -72,12 +88,12 @@ export default function RunView({
 
   const now = nowPanel(run, live, lastTool);
   const progress = subjectProgress(runs, run);
-  const nextStageTwo =
-    run.status === 'completed' &&
-    runStage(run) === 1 &&
-    !progress.stageTwoDone &&
-    !progress.stageTwoLive;
+  const stage = runStage(run);
+  const next = stage < 3 && run.status === 'completed' ? ((stage + 1) as 2 | 3) : null;
+  const nextStage = next && !progress.done[next] && !progress.live[next] ? NEXT_STAGE[next] : null;
   const nodesInRun = new Set((run.nodes ?? packet?.nodes.map((n) => n.node) ?? []) as string[]);
+  const stagePacket = packet && packet.stage !== 2 ? (packet as StagePacket) : null;
+  const truthPacket = packet && packet.stage === 2 ? (packet as ProductTruthPacket) : null;
 
   return (
     <div className="cols two">
@@ -98,10 +114,11 @@ export default function RunView({
 
         {run.status === 'invalid' && (
           <div className="error">
-            <b>Packet rejected.</b> {run.error}
+            <b>{packet ? 'Some checks failed.' : 'Packet rejected.'}</b> {run.error}
             <div className="error-note">
-              The agent finished and what it produced broke the stage-1 contract.
-              That is a more useful failure than a crash — the raw output is below.
+              {packet
+                ? 'Everything that passed is shown below. Rows that broke a check were set aside as gaps; the problems above belong to no single row.'
+                : `The agents finished and what they produced broke the stage-${stage} contract. The raw output is below.`}
             </div>
           </div>
         )}
@@ -121,17 +138,14 @@ export default function RunView({
               Activity log ↗
             </a>
           </div>
-          {nextStageTwo && (
+          {nextStage && (
             <div className="next-stage">
               <div className="txt">
-                <b>Next: Stage 2 · Review mining</b>
-                <div className="sub">
-                  Stage 1 is in. Mine verbatim customer language from the reviews of the
-                  product it found — you approve the plan before anything runs.
-                </div>
+                <b>Next: Stage {next} · {nextStage.name}</b>
+                <div className="sub">{nextStage.sub}</div>
               </div>
-              <button className="primary" onClick={() => onRunNode('review_mining')}>
-                Start stage 2 →
+              <button className="primary" onClick={() => onRunNode(nextStage.node)}>
+                Start stage {next} →
               </button>
             </div>
           )}
@@ -144,9 +158,17 @@ export default function RunView({
           </div>
         )}
 
-        {packet && runStage(run) === 1 && (
+        {stagePacket && stage === 1 && (
           <div className="tiles">
-            <StageOneTiles runId={runId} packet={packet} nodes={nodesInRun} listings={run?.listings ?? []} requiredFields={requiredFields} />
+            <StageOneTiles runId={runId} packet={stagePacket} nodes={nodesInRun} listings={run?.listings ?? []} requiredFields={requiredFields} />
+          </div>
+        )}
+        {truthPacket && (
+          <div className="tiles">
+            {progress.newerStageOne && (
+              <div className="warn">Stage 1 was rerun on {new Date(progress.newerStageOne.created_at).toLocaleString()}; this assessment is of the earlier run.</div>
+            )}
+            <ProductTruthTiles runId={runId} packet={truthPacket} />
           </div>
         )}
         {nodesInRun.has('review_mining') &&

@@ -10,7 +10,7 @@ import { FallbackPageFetcher } from "../src/adapters/fallback-fetcher.js";
 import { Firecrawl } from "../src/adapters/firecrawl.js";
 import { ServiceClients } from "../src/adapters/service-clients.js";
 import { Env, type Settings } from "../src/config/index.js";
-import { FetcherUnavailableError, type PageFetcher } from "../src/domain/index.js";
+import { ServiceUnavailableError, type PageFetcher } from "../src/domain/index.js";
 
 const settings = (overrides: Partial<Settings> = {}): Settings => ({
   ...Env.settings(),
@@ -39,21 +39,21 @@ describe("Crawl4ai", () => {
 
   it("says it can fetch nothing on no credit or a rejected key, and fails only the page otherwise", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => json(402, { error: "no_credit", message: "balance -0.50" })));
-    await expect(new Crawl4ai(settings()).scrape("https://a.example")).rejects.toBeInstanceOf(FetcherUnavailableError);
+    await expect(new Crawl4ai(settings()).scrape("https://a.example")).rejects.toBeInstanceOf(ServiceUnavailableError);
     vi.stubGlobal("fetch", vi.fn(async () => json(401, {})));
-    await expect(new Crawl4ai(settings()).scrape("https://a.example")).rejects.toBeInstanceOf(FetcherUnavailableError);
+    await expect(new Crawl4ai(settings()).scrape("https://a.example")).rejects.toBeInstanceOf(ServiceUnavailableError);
     vi.stubGlobal("fetch", vi.fn(async () => json(403, { error: "blocked" })));
     const blocked = new Crawl4ai(settings()).scrape("https://a.example");
     await expect(blocked).rejects.toThrow(/Crawl4AI returned 403/);
-    await expect(blocked).rejects.not.toBeInstanceOf(FetcherUnavailableError);
+    await expect(blocked).rejects.not.toBeInstanceOf(ServiceUnavailableError);
   });
 });
 
 describe("Firecrawl out of credits", () => {
   it("is an account that can fetch nothing, not a failed page", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => json(402, { success: false, error: "Insufficient credits" })));
-    await expect(new Firecrawl(settings()).scrape("https://a.example")).rejects.toBeInstanceOf(FetcherUnavailableError);
-    await expect(new Firecrawl(settings({ firecrawlApiKey: "" })).scrape("https://a.example")).rejects.toBeInstanceOf(FetcherUnavailableError);
+    await expect(new Firecrawl(settings()).scrape("https://a.example")).rejects.toBeInstanceOf(ServiceUnavailableError);
+    await expect(new Firecrawl(settings({ firecrawlApiKey: "" })).scrape("https://a.example")).rejects.toBeInstanceOf(ServiceUnavailableError);
   });
 });
 
@@ -64,7 +64,7 @@ describe("FallbackPageFetcher", () => {
   };
 
   it("reads through Crawl4AI when Firecrawl has no credits", async () => {
-    const primary = fetcher(() => Promise.reject(new FetcherUnavailableError("firecrawl", "Firecrawl returned 402")));
+    const primary = fetcher(() => Promise.reject(new ServiceUnavailableError("firecrawl", "Firecrawl returned 402")));
     const fallback = fetcher(() => Promise.resolve({ text: "page", title: "t" }));
     expect(await new FallbackPageFetcher(primary, fallback).scrape("https://a.example")).toEqual({ text: "page", title: "t" });
     expect(fallback.calls).toBe(1);
@@ -105,7 +105,7 @@ describe("the chain the app builds", () => {
       hosts.push(new URL(String(input)).host);
       return json(402, { success: false, error: "Insufficient credits" });
     }));
-    await expect(ServiceClients.forSettings(settings({ crawl4aiApiKey: "" })).pages.scrape("https://a.example")).rejects.toBeInstanceOf(FetcherUnavailableError);
+    await expect(ServiceClients.forSettings(settings({ crawl4aiApiKey: "" })).pages.scrape("https://a.example")).rejects.toBeInstanceOf(ServiceUnavailableError);
     expect(hosts).toEqual(["firecrawl.test"]);
   });
 });

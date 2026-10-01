@@ -16,6 +16,9 @@ export interface Settings {
   crawl4aiApiKey: string;
   crawl4aiBaseUrl: string;
   crawl4aiConcurrency: number;
+  parallelApiKey: string;
+  parallelBaseUrl: string;
+  parallelConcurrency: number;
   webTimeoutSeconds: number;
   fetchCharLimit: number;
   firecrawlConcurrency: number;

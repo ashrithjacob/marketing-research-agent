@@ -227,9 +227,17 @@ that has neither a row nor a gap starting with its name.
 the operator 2026-10-01). The
 prompt states it. `TurnBudget` counts turns through pi-agent-core's own
 `finishTurn` hook, which ends the agent loop after the last one. If the agent had
-not passed `finish` by then, code records under its id a gap for every field
-still open (`"<field>: not found within the 15-call limit"`) and an incomplete
-status, and emits `agent.limit_reached {agent_id, limit, gapped}`. The champion
+not passed `finish` by then, `LimitClose` first retracts every row of its own
+that fails its `finish` check, recording a gap for each (`"saturation sat112
+retracted at the 20-turn limit: <problem>"`), and repeats until none fails. Then it
+records a gap for every field still open (`"<field>: not found within the 15-call
+limit"`) and an incomplete status if none is left, and emits `agent.limit_reached
+{agent_id, limit, gapped, retracted}`. A row can be retracted because each check
+problem names the ledger row it is about (`CheckProblem.row`). A problem that
+belongs to no single row still leaves the run `invalid`. Settlement runs the same
+repair (`RowRepair`) over every agent's rows before deciding the status, and stores
+the packet even when the run ends `invalid`. Why: `workings_stage1.md` decisions
+17 and 18. The champion
 is not closed this way: a missing champion cannot be gapped into existence. The
 first limits (category 20, competitors 40) were set from run `4035e2b6`, where
 product finished in 10 turns and category in 22.

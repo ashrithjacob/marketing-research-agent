@@ -105,8 +105,8 @@ const CLIENT_ONLY_FIELDS = new Set([
   // server genuinely does not send it.
   "handlers", "onEnd", "onError", "onEvent", "onReconnecting", "onConnected",
   "startRun", "stopRun",
-  "logsUrl", "traceUrl", "sourceUrl", "arguments", "toolCallId", "stageTwoPlan", "productRuns",
-  "reviewAnalysis", "startReviewAnalysis", "stageTwoListings",
+  "logsUrl", "traceUrl", "sourceUrl", "arguments", "toolCallId", "reviewMiningPlan", "productRuns",
+  "reviewAnalysis", "startReviewAnalysis", "reviewMiningListings",
 ]);
 
 // The client's declared server surface: `frontend/src/api.ts`, or the

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { api, type Brief, type Config, type ResearchNode, type RunSummary } from './api';
-import { scopeLabel } from './StageRail';
+import { scopeLabel } from './stages';
 
 /** The markets a run covers unless you say otherwise — the English-language markets sold into. */
 export const DEFAULT_MARKETS = ['US', 'UK', 'Australia', 'New Zealand', 'Canada'] as const;

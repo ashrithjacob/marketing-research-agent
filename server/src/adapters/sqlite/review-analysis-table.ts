@@ -3,7 +3,7 @@ import type Database from "better-sqlite3";
 import { Clock, type ReviewAnalysis } from "../../domain/index.js";
 import { Trace } from "../../trace/index.js";
 
-/** One review analysis per stage-2 run, kept whole as it was last written. */
+/** One review analysis per review-mining run, kept whole as it was last written. */
 export class ReviewAnalysisTable {
   static readonly DDL = `
 CREATE TABLE IF NOT EXISTS research_review_analyses (

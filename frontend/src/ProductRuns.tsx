@@ -1,6 +1,6 @@
 import type { ProductSummary, RunSummary } from './api';
 import { Link, paths } from './route';
-import { NODE_ORDER, scopeLabel } from './StageRail';
+import { NODE_ORDER, scopeLabel } from './stages';
 
 export default function ProductRuns({
   product,

@@ -9,7 +9,7 @@ import Database from "better-sqlite3";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { App } from "../src/http/index.js";
-import { RunSupervisor, StageTwoHandoff } from "../src/agent/index.js";
+import { RunSupervisor, StageOneHandoff } from "../src/agent/index.js";
 import { Env } from "../src/config/index.js";
 import { Briefs, ProductFolders, type Product, type RunHead } from "../src/domain/index.js";
 import { SqliteResearchStore } from "../src/adapters/index.js";
@@ -199,7 +199,7 @@ describe("products cover every run, not the newest page", () => {
   it("hands stage 2 a stage-1 run older than the newest 200", () => {
     const oldest = seed(210);
     store.updateRun(oldest.id, { status: "completed", packet: minimalPacket() });
-    const found = new StageTwoHandoff(store).forBrief({ product: "VITAMIN-D", url: "", market: "", notes: "" }, Scope.everything);
+    const found = new StageOneHandoff(store).forBrief({ product: "VITAMIN-D", url: "", market: "", notes: "" }, Scope.everything);
     expect(found?.run.id).toBe(oldest.id);
   });
 });

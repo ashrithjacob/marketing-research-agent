@@ -1,5 +1,4 @@
 import {
-  CODE_ID_KINDS,
   CONTRACT_VERSION,
   Findings,
   Stages,
@@ -9,6 +8,8 @@ import {
   type Node,
 } from "../domain/index.js";
 import { Trace } from "../trace/index.js";
+
+import { LatestRows } from "./latest-rows.js";
 
 /** Builds the packet from the run ledger, the way ReviewAssembly builds its review half: the model never writes it. */
 export class PacketAssembly {
@@ -40,16 +41,9 @@ export class PacketAssembly {
     };
   }
 
-  /** Two agents may record one thing under the same key, each on its own row; the packet carries it once, as last recorded. */
   private payloads(kind: FindingKind): Record<string, unknown>[] {
     Trace.line(import.meta.url, "PacketAssembly.payloads", { kind });
-    const byKey = new Map<string, Finding>();
-    for (const row of this.live.filter((r) => r.kind === kind)) {
-      const key = Findings.key(kind, row.payload);
-      if (key !== null) byKey.delete(key);
-      byKey.set(key ?? row.id, row);
-    }
-    return [...byKey.values()].map((row) => (CODE_ID_KINDS.has(kind) ? { ...row.payload, id: row.id } : row.payload));
+    return LatestRows.payloads(this.live, kind);
   }
 
   /** A site brief names no product; the product's own `name` attribute, or the champion's name, does. */

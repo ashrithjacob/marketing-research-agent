@@ -3,7 +3,8 @@ import type { Config } from './config';
 import type { Judgement } from './judgements';
 import type { Brief, ProductSummary, ResearchNode, RunDetail, RunSummary } from './runs';
 import type { ReviewAnalysisResponse } from './review-analysis';
-import type { StageTwoPlanResponse, TargetListing } from './stage-two';
+import type { ProductTruthInputs } from './product-truth';
+import type { ReviewMiningPlanResponse, TargetListing } from './review-mining';
 
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, {
@@ -44,18 +45,18 @@ export const api = {
   productRuns: (id: string) =>
     request<{ data: RunSummary[] }>(`/api/research/products/${id}/runs`),
   run: (id: string) => request<RunDetail>(`/api/research/runs/${id}`),
-  startRun: (brief: Brief, nodes: ResearchNode[] = [], targets: string[] = []) =>
+  startRun: (brief: Brief, nodes: ResearchNode[] = [], targets: string[] = [], inputs?: ProductTruthInputs) =>
     request<RunSummary>('/api/research/runs', {
       method: 'POST',
-      body: JSON.stringify({ brief, nodes, targets }),
+      body: JSON.stringify({ brief, nodes, targets, ...(inputs ? { inputs } : {}) }),
     }),
-  stageTwoPlan: (brief: Brief, targets: string[] = []) =>
-    request<StageTwoPlanResponse>('/api/research/stage2/plan', {
+  reviewMiningPlan: (brief: Brief, targets: string[] = []) =>
+    request<ReviewMiningPlanResponse>('/api/research/review-mining/plan', {
       method: 'POST',
       body: JSON.stringify({ brief, targets }),
     }),
-  stageTwoListings: (brief: Brief) =>
-    request<{ listings: TargetListing[] }>('/api/research/stage2/listings', {
+  reviewMiningListings: (brief: Brief) =>
+    request<{ listings: TargetListing[] }>('/api/research/review-mining/listings', {
       method: 'POST',
       body: JSON.stringify({ brief }),
     }),

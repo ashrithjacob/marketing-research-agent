@@ -20,20 +20,20 @@ export class TrustpilotDomain {
   }
 }
 
-/** What stage 2 mines each target from: its matched Amazon listing, else its own Trustpilot domain, else nothing. One listing belongs to one target. */
-export class StageTwoOffer {
+/** What review mining mines each target from: its matched Amazon listing, else its own Trustpilot domain, else nothing. One listing belongs to one target. */
+export class ReviewMiningOffer {
   static of(roster: readonly MiningTarget[], listings: readonly TargetListing[]): MiningTarget[] {
-    Trace.line(import.meta.url, "StageTwoOffer.of", { roster: roster.length, listings: listings.length });
+    Trace.line(import.meta.url, "ReviewMiningOffer.of", { roster: roster.length, listings: listings.length });
     const matched = new Map<string, TargetListing>();
     for (const row of listings) if (row.matches && row.listing) matched.set(row.target_id, row);
     const claimants = new Map<string, string[]>();
     for (const target of roster) {
-      const key = StageTwoOffer.key(matched.get(target.id));
+      const key = ReviewMiningOffer.key(matched.get(target.id));
       if (key) claimants.set(key, [...(claimants.get(key) ?? []), target.id]);
     }
     return roster.flatMap((target) => {
       const row = matched.get(target.id);
-      const sharing = claimants.get(StageTwoOffer.key(row)) ?? [];
+      const sharing = claimants.get(ReviewMiningOffer.key(row)) ?? [];
       const collided = sharing.length > 1;
       const amazon = row?.listing && !collided ? row.listing.url : "";
       const trustpilot = amazon ? "" : TrustpilotDomain.of(target);
@@ -45,7 +45,7 @@ export class StageTwoOffer {
   }
 
   private static key(row: TargetListing | undefined): string {
-    Trace.tick(import.meta.url, "StageTwoOffer.key", {});
+    Trace.tick(import.meta.url, "ReviewMiningOffer.key", {});
     return row?.listing ? `${row.listing.marketplace}/${row.listing.asin}` : "";
   }
 }

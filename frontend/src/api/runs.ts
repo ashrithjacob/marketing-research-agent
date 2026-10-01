@@ -1,5 +1,6 @@
 import type { StagePacket } from './packet';
-import type { TargetListing } from './stage-two';
+import type { ProductTruthPacket } from './product-truth';
+import type { TargetListing } from './review-mining';
 
 export type RunStatus =
   | 'queued'
@@ -15,7 +16,11 @@ export type ResearchNode =
   | 'product_data'
   | 'competitors'
   | 'review_mining'
-  | 'category_data';
+  | 'category_data'
+  | 'mechanism'
+  | 'dose_vs_study'
+  | 'claim_limits'
+  | 'cogs_refills';
 
 export const TERMINAL_STATUSES: ReadonlySet<RunStatus> = new Set([
   'completed',
@@ -76,10 +81,10 @@ export interface RunSummary {
   id: string;
   workspace_id: string;
   product_id: string;
-  /** A stage-2 run's stage-1 run: the one whose competitors it mined. Empty on stage 1. */
+  /** The stage-1 run a product-truth or review-mining run built on. Empty on stage 1. */
   source_run_id: string;
   status: RunStatus;
-  /** 1 collects the product, its competitors and its category; 2 is review mining. */
+  /** 1 collects the product, its competitors and its category; 2 is product truth; 3 is review mining. */
   stage: number;
   model: string;
   brief: Brief;
@@ -107,8 +112,9 @@ export interface ProductSummary {
 }
 
 export interface RunDetail extends RunSummary {
-  packet: StagePacket | null;
-  /** "finish" when the agent's finish passed, "ledger" when settled from its ledger, "pipeline" for stage 2. */
+  /** Stage 2's packet is product truth's own shape; stages 1 and 3 share StagePacket. */
+  packet: StagePacket | ProductTruthPacket | null;
+  /** "finish" when the agent's finish passed, "ledger" when settled from its ledger, "pipeline" for review mining. */
   packet_source?: string;
   /** The Amazon listing stage 1 looked up for its champion and each competitor. */
   listings?: TargetListing[];

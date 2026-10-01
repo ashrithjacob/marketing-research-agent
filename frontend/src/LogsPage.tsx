@@ -9,7 +9,7 @@ import {
   type RunSummary,
 } from './api';
 import { formatTokens } from './format';
-import { scopeLabel } from './StageRail';
+import { scopeLabel } from './stages';
 import { AgentTabs } from './logs/AgentTabs';
 import { RUN_TAB, agentTabs, eventsFor } from './logs/agents';
 import { Stat, duration } from './logs/parts';

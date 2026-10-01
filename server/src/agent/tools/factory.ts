@@ -11,6 +11,7 @@ import type { AgentRoster } from "../agent-roster.js";
 import type { DoneCheck } from "../done-check.js";
 import type { FetchRecord } from "./lanes.js";
 import { RECORD_TOOLS } from "../prompt/text/record-tools.js";
+import { TRUTH_RECORD_TOOLS } from "../prompt/text/truth-record-tools.js";
 import type { RunFindings } from "../run-findings.js";
 
 import { FinishTool } from "./finish-tool.js";
@@ -20,6 +21,7 @@ import { FindProductTool } from "./find-product-tool.js";
 import { WebFetchTool } from "./web-fetch-tool.js";
 import { TracedTool } from "./traced-tool.js";
 import { WebSearchTool } from "./web-search-tool.js";
+import { EvidenceSearchTool } from "./evidence-search-tool.js";
 import type { ToolSteps } from "../tool-steps.js";
 import { Trace } from "../../trace/index.js";
 
@@ -40,12 +42,13 @@ export interface ToolsetOptions {
   onFetch?: (record: FetchRecord) => void;
   onApifyCharge?: (charge: ActorCharge) => void;
   productSearch?: boolean;
+  evidence?: boolean;
   subject?: string;
   market?: string;
   steps?: ToolSteps;
 }
 
-/** The tools one stage-1 agent gets. Amazon search only where its spec allows and an Apify runner exists; wait_for only with a roster of agents to wait on: withheld, not stubbed. */
+/** The tools one agent gets. Amazon search only where its spec allows and an Apify runner exists; wait_for only with a roster of agents to wait on: withheld, not stubbed. */
 export class ResearchToolset {
   constructor(private readonly options: ToolsetOptions) {}
 
@@ -58,24 +61,41 @@ export class ResearchToolset {
 
   private tools(): AgentTool<any>[] {
     Trace.line(import.meta.url, "ResearchToolset.tools");
-    const { settings, runId, onFetch, services } = this.options;
+    const { services } = this.options;
     const bare = this.options.productSearch ? services.actors : null;
     const onCharge = this.options.onApifyCharge;
     const runner = bare && onCharge ? new MeteredActorRunner(bare, onCharge) : bare;
+    const web = this.options.evidence ? this.evidenceTools() : this.webTools();
+    const search = runner ? [new FindProductTool(new AmazonProducts(runner)).tool()] : [];
+    return [...web, ...search, ...this.ledgerTools()];
+  }
+
+  private webTools(): AgentTool<any>[] {
+    Trace.line(import.meta.url, "ResearchToolset.webTools");
+    const { settings, runId, onFetch, services } = this.options;
     const gate = settings.gateModel ? new OpenRouterGate(settings) : undefined;
-    const web = [
+    return [
       new WebSearchTool(services.search).tool(),
       new WebFetchTool(settings, services.pages, new Corpus(settings.corpusPath), runId, onFetch, gate, this.options.subject, this.options.market).tool(),
     ];
-    const search = runner ? [new FindProductTool(new AmazonProducts(runner)).tool()] : [];
-    return [...web, ...search, ...this.ledgerTools()];
+  }
+
+  /** Product truth reads regulators, trials and the label through Parallel, with no relevance gate: a regulator's page is not about the product, and must not be filtered as if it should be. */
+  private evidenceTools(): AgentTool<any>[] {
+    Trace.line(import.meta.url, "ResearchToolset.evidenceTools");
+    const { settings, runId, onFetch, services } = this.options;
+    const corpus = new Corpus(settings.corpusPath);
+    return [
+      new EvidenceSearchTool(services.evidence.search, corpus, runId).tool(),
+      new WebFetchTool(settings, services.evidence.pages, corpus, runId, onFetch, undefined, this.options.subject, this.options.market).tool(),
+    ];
   }
 
   private ledgerTools(): AgentTool<any>[] {
     Trace.line(import.meta.url, "ResearchToolset.ledgerTools");
     const ledger = this.options.ledger;
     if (!ledger) return [];
-    const records = RECORD_TOOLS.filter((spec) => ledger.records.includes(spec.kind)).map((spec) =>
+    const records = [...RECORD_TOOLS, ...TRUTH_RECORD_TOOLS].filter((spec) => ledger.records.includes(spec.kind)).map((spec) =>
       new RecordTool(spec, ledger.findings).tool(),
     );
     const wait = ledger.roster ? [new WaitForTool(ledger.findings, ledger.roster, ledger.pollMs).tool()] : [];

@@ -18,7 +18,7 @@ export const miningTargetSchema = z
   .strict();
 export type MiningTarget = z.infer<typeof miningTargetSchema>;
 
-export const stageTwoEstimateSchema = z
+export const reviewMiningEstimateSchema = z
   .object({
     targets: z.number().int(),
     reviews_per_target: z.number().int(),
@@ -30,20 +30,20 @@ export const stageTwoEstimateSchema = z
     arithmetic: z.string(),
   })
   .strict();
-export type StageTwoEstimate = z.infer<typeof stageTwoEstimateSchema>;
+export type ReviewMiningEstimate = z.infer<typeof reviewMiningEstimateSchema>;
 
-export const stageTwoPlanSchema = z
+export const reviewMiningPlanSchema = z
   .object({
     source_run_id: z.string(),
     subject: miningTargetSchema,
     offered: z.array(miningTargetSchema),
     targets: z.array(miningTargetSchema),
-    estimate: stageTwoEstimateSchema,
+    estimate: reviewMiningEstimateSchema,
   })
   .strict();
-export type StageTwoPlan = z.infer<typeof stageTwoPlanSchema>;
+export type ReviewMiningPlan = z.infer<typeof reviewMiningPlanSchema>;
 
-export const stageTwoPlanRequestSchema = z
+export const reviewMiningPlanRequestSchema = z
   .object({
     brief: z
       .object({
@@ -56,7 +56,7 @@ export const stageTwoPlanRequestSchema = z
     targets: z.array(z.string()).default([]),
   })
   .strict();
-export type StageTwoPlanRequest = z.infer<typeof stageTwoPlanRequestSchema>;
+export type ReviewMiningPlanRequest = z.infer<typeof reviewMiningPlanRequestSchema>;
 
 export interface BestsellerRank {
   rank: number;

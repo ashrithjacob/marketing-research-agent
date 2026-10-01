@@ -72,12 +72,12 @@ export class AgentDriver {
     }
   }
 
-  /** An agent its turn limit ended: whatever it left open is recorded as gaps for it, so the run shows gaps rather than an unfinished part. */
+  /** An agent its turn limit ended: rows that fail its check are retracted and whatever it left open is gapped, so the run shows what it found rather than a rejected part. */
   private closeAtLimit(agentId: string, built: BuiltAgent, finished: () => boolean): void {
     Trace.line(import.meta.url, "AgentDriver.closeAtLimit", { agentId, spent: built.budget.spent });
     if (!built.budget.spent || finished() || this.stopping() || !built.closeOnLimit) return;
-    const gapped = built.closeOnLimit();
-    this.runs.emit(this.runId, "agent.limit_reached", { agent_id: agentId, limit: built.budget.limit, gapped });
+    const { gapped, retracted } = built.closeOnLimit();
+    this.runs.emit(this.runId, "agent.limit_reached", { agent_id: agentId, limit: built.budget.limit, gapped, retracted });
   }
 
   private stopping(): boolean {

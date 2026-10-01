@@ -8,18 +8,18 @@ import {
 import { Corpus } from "../adapters/corpus.js";
 import type { Settings } from "../config/index.js";
 import { Scope, type Brief, type MiningTarget, type ResearchStore } from "../domain/index.js";
-import { StageTwoOffer, StageTwoRoster, type PullFailure } from "../extract/index.js";
+import { ReviewMiningOffer, ReviewMiningRoster, type PullFailure } from "../extract/index.js";
 import { Trace } from "../trace/index.js";
 
 import type { LiveRuns } from "./live-runs.js";
 import { ReviewFiling } from "./review-filing.js";
 import { ReviewLedger } from "./review-ledger.js";
 import { ReviewPuller, type PullJob } from "./review-puller.js";
-import { StageTwoHandoff } from "./stage-two-handoff.js";
-import { StageTwoListings } from "./stage-two-listings.js";
-import { StageTwoSettlement } from "./stage-two-settlement.js";
+import { StageOneHandoff } from "./stage-one-handoff.js";
+import { ReviewMiningListings } from "./review-mining-listings.js";
+import { ReviewMiningSettlement } from "./review-mining-settlement.js";
 
-/** Stage 2, with no model in it: the offered targets' listings, their pulls, the computed packet. */
+/** Review mining (stage 3), with no model in it: the offered targets' listings, their pulls, the computed packet. */
 export class ReviewMiningJob {
   static readonly BANDS = [3, 1, 2, 4, 5] as const;
   static readonly RETRY_DELAY_MS = 10_000;
@@ -36,7 +36,7 @@ export class ReviewMiningJob {
     Trace.line(import.meta.url, "ReviewMiningJob.start", { runId, targets: request.targets });
     const stop = new AbortController();
     const ledger = new ReviewLedger();
-    const settlement = new StageTwoSettlement(this.store, this.runs, runId, ledger);
+    const settlement = new ReviewMiningSettlement(this.store, this.runs, runId, ledger);
     const done = this.mine(runId, request, ledger, stop.signal).then(
       (mined) => settlement.settle(request.brief, mined.targets, mined.failures, stop.signal.aborted),
       (error: unknown) => settlement.fail(error, stop.signal.aborted),
@@ -52,16 +52,20 @@ export class ReviewMiningJob {
   ): Promise<{ targets: MiningTarget[]; failures: PullFailure[] }> {
     Trace.line(import.meta.url, "ReviewMiningJob.mine", { runId });
     if (!this.actors) throw new Error("APIFY_TOKEN is not set, so no review can be pulled");
-    const source = new StageTwoHandoff(this.store).forBrief(request.brief, Scope.of(request.workspaceId));
+    const handoff = new StageOneHandoff(this.store);
+    const source = handoff.forBrief(request.brief, Scope.of(request.workspaceId));
     if (!source) throw new Error("no completed stage-1 run for this brief names the targets to mine");
+    if (!handoff.hasCompleted(2, source.run.id, Scope.of(request.workspaceId))) {
+      throw new Error(`product truth has not completed on stage-1 run ${source.run.id}, so review mining cannot start`);
+    }
     this.store.updateRun(runId, { source_run_id: source.run.id });
     const runner = new MeteredActorRunner(this.actors, (charge) =>
       this.runs.emit(runId, "apify.charged", { actor: charge.actor, usd: charge.usd, status: charge.status }),
     );
-    const roster = StageTwoRoster.of(source.packet);
-    const listings = await new StageTwoListings(this.store.listings, new AmazonListingLookup(runner), this.settings.apifyConcurrency)
+    const roster = ReviewMiningRoster.of(source.packet);
+    const listings = await new ReviewMiningListings(this.store.listings, new AmazonListingLookup(runner), this.settings.apifyConcurrency)
       .ensure(source.run.id, roster);
-    const targets = StageTwoRoster.select(StageTwoOffer.of(roster, listings), request.targets);
+    const targets = ReviewMiningRoster.select(ReviewMiningOffer.of(roster, listings), request.targets);
     const puller = new ReviewPuller({
       retries: this.settings.apifyPullRetries,
       delayMs: this.retryDelayMs,

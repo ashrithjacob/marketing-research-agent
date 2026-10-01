@@ -78,6 +78,17 @@ classDiagram
       label()
       key()
     }
+    class RowRef {
+      <<interface>>
+    }
+    class CheckProblem {
+      <<interface>>
+    }
+    class CheckProblems {
+      of()
+      at()
+      texts()
+    }
     class FindingDraft {
       <<interface>>
     }
@@ -87,6 +98,7 @@ classDiagram
     class Findings {
       rowId()
       key()
+      identity()
       live()
     }
     class RunEvent {
@@ -395,6 +407,7 @@ classDiagram
     class PacketValidator {
       expand()
       validate()
+      inspect()
     }
   }
   namespace adapters {
@@ -659,6 +672,9 @@ classDiagram
     class ChampionDone {
       problems()
     }
+    class DoneChecks {
+      of()
+    }
     class RunError {
     }
     class TurnEnd {
@@ -676,9 +692,18 @@ classDiagram
       toolErrorText()
       callSummary()
     }
+    class InvalidRunResettle {
+      resettleAll()
+    }
     class LedgerPacket {
       assemble()
       isEmpty()
+    }
+    class LimitClosed {
+      <<interface>>
+    }
+    class LimitClose {
+      close()
     }
     class ListingMatch {
       mismatch()
@@ -807,6 +832,9 @@ classDiagram
     class ReviewPuller {
       pullAll()
     }
+    class RowRepair {
+      repair()
+    }
     class RunFindings {
       record()
       retract()
@@ -819,10 +847,12 @@ classDiagram
     }
     class RunSettlement {
       settle()
+      resettle()
     }
     class RunSupervisor {
       start()
       recoverRunsKilledByRestart()
+      resettleInvalidRuns()
       steer()
       stop()
       close()
@@ -911,7 +941,6 @@ classDiagram
       tool()
     }
     class TurnBudget {
-      close()
     }
     class UsageTotals {
       empty()
@@ -1029,7 +1058,12 @@ classDiagram
   ChampionDone --> RunFindings
   AgentEventRecorder --> LiveRuns
   AgentEventRecorder --> ToolSteps
+  InvalidRunResettle --> ResearchStore
+  InvalidRunResettle --> LiveRuns
   LedgerPacket --> FindingLedger
+  LimitClose --> RunFindings
+  LimitClose --> RowRepair
+  LimitClose --> DoneCheck
   LiveRuns --> ResearchStore
   ModelChain --> Pricing
   ModelPricing --> OpenRouterPrices
@@ -1047,6 +1081,7 @@ classDiagram
   ReviewMiningJob --> Settings
   ReviewMiningJob --> ActorRunner
   ReviewPuller --> PullEvents
+  RowRepair --> FindingLedger
   RunFindings --> FindingLedger
   RunLauncher --> ResearchStore
   RunLauncher --> Settings
@@ -1059,6 +1094,7 @@ classDiagram
   RunSettlement --> ResearchStore
   RunSettlement --> LiveRuns
   RunSettlement --> LedgerPacket
+  RunSettlement --> RowRepair
   RunWrapUp --> ResearchStore
   RunWrapUp --> LiveRuns
   RunWrapUp --> StageOneListings
@@ -1089,6 +1125,7 @@ classDiagram
   WebFetchTool --> Corpus
   WebFetchTool --> FetchGate
   WebSearchTool --> WebSearch
+  PacketError --> CheckProblem
   PacketAssembly --> Finding
   ReviewAssembly --> ReviewLedgerSnapshot
   StageTwoPacket --> ReviewLedgerSnapshot
@@ -1174,11 +1211,13 @@ classDiagram
 | `agent` | `agent/agent-driver.ts` | AgentOutcome, AgentDriver |
 | `agent` | `agent/agent-roster.ts` | AgentRoster |
 | `agent` | `agent/billed-costs.ts` | BilledCosts |
-| `agent` | `agent/done-check.ts` | DoneCheck, NodeDone, ChampionDone |
+| `agent` | `agent/done-check.ts` | DoneCheck, NodeDone, ChampionDone, DoneChecks |
 | `agent` | `agent/errors.ts` | RunError |
 | `agent` | `agent/event-recorder.ts` | TurnEnd, AgentEventRecorder |
 | `agent` | `agent/frames.ts` | EventFrame, Frames |
+| `agent` | `agent/invalid-run-resettle.ts` | InvalidRunResettle |
 | `agent` | `agent/ledger-packet.ts` | LedgerPacket |
+| `agent` | `agent/limit-close.ts` | LimitClosed, LimitClose |
 | `agent` | `agent/listing-match.ts` | ListingMatch |
 | `agent` | `agent/live-runs.ts` | RunControl, Live, LiveRuns |
 | `agent` | `agent/llm-call-log.ts` | CallSequence, LlmCallLog |
@@ -1201,6 +1240,7 @@ classDiagram
 | `agent` | `agent/review-ledger.ts` | ReviewLedger |
 | `agent` | `agent/review-mining-job.ts` | ReviewMiningJob |
 | `agent` | `agent/review-puller.ts` | PullJob, PullEvents, ReviewPuller |
+| `agent` | `agent/row-repair.ts` | RowRepair |
 | `agent` | `agent/run-findings.ts` | RunFindings |
 | `agent` | `agent/run-launcher.ts` | RunLauncher |
 | `agent` | `agent/run-settlement.ts` | RunSettlement |
@@ -1229,6 +1269,7 @@ classDiagram
 | `config` | `config/settings.ts` | Env |
 | `domain` | `domain/accounts.ts` | Workspace, Account, AccountListing, Principal, Scope |
 | `domain` | `domain/brief.ts` | Briefs |
+| `domain` | `domain/check-problem.ts` | RowRef, CheckProblem, CheckProblems |
 | `domain` | `domain/findings.ts` | FindingDraft, Finding, Findings |
 | `domain` | `domain/logs.ts` | RunEvent, Judgement, PacketCheck, RunUpdate, LlmCallRecord, Generation, LlmCall |
 | `domain` | `domain/node-fields.ts` | NodeFieldSet, NodeFields |

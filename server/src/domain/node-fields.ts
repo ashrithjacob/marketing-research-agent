@@ -1,4 +1,5 @@
-import type { Finding, FindingKind } from "./findings.js";
+import type { FindingKind } from "./finding-kinds.js";
+import type { Finding } from "./findings.js";
 import type { Node } from "./nodes.js";
 import { PRODUCT_ATTRIBUTES } from "./vocabulary.js";
 import { Trace } from "../trace/index.js";

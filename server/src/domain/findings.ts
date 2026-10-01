@@ -1,54 +1,5 @@
-import { z } from "zod";
-
-import { attributeSchema, excerptSchema, measurementSchema, sourceSchema } from "./evidence.js";
-import {
-  competitorReferenceSchema,
-  competitorSchema,
-  gapSchema,
-  nodeStatusSchema,
-  saturationSchema,
-} from "./packet.js";
+import { FINDING_ROW_PREFIX, type FindingKind } from "./finding-kinds.js";
 import { Trace } from "../trace/index.js";
-
-export const FINDING_KINDS = [
-  "source",
-  "excerpt",
-  "measurement",
-  "attribute",
-  "competitor",
-  "competitor_reference",
-  "saturation",
-  "node_status",
-  "gap",
-] as const;
-export type FindingKind = (typeof FINDING_KINDS)[number];
-
-/** Kinds whose packet `id` is the ledger row's id, so the agent never invents one. */
-export const CODE_ID_KINDS: ReadonlySet<FindingKind> = new Set(["excerpt", "measurement", "attribute"]);
-
-export const FINDING_SCHEMAS: Readonly<Record<FindingKind, z.ZodTypeAny>> = {
-  source: sourceSchema,
-  excerpt: excerptSchema.omit({ id: true }),
-  measurement: measurementSchema.omit({ id: true }),
-  attribute: attributeSchema.omit({ id: true }),
-  competitor: competitorSchema,
-  competitor_reference: competitorReferenceSchema,
-  saturation: saturationSchema,
-  node_status: nodeStatusSchema,
-  gap: gapSchema,
-};
-
-const ROW_PREFIX: Readonly<Record<FindingKind, string>> = {
-  source: "src",
-  excerpt: "ex",
-  measurement: "me",
-  attribute: "at",
-  competitor: "co",
-  competitor_reference: "ref",
-  saturation: "sat",
-  node_status: "ns",
-  gap: "gap",
-};
 
 export interface FindingDraft {
   run_id: string;
@@ -71,7 +22,7 @@ export interface Finding extends FindingDraft {
 export class Findings {
   static rowId(kind: FindingKind, seq: number): string {
     Trace.line(import.meta.url, "Findings.rowId", { kind, seq });
-    return `${ROW_PREFIX[kind]}${seq}`;
+    return `${FINDING_ROW_PREFIX[kind]}${seq}`;
   }
 
   /** Rows of one kind with the same key describe one thing; the newest stands. Null means rows never replace each other. */
@@ -91,9 +42,33 @@ export class Findings {
         return `${String(payload.node ?? "")}:${String(payload.key ?? "")}`;
       case "measurement":
         return `${String(payload.node ?? "")}:${String(payload.metric ?? "")}:${String(payload.period ?? "")}`;
+      case "active":
+        return Findings.name(payload.name);
+      case "mechanism":
+      case "dose_study":
+        return Findings.name(payload.active);
+      case "claim_limit":
+        return `${Findings.name(payload.market)}:${String(payload.platform ?? "")}`;
+      case "price_point":
+        return Findings.name(payload.label);
+      case "regimen":
+      case "operator_input":
+        return kind;
       default:
         return null;
     }
+  }
+
+  /** What one packet entry and the row it came from have in common: the replacement key, or the row id where rows never replace each other. */
+  static identity(kind: FindingKind, payload: Record<string, unknown>, rowId: string): string {
+    Trace.line(import.meta.url, "Findings.identity", { kind });
+    return Findings.key(kind, payload) ?? rowId;
+  }
+
+  /** A name as a key: case and surrounding space do not make two things. */
+  static name(value: unknown): string {
+    Trace.tick(import.meta.url, "Findings.name");
+    return String(value ?? "").trim().toLowerCase();
   }
 
   static live(rows: readonly Finding[]): Finding[] {

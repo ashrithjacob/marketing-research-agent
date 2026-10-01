@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 
-import { ReviewAnalyst, RunSupervisor, StageTwoHandoff, StageTwoListings } from "../agent/index.js";
+import { ReviewAnalyst, RunSupervisor, StageOneHandoff, ReviewMiningListings } from "../agent/index.js";
 import { TrustpilotProfiles } from "../adapters/index.js";
 import type { Settings } from "../config/index.js";
 import type { AmazonListingSource, PageFetcher, ResearchStore } from "../domain/index.js";
@@ -13,7 +13,7 @@ import { EventStream } from "./event-stream.js";
 import { JudgementRoutes } from "./judgement-routes.js";
 import { ReviewAnalysisRoutes } from "./review-analysis-routes.js";
 import { RunRoutes } from "./run-routes.js";
-import { StageTwoRoutes } from "./stage-two-routes.js";
+import { ReviewMiningRoutes } from "./review-mining-routes.js";
 import { ProductRoutes } from "./product-routes.js";
 import { ScopeGuard } from "./scope-guard.js";
 import { TraceRoute } from "./trace-route.js";
@@ -35,11 +35,11 @@ export class ResearchApi {
     Trace.line(import.meta.url, "ResearchApi.router");
     const api = new Hono<ApiEnv>();
     const { store, supervisor, settings, traces, listingSource, pages } = this.options;
-    const handoff = new StageTwoHandoff(store);
+    const handoff = new StageOneHandoff(store);
     new ScopeGuard(store).register(api);
-    const listings = new StageTwoListings(store.listings, listingSource, settings.apifyConcurrency, new TrustpilotProfiles(pages));
+    const listings = new ReviewMiningListings(store.listings, listingSource, settings.apifyConcurrency, new TrustpilotProfiles(pages));
     new RunRoutes(store, supervisor, handoff, listings).register(api);
-    new StageTwoRoutes(handoff, settings, listings).register(api);
+    new ReviewMiningRoutes(handoff, settings, listings).register(api);
     new ReviewAnalysisRoutes(store, supervisor, new ReviewAnalyst(store, settings, supervisor.models, supervisor.costs)).register(api);
     new ProductRoutes(store).register(api);
     new EventStream(store, supervisor).register(api);

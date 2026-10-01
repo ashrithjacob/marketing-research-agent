@@ -1,4 +1,4 @@
-import type { FetchedPage, PageFetcher, SearchPage, WebSearch } from "../domain/index.js";
+import type { FetchedPage, PageFetcher, SearchPage, SearchScope, WebSearch } from "../domain/index.js";
 import { Trace } from "../trace/index.js";
 
 import type { ActorRun, ActorRunner } from "./apify/index.js";
@@ -22,9 +22,9 @@ export class ThrottledWebSearch implements WebSearch {
     private readonly queue: ServiceQueue,
   ) {}
 
-  find(query: string, maxResults: number, signal?: AbortSignal): Promise<SearchPage> {
-    Trace.line(import.meta.url, "ThrottledWebSearch.find", { query, maxResults });
-    return this.queue.run(() => this.inner.find(query, maxResults, signal), signal);
+  find(query: string, maxResults: number, signal?: AbortSignal, scope?: SearchScope): Promise<SearchPage> {
+    Trace.line(import.meta.url, "ThrottledWebSearch.find", { query, maxResults, scope });
+    return this.queue.run(() => this.inner.find(query, maxResults, signal, scope), signal);
   }
 }
 

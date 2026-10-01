@@ -3,7 +3,7 @@ import type Database from "better-sqlite3";
 import type { TargetListing, TargetListings } from "../../domain/index.js";
 import { Trace } from "../../trace/index.js";
 
-/** The Amazon listing found for each stage-2 target, one row per stage-1 run and target. */
+/** The Amazon listing found for each review-mining target, one row per stage-1 run and target. */
 export class TargetListingTable implements TargetListings {
   static readonly DDL = `
 CREATE TABLE IF NOT EXISTS research_target_listings (

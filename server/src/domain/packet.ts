@@ -98,7 +98,7 @@ export type Competitor = z.infer<typeof competitorSchema>;
 export const stagePacketSchema = z
   .object({
     contract_version: z.string().default(CONTRACT_VERSION),
-    stage: z.union([z.literal(1), z.literal(2)]).default(1),
+    stage: z.union([z.literal(1), z.literal(3)]).default(1),
     run_id: z.string().default(""),
     brief: briefSchema,
     sources: z.array(sourceSchema).default([]),

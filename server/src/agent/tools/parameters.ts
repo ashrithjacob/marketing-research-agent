@@ -7,6 +7,14 @@ export const searchParameters = Type.Object({
   ),
 });
 
+export const evidenceSearchParameters = Type.Object({
+  query: Type.String({ description: "What you are looking for, in a few words." }),
+  max_results: Type.Optional(Type.Number({ description: "How many results to return (default 5, max 10)." })),
+  domains: Type.Optional(
+    Type.Array(Type.String(), { description: "Only these sites, e.g. [\"ftc.gov\", \"fda.gov\"]. Leave out to search everywhere." }),
+  ),
+});
+
 export const fetchParameters = Type.Object({
   url: Type.String({ description: "The absolute url to fetch." }),
 });

@@ -1,4 +1,4 @@
-import { NODES, Stages, type Node, type StagePacket } from "../domain/index.js";
+import { CheckProblems, NODES, Stages, type Node, type CheckProblem, type StagePacket } from "../domain/index.js";
 
 import type { PacketCheck, PacketContext } from "./check.js";
 import { Trace } from "../trace/index.js";
@@ -18,8 +18,13 @@ export class ScopeCheck implements PacketCheck {
     ];
   }
 
-  problems(packet: StagePacket, context: PacketContext): string[] {
+  problems(packet: StagePacket, context: PacketContext): CheckProblem[] {
     Trace.line(import.meta.url, "ScopeCheck.problems", { packet });
+    return this.texts(packet, context).map(CheckProblems.of);
+  }
+
+  private texts(packet: StagePacket, context: PacketContext): string[] {
+    Trace.line(import.meta.url, "ScopeCheck.texts", { packet });
     return [
       ...this.stageProblems(packet, context),
       ...this.foreignNodeProblems(packet, context),

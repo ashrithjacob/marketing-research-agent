@@ -148,7 +148,7 @@ describe("ReviewAnalyst", () => {
     models.setProvider(faux.provider);
     const settings = { ...Env.settings(), model: "faux-model", backupModels: backups };
     const supervisor = new RunSupervisor({ store, settings, models });
-    const run = store.createRun({ workspaceId: "admin", brief: { product: "Vitamin D" }, model: "faux-model", rejectKinds: [], judgementIds: [], nodes: ["review_mining"], stage: 2 });
+    const run = store.createRun({ workspaceId: "admin", brief: { product: "Vitamin D" }, model: "faux-model", rejectKinds: [], judgementIds: [], nodes: ["review_mining"], stage: 3 });
     const review = (ref: string, star: number, text: string): LedgerReview => ({ ref, pull: "p", platform: "amazon", review_key: ref, listing: "", star, title: "", text, posted_at: "", verified: true, locator: "" });
     store.saveRunReviews(run.id, {
       pulls: [{ handle: "p", source_id: "s", target_id: "product", platform: "amazon", listing: "", band_requested: null, fetched_at: "", archived: false, total_reviews: null, total_ratings: null, gap: null }],

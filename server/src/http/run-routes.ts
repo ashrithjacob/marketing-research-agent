@@ -1,19 +1,8 @@
 import type { Context, Hono } from "hono";
 
-import { RunError, RunSupervisor, type StageTwoHandoff, type StageTwoListings } from "../agent/index.js";
-import { StageTwoRoster } from "../extract/index.js";
-import {
-  Briefs,
-  stagePacketSchema,
-  type ResearchRun,
-  type ResearchStore,
-  type TargetListing,
-  Runs,
-  Scope,
-  Stages,
-  judgementInSchema,
-  runRequestSchema,
-} from "../domain/index.js";
+import { RunError, RunSupervisor, type StageOneHandoff, type ReviewMiningListings } from "../agent/index.js";
+import { ReviewMiningRoster } from "../extract/index.js";
+import { Briefs, Runs, Scope, Stages, judgementInSchema, runRequestSchema, stagePacketSchema, type Brief, type ResearchRun, type ResearchStore, type TargetListing } from "../domain/index.js";
 
 import { CallStats } from "./call-stats.js";
 import type { ApiEnv } from "./api-env.js";
@@ -24,8 +13,8 @@ export class RunRoutes {
   constructor(
     private readonly store: ResearchStore,
     private readonly supervisor: RunSupervisor,
-    private readonly handoff: StageTwoHandoff,
-    private readonly listings: StageTwoListings,
+    private readonly handoff: StageOneHandoff,
+    private readonly listings: ReviewMiningListings,
   ) {}
 
   register(api: Hono<ApiEnv>): void {
@@ -75,21 +64,8 @@ export class RunRoutes {
     if (!brief.product && !brief.url) {
       return c.json({ detail: "brief.product or brief.url is required" }, 400);
     }
-    const nodes = Stages.expand(parsed.data.nodes);
-    if ((Stages.covering(nodes) ?? 1) === 2) {
-      const source = this.handoff.forBrief(brief, Scope.of(workspaceId));
-      if (!source) {
-        return c.json(
-          {
-            detail:
-              "review mining is stage 2: run stage 1 for this brief first, and let it " +
-              "complete — its packet names the listings stage 2 mines. No stage-1 packet " +
-              "exists for this subject yet.",
-          },
-          409,
-        );
-      }
-    }
+    const refused = this.unready(Stages.covering(Stages.expand(parsed.data.nodes)) ?? 1, brief, workspaceId);
+    if (refused) return c.json({ detail: refused }, 409);
 
     let runId: string;
     try {
@@ -100,6 +76,22 @@ export class RunRoutes {
     }
     const run = this.store.getRun(runId);
     return c.json(run ? Runs.summary(run) : { detail: "run vanished" }, run ? 200 : 500);
+  }
+
+  /** Why a stage cannot start yet: product truth reads a completed stage 1, and review mining also needs product truth complete on that same stage-1 run. */
+  private unready(stage: number, brief: Brief, workspaceId: string): string | null {
+    Trace.line(import.meta.url, "RunRoutes.unready", { stage });
+    if (stage === 1) return null;
+    const source = this.handoff.forBrief(brief, Scope.of(workspaceId));
+    if (!source) {
+      return `stage ${stage} builds on stage 1: run stage 1 for this brief first, and let it complete. ` +
+        "No completed stage-1 packet exists for this subject yet.";
+    }
+    if (stage === 3 && !this.handoff.hasCompleted(2, source.run.id, Scope.of(workspaceId))) {
+      return `review mining is stage 3: it starts once product truth (stage 2) has completed on stage-1 run ${source.run.id.slice(0, 8)}, ` +
+        "the run whose listings it mines.";
+    }
+    return null;
   }
 
   private calls(c: Context<ApiEnv>, runId: string) {
@@ -143,6 +135,6 @@ export class RunRoutes {
     Trace.line(import.meta.url, "RunRoutes.judgedListings", { runId: run.id });
     const packet = stagePacketSchema.safeParse(run.packet);
     if (!packet.success || packet.data.stage !== 1) return [];
-    return this.listings.judged(run.id, StageTwoRoster.of(packet.data));
+    return this.listings.judged(run.id, ReviewMiningRoster.of(packet.data));
   }
 }

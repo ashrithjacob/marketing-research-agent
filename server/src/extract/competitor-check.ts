@@ -1,4 +1,4 @@
-import type { Competitor, CompetitorReference, StagePacket } from "../domain/index.js";
+import { CheckProblems, type CheckProblem, type Competitor, type CompetitorReference, type StagePacket } from "../domain/index.js";
 
 import type { PacketCheck, PacketContext } from "./check.js";
 import { Relations } from "./names.js";
@@ -7,20 +7,22 @@ import { Trace } from "../trace/index.js";
 
 /** Direct and indirect are measured against the product's own form and actives. */
 export class CompetitorCheck implements PacketCheck {
-  problems(packet: StagePacket, { sourceIds }: PacketContext): string[] {
+  problems(packet: StagePacket, { sourceIds }: PacketContext): CheckProblem[] {
     Trace.line(import.meta.url, "CompetitorCheck.problems", { packet });
     const reference = packet.competitor_reference;
-    const problems: string[] = [];
+    const problems: CheckProblem[] = [];
 
     if (packet.competitors.length > 0 && !reference) {
       problems.push(
-        "competitors are listed but competitor_reference is missing — direct and " +
+        CheckProblems.of(
+          "competitors are listed but competitor_reference is missing — direct and " +
           "indirect are measured against the product's own form and actives",
+        ),
       );
     }
     if (reference && !sourceIds.has(reference.source_id)) {
       problems.push(
-        `competitor_reference cites source '${reference.source_id}', which is not in the packet`,
+        CheckProblems.at("competitor_reference", reference, `competitor_reference cites source '${reference.source_id}', which is not in the packet`),
       );
     }
 
@@ -29,14 +31,14 @@ export class CompetitorCheck implements PacketCheck {
 
     for (const row of packet.competitors) {
       const label = `competitor '${row.name}'`;
-      if (seen.has(row.id)) problems.push(`${label} repeats id '${row.id}'`);
+      if (seen.has(row.id)) problems.push(CheckProblems.of(`${label} repeats id '${row.id}'`));
       seen.add(row.id);
-      if (!sourceIds.has(row.source_id)) {
-        problems.push(`${label} cites source '${row.source_id}', which is not in the packet`);
-      }
-      problems.push(...this.adProblems(row, label, sourceIds, kinds));
-      if (reference) problems.push(...SharedActives.problems(label, row.shared_actives, reference.actives));
-      if (reference) problems.push(...this.relationProblems(row, label, reference));
+      const own: string[] = [];
+      if (!sourceIds.has(row.source_id)) own.push(`${label} cites source '${row.source_id}', which is not in the packet`);
+      own.push(...this.adProblems(row, label, sourceIds, kinds));
+      if (reference) own.push(...SharedActives.problems(label, row.shared_actives, reference.actives));
+      if (reference) own.push(...this.relationProblems(row, label, reference));
+      problems.push(...own.map((text) => CheckProblems.at("competitor", row, text)));
     }
     return problems;
   }

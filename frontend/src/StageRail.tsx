@@ -1,40 +1,21 @@
 import type { NodeStatus, ResearchNode, RunStatus, Saturation } from './api';
+import { NODE_LABELS, STAGE_NODES, stageOfNode, type CollectingStage } from './stages';
 
 const STAGES = [
   { id: '1', name: 'Raw material', note: 'product, competitors, category', nodes: 1 },
-  { id: '2', name: 'Review mining', note: 'verbatim customer language', nodes: 2 },
-  { id: '3', name: 'Product truth', note: 'product in isolation' },
+  { id: '2', name: 'Product truth', note: 'product in isolation', nodes: 2 },
+  { id: '3', name: 'Review mining', note: 'verbatim customer language', nodes: 3 },
   { id: '4', name: 'Market truth', note: 'product vs world' },
   { id: 'gate', name: 'Viability gate', note: 'human decision' },
   { id: '5', name: 'Customer truth', note: 'after the gate only' },
   { id: '6', name: 'Synthesis', note: 'artifacts leave here' },
 ] as const;
 
-export const NODE_LABELS: Record<ResearchNode, string> = {
-  product_data: 'Product data',
-  competitors: 'Competitors',
-  review_mining: 'Review mining',
-  category_data: 'Category data',
+const START_TITLE: Record<CollectingStage, string> = {
+  1: '',
+  2: 'Assess the product stage 1 found, in isolation — you enter its landed cost before it runs',
+  3: 'Mine reviews for the product stage 1 found — you approve the plan before it runs',
 };
-
-/** Which nodes each collecting stage owns. Mirrors STAGE_NODES in the server. */
-/** Which nodes each collecting stage owns. Mirrors `STAGE_NODES` in `server/src/domain/nodes.ts`. */
-export const STAGE_NODES: Record<1 | 2, ResearchNode[]> = {
-  1: ['product_data', 'competitors', 'category_data'],
-  2: ['review_mining'],
-};
-
-export const NODE_ORDER: ResearchNode[] = [
-  'product_data',
-  'competitors',
-  'review_mining',
-  'category_data',
-];
-
-/** The stage a node is collected in. */
-export function stageOfNode(node: ResearchNode): 1 | 2 {
-  return node === 'review_mining' ? 2 : 1;
-}
 
 function runState(status: RunStatus): { cls: string; label: string } {
   switch (status) {
@@ -57,39 +38,24 @@ function runState(status: RunStatus): { cls: string; label: string } {
   }
 }
 
-/** "Product data" for one node, "Whole stage" for all of the stage's nodes. */
-export function scopeLabel(nodes: readonly ResearchNode[]): string {
-  if (nodes.length === 0) return 'Whole stage';
-  const stage = stageOfNode(nodes[0]);
-  if (nodes.length === STAGE_NODES[stage].length) {
-    return stage === 2 ? 'Review mining' : 'Whole stage';
-  }
-  return nodes.map((n) => NODE_LABELS[n]).join(' + ');
-}
-
-/** A stage's standing when the shown run is not the one collecting it. */
-function standing(
-  collects: 1 | 2,
-  progress: StageProgress | undefined,
-): { cls: string; label: string } | null {
+/** A stage's standing when the shown run is not the one collecting it: each later stage needs the one before it complete, on the same stage-1 run. */
+function standing(collects: CollectingStage, progress: StageProgress | undefined): { cls: string; label: string } | null {
   if (!progress) return null;
-  if (collects === 1) return progress.stageOneDone ? { cls: 'done', label: 'complete' } : null;
-  if (progress.stageTwoLive) return { cls: 'active', label: 'running in another run' };
-  if (progress.stageTwoDone) return { cls: 'done', label: 'complete' };
-  if (progress.stageOneDone) return { cls: 'ready', label: 'ready — stage 1 is complete' };
-  return { cls: 'unbuilt', label: 'needs a completed stage 1' };
+  if (collects === 1) return progress.done[1] ? { cls: 'done', label: 'complete' } : null;
+  if (progress.live[collects]) return { cls: 'active', label: 'running in another run' };
+  if (progress.done[collects]) return { cls: 'done', label: 'complete' };
+  if (progress.done[(collects - 1) as CollectingStage]) return { cls: 'ready', label: `ready — stage ${collects - 1} is complete` };
+  return { cls: 'unbuilt', label: `needs a completed stage ${collects - 1}` };
 }
 
 export interface StageProgress {
-  /** A stage-1 run for this subject completed, so stage 2 can start. */
-  stageOneDone: boolean;
-  /** A stage-2 run for this subject completed. */
-  stageTwoDone: boolean;
-  /** A stage-2 run for this subject is queued or running right now. */
-  stageTwoLive: boolean;
+  /** Which collecting stages have a completed run on the stage-1 run the shown run belongs to. */
+  done: Record<CollectingStage, boolean>;
+  /** Which of them have a run queued or running right now. */
+  live: Record<CollectingStage, boolean>;
   /** The run each collecting stage opens when its header is clicked. */
-  runIds?: Partial<Record<1 | 2, string>>;
-  /** On a stage-2 run: a completed stage-1 run newer than the one it mined, so its customer voice is out of date. */
+  runIds?: Partial<Record<CollectingStage, string>>;
+  /** On a stage-2 or stage-3 run: a completed stage-1 run newer than the one it built on, so what it found is out of date. */
   newerStageOne?: { id: string; created_at: string };
 }
 
@@ -118,18 +84,18 @@ export default function StageRail({
   const curves = new Map<ResearchNode, Saturation[]>();
   for (const entry of saturation) curves.set(entry.node, [...(curves.get(entry.node) ?? []), entry]);
   const inScope = new Set(scope);
-  const stageTwoBlocked = progress ? !progress.stageOneDone : false;
+  const blocked = (stage: CollectingStage) => stage > 1 && !!progress && !progress.done[(stage - 1) as CollectingStage];
 
   return (
     <div className="rail">
       <h3>Stages</h3>
       {STAGES.map((stage) => {
-        const collects = 'nodes' in stage ? (stage.nodes as 1 | 2) : null;
+        const collects = 'nodes' in stage ? (stage.nodes as CollectingStage) : null;
         const shown = collects !== null && scope.length > 0 && stageOfNode(scope[0]) === collects;
-        const rerun = shown && collects === 2 && progress?.newerStageOne ? { cls: 'ready', label: 'ready — stage 1 was rerun' } : null;
+        const rerun = shown && collects !== 1 && progress?.newerStageOne ? { cls: 'ready', label: 'ready — stage 1 was rerun' } : null;
         const state =
           rerun ?? (shown && status ? runState(status) : collects !== null ? standing(collects, progress) : null);
-        const ready = collects === 2 && state?.cls === 'ready';
+        const ready = collects !== null && collects !== 1 && state?.cls === 'ready';
         const target = collects !== null && !shown ? progress?.runIds?.[collects] : undefined;
         const open = target && onSelectRun ? () => onSelectRun(target) : undefined;
         return (
@@ -151,16 +117,16 @@ export default function StageRail({
                 <div className="stage-s">
                   {state ? state.label : collects !== null ? stage.note : 'not built'}
                 </div>
-                {ready && onRunNode && (
+                {ready && collects && onRunNode && (
                   <button
                     className="primary stage-start"
-                    title="Mine reviews for the product stage 1 found — you approve the plan before it runs"
+                    title={START_TITLE[collects]}
                     onClick={(e) => {
                       e.stopPropagation();
-                      onRunNode(STAGE_NODES[2][0]);
+                      onRunNode(STAGE_NODES[collects][0]);
                     }}
                   >
-                    Start stage 2 →
+                    Start stage {collects} →
                   </button>
                 )}
               </div>
@@ -193,11 +159,13 @@ export default function StageRail({
                       {onRunNode && (
                         <button
                           className="node-run"
-                          disabled={collects === 2 && stageTwoBlocked}
+                          disabled={blocked(collects)}
                           title={
-                            collects === 2 && stageTwoBlocked
-                              ? 'Stage 2 mines what stage 1 found — run stage 1 for this brief first'
-                              : `Run ${NODE_LABELS[node]} on its own`
+                            blocked(collects)
+                              ? `Stage ${collects} builds on stage ${collects - 1} — complete that first`
+                              : collects === 2
+                                ? 'Run product truth: its four nodes run together'
+                                : `Run ${NODE_LABELS[node]} on its own`
                           }
                           aria-label={`Run ${NODE_LABELS[node]}`}
                           onClick={() => onRunNode(node)}

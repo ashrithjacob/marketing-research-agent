@@ -2,14 +2,14 @@ import type { AssistantMessage, ToolCall } from "@earendil-works/pi-ai";
 import { fauxAssistantMessage, fauxToolCall } from "@earendil-works/pi-ai/providers/faux";
 
 import { ServiceClients } from "../src/adapters/index.js";
-import { Findings, PRODUCT_ATTRIBUTES, type Finding, type FindingDraft, type FindingLedger, type PageFetcher } from "../src/domain/index.js";
+import { Findings, PRODUCT_ATTRIBUTES, STAGE_NODES, type Finding, type FindingDraft, type FindingLedger, type PageFetcher, type ResearchStore } from "../src/domain/index.js";
 import type { ActorRunner } from "../src/adapters/apify/index.js";
 import type { Settings } from "../src/config/index.js";
 
 /**
  * Packets that validate. Tests mutate one thing and assert the failure.
  *
- * Two of them, because review mining became stage 2 on 2026-09-21: a packet
+ * Two of them, because review mining is its own stage (2 on 2026-09-21, 3 since 2026-10-01): a packet
  * belongs to one stage, and the validator rejects one that mixes them.
  */
 
@@ -64,11 +64,11 @@ export function minimalPacket(overrides: Record<string, unknown> = {}): Record<s
   return { ...data, ...overrides };
 }
 
-/** Stage 2: verbatim customer language, with its 3★ excerpt. */
+/** Review mining (stage 3): verbatim customer language, with its 3★ excerpt. */
 export function reviewPacket(overrides: Record<string, unknown> = {}): Record<string, any> {
   const data: Record<string, any> = {
     contract_version: "1",
-    stage: 2,
+    stage: 3,
     brief: { product: "MagnaCalm 400mg", url: "https://x", market: "UK" },
     sources: [
       {
@@ -170,6 +170,14 @@ export function genreRun(packet: Record<string, any> = productPacket()): Assista
     gaps: [{ node: "product_data", missing: "champion ranking unavailable: no Amazon search in tests" }],
   };
   return [...recorded(champion), ...recorded(packet)];
+}
+
+/** A completed product-truth run on stage-1 run `sourceRunId`: review mining starts only after one (spec-stage-2-product-truth.md §4). */
+export function completeProductTruth(store: ResearchStore, sourceRunId: string): string {
+  const source = store.getRun(sourceRunId)!;
+  const run = store.createRun({ workspaceId: source.workspace_id, brief: source.brief, model: "m", rejectKinds: [], judgementIds: [], nodes: [...STAGE_NODES[2]], stage: 2 });
+  store.updateRun(run.id, { status: "completed", source_run_id: sourceRunId });
+  return run.id;
 }
 
 /** The shared service clients, with a stand-in Apify runner when a test needs one. */

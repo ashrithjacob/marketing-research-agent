@@ -2,7 +2,7 @@ import { useState } from 'react';
 import type { ResearchNode } from '../api';
 import { VoiceAnalysis } from './voice/VoiceAnalysis';
 
-/** A stage-2 run whose stage 1 has since been rerun: say so, offer stage 2 for the new one, and keep the old customer voice folded away. */
+/** A review-mining run whose stage 1 has since been rerun: say so, offer stage 2 for the new one, and keep the old customer voice folded away. */
 export function OutdatedVoice({
   runId,
   finished,

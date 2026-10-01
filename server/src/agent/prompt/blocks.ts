@@ -1,12 +1,23 @@
-import type { Brief, Judgement } from "../../domain/index.js";
+import { DEFAULT_REJECTED_KINDS, SOURCE_KIND_NOTES, type Brief, type Judgement } from "../../domain/index.js";
 
 import { Trace } from "../../trace/index.js";
+
+import { SOURCES } from "./text/sources.js";
 
 /** The parts of the instructions that depend on this run's scope and brief. */
 export class PromptBlocks {
   static code(names: readonly string[]): string {
     Trace.line(import.meta.url, "PromptBlocks.code", { names });
     return names.map((name) => `\`${name}\``).join(", ");
+  }
+
+  static sources(rejectKinds: readonly string[]): string {
+    Trace.line(import.meta.url, "PromptBlocks.sources", { rejectKinds });
+    const rejected = rejectKinds.length > 0 ? rejectKinds : DEFAULT_REJECTED_KINDS;
+    return SOURCES.replace("{kinds}", SOURCE_KIND_NOTES.map(([kind, note]) => `  - \`${kind}\` — ${note}`).join("\n")).replace(
+      "{rejected}",
+      rejected.map((kind) => `  - \`${kind}\``).join("\n"),
+    );
   }
 
   static judgements(judgements: readonly Judgement[]): string {

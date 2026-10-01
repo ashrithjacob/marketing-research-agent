@@ -21,10 +21,10 @@ import { minimalPacket, reviewPacket } from "./fixtures.js";
 
 const packets = new PacketValidator();
 
-/** Stage 1 is the product, its competitors and its category; stage 2 is review
+/** Stage 1 is the product, its competitors and its category; stage 3 is review
  *  mining. A packet belongs to one of them, so its scope comes with it. */
 const STAGE1 = STAGE_NODES[1];
-const REVIEW = STAGE_NODES[2];
+const REVIEW = STAGE_NODES[3];
 
 describe("assembly from the ledger", () => {
   let seq = 0;
@@ -122,7 +122,7 @@ describe("validation: the cross-object rules", () => {
     expect(() => packets.validate(data)).not.toThrow();
   });
 
-  it("asks stage 2 for neither a curve nor a gap: it searches nothing, and no agent invents completeness", () => {
+  it("asks review mining for neither a curve nor a gap: it searches nothing, and no agent invents completeness", () => {
     // spec-stage-2-pipeline.md §5: the packet is computed from fixed pulls.
     expect(() => packets.validate(reviewPacket({ saturation: [], gaps: [] }), REVIEW)).not.toThrow();
   });
@@ -362,7 +362,7 @@ describe("runNodes", () => {
       "category_data",
     ]);
     // Empty is stage 1, which is what a bare "Start run" sends and what every
-    // run stored before review mining moved to stage 2 actually was.
+    // run stored before review mining became its own stage actually was.
     expect(Stages.expand([])).toEqual([...STAGE1]);
     expect(Stages.expand(undefined)).toEqual([...STAGE1]);
   });

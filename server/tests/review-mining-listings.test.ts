@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { AmazonListingLookup } from "../src/adapters/apify/index.js";
 import type { ActorRunner } from "../src/adapters/apify/index.js";
-import { ListingMatch, StageTwoListings } from "../src/agent/index.js";
+import { ListingMatch, ReviewMiningListings } from "../src/agent/index.js";
 import type { AmazonListing, AmazonListingSource, MiningTarget, TargetListing, TargetListings } from "../src/domain/index.js";
 import { MULLEIN_LISTINGS } from "./mullein-listings.js";
 import { HERB_PHARM_PAGE, HUEL_PAGE } from "./trustpilot-pages.js";
@@ -48,10 +48,10 @@ class MemoryListings implements TargetListings {
   }
 }
 
-describe("StageTwoListings", () => {
+describe("ReviewMiningListings", () => {
   it("searches by brand and name, without the '(Amazon: …)' wrapper", () => {
-    expect(StageTwoListings.query(target("c1", "Creatine Monohydrate Powder", "Myprotein"))).toBe("Myprotein Creatine Monohydrate Powder");
-    expect(StageTwoListings.query(target("p", "Optimum Nutrition Creatine (Amazon: Creatine Powder, 120 Servings)"))).toBe(
+    expect(ReviewMiningListings.query(target("c1", "Creatine Monohydrate Powder", "Myprotein"))).toBe("Myprotein Creatine Monohydrate Powder");
+    expect(ReviewMiningListings.query(target("p", "Optimum Nutrition Creatine (Amazon: Creatine Powder, 120 Servings)"))).toBe(
       "Optimum Nutrition Creatine Creatine Powder, 120 Servings",
     );
   });
@@ -85,7 +85,7 @@ describe("StageTwoListings", () => {
     const spray = { ...target("c16", "A.Vogel Mullein & Marshmallow Spray", "A.Vogel"), form: "spray" as const, actives: ["mullein"] };
     const sinuforce = listing("A.Vogel", "A.Vogel Sinuforce Nasal Spray + Menthol");
     store.save({ source_run_id: "r", target_id: "c16", query: "", strategy: "", listing: sinuforce, matches: true, mismatch: "", error: "", fetched_at: "" });
-    const [row] = new StageTwoListings(store, null, 1).judged("r", [spray]);
+    const [row] = new ReviewMiningListings(store, null, 1).judged("r", [spray]);
     expect([row!.matches, row!.mismatch]).toEqual([false, "active"]);
     expect(store.list("r")[0]!.matches).toBe(false);
   });
@@ -95,8 +95,8 @@ describe("StageTwoListings", () => {
     const asked: string[] = [];
     const source: AmazonListingSource = { lookup: async (q) => (asked.push(q), []) };
     const bulk = { ...target("c2", "Creatine Monohydrate Powder", "Bulk"), url: "https://www.bulk.com/uk/p" };
-    const listings = new StageTwoListings(store, source, 2);
-    store.save({ source_run_id: "r", target_id: "c2", query: "", strategy: StageTwoListings.strategy(bulk), listing: listing("Bulk", "Bulk Creatine Monohydrate Tablets"), matches: true, mismatch: "", fetched_at: "", error: "" });
+    const listings = new ReviewMiningListings(store, source, 2);
+    store.save({ source_run_id: "r", target_id: "c2", query: "", strategy: ReviewMiningListings.strategy(bulk), listing: listing("Bulk", "Bulk Creatine Monohydrate Tablets"), matches: true, mismatch: "", fetched_at: "", error: "" });
     const [row] = await listings.ensure("r", [bulk]);
     expect([row!.matches, row!.mismatch]).toEqual([false, "form"]);
     expect(asked).toEqual([]);
@@ -113,7 +113,7 @@ describe("StageTwoListings", () => {
       },
     };
     const store = new MemoryListings();
-    const listings = new StageTwoListings(store, source, 4);
+    const listings = new ReviewMiningListings(store, source, 4);
     const roster = [target("c1", "Creatine", "Thorne"), target("c2", "Creatine Powder", "Bulk")];
     expect((await listings.ensure("run1", roster)).map((row) => row.target_id)).toEqual(["c1"]);
     fail = false;
@@ -123,7 +123,7 @@ describe("StageTwoListings", () => {
   });
 
   it("searches the brand's home Amazon store, worked out from its site", () => {
-    const at = (url: string) => StageTwoListings.marketplace({ ...target("c", "Creatine"), url });
+    const at = (url: string) => ReviewMiningListings.marketplace({ ...target("c", "Creatine"), url });
     expect(at("https://switchnutrition.com.au/products/creatine-monohydrate")).toBe("www.amazon.com.au");
     expect(at("https://kyro.co.nz/products/creatine")).toBe("www.amazon.com.au");
     expect(at("https://www.bulk.com/uk/products/creatine-monohydrate/bpb-cmon-0000")).toBe("www.amazon.co.uk");
@@ -141,13 +141,13 @@ describe("StageTwoListings", () => {
     const store = new MemoryListings();
     const switchTarget = { ...target("c5", "Creatine Monohydrate", "Switch Nutrition"), url: "https://switchnutrition.com.au/p" };
     store.save({ source_run_id: "r", target_id: "c5", query: "", strategy: "", listing: listing("Optimum Nutrition"), matches: false, mismatch: "brand", error: "", fetched_at: "" });
-    const [row] = await new StageTwoListings(store, source, 2).ensure("r", [switchTarget]);
+    const [row] = await new ReviewMiningListings(store, source, 2).ensure("r", [switchTarget]);
     expect(row!.matches).toBe(true);
     expect(row!.listing!.title).toBe("Switch Creatine Powder");
-    await new StageTwoListings(store, source, 2).ensure("r", [switchTarget]);
+    await new ReviewMiningListings(store, source, 2).ensure("r", [switchTarget]);
     expect(asked).toEqual(["www.amazon.com.au 5"]);
     store.save({ source_run_id: "r", target_id: "c3", query: "", strategy: "", listing: listing("Thorne"), matches: true, mismatch: "", error: "", fetched_at: "" });
-    await new StageTwoListings(store, source, 2).ensure("r", [{ ...target("c3", "Creatine", "Thorne"), url: "https://thorne.com/p" }]);
+    await new ReviewMiningListings(store, source, 2).ensure("r", [{ ...target("c3", "Creatine", "Thorne"), url: "https://thorne.com/p" }]);
     expect(asked).toHaveLength(1);
   });
 });

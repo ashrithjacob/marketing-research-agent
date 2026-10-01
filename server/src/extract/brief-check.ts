@@ -1,4 +1,4 @@
-import { Briefs, type StagePacket } from "../domain/index.js";
+import { CheckProblems, Briefs, type CheckProblem, type StagePacket } from "../domain/index.js";
 
 import type { PacketCheck, PacketContext } from "./check.js";
 import { BrandLabels, Names } from "./names.js";
@@ -6,8 +6,13 @@ import { Trace } from "../trace/index.js";
 
 /** The worked example is not the assignment: the packet must be about this brief. */
 export class BriefCheck implements PacketCheck {
-  problems(packet: StagePacket, { brief }: PacketContext): string[] {
+  problems(packet: StagePacket, context: PacketContext): CheckProblem[] {
     Trace.line(import.meta.url, "BriefCheck.problems", { packet });
+    return this.texts(packet, context).map(CheckProblems.of);
+  }
+
+  private texts(packet: StagePacket, { brief }: PacketContext): string[] {
+    Trace.line(import.meta.url, "BriefCheck.texts", { packet });
     const wanted = typeof brief?.product === "string" ? Names.normalise(brief.product) : "";
     const site = typeof brief?.url === "string" ? brief.url.trim() : "";
     const got = Names.normalise(packet.brief.product);

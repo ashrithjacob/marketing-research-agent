@@ -1,4 +1,4 @@
-/** A stage-2 run's review analysis. Mirrors the server's `/runs/:id/review-analysis`. */
+/** A review-mining run's review analysis. Mirrors the server's `/runs/:id/review-analysis`. */
 
 export type IssueKind = 'complaint' | 'request' | 'praise';
 

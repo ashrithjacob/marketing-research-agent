@@ -13,10 +13,10 @@ import type { ResearchRun } from "./records.js";
 import type { Product, RunHead } from "./products.js";
 import type { StoredPacketRows } from "./packet-rows.js";
 import type { ReviewAnalysis } from "./review-analysis.js";
-import type { AmazonListing, TargetListing } from "./stage-two.js";
+import type { AmazonListing, TargetListing } from "./review-mining.js";
 import type { ReviewLedgerSnapshot, StoredRunReview } from "./reviews.js";
 import type { Finding, FindingDraft } from "./findings.js";
-import type { FetchedPage, SearchPage } from "./web.js";
+import type { FetchedPage, SearchPage, SearchScope } from "./web.js";
 
 /** Products and what their runs found, counted only over the runs a scope admits. */
 export interface ProductCatalog {
@@ -52,7 +52,7 @@ export interface AmazonListingSource {
   lookup(query: string, marketplace: string, max: number, signal?: AbortSignal): Promise<AmazonListing[]>;
 }
 
-/** The Amazon listing looked up for each stage-2 target, kept per stage-1 run so it is paid for once. */
+/** The Amazon listing looked up for each review-mining target, kept per stage-1 run so it is paid for once. */
 export interface TargetListings {
   save(listing: TargetListing): void;
   list(sourceRunId: string): TargetListing[];
@@ -72,7 +72,7 @@ export interface PageFetcher {
 
 /** Finds urls for a query; it cannot read pages. */
 export interface WebSearch {
-  find(query: string, maxResults: number, signal?: AbortSignal): Promise<SearchPage>;
+  find(query: string, maxResults: number, signal?: AbortSignal, scope?: SearchScope): Promise<SearchPage>;
 }
 
 export interface ResearchStore {

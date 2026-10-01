@@ -212,6 +212,14 @@ A red `.error` block under a `failed` run shows `run.error`. A red block on an
 something the schema refused — the message names the offending field. `invalid`
 is kept distinct from `failed` on purpose.
 
+Since 2026-10-01 an `invalid` run still shows its tiles. At settlement, every row
+a check problem points at is retracted and turned into a gap
+(`"<kind> <row id> retracted when the run settled: <problem>"`), so what passed is
+kept. The run is `invalid` only when a problem belongs to no single row (an empty
+gap list, a brief about the wrong product). It still stores the packet, and the
+banner reads "Some checks failed" above the tiles. "Packet rejected" and the raw
+output appear only when the ledger does not parse at all.
+
 **Activity** (`.logs-link`, labelled "Activity ↗") opens `/runs/:id/logs` in a
 new tab. The reasoning trace and the crawling lanes used to live on the
 cockpit's middle column; they are only on the activity log now.

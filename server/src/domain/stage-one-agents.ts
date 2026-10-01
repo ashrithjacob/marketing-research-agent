@@ -1,5 +1,5 @@
 import type { Brief } from "./brief.js";
-import type { FindingKind } from "./findings.js";
+import type { FindingKind } from "./finding-kinds.js";
 import type { Node } from "./nodes.js";
 import { Trace } from "../trace/index.js";
 

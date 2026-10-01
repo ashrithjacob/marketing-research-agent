@@ -1,10 +1,10 @@
 import type { Settings } from "../config/index.js";
-import type { SearchPage, ServicePart, ServiceReport, WebSearch } from "../domain/index.js";
+import { Domains, type SearchPage, type SearchScope, type ServicePart, type ServiceReport, type WebSearch } from "../domain/index.js";
 
 import { Http } from "./http.js";
 import { Trace } from "../trace/index.js";
 
-/** SearXNG finds urls; it cannot read pages. That is Firecrawl's half. */
+/** SearXNG finds urls; it cannot read pages. It has no site filter, so a scoped search keeps only the hits on the scope's domains. */
 export class Searxng implements WebSearch {
   constructor(private readonly settings: Settings) {}
 
@@ -12,8 +12,9 @@ export class Searxng implements WebSearch {
     query: string,
     maxResults: number,
     signal?: AbortSignal,
+    scope?: SearchScope,
   ): Promise<SearchPage> {
-    Trace.line(import.meta.url, "Searxng.find", { query, maxResults });
+    Trace.line(import.meta.url, "Searxng.find", { query, maxResults, scope });
     const url = new URL("/search", this.settings.searxngUrl);
     url.searchParams.set("q", query);
     url.searchParams.set("format", "json");
@@ -33,8 +34,9 @@ export class Searxng implements WebSearch {
       results?: Array<Record<string, unknown>>;
       unresponsive_engines?: unknown[];
     };
-    const results = body.results ?? [];
+    const results = (body.results ?? []).filter((r) => Domains.within(String(r.url ?? ""), scope?.domains));
     return {
+      excerpted: false,
       hits: results.slice(0, maxResults).map((r) => ({
         title: String(r.title ?? ""),
         url: String(r.url ?? ""),

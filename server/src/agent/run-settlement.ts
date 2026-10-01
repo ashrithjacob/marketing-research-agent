@@ -1,23 +1,30 @@
 import type { Usage } from "@earendil-works/pi-ai";
 
 import type { Pricing } from "../adapters/index.js";
-import { Clock, Scope, type ResearchStore, type StagePacket } from "../domain/index.js";
+import { CheckProblems, Clock, Scope, type CheckProblem, type ResearchStore, type StagePacket } from "../domain/index.js";
 
 import type { LedgerPacket } from "./ledger-packet.js";
 import type { LiveRuns } from "./live-runs.js";
+import type { RowRepair } from "./row-repair.js";
 import { Trace } from "../trace/index.js";
 
-/** Decides what a finished run is: completed, invalid, failed or cancelled. */
+/** Decides what a finished run is: completed, invalid, failed or cancelled; a run with rows in its ledger always keeps the packet they make. */
 export class RunSettlement {
   constructor(
     private readonly store: ResearchStore,
     private readonly runs: LiveRuns,
     private readonly runId: string,
     private readonly packet: LedgerPacket,
+    private readonly repair: RowRepair,
   ) {}
 
-  settle(output: string, usage: Usage & { pricing: Pricing }, errorMessage?: string, partProblems: readonly string[] = []): void {
-    Trace.line(import.meta.url, "RunSettlement.settle", { output, usage, errorMessage, partProblems });
+  settle(
+    output: string,
+    usage: Usage & { pricing: Pricing },
+    errorMessage?: string,
+    partProblems: () => readonly CheckProblem[] = () => [],
+  ): void {
+    Trace.line(import.meta.url, "RunSettlement.settle", { output, usage, errorMessage });
     const stopping = this.store.getRun(this.runId)?.status === "stopping";
     this.store.updateRun(this.runId, { output, usage, ended_at: Clock.nowIso() });
 
@@ -33,31 +40,41 @@ export class RunSettlement {
     this.settleFromLedger(usage, partProblems, errorMessage);
   }
 
-  /** Every agent has ended: the packet is built from the whole ledger, and only a failing ledger is invalid. */
-  private settleFromLedger(usage: Usage & { pricing: Pricing }, partProblems: readonly string[], errorMessage?: string): void {
-    Trace.line(import.meta.url, "RunSettlement.settleFromLedger", { errorMessage, partProblems });
-    const assembled = this.packet.assemble();
-    const problems = [...partProblems, ...("problems" in assembled ? assembled.problems : [])];
-    const result = problems.length > 0 ? { problems } : assembled;
-    if ("problems" in result) {
+  /** Settles again a run that ended before rows could be repaired, from the ledger it left; its output, usage and end time stay as they were. */
+  resettle(usage: Usage & { pricing: Pricing }, partProblems: () => readonly CheckProblem[]): void {
+    Trace.line(import.meta.url, "RunSettlement.resettle", { runId: this.runId });
+    this.settleFromLedger(usage, partProblems);
+  }
+
+  /** Every agent has ended: rows that break the contract are retracted into gaps, and whatever parses is kept and shown, even when a problem no single row owns leaves the run invalid. */
+  private settleFromLedger(usage: Usage & { pricing: Pricing }, partProblems: () => readonly CheckProblem[], errorMessage?: string): void {
+    Trace.line(import.meta.url, "RunSettlement.settleFromLedger", { errorMessage });
+    const all = () => [...partProblems(), ...this.packet.assemble().problems];
+    const retracted = this.repair.repair(all, "when the run settled");
+    const { packet } = this.packet.assemble();
+    const problems = CheckProblems.texts(all());
+    if (packet) {
+      this.store.updateRun(this.runId, { packet, packet_source: "ledger" });
+      this.runs.emit(this.runId, "packet.ready", {
+        sources: packet.sources.length,
+        excerpts: packet.excerpts.length,
+        gaps: packet.gaps.length,
+        retracted: retracted.length,
+        via: "ledger",
+      });
+    }
+    if (problems.length > 0 || !packet) {
       if (errorMessage) {
         this.fail(errorMessage);
         return;
       }
-      const error = result.problems.join("; ");
-      this.store.addPacketCheck(this.runId, false, result.problems);
+      const error = problems.join("; ");
+      this.store.addPacketCheck(this.runId, false, problems);
       this.store.updateRun(this.runId, { status: "invalid", error });
       this.runs.emit(this.runId, "packet.invalid", { error });
       return;
     }
-    this.store.updateRun(this.runId, { packet: result.packet, packet_source: "ledger" });
-    this.runs.emit(this.runId, "packet.ready", {
-      sources: result.packet.sources.length,
-      excerpts: result.packet.excerpts.length,
-      gaps: result.packet.gaps.length,
-      via: "ledger",
-    });
-    this.complete(result.packet, usage, errorMessage);
+    this.complete(packet, usage, errorMessage);
   }
 
   private complete(packet: StagePacket, usage: Usage & { pricing: Pricing }, errorMessage?: string): void {

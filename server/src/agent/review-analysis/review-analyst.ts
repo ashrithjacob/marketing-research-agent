@@ -10,25 +10,25 @@ import {
   type ResearchStore,
   type ReviewAnalysis,
 } from "../../domain/index.js";
-import { StageTwoRoster } from "../../extract/index.js";
+import { ReviewMiningRoster } from "../../extract/index.js";
 import { Trace } from "../../trace/index.js";
 
 import { RunError } from "../errors.js";
 import { ModelChain } from "../model-chain.js";
 import { ModelPricing } from "../pricing.js";
-import { StageTwoHandoff } from "../stage-two-handoff.js";
+import { StageOneHandoff } from "../stage-one-handoff.js";
 import { UsageTotals } from "../usage.js";
 
 import { IssueTally } from "./issue-tally.js";
 import { ReviewAnalysisJob } from "./review-analysis-job.js";
 import { StructuredAsk } from "./structured-ask.js";
 
-/** Starts a stage-2 run's review analysis in the background and reports where it stands. */
+/** Starts a review-mining run's review analysis in the background and reports where it stands. */
 export class ReviewAnalyst {
   static readonly MAX_TOKENS = 8000;
 
   private readonly inFlight = new Map<string, Promise<void>>();
-  private readonly handoff: StageTwoHandoff;
+  private readonly handoff: StageOneHandoff;
 
   constructor(
     private readonly store: ResearchStore,
@@ -37,7 +37,7 @@ export class ReviewAnalyst {
     private readonly costs: OpenRouterPrices,
   ) {
     Trace.line(import.meta.url, "ReviewAnalyst.constructor");
-    this.handoff = new StageTwoHandoff(store);
+    this.handoff = new StageOneHandoff(store);
   }
 
   read(runId: string): ReviewAnalysis | null {
@@ -59,7 +59,7 @@ export class ReviewAnalyst {
     if ("unknown" in resolved) throw new RunError(`unknown model ${JSON.stringify(resolved.unknown)} for provider openrouter`);
     const brief = Briefs.normalise(briefSchema.parse(run.brief));
     const source = this.handoff.forRun(run);
-    const roster = source ? StageTwoRoster.of(source.packet) : [];
+    const roster = source ? ReviewMiningRoster.of(source.packet) : [];
     const pending = ReviewAnalyst.pending(run.id, this.settings.model);
     this.store.saveReviewAnalysis(pending);
     let usage: Usage = UsageTotals.empty();

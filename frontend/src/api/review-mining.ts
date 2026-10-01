@@ -1,4 +1,4 @@
-/** The stage-2 plan: what stage 1 found, and what mining it costs. Mirrors the server's `/stage2/plan`. */
+/** The review-mining plan: what stage 1 found, and what mining it costs. Mirrors the server's `/review-mining/plan`. */
 
 export interface MiningTarget {
   id: string;
@@ -60,7 +60,7 @@ export interface TargetListing {
   trustpilot?: TrustpilotSummary | null;
 }
 
-export interface StageTwoEstimate {
+export interface ReviewMiningEstimate {
   targets: number;
   reviews_per_target: number;
   bands: number;
@@ -71,19 +71,19 @@ export interface StageTwoEstimate {
   arithmetic: string;
 }
 
-export interface StageTwoPlan {
+export interface ReviewMiningPlan {
   source_run_id: string;
   subject: MiningTarget;
-  /** Every target stage 2 can mine: a matched Amazon listing, else its own Trustpilot domain. */
+  /** Every target review mining can mine: a matched Amazon listing, else its own Trustpilot domain. */
   offered: MiningTarget[];
   targets: MiningTarget[];
-  estimate: StageTwoEstimate;
+  estimate: ReviewMiningEstimate;
 }
 
-export interface StageTwoPlanResponse {
+export interface ReviewMiningPlanResponse {
   ready: boolean;
   detail?: string;
-  plan?: StageTwoPlan;
+  plan?: ReviewMiningPlan;
   listings?: TargetListing[];
   lookup_available?: boolean;
   lookup_needed?: boolean;
