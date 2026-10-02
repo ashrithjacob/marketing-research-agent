@@ -17,9 +17,10 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { OpenRouterPrices } from "../src/adapters/index.js";
 import { RunSupervisor } from "../src/agent/index.js";
-import { CheckProblems, RejectKinds, StageOnePlans } from "../src/domain/index.js";
+import { COMPETITORS_DELIVERABLE, CheckProblems, RejectKinds, StageOnePlans } from "../src/domain/index.js";
 import { DEFAULT_RETRY, Retries } from "../src/agent/retry.js";
-import { NodeDone } from "../src/agent/done-check.js";
+import { DoneChecks } from "../src/agent/done-check.js";
+import { DeliverableChecks } from "../src/extract/index.js";
 import { LimitClose } from "../src/agent/limit-close.js";
 import { RowRepair } from "../src/agent/row-repair.js";
 import { RunFindings } from "../src/agent/run-findings.js";
@@ -189,13 +190,18 @@ describe("settling a run", () => {
       name: "Mullein Drops",
       form: "liquid",
       actives: ["mullein"],
+      icp: "adults with a cough",
       source_id: "sha256:aaa",
       runner_up_name: null,
       runner_up_reviews: null,
     };
     const packet = productPacket({
       competitor_reference: reference,
-      gaps: [{ node: "competitors", missing: "no competitor researched", would_need: "time" }],
+      gaps: [
+        { node: "competitors", missing: "no competitor researched", would_need: "time" },
+        { node: "competitors", missing: "saturation: direct: no competitor researched", would_need: "time" },
+        { node: "competitors", missing: "saturation: indirect: no competitor researched", would_need: "time" },
+      ],
       nodes: [{ node: "competitors", status: "incomplete", done_criterion_met: false, why: "test" }],
     });
     packet.sources[0].node = "competitors";
@@ -1110,8 +1116,8 @@ describe("the two steps of a stage-1 run", () => {
     findings.record("saturation", curve("direct"));
     findings.record("saturation", curve("indirect"));
     findings.record("node_status", statusRow);
-    const check = new NodeDone(findings, { brief: genre, node: "competitors", champion: "champion" });
-    const closed = new LimitClose(findings, new RowRepair(store.findings, runId, ["competitors"]), check, "competitors", 20).close();
+    const check = DoneChecks.of("competitors", findings, genre, ["competitors"]);
+    const closed = new LimitClose(findings, new RowRepair(store.findings, runId, ["competitors"]), check, DeliverableChecks.of(COMPETITORS_DELIVERABLE), "competitors", 20).close();
     expect(closed.retracted.map((id) => id.replace(/\d+$/, ""))).toEqual(["sat", "sat", "ns"]);
     expect(findings.own().find((row) => row.kind === "node_status")!.payload).toMatchObject({ status: "incomplete" });
     expect(CheckProblems.texts(check.problems()).filter((p) => /saturation|complete with no/.test(p))).toEqual([]);
@@ -1122,7 +1128,7 @@ describe("the two steps of a stage-1 run", () => {
     const findings = new RunFindings(store.findings, runId, "competitors", ["competitors"]);
     findings.record("saturation", { node: "competitors", class: "direct", curve: [{ source_id: "sha256:never-recorded", new_themes: 0, cumulative_themes: 1 }] });
     findings.record("node_status", { node: "competitors", status: "complete", done_criterion_met: true, why: "saturated" });
-    const check = new NodeDone(findings, { brief: genre, node: "competitors", champion: "champion" });
+    const check = DoneChecks.of("competitors", findings, genre, ["competitors"]);
     new RowRepair(store.findings, runId, ["competitors"]).repair(() => check.problems(), "when the run settled");
     expect(findings.own().filter((row) => row.kind === "node_status").map((row) => row.payload)).toEqual([
       expect.objectContaining({ status: "incomplete", why: "its status was retracted when the run settled" }),
@@ -1182,12 +1188,16 @@ describe("the Amazon listings of a completed stage-1 run", () => {
       competitors: [
         {
           id: "c1", name: "Herb Pharm Mullein Blend", brand: "Herb Pharm", url: "https://herb-pharm.com/mullein",
-          relation: "direct", form: "liquid", shared_actives: ["mullein"], icp_as_printed: "for coughs and chest congestion", source_id: "sha256:aaa",
+          relation: "direct", form: "liquid", shared_actives: ["mullein"], form_as_printed: "as printed", icp_as_printed: "for coughs and chest congestion", source_id: "sha256:aaa",
           active_ingredients: [{ name_as_printed: "Mullein", name_normalised: "mullein" }],
         },
       ],
       nodes: [{ node: "competitors", status: "incomplete", done_criterion_met: false, why: "one competitor" }],
-      gaps: [{ node: "competitors", missing: "no ad library entries" }],
+      gaps: [
+        { node: "competitors", missing: "no ad library entries" },
+        { node: "competitors", missing: "saturation: direct: one competitor only" },
+        { node: "competitors", missing: "saturation: indirect: one competitor only" },
+      ],
     });
   const searches: string[] = [];
   const actors = {

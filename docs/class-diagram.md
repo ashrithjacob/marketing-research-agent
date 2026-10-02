@@ -435,13 +435,20 @@ classDiagram
     class CompetitorCheck {
       problems()
     }
-    class CompetitorIcp {
-      problems()
-    }
     class CompletenessCheck {
       problems()
     }
     class CostReports {
+      of()
+    }
+    class Missing {
+      <<interface>>
+    }
+    class DeliverableCheck {
+      <<interface>>
+      missing()
+    }
+    class DeliverableChecks {
       of()
     }
     class DoseBands {
@@ -453,11 +460,7 @@ classDiagram
     }
     class PacketError {
     }
-    class Missing {
-      <<interface>>
-    }
     class FieldsCheck {
-      missingOn()
       missing()
       gapped()
     }
@@ -467,6 +470,10 @@ classDiagram
     class LatestRows {
       payloads()
       rows()
+    }
+    class ListCheck {
+      missing()
+      parts()
     }
     class MarketCheck {
       problems()
@@ -1372,6 +1379,7 @@ classDiagram
   BilledCosts --> ResearchStore
   BilledCosts --> LiveRuns
   NodeDone --> RunFindings
+  NodeDone --> DeliverableCheck
   ChampionDone --> RunFindings
   AgentEventRecorder --> LiveRuns
   AgentEventRecorder --> ToolSteps
@@ -1380,6 +1388,7 @@ classDiagram
   LimitClose --> RunFindings
   LimitClose --> RowRepair
   LimitClose --> DoneCheck
+  LimitClose --> DeliverableCheck
   LiveRuns --> ResearchStore
   OperatorInputs --> FindingLedger
   ModelPricing --> OpenRouterPrices
@@ -1462,6 +1471,7 @@ classDiagram
   TruthLimitClose --> DoneCheck
   PacketError --> CheckProblem
   FieldsCheck --> FieldsDeliverable
+  ListCheck --> ListDeliverable
   PacketAssembly --> Finding
   ProductTruthAssembly --> Finding
   ProductTruthCoverage --> Finding
@@ -1663,15 +1673,16 @@ classDiagram
 | `extract` | `extract/check.ts` | PacketContext, PacketCheck |
 | `extract` | `extract/citation-check.ts` | CitationCheck |
 | `extract` | `extract/competitor-check.ts` | CompetitorCheck |
-| `extract` | `extract/competitor-icp.ts` | CompetitorIcp |
 | `extract` | `extract/completeness-check.ts` | CompletenessCheck |
 | `extract` | `extract/cost-reports.ts` | CostReports |
+| `extract` | `extract/deliverable-check.ts` | Missing, DeliverableCheck, DeliverableChecks |
 | `extract` | `extract/dose-bands.ts` | DoseBands |
 | `extract` | `extract/draft.ts` | PacketDraft |
 | `extract` | `extract/errors.ts` | PacketError |
-| `extract` | `extract/fields-check.ts` | Missing, FieldsCheck |
+| `extract` | `extract/fields-check.ts` | FieldsCheck |
 | `extract` | `extract/finding-check.ts` | FindingCheck |
 | `extract` | `extract/latest-rows.ts` | LatestRows |
+| `extract` | `extract/list-check.ts` | ListCheck |
 | `extract` | `extract/market-check.ts` | MarketCheck |
 | `extract` | `extract/names.ts` | Names, BrandLabels, Relations |
 | `extract` | `extract/packet-assembly.ts` | PacketAssembly |

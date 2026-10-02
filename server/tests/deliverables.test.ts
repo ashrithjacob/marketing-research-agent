@@ -6,8 +6,10 @@
 import { describe, expect, it } from "vitest";
 
 import { DeliverableTable, PromptBuilder } from "../src/agent/prompt/index.js";
-import { CATEGORY_DELIVERABLE, FORMULA_DELIVERABLE, PRODUCT_DELIVERABLE, STAGE_NODES, briefSchema, type Finding, type FindingKind } from "../src/domain/index.js";
-import { FieldsCheck } from "../src/extract/index.js";
+import { RunFindings } from "../src/agent/run-findings.js";
+import { MemoryLedger } from "./fixtures.js";
+import { CATEGORY_DELIVERABLE, COMPETITORS_DELIVERABLE, FORMULA_DELIVERABLE, PRODUCT_DELIVERABLE, STAGE_NODES, briefSchema, type Finding, type FindingKind } from "../src/domain/index.js";
+import { FieldsCheck, ListCheck } from "../src/extract/index.js";
 
 let seq = 0;
 const row = (kind: FindingKind, payload: Record<string, unknown>): Finding => {
@@ -75,5 +77,47 @@ describe("FieldsCheck", () => {
     const regimen = (perDay: number | null) => row("regimen", { servings_per_day: perDay, servings_per_container: 30 });
     expect(formula.missing([row("active", { name: "mullein" }), regimen(2)])).toEqual([]);
     expect(formula.missing([row("active", { name: "mullein" }), regimen(2), regimen(null)]).map((m) => m.key)).toEqual(["servings_per_day"]);
+  });
+});
+
+describe("ListCheck", () => {
+  const competitors = new ListCheck(COMPETITORS_DELIVERABLE);
+  const point = (n: number, added: number) => ({ source_id: `sha256:s${n}`, new_themes: added, cumulative_themes: 0 });
+  const curve = (cls: string, added: number[]) => row("saturation", { node: "competitors", class: cls, curve: added.map((a, i) => point(i, a)) });
+  const saturated = curve("indirect", [2, 0, 0, 0]);
+
+  it("refuses a class whose curve ends on two quiet sources, as run f7b10adb's did and passed", () => {
+    // Mullevia, 2026-10-02: the direct curve ended 1, 0, 0 and the node was
+    // reported complete; the rule is three sources in a row adding nothing.
+    const open = competitors.missing([curve("direct", [3, 1, 0, 0]), saturated]);
+    expect(open.map((m) => m.key)).toEqual(["saturation: direct"]);
+    expect(open[0]!.text).toMatch(/ends in 2 sources in a row adding nothing; it is saturated after 3/);
+  });
+
+  it("accepts three quiet sources in a row, or a gap naming the class", () => {
+    expect(competitors.missing([curve("direct", [3, 0, 0, 0]), saturated])).toEqual([]);
+    expect(competitors.missing([row("gap", { node: "competitors", missing: "saturation: direct: only two brands sell this" }), saturated])).toEqual([]);
+  });
+
+  it("asks for a curve per class when none is recorded", () => {
+    expect(competitors.missing([]).map((m) => m.text)).toEqual([
+      expect.stringMatching(/^no direct saturation curve is recorded/),
+      expect.stringMatching(/^no indirect saturation curve is recorded/),
+    ]);
+  });
+
+  it("names a competitor missing a required part, tied to its row; an optional part may be empty", () => {
+    const item = row("competitor", { node: "competitors", id: "c4", name: "Herbify", form_as_printed: "drops", icp_as_printed: "", price: "" });
+    const open = competitors.missing([item, curve("direct", [0, 0, 0]), saturated]);
+    expect(open).toEqual([{ key: "competitor c4", text: "competitor 'Herbify' has no icp_as_printed — record who its own page says it is for and what it treats, word for word", row: { kind: "competitor", key: "c4" } }]);
+  });
+});
+
+describe("a competitor row missing a required part", () => {
+  it("is refused when it is written, with or without a champion to compare against", () => {
+    const findings = new RunFindings(new MemoryLedger(), "r", "competitors", ["competitors"]);
+    const competitor = { id: "c1", name: "Herbify", url: "https://herbify.example", relation: "direct", form: "liquid", active_ingredients: [{ name_as_printed: "Mullein", name_normalised: "mullein" }], shared_actives: [], icp_as_printed: "for coughs", source_id: "sha256:a" };
+    expect(findings.record("competitor", competitor)).toEqual({ problems: "competitor 'Herbify' has no form_as_printed — record what the product physically is, as printed" });
+    expect(findings.record("competitor", { ...competitor, form_as_printed: "1 fl oz drops" })).toHaveProperty("recorded");
   });
 });

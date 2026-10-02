@@ -3,13 +3,17 @@ import { CheckProblems, Briefs, type CheckProblem, type StagePacket } from "../d
 import type { PacketCheck, PacketContext } from "./check.js";
 import { Trace } from "../trace/index.js";
 
-/** The champion must be the genre's most-bought listing, with the ranking that proves it. */
+/** The champion must say who its customer is, since every competitor is measured against that; and on a genre brief it must be the most-bought listing, with the ranking that proves it. */
 export class ChampionCheck implements PacketCheck {
   private static readonly RANKING_GAP = /champion ranking unavailable/i;
 
   problems(packet: StagePacket, context: PacketContext): CheckProblem[] {
     Trace.line(import.meta.url, "ChampionCheck.problems", { packet });
-    return this.texts(packet, context).map(CheckProblems.of);
+    const reference = packet.competitor_reference;
+    const customer = reference && !reference.icp.trim()
+      ? [CheckProblems.at("competitor_reference", reference, `the champion '${reference.name}' records no icp — who its page says the product is for and the problem it solves, in its own words; every competitor is measured against it`)]
+      : [];
+    return [...customer, ...this.texts(packet, context).map(CheckProblems.of)];
   }
 
   private texts(packet: StagePacket, { brief }: PacketContext): string[] {

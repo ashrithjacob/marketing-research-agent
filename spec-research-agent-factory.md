@@ -983,3 +983,27 @@ does too.
 - **The competitors and champion parts are still checked as before** in this
   phase: `FieldsCheck.missingOn(node, rows)` finds the stage-1 `fields`
   deliverable for a node, and competitors' is a `list`.
+
+**Phase 4 (2026-10-03).** `ListCheck` (`extract/list-check.ts`) and the
+`DeliverableCheck` interface with `DeliverableChecks.of`
+(`extract/deliverable-check.ts`). `NodeDone` and `LimitClose` are handed the
+role's deliverable check instead of looking one up by node, so
+`FieldsCheck.missingOn` is gone. Deleted: `CompetitorIcp`. Tests in
+`tests/deliverables.test.ts`, including run `f7b10adb`'s curve (…, 0, 0) refused.
+
+- **A class is done by saturation or by a gap.** `finish` now requires, per
+  class, a curve ending in three sources in a row adding nothing, or a gap whose
+  `missing` starts "saturation: <class>" — the same "recorded or gapped" rule the
+  fields use. Before, a curve was required only once the agent called the node
+  complete, and its length was never counted. `COMPETITORS_TASK` says how to gap
+  a class; at the turn limit `LimitClose` gaps each unsaturated class.
+- **`form_as_printed` is now required on every competitor**, as the §4.2 example
+  declared, alongside `icp_as_printed`; both are refused at write time
+  (`RowPicks` → `ListCheck.parts`), whether or not a champion is recorded yet.
+  An item missing a part is tied to its row, so at settlement or the limit the
+  row is retracted rather than gapped.
+- **`CompetitorIcp`'s other half moved to the champion.** It also refused every
+  competitor while the champion lacked an `icp`, which the competitors agent
+  could not fix. `ChampionCheck` now flags a champion with no `icp` on its own
+  row, so the champion agent cannot finish without one and settlement retracts
+  such a row.

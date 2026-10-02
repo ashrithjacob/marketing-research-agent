@@ -1,4 +1,5 @@
 import { Roles, type Brief, type Node, type ProductTruthAgent, type RoleSpec, type StageOneAgent } from "../domain/index.js";
+import { DeliverableChecks } from "../extract/index.js";
 import { Trace } from "../trace/index.js";
 
 import { DoneChecks, type DoneCheck } from "./done-check.js";
@@ -21,8 +22,11 @@ export class RoleChecks {
     switch (role.consistency) {
       case "champion":
         return null;
-      case "stage_one_node":
-        return () => new LimitClose(findings, repair, check, Roles.node(role, run.nodes), role.maxTurns).close();
+      case "stage_one_node": {
+        const deliverable = role.deliverable;
+        if (deliverable.shape === "per_item") return null;
+        return () => new LimitClose(findings, repair, check, DeliverableChecks.of(deliverable), Roles.node(role, run.nodes), role.maxTurns).close();
+      }
       case "product_truth": {
         const part = { agent: role.id as ProductTruthAgent, node: Roles.node(role, run.nodes), markets: run.markets };
         return () => new TruthLimitClose(findings, repair, check, part, role.maxTurns).close();

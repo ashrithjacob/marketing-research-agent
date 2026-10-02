@@ -1,5 +1,5 @@
 import type { Node } from "../domain/index.js";
-import { FieldsCheck } from "../extract/index.js";
+import type { DeliverableCheck } from "../extract/index.js";
 import { Trace } from "../trace/index.js";
 
 import type { DoneCheck } from "./done-check.js";
@@ -11,12 +11,13 @@ export interface LimitClosed {
   retracted: string[];
 }
 
-/** Closes an agent its turn limit ended, with no turn left to repair: its own rows that break the contract are retracted with a gap each, every field still open is gapped, and a node it left unreported is marked incomplete. */
+/** Closes an agent its turn limit ended, with no turn left to repair: its own rows that break the contract are retracted with a gap each, everything its deliverable still lacks is gapped, and a node it left unreported is marked incomplete. */
 export class LimitClose {
   constructor(
     private readonly findings: RunFindings,
     private readonly repair: RowRepair,
     private readonly check: DoneCheck,
+    private readonly deliverable: DeliverableCheck,
     private readonly node: Node,
     private readonly limit: number,
   ) {}
@@ -31,7 +32,7 @@ export class LimitClose {
     Trace.line(import.meta.url, "LimitClose.gapOpen", { node: this.node });
     const { findings, node } = this;
     const why = `not found within the ${this.limit}-call limit`;
-    const open = FieldsCheck.missingOn(node, findings.own()).map((missing) => missing.key);
+    const open = this.deliverable.missing(findings.own()).filter((missing) => !missing.row).map((missing) => missing.key);
     for (const field of open) findings.record("gap", { node, missing: `${field}: ${why}`, would_need: "a longer search" });
     const own = findings.own();
     if (!own.some((row) => row.kind === "gap")) findings.record("gap", { node, missing: `research stopped: ${why}`, would_need: "a longer search" });

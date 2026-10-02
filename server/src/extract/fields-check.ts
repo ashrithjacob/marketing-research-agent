@@ -1,22 +1,11 @@
-import { Findings, ROLES, type FieldSpec, type FieldsDeliverable, type Finding, type Node } from "../domain/index.js";
+import { Findings, type FieldSpec, type FieldsDeliverable, type Finding } from "../domain/index.js";
 import { Trace } from "../trace/index.js";
 
-/** Something a deliverable still lacks: the key a gap must start with to close it, and what to tell the agent. */
-export interface Missing {
-  key: string;
-  text: string;
-}
+import type { DeliverableCheck, Missing } from "./deliverable-check.js";
 
 /** What a `fields` deliverable still lacks: each required field with no row that fills it and no gap on its node whose `missing` starts with its key. */
-export class FieldsCheck {
+export class FieldsCheck implements DeliverableCheck {
   constructor(private readonly deliverable: FieldsDeliverable) {}
-
-  /** What the stage-1 node's `fields` deliverable still lacks; nothing for a node whose deliverable is another shape. */
-  static missingOn(node: Node, rows: readonly Finding[]): Missing[] {
-    Trace.line(import.meta.url, "FieldsCheck.missingOn", { node });
-    const deliverable = ROLES.find((role) => role.stage === 1 && role.deliverable.node === node)?.deliverable;
-    return deliverable?.shape === "fields" ? new FieldsCheck(deliverable).missing(rows) : [];
-  }
 
   missing(rows: readonly Finding[]): Missing[] {
     Trace.line(import.meta.url, "FieldsCheck.missing", { node: this.deliverable.node, rows: rows.length });

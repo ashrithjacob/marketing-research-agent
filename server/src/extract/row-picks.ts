@@ -1,7 +1,7 @@
-import { Findings, type Finding, type FindingKind } from "../domain/index.js";
+import { COMPETITORS_DELIVERABLE, Findings, type Finding, type FindingKind } from "../domain/index.js";
 import { Trace } from "../trace/index.js";
 
-import { CompetitorIcp } from "./competitor-icp.js";
+import { ListCheck } from "./list-check.js";
 import { SharedActives } from "./shared-actives.js";
 
 /** A row that names something another row or the brief already holds — the champion's actives, the formula's actives, the brief's markets — must name it as written there; checked when it is written, so a wrong pick is refused on the turn it is made. */
@@ -23,14 +23,12 @@ export class RowPicks {
 
   private static competitor(payload: Record<string, unknown>, live: readonly Finding[]): string[] {
     Trace.line(import.meta.url, "RowPicks.competitor", { id: payload.id });
+    const parts = ListCheck.parts(COMPETITORS_DELIVERABLE, payload);
     const champion = live.find((row) => row.kind === "competitor_reference");
-    if (!champion) return [];
+    if (!champion) return parts;
     const actives = (champion.payload.actives as string[] | undefined) ?? [];
     const label = `competitor '${String(payload.name ?? payload.id)}'`;
-    return [
-      ...SharedActives.problems(label, (payload.shared_actives as string[] | undefined) ?? [], actives),
-      ...CompetitorIcp.problems(label, String(payload.icp_as_printed ?? ""), String(champion.payload.icp ?? "")),
-    ];
+    return [...SharedActives.problems(label, (payload.shared_actives as string[] | undefined) ?? [], actives), ...parts];
   }
 
   private static active(kind: FindingKind, payload: Record<string, unknown>, live: readonly Finding[]): string[] {

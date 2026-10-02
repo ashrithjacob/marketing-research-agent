@@ -160,6 +160,8 @@ How to work:
 4. Stop per class: a class is done when three sources in a row surface no new
    brand of that class. \`record_saturation\` twice, \`class\` "direct" and
    "indirect", each point a source with \`new_themes\` = new brands it added.
+   A class you cannot saturate is a \`record_gap\` with missing
+   "saturation: <class>: <why>".
 5. \`record_node_status\` (\`complete\` only if both classes saturated), gaps,
    then \`finish\`.
 

@@ -389,8 +389,8 @@ describe("validation: competitors, direct and indirect", () => {
       source_id: "sha256:ref",
     };
     data.competitors = [
-      { id: "c1", name: "CalmWell 400", url: "https://calmwell.example/p", relation: "direct", form: "capsule", active_ingredients: [active], shared_actives: ["magnesium glycinate"], icp_as_printed: "for restless nights", positioning_copy: "Sleep through.", source_id: "sha256:cw", ad_source_ids: ["sha256:ad"] },
-      { id: "c2", name: "SleepMist spray", url: "https://sleepmist.example/p", relation: "indirect", form: "spray", active_ingredients: [active], shared_actives: ["Magnesium Glycinate"], icp_as_printed: "for restless nights", source_id: "sha256:sm" },
+      { id: "c1", name: "CalmWell 400", url: "https://calmwell.example/p", relation: "direct", form: "capsule", active_ingredients: [active], shared_actives: ["magnesium glycinate"], form_as_printed: "as printed", icp_as_printed: "for restless nights", positioning_copy: "Sleep through.", source_id: "sha256:cw", ad_source_ids: ["sha256:ad"] },
+      { id: "c2", name: "SleepMist spray", url: "https://sleepmist.example/p", relation: "indirect", form: "spray", active_ingredients: [active], shared_actives: ["Magnesium Glycinate"], form_as_printed: "spray", icp_as_printed: "for restless nights", source_id: "sha256:sm" },
     ];
     return data;
   };
@@ -475,7 +475,7 @@ describe("validation: competitors, direct and indirect", () => {
     expect(() => packets.validate(data)).toThrow(/competitor 'CalmWell 400' has no icp_as_printed/);
     const noIcp = withCompetitors();
     noIcp.competitor_reference.icp = "";
-    expect(() => packets.validate(noIcp)).toThrow(/the champion records no icp/);
+    expect(() => packets.validate(noIcp)).toThrow(/the champion 'MagnaCalm 400mg' records no icp/);
   });
 
   it("takes shared actives as picks from the champion's list, whatever the competitor's page calls them", () => {
@@ -559,7 +559,7 @@ describe("validation: the champion is the genre's most-bought", () => {
       runner_up_reviews: 9211,
     };
     data.competitors = [
-      { id: "c1", name: "CalmWell 400", url: "https://calmwell.example/p", relation: "direct", form: "capsule", active_ingredients: [active], shared_actives: ["magnesium glycinate"], icp_as_printed: "for restless nights", positioning_copy: "Sleep through.", market: "UK", source_id: "sha256:cw", ad_source_ids: [] },
+      { id: "c1", name: "CalmWell 400", url: "https://calmwell.example/p", relation: "direct", form: "capsule", active_ingredients: [active], shared_actives: ["magnesium glycinate"], form_as_printed: "as printed", icp_as_printed: "for restless nights", positioning_copy: "Sleep through.", market: "UK", source_id: "sha256:cw", ad_source_ids: [] },
     ];
     return data;
   };

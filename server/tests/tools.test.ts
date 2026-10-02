@@ -30,7 +30,7 @@ import {
   WebFetchTool,
   type ToolContext,
 } from "../src/agent/tools/index.js";
-import { AgentRoster, ChampionDone, NodeDone, RunFindings } from "../src/agent/index.js";
+import { AgentRoster, DoneChecks, RunFindings } from "../src/agent/index.js";
 import { ServiceClients } from "../src/adapters/index.js";
 import {
   STAGE_NODES,
@@ -462,10 +462,7 @@ describe("the ledger tools", () => {
     const ledger = options.ledger ?? new MemoryLedger();
     const node = StageOnePlans.nodeOf(agent, nodes);
     const findings = new RunFindings(ledger, "run-l", agent, [node]);
-    const check =
-      agent === "champion"
-        ? new ChampionDone(findings, brief)
-        : new NodeDone(findings, { brief, node, champion: agent === "competitors" ? "champion" : null });
+    const check = DoneChecks.of(agent, findings, brief, nodes);
     const checked: Array<{ valid: boolean; problems: readonly string[] }> = [];
     const list = new LedgerToolset({
       findings,
@@ -569,7 +566,7 @@ describe("the ledger tools", () => {
     const competitor = {
       id: "c3", name: "HERBIFY Mullein", url: "https://herbify.example", relation: "direct", form: "liquid",
       active_ingredients: [{ name_as_printed: "Mullein", name_normalised: "mullein" }],
-      shared_actives: ["mullein"], icp_as_printed: "for coughs and chest congestion", source_id: "sha256:ccc",
+      shared_actives: ["mullein"], form_as_printed: "as printed", icp_as_printed: "for coughs and chest congestion", source_id: "sha256:ccc",
     };
     expect(text(await tool("record_competitor").execute("1", { item: competitor }))).toBe("RECORDED co1");
     expect(ledger.rows[0]!.entity).toBe("c3");
@@ -587,7 +584,7 @@ describe("the ledger tools", () => {
     const row = {
       id: "c1", name: "HERBIFY Mullein Drops", url: "https://herbify.example", relation: "direct", form: "liquid",
       active_ingredients: [{ name_as_printed: "Mullein Leaf Extract", name_normalised: "mullein leaf extract" }],
-      shared_actives: ["mullein leaf extract"], icp_as_printed: "for coughs and chest congestion", source_id: "sha256:ccc",
+      shared_actives: ["mullein leaf extract"], form_as_printed: "as printed", icp_as_printed: "for coughs and chest congestion", source_id: "sha256:ccc",
     };
     expect(text(await competitors.tool("record_competitor").execute("1", { item: row }))).toMatch(
       /^NOT RECORDED — competitor 'HERBIFY Mullein Drops' lists 'mullein leaf extract' as shared, but shared_actives must be copied word for word from the champion's actives: mullein leaf extract \(wildcrafted mullein leaf\), ginger/,
@@ -709,7 +706,7 @@ describe("the ledger tools", () => {
     expect(text(await tool("finish").execute("0", {}))).toContain("1. no champion is recorded");
     const source = { ...minimalPacket().sources[0], node: "competitors" };
     await tool("record_source").execute("1", { item: source });
-    const reference = { name: "MagnaCalm Glycinate", form: "capsule", actives: ["magnesium glycinate"], source_id: "sha256:aaa" };
+    const reference = { name: "MagnaCalm Glycinate", form: "capsule", actives: ["magnesium glycinate"], icp: "adults who sleep badly", source_id: "sha256:aaa" };
     await tool("record_reference").execute("2", { item: reference });
     expect(text(await tool("finish").execute("3", {}))).toMatch(/carries no popularity evidence/);
     await tool("record_reference").execute("4", {

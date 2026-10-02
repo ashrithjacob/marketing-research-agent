@@ -1,5 +1,5 @@
-import { CheckProblems, StageOnePlans, stagePacketSchema, type Brief, type CheckProblem, type Finding, type Node, type StageOneAgent } from "../domain/index.js";
-import { ChampionCheck, FieldsCheck, PacketAssembly, PacketError, PacketValidator, ZodProblems } from "../extract/index.js";
+import { CheckProblems, Roles, StageOnePlans, stagePacketSchema, type Brief, type CheckProblem, type Finding, type Node, type StageOneAgent } from "../domain/index.js";
+import { ChampionCheck, DeliverableChecks, PacketAssembly, PacketError, PacketValidator, ZodProblems, type DeliverableCheck } from "../extract/index.js";
 import { Trace } from "../trace/index.js";
 
 import type { RunFindings } from "./run-findings.js";
@@ -8,11 +8,12 @@ export interface DoneCheck {
   problems(): CheckProblem[];
 }
 
-/** A step-2 agent is done when its own rows, with the champion's when it measures against it, pass the contract for its node. */
+/** A step-2 agent is done when its deliverable lacks nothing and its own rows, with the champion's when it measures against it, pass the contract for its node. */
 export class NodeDone implements DoneCheck {
   constructor(
     private readonly findings: RunFindings,
     private readonly run: { brief: Brief; node: Node; champion: string | null },
+    private readonly deliverable: DeliverableCheck,
   ) {}
 
   problems(): CheckProblem[] {
@@ -20,7 +21,7 @@ export class NodeDone implements DoneCheck {
     const { brief, node, champion } = this.run;
     const rows = this.findings.live().filter((row) => row.agent_id === this.findings.agentId || row.agent_id === champion);
     const draft = new PacketAssembly(rows).draft({ runId: this.findings.runId, brief, nodes: [node] });
-    const unfilled = FieldsCheck.missingOn(node, rows).map((missing) => CheckProblems.of(missing.text));
+    const unfilled = this.deliverable.missing(rows).map((missing) => ({ text: missing.text, row: missing.row ?? null }));
     try {
       new PacketValidator().validate(draft, [node], brief);
       return unfilled;
@@ -61,6 +62,8 @@ export class DoneChecks {
     Trace.line(import.meta.url, "DoneChecks.of", { id });
     if (id === "champion") return new ChampionDone(findings, brief);
     const node = StageOnePlans.nodeOf(id, nodes);
-    return new NodeDone(findings, { brief, node, champion: id === "competitors" ? "champion" : null });
+    const deliverable = Roles.of(id).deliverable;
+    if (deliverable.shape === "per_item") throw new Error(`${id} is not a stage-1 node role`);
+    return new NodeDone(findings, { brief, node, champion: id === "competitors" ? "champion" : null }, DeliverableChecks.of(deliverable));
   }
 }
