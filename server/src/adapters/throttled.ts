@@ -1,4 +1,4 @@
-import type { FetchedPage, PageFetcher, SearchPage, SearchScope, WebSearch } from "../domain/index.js";
+import type { AdLibrary, AdPage, AdQuery, FetchedPage, PageFetcher, SearchPage, SearchScope, WebSearch } from "../domain/index.js";
 import { Trace } from "../trace/index.js";
 
 import type { ActorRun, ActorRunner } from "./apify/index.js";
@@ -42,5 +42,17 @@ export class ThrottledActorRunner implements ActorRunner {
   ): Promise<ActorRun> {
     Trace.line(import.meta.url, "ThrottledActorRunner.run", { actorId, maxTotalChargeUsd });
     return this.queue.run(() => this.inner.run(actorId, input, maxTotalChargeUsd, signal), signal);
+  }
+}
+
+export class ThrottledAdLibrary implements AdLibrary {
+  constructor(
+    private readonly inner: AdLibrary,
+    private readonly queue: ServiceQueue,
+  ) {}
+
+  search(query: AdQuery, signal?: AbortSignal): Promise<AdPage> {
+    Trace.line(import.meta.url, "ThrottledAdLibrary.search", { terms: query.terms });
+    return this.queue.run(() => this.inner.search(query, signal), signal);
   }
 }

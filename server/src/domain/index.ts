@@ -9,6 +9,8 @@ export * from "./finding-kinds.js";
 export * from "./findings.js";
 export * from "./check-problem.js";
 export * from "./web.js";
+export * from "./competitor-discovery.js";
+export * from "./ad-library.js";
 export * from "./review-mining.js";
 export * from "./request.js";
 export * from "./records.js";

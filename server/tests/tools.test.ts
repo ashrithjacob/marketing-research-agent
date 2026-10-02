@@ -24,6 +24,7 @@ import {
 } from "../src/adapters/apify/index.js";
 import { Env, type Settings } from "../src/config/index.js";
 import {
+  DiscoverCompetitorsTool,
   ResearchToolset,
   WebFetchTool,
 } from "../src/agent/tools/index.js";
@@ -47,7 +48,8 @@ beforeEach(() => {
   settings = {
     ...Env.settings(),
     corpusPath: join(dir, "corpus"),
-    searxngUrl: "http://searxng.test",
+    parallelApiKey: "pk-test",
+    parallelBaseUrl: "https://parallel.test",
     firecrawlApiKey: "test-key",
     firecrawlBaseUrl: "https://firecrawl.test",
     fetchCharLimit: 100,
@@ -75,28 +77,34 @@ const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 
 describe("web_search", () => {
-  it("reads SearXNG's json results", async () => {
-    stubFetch((url) => {
-      expect(url).toContain("format=json");
-      expect(url).toContain("q=magnesium");
+  const sent = (init?: RequestInit) => JSON.parse(String(init?.body));
+
+  it("searches through Parallel and shows each hit's excerpts", async () => {
+    stubFetch((url, init) => {
+      expect(url).toBe("https://parallel.test/v1/search");
+      expect(sent(init).search_queries).toEqual(["magnesium"]);
       return json({
         results: [
-          { title: "A", url: "https://a.example", content: "snippet a" },
-          { title: "B", url: "https://b.example", content: "snippet b" },
+          { title: "A", url: "https://a.example", excerpts: ["excerpt a"] },
+          { title: "B", url: "https://b.example", excerpts: ["excerpt b"] },
         ],
       });
     });
     const result = await tools().search.execute("1", { query: "magnesium" });
     expect(result.details.hits).toHaveLength(2);
     expect((result.content[0] as any).text).toContain("https://a.example");
+    expect((result.content[0] as any).text).toContain("excerpt a");
   });
 
   it("honours max_results and clamps it", async () => {
-    stubFetch(() =>
-      json({ results: Array.from({ length: 40 }, (_, i) => ({ title: `${i}`, url: `https://${i}.example`, content: "" })) }),
-    );
-    expect((await tools().search.execute("1", { query: "x", max_results: 3 })).details.hits).toHaveLength(3);
-    expect((await tools().search.execute("1", { query: "x", max_results: 99 })).details.hits).toHaveLength(25);
+    const asked: number[] = [];
+    stubFetch((_url, init) => {
+      asked.push(sent(init).advanced_settings.max_results);
+      return json({ results: [] });
+    });
+    await tools().search.execute("1", { query: "x", max_results: 3 });
+    await tools().search.execute("1", { query: "x", max_results: 99 });
+    expect(asked).toEqual([3, 25]);
   });
 
   it("says so plainly when there are no results", async () => {
@@ -105,41 +113,51 @@ describe("web_search", () => {
     expect((result.content[0] as any).text).toMatch(/No results/);
   });
 
-  it("reports which engines answered and which failed, without changing what the model reads", async () => {
-    stubFetch(() =>
-      json({
-        results: [
-          { title: "A", url: "https://a.example", content: "a", engines: ["google cse"] },
-          { title: "B", url: "https://b.example", content: "b", engines: ["google cse", "bing"] },
-        ],
-        unresponsive_engines: [["brave", "too many requests"], ["duckduckgo", "CAPTCHA"]],
-      }),
-    );
-    const result = await tools().search.execute("1", { query: "magnesium" });
-    expect(result.details.service).toEqual({
-      service: "SearXNG",
-      outcome: "degraded",
-      parts: [
-        { name: "google cse", ok: true, detail: "2 results" },
-        { name: "bing", ok: true, detail: "1 result" },
-        { name: "brave", ok: false, detail: "too many requests" },
-        { name: "duckduckgo", ok: false, detail: "CAPTCHA" },
-      ],
-    });
-    expect((result.content[0] as any).text).not.toMatch(/brave|engine/i);
+  it("throws when search is down rather than answering 'No results'", async () => {
+    stubFetch(() => json({ message: "Insufficient credit" }, 402));
+    await expect(tools().search.execute("1", { query: "x" })).rejects.toThrow(/402/);
+    settings = { ...settings, parallelApiKey: "" };
+    await expect(tools().search.execute("1", { query: "x" })).rejects.toThrow(/PARALLEL_API_KEY is not set/);
+  });
+});
+
+describe("discover_competitors", () => {
+  const question = { product: "Healora", url: "https://healora.com", icp: "adults with skin-fold rash", form: "topical", actives: ["Zinc Oxide (15%)"], markets: "US" };
+  const report = {
+    processor: "pro",
+    taskRunId: "trun_1",
+    candidates: [{ brand: "PureCrest", name: "PureCrest", url: "https://trypurecrest.com/", form: "Cream", market: "US", icp_as_printed: "under the breasts", evidence_url: "https://trypurecrest.com/", evidence: "" }],
+  };
+
+  it("hands back candidates to fetch, archived as a citable source, and asks Parallel only once", async () => {
+    const discovery = { discover: vi.fn(async () => report) };
+    const tool = new DiscoverCompetitorsTool(discovery, question, new Corpus(settings.corpusPath), "run-3").tool();
+    const first = await tool.execute("1", {});
+    const text = (first.content[0] as any).text as string;
+    expect(text).toMatch(/1 candidates from Parallel \(processor pro, task run trun_1\)/);
+    expect(text).toMatch(/A candidate is not a competitor: web_fetch its own page/);
+    expect(text).toContain("1. PureCrest — PureCrest (Cream, US)\n   https://trypurecrest.com/\n   for: under the breasts");
+    const digest = first.details.source_id.replace("sha256:", "");
+    expect(JSON.parse(readFileSync(join(settings.corpusPath, "runs", "run-3", "sources", digest), "utf-8")).taskRunId).toBe("trun_1");
+    const second = await tool.execute("2", {});
+    expect((second.content[0] as any).text).toMatch(/^Already asked this run; the same list/);
+    expect(discovery.discover).toHaveBeenCalledTimes(1);
   });
 
-  it("calls a search failed, not empty, when no engine answered", async () => {
-    stubFetch(() => json({ results: [], unresponsive_engines: [["brave", "too many requests"]] }));
-    const result = await tools().search.execute("1", { query: "x" });
-    expect(result.details.service.outcome).toBe("failed");
+  it("asks again after a failure rather than repeating the error", async () => {
+    const discovery = { discover: vi.fn().mockRejectedValueOnce(new Error("Parallel returned 500")).mockResolvedValueOnce(report) };
+    const tool = new DiscoverCompetitorsTool(discovery, question, new Corpus(settings.corpusPath), "run-4").tool();
+    await expect(tool.execute("1", {})).rejects.toThrow(/500/);
+    expect((await tool.execute("2", {})).details.candidates).toHaveLength(1);
   });
 
-  it("throws on a SearXNG error rather than returning an empty page", async () => {
-    // A stock SearXNG refuses format=json with a 403, and swallowing that makes
-    // it look like the web simply has nothing to say about the product.
-    stubFetch(() => new Response("forbidden", { status: 403 }));
-    await expect(tools().search.execute("1", { query: "x" })).rejects.toThrow(/403/);
+  it("is offered only to an agent given a question, and only with a discovery service", () => {
+    const names = (options: Partial<ConstructorParameters<typeof ResearchToolset>[0]>) =>
+      new ResearchToolset({ settings, runId: "r", services: services(settings), ...options }).build().map((t) => t.name);
+    const withDiscovery = new ServiceClients(services(settings).pages, services(settings).search, null, undefined, { discover: async () => report });
+    expect(names({ discover: question })).not.toContain("discover_competitors");
+    expect(names({ services: withDiscovery })).not.toContain("discover_competitors");
+    expect(names({ services: withDiscovery, discover: question })).toContain("discover_competitors");
   });
 });
 
@@ -552,7 +570,7 @@ describe("the ledger tools", () => {
     const competitor = {
       id: "c3", name: "HERBIFY Mullein", url: "https://herbify.example", relation: "direct", form: "liquid",
       active_ingredients: [{ name_as_printed: "Mullein", name_normalised: "mullein" }],
-      shared_actives: ["mullein"], source_id: "sha256:ccc",
+      shared_actives: ["mullein"], icp_as_printed: "for coughs and chest congestion", source_id: "sha256:ccc",
     };
     expect(text(await tool("record_competitor").execute("1", { item: competitor }))).toBe("RECORDED co1");
     expect(ledger.rows[0]!.entity).toBe("c3");
@@ -565,12 +583,12 @@ describe("the ledger tools", () => {
     const competitors = ledgerTools("competitors", { ledger });
     const listed = "mullein leaf extract (wildcrafted mullein leaf)";
     await champion.tool("record_reference").execute("0", {
-      item: { name: "Mullevia Mullein Drops", form: "liquid", actives: [listed, "ginger"], source_id: "sha256:aaa" },
+      item: { name: "Mullevia Mullein Drops", form: "liquid", actives: [listed, "ginger"], icp: "adults with a cough", source_id: "sha256:aaa" },
     });
     const row = {
       id: "c1", name: "HERBIFY Mullein Drops", url: "https://herbify.example", relation: "direct", form: "liquid",
       active_ingredients: [{ name_as_printed: "Mullein Leaf Extract", name_normalised: "mullein leaf extract" }],
-      shared_actives: ["mullein leaf extract"], source_id: "sha256:ccc",
+      shared_actives: ["mullein leaf extract"], icp_as_printed: "for coughs and chest congestion", source_id: "sha256:ccc",
     };
     expect(text(await competitors.tool("record_competitor").execute("1", { item: row }))).toMatch(
       /^NOT RECORDED — competitor 'HERBIFY Mullein Drops' lists 'mullein leaf extract' as shared, but shared_actives must be copied word for word from the champion's actives: mullein leaf extract \(wildcrafted mullein leaf\), ginger/,
@@ -705,7 +723,7 @@ describe("the ledger tools", () => {
     const { tool } = ledgerTools("champion", { brief: { ...MAGNACALM, product: "", url: "https://magnacalm.example" } });
     await tool("record_source").execute("1", { item: { ...minimalPacket().sources[0], node: "competitors" } });
     await tool("record_reference").execute("2", {
-      item: { name: "MagnaCalm", form: "capsule", actives: ["magnesium glycinate"], source_id: "sha256:aaa" },
+      item: { name: "MagnaCalm", form: "capsule", actives: ["magnesium glycinate"], icp: "adults with a cough", source_id: "sha256:aaa" },
     });
     expect(text(await tool("finish").execute("3", {}))).toMatch(/^FINISHED/);
   });

@@ -29,7 +29,7 @@ function CompetitorRow({ competitor: c, listing }: { competitor: Competitor; lis
           {c.form_as_printed ? ` · ${c.form_as_printed}` : ''}
         </span>
         {c.market && <span>{c.market}</span>}
-        <span>shares {c.shared_actives.join(', ')}</span>
+        {c.shared_actives.length > 0 && <span>shares {c.shared_actives.join(', ')}</span>}
         {c.dose_per_serving && <span>{c.dose_per_serving}</span>}
         {c.price && (
           <span>
@@ -39,6 +39,7 @@ function CompetitorRow({ competitor: c, listing }: { competitor: Competitor; lis
         )}
         {ads > 0 && <span>{ads} ad{ads === 1 ? '' : 's'}</span>}
       </div>
+      {c.icp_as_printed && <div className="comp-copy">for: {c.icp_as_printed}</div>}
       {c.positioning_copy && <div className="comp-copy">“{c.positioning_copy}”</div>}
     </div>
   );

@@ -3,6 +3,8 @@ export * from "./parameters.js";
 export * from "./web-search-tool.js";
 export * from "./web-fetch-tool.js";
 export * from "./find-product-tool.js";
+export * from "./discover-competitors-tool.js";
+export * from "./ad-library-tool.js";
 export * from "./ledger-tools.js";
 export * from "./finish-tool.js";
 export * from "./factory.js";

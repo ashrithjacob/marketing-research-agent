@@ -13,7 +13,7 @@ const packet = (markets: string[]) =>
       relation: "direct",
       form: "powder",
       active_ingredients: [{ name_as_printed: "Creatine Monohydrate", name_normalised: "creatine monohydrate" }],
-      shared_actives: ["creatine monohydrate"],
+      shared_actives: ["creatine monohydrate"], icp_as_printed: "for strength training",
       market,
       source_id: "s",
     })),

@@ -34,10 +34,12 @@ export const RECORD_TOOLS = [
     description:
       "Record the champion product every competitor is measured against. There is one; " +
       "recording it again replaces it. With a url brief the champion is that site's product and " +
-      "there is no ranking: runner_up_name and runner_up_reviews are null. amazon_url is the " +
+      "there is no ranking: runner_up_name and runner_up_reviews are null. icp is who the product is for and the " +
+      "problem it solves, as its page says; every competitor must share it. amazon_url is the " +
       "champion's Amazon listing, or \"\" when it has none. Example: " +
       '{"name":"MagnaCalm Glycinate 400mg","form":"capsule","form_as_printed":"90 vegan capsules",' +
-      '"actives":["magnesium glycinate"],"source_id":"sha256:1c9d…","reviews_count":18234,' +
+      '"actives":["magnesium glycinate"],"icp":"adults who struggle to fall asleep",' +
+      '"source_id":"sha256:1c9d…","reviews_count":18234,' +
       '"runner_up_name":"CalmWell Glycinate","runner_up_reviews":9120,' +
       '"amazon_url":"https://www.amazon.com/dp/B0EXAMPLE1"}',
   },
@@ -46,13 +48,16 @@ export const RECORD_TOOLS = [
     kind: "competitor",
     description:
       "Record one competitor, read off its own page. `id` is yours: c1, c2, …; " + REPLACES +
-      " relation is checked against the champion's form. shared_actives are picked from the champion's " +
-      "actives and copied word for word; the competitor's own actives keep its page's wording. Example: " +
+      " A competitor sells to the champion's icp, whatever its actives; a product with the same active sold to " +
+      "another audience or for another problem is not a competitor — do not record it. icp_as_printed is who its own page says it " +
+      "is for. relation is checked against the champion's form. shared_actives are picked from the champion's " +
+      "actives and copied word for word, [] when it shares none; the competitor's own actives keep its page's wording. Example: " +
       '{"id":"c1","name":"CalmWell Magnesium Glycinate","brand":"CalmWell",' +
       '"url":"https://calmwell.example/mg","relation":"direct","form":"capsule",' +
       '"form_as_printed":"60 capsules","active_ingredients":[{"name_as_printed":"Magnesium ' +
       '(as bisglycinate chelate)","name_normalised":"magnesium bisglycinate","dose":"400","unit":"mg",' +
-      '"per":"2 capsules"}],"shared_actives":["magnesium glycinate"],"dose_per_serving":"400 mg",' +
+      '"per":"2 capsules"}],"shared_actives":["magnesium glycinate"],"icp_as_printed":"for restless nights",' +
+      '"dose_per_serving":"400 mg",' +
       '"positioning_copy":"Sleep deeper, naturally.","price":"£14.99","price_per_dose":"£0.50",' +
       '"market":"UK","source_id":"sha256:5e21…","ad_source_ids":[]}',
   },

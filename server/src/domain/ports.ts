@@ -17,6 +17,8 @@ import type { AmazonListing, TargetListing } from "./review-mining.js";
 import type { ReviewLedgerSnapshot, StoredRunReview } from "./reviews.js";
 import type { Finding, FindingDraft } from "./findings.js";
 import type { FetchedPage, SearchPage, SearchScope } from "./web.js";
+import type { DiscoveryQuestion, DiscoveryReport } from "./competitor-discovery.js";
+import type { AdPage, AdQuery } from "./ad-library.js";
 
 /** Products and what their runs found, counted only over the runs a scope admits. */
 export interface ProductCatalog {
@@ -73,6 +75,16 @@ export interface PageFetcher {
 /** Finds urls for a query; it cannot read pages. */
 export interface WebSearch {
   find(query: string, maxResults: number, signal?: AbortSignal, scope?: SearchScope): Promise<SearchPage>;
+}
+
+/** Searches an index of Meta ads: who advertises, the copy, where each ad lands, when it ran. */
+export interface AdLibrary {
+  search(query: AdQuery, signal?: AbortSignal): Promise<AdPage>;
+}
+
+/** Names brands selling to a product's customer, from one research pass over the web. */
+export interface CompetitorDiscovery {
+  discover(question: DiscoveryQuestion, signal?: AbortSignal): Promise<DiscoveryReport>;
 }
 
 export interface ResearchStore {

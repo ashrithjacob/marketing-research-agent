@@ -24,7 +24,7 @@ export class ReviewMiningRoster {
       name: competitor.name,
       relation: competitor.relation,
       form: competitor.form,
-      actives: [...competitor.shared_actives],
+      actives: competitor.active_ingredients.map((active) => active.name_normalised),
       url: competitor.url,
       brand: competitor.brand,
       amazon_url: "",

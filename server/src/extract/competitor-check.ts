@@ -2,10 +2,11 @@ import { CheckProblems, type CheckProblem, type Competitor, type CompetitorRefer
 
 import type { PacketCheck, PacketContext } from "./check.js";
 import { Relations } from "./names.js";
+import { CompetitorIcp } from "./competitor-icp.js";
 import { SharedActives } from "./shared-actives.js";
 import { Trace } from "../trace/index.js";
 
-/** Direct and indirect are measured against the product's own form and actives. */
+/** A competitor sells to the product's own customer; direct and indirect are told apart by the product's form. */
 export class CompetitorCheck implements PacketCheck {
   problems(packet: StagePacket, { sourceIds }: PacketContext): CheckProblem[] {
     Trace.line(import.meta.url, "CompetitorCheck.problems", { packet });
@@ -37,6 +38,7 @@ export class CompetitorCheck implements PacketCheck {
       if (!sourceIds.has(row.source_id)) own.push(`${label} cites source '${row.source_id}', which is not in the packet`);
       own.push(...this.adProblems(row, label, sourceIds, kinds));
       if (reference) own.push(...SharedActives.problems(label, row.shared_actives, reference.actives));
+      if (reference) own.push(...CompetitorIcp.problems(label, row.icp_as_printed, reference.icp));
       if (reference) own.push(...this.relationProblems(row, label, reference));
       problems.push(...own.map((text) => CheckProblems.at("competitor", row, text)));
     }

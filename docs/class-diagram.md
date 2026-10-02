@@ -71,6 +71,15 @@ classDiagram
       forViewer()
       admits()
     }
+    class AdQuery {
+      <<interface>>
+    }
+    class AdHit {
+      <<interface>>
+    }
+    class AdPage {
+      <<interface>>
+    }
     class Briefs {
       markets()
       looksLikeUrl()
@@ -88,6 +97,15 @@ classDiagram
       of()
       at()
       texts()
+    }
+    class CompetitorCandidate {
+      <<interface>>
+    }
+    class DiscoveryQuestion {
+      <<interface>>
+    }
+    class DiscoveryReport {
+      <<interface>>
     }
     class FindingDraft {
       <<interface>>
@@ -185,6 +203,14 @@ classDiagram
     class WebSearch {
       <<interface>>
       find()
+    }
+    class AdLibrary {
+      <<interface>>
+      search()
+    }
+    class CompetitorDiscovery {
+      <<interface>>
+      discover()
     }
     class ResearchStore {
       <<interface>>
@@ -319,9 +345,6 @@ classDiagram
     }
     class ServiceUnavailableError {
     }
-    class Domains {
-      within()
-    }
   }
   namespace config {
     class Settings {
@@ -355,6 +378,9 @@ classDiagram
       problems()
     }
     class CompetitorCheck {
+      problems()
+    }
+    class CompetitorIcp {
       problems()
     }
     class CompletenessCheck {
@@ -522,9 +548,6 @@ classDiagram
     class FallbackPageFetcher {
       scrape()
     }
-    class FallbackWebSearch {
-      find()
-    }
     class OpenRouterGate {
       admit()
       parse()
@@ -551,6 +574,13 @@ classDiagram
     }
     class ParallelApi {
       post()
+      get()
+    }
+    class Basis {
+      <<interface>>
+    }
+    class ParallelCompetitorDiscovery {
+      discover()
     }
     class ExtractResult {
       <<interface>>
@@ -566,6 +596,9 @@ classDiagram
     }
     class ParallelSearch {
       find()
+    }
+    class ParallelTask {
+      run()
     }
     class RateLimitWait {
       askedMs()
@@ -588,9 +621,6 @@ classDiagram
     class RunBilling {
       track()
       settle()
-    }
-    class Searxng {
-      find()
     }
     class EvidenceServices {
       <<interface>>
@@ -714,6 +744,15 @@ classDiagram
     }
     class ThrottledActorRunner {
       run()
+    }
+    class ThrottledAdLibrary {
+      search()
+    }
+    class TrendtrackAd {
+      <<interface>>
+    }
+    class TrendtrackAds {
+      search()
     }
     class TrustpilotProfiles {
       read()
@@ -1015,6 +1054,12 @@ classDiagram
       start()
       take()
     }
+    class AdLibraryTool {
+      tool()
+    }
+    class DiscoverCompetitorsTool {
+      tool()
+    }
     class EvidenceSearchTool {
       tool()
     }
@@ -1152,18 +1197,20 @@ classDiagram
   TrustpilotReviews --> ActorRunner
   Crawl4ai --> Settings
   FallbackPageFetcher --> PageFetcher
-  FallbackWebSearch --> WebSearch
   OpenRouterGate --> Settings
   Firecrawl --> Settings
   ParallelApi --> Settings
+  ParallelCompetitorDiscovery --> ParallelTask
   ParallelExtract --> ParallelApi
   ParallelSearch --> ParallelApi
+  ParallelTask --> ParallelApi
   RunBilling --> OpenRouterPrices
-  Searxng --> Settings
   ServiceClients --> PageFetcher
   ServiceClients --> WebSearch
   ServiceClients --> ActorRunner
   ServiceClients --> EvidenceServices
+  ServiceClients --> CompetitorDiscovery
+  ServiceClients --> AdLibrary
   ProductBackfill --> ProductTable
   ProductBackfill --> PacketRowTable
   SqliteProductCatalog --> ProductTable
@@ -1175,6 +1222,9 @@ classDiagram
   ThrottledWebSearch --> ServiceQueue
   ThrottledActorRunner --> ActorRunner
   ThrottledActorRunner --> ServiceQueue
+  ThrottledAdLibrary --> AdLibrary
+  ThrottledAdLibrary --> ServiceQueue
+  TrendtrackAds --> Settings
   TrustpilotProfiles --> PageFetcher
   AgentDriver --> ResearchStore
   AgentDriver --> LiveRuns
@@ -1250,6 +1300,11 @@ classDiagram
   StageOneListings --> TargetListings
   StageOneListings --> ActorRunner
   StageOneListings --> PageFetcher
+  AdLibraryTool --> AdLibrary
+  AdLibraryTool --> Corpus
+  DiscoverCompetitorsTool --> CompetitorDiscovery
+  DiscoverCompetitorsTool --> DiscoveryQuestion
+  DiscoverCompetitorsTool --> Corpus
   EvidenceSearchTool --> WebSearch
   EvidenceSearchTool --> Corpus
   ResearchToolset --> ToolsetOptions
@@ -1321,19 +1376,19 @@ classDiagram
 | `adapters` | `adapters/corpus.ts` | Corpus |
 | `adapters` | `adapters/crawl4ai.ts` | Crawl4aiPayload, Crawl4ai |
 | `adapters` | `adapters/fallback-fetcher.ts` | FallbackPageFetcher |
-| `adapters` | `adapters/fallback-search.ts` | FallbackWebSearch |
 | `adapters` | `adapters/fetch-gate.ts` | OpenRouterGate |
 | `adapters` | `adapters/firecrawl.ts` | FirecrawlPayload, Firecrawl |
 | `adapters` | `adapters/http.ts` | Http |
 | `adapters` | `adapters/openrouter-generation.ts` | OpenRouterGeneration |
 | `adapters` | `adapters/openrouter-prices.ts` | OpenRouterPrices |
 | `adapters` | `adapters/parallel-api.ts` | ParallelApi |
+| `adapters` | `adapters/parallel-discovery.ts` | Basis, ParallelCompetitorDiscovery |
 | `adapters` | `adapters/parallel-extract.ts` | ExtractResult, ExtractError, ParallelExtract |
 | `adapters` | `adapters/parallel-search.ts` | ParallelResult, ParallelSearch |
+| `adapters` | `adapters/parallel-task.ts` | ParallelTask |
 | `adapters` | `adapters/rate-limit-wait.ts` | RateLimitWait |
 | `adapters` | `adapters/rates.ts` | Rates, Pricing, Billed, Money |
 | `adapters` | `adapters/run-billing.ts` | RunBilling |
-| `adapters` | `adapters/searxng.ts` | Searxng |
 | `adapters` | `adapters/service-clients.ts` | EvidenceServices, ServiceClients |
 | `adapters` | `adapters/service-queue.ts` | Waiter, ServiceQueue |
 | `adapters` | `adapters/sqlite/account-table.ts` | AccountTable |
@@ -1356,7 +1411,8 @@ classDiagram
 | `adapters` | `adapters/sqlite/store.ts` | SqliteResearchStore |
 | `adapters` | `adapters/sqlite/tables.ts` | SqliteTables |
 | `adapters` | `adapters/sqlite/target-listing-table.ts` | TargetListingTable |
-| `adapters` | `adapters/throttled.ts` | ThrottledPageFetcher, ThrottledWebSearch, ThrottledActorRunner |
+| `adapters` | `adapters/throttled.ts` | ThrottledPageFetcher, ThrottledWebSearch, ThrottledActorRunner, ThrottledAdLibrary |
+| `adapters` | `adapters/trendtrack-ads.ts` | TrendtrackAd, TrendtrackAds |
 | `adapters` | `adapters/trustpilot-profiles.ts` | TrustpilotProfiles |
 | `agent` | `agent/agent-driver.ts` | AgentOutcome, AgentDriver |
 | `agent` | `agent/agent-roster.ts` | AgentRoster |
@@ -1412,6 +1468,8 @@ classDiagram
 | `agent` | `agent/stage-one-listings.ts` | StageOneListings |
 | `agent` | `agent/stage-one-run.ts` | StageOneRun |
 | `agent` | `agent/tool-steps.ts` | ToolSteps |
+| `agent` | `agent/tools/ad-library-tool.ts` | AdLibraryTool |
+| `agent` | `agent/tools/discover-competitors-tool.ts` | DiscoverCompetitorsTool |
 | `agent` | `agent/tools/evidence-search-tool.ts` | EvidenceSearchTool |
 | `agent` | `agent/tools/factory.ts` | LedgerOptions, ToolsetOptions, ResearchToolset |
 | `agent` | `agent/tools/find-product-tool.ts` | FindProductTool |
@@ -1428,14 +1486,16 @@ classDiagram
 | `config` | `config/settings-shape.ts` | Settings |
 | `config` | `config/settings.ts` | Env |
 | `domain` | `domain/accounts.ts` | Workspace, Account, AccountListing, Principal, Scope |
+| `domain` | `domain/ad-library.ts` | AdQuery, AdHit, AdPage |
 | `domain` | `domain/brief.ts` | Briefs |
 | `domain` | `domain/check-problem.ts` | RowRef, CheckProblem, CheckProblems |
+| `domain` | `domain/competitor-discovery.ts` | CompetitorCandidate, DiscoveryQuestion, DiscoveryReport |
 | `domain` | `domain/findings.ts` | FindingDraft, Finding, Findings |
 | `domain` | `domain/logs.ts` | RunEvent, Judgement, PacketCheck, RunUpdate, LlmCallRecord, Generation, LlmCall |
 | `domain` | `domain/node-fields.ts` | NodeFieldSet, NodeFields |
 | `domain` | `domain/nodes.ts` | Stages |
 | `domain` | `domain/packet-rows.ts` | PacketRowSet, PacketRows |
-| `domain` | `domain/ports.ts` | ProductCatalog, AccountDirectory, AmazonListingSource, TargetListings, FindingLedger, PageFetcher, WebSearch, ResearchStore, GateVerdict, FetchGate |
+| `domain` | `domain/ports.ts` | ProductCatalog, AccountDirectory, AmazonListingSource, TargetListings, FindingLedger, PageFetcher, WebSearch, AdLibrary, CompetitorDiscovery, ResearchStore, GateVerdict, FetchGate |
 | `domain` | `domain/product-truth-agents.ts` | ProductTruthAgentSpec |
 | `domain` | `domain/products.ts` | RunHead, Product, ProductSummary, ProductFolders |
 | `domain` | `domain/records.ts` | Clock, Ids, ResearchRun, RunSummary, Runs |
@@ -1445,12 +1505,13 @@ classDiagram
 | `domain` | `domain/reviews.ts` | LedgerPull, LedgerReview, ReviewLedgerSnapshot, StoredRunReview |
 | `domain` | `domain/service-report.ts` | ServicePart, ServiceReport, ServiceReports |
 | `domain` | `domain/stage-one-agents.ts` | StageOneAgentSpec, StageOnePlan, StageOnePlans |
-| `domain` | `domain/web.ts` | SearchHit, SearchPage, SearchScope, FetchedPage, ServiceUnavailableError, Domains |
+| `domain` | `domain/web.ts` | SearchHit, SearchPage, SearchScope, FetchedPage, ServiceUnavailableError |
 | `extract` | `extract/brief-check.ts` | BriefCheck |
 | `extract` | `extract/champion-check.ts` | ChampionCheck |
 | `extract` | `extract/check.ts` | PacketContext, PacketCheck |
 | `extract` | `extract/citation-check.ts` | CitationCheck |
 | `extract` | `extract/competitor-check.ts` | CompetitorCheck |
+| `extract` | `extract/competitor-icp.ts` | CompetitorIcp |
 | `extract` | `extract/completeness-check.ts` | CompletenessCheck |
 | `extract` | `extract/dose-bands.ts` | DoseBands |
 | `extract` | `extract/draft.ts` | PacketDraft |

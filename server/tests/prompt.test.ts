@@ -51,7 +51,7 @@ const build = (overrides: Record<string, unknown> = {}, agent: StageOneAgent = "
 
 const AGENTS = ["champion", "product", "competitors", "category"] as const;
 
-const system = (agent: StageOneAgent, options = { amazon: true, waits: true }) => prompts.system(agent, options);
+const system = (agent: StageOneAgent, options: { amazon: boolean; waits: boolean; discovery?: boolean; ads?: boolean } = { amazon: true, waits: true }) => prompts.system(agent, options);
 
 describe("the record examples", () => {
   it("are each a record the ledger accepts", () => {
@@ -249,7 +249,8 @@ describe("each agent gets only its own task", () => {
     // The brief names a genre; "the first plausible match" is not the champion.
     const text = build({}, "champion");
     expect(text).toMatch(/The listing with the highest\s+`reviewsCount` is the champion/);
-    expect(text).toMatch(/`runner_up_name`, `runner_up_reviews`/);
+    expect(text).toMatch(/`runner_up_name`,\s+`runner_up_reviews`/);
+    expect(text).toMatch(/`icp` is the customer: who the page\s+says the product is for and the problem it solves/);
     expect(text).toMatch(/champion ranking unavailable/);
     expect(text).not.toContain("## The champion\n");
   });
@@ -290,10 +291,38 @@ describe("each agent gets only its own task", () => {
 describe("the competitors agent", () => {
   it("states the mechanical test and the per-class saturation", () => {
     const text = build({}, "competitors");
-    expect(text).toMatch(/\*\*direct\*\* — shares an active with the champion \*\*and\*\* has the same form/);
-    expect(text).toMatch(/\*\*indirect\*\* — shares an active, \*\*different\*\* form/);
+    expect(text).toMatch(/\*\*direct\*\* — the champion's customer, \*\*same\*\* form/);
+    expect(text).toMatch(/\*\*indirect\*\* — the champion's customer, \*\*different\*\* form/);
     expect(text).toMatch(/`record_saturation` twice, `class` "direct" and\s+"indirect"/);
-    expect(text).toMatch(/same problem, different active/);
+    expect(text).not.toMatch(/same problem, different active/);
+  });
+
+  it("calls discover_competitors first when it has it, and treats what it names as candidates", () => {
+    const text = build({}, "competitors");
+    expect(text).toMatch(/If you have `discover_competitors`, call it first, once/);
+    expect(text).toMatch(/A search result, an ad or a discovered brand is a candidate,\s+not a competitor/);
+    expect(system("competitors", { amazon: true, waits: true, discovery: true })).toContain("- `discover_competitors` — once:");
+    expect(system("competitors")).not.toContain("discover_competitors");
+    expect(system("competitors")).toContain("every brand selling to its customer");
+  });
+
+  it("sends product, competitors and category to the Meta ad library, each for its own reason", () => {
+    expect(system("product", { amazon: false, waits: true, ads: true })).toContain("- `ad_library_search` — Meta ads, live and past");
+    expect(system("product", { amazon: false, waits: true })).not.toContain("ad_library_search");
+    expect(build({}, "product")).toMatch(/search the brand's\s+own domain \(`search_in` "domain"/);
+    expect(build({}, "product")).toMatch(/`ad_activity` \(how many ads, which pages run them,\s+first and last seen\) and `ad_claims`/);
+    expect(build({}, "category")).toMatch(/`metric` "meta_ads_matching: <query>", `unit` "ads"/);
+    expect(build({}, "competitors")).toMatch(/brands that sell only through Meta ads appear\s+there and nowhere else/);
+  });
+
+  it("makes the champion's customer the whole test of a competitor, whatever its actives", () => {
+    const text = build({}, "competitors");
+    expect(text).toMatch(/sells to the champion's customer: its `icp` below — the\s+same people, with the same problem/);
+    expect(text).toMatch(/not one,\s+even when it shares an active/);
+    expect(text).toMatch(/A product for the same people and\s+problem is one, whatever its actives/);
+    expect(text).toMatch(/`icp_as_printed` — who its own page says it is for/);
+    expect(text).toMatch(/or \[\] when it shares none/);
+    expect(text).toMatch(/If that audience or problem differs from the champion's `icp`,\s+it is not a competitor, \*\*even with the same active\*\*: record nothing for it/);
   });
 
   it("has shared actives copied from the champion's list, and says once what sharing an active means", () => {
@@ -305,7 +334,7 @@ describe("the competitors agent", () => {
 
   it("measures competitors against the champion instead of choosing one", () => {
     const text = build({}, "competitors");
-    expect(text).toMatch(/measured against\s+the champion below/);
+    expect(text).toMatch(/the champion's customer: its `icp` below/);
     expect(text).not.toMatch(/highest\s+`reviewsCount`/);
   });
 

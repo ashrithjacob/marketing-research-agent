@@ -6,19 +6,18 @@
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { FallbackWebSearch } from "../src/adapters/fallback-search.js";
 import { ParallelApi } from "../src/adapters/parallel-api.js";
 import { ParallelExtract } from "../src/adapters/parallel-extract.js";
+import { ParallelCompetitorDiscovery } from "../src/adapters/parallel-discovery.js";
 import { ParallelSearch } from "../src/adapters/parallel-search.js";
-import { Searxng } from "../src/adapters/searxng.js";
+import { ParallelTask } from "../src/adapters/parallel-task.js";
 import { Env, type Settings } from "../src/config/index.js";
-import { Domains, ServiceUnavailableError, type SearchPage, type WebSearch } from "../src/domain/index.js";
+import { ServiceUnavailableError } from "../src/domain/index.js";
 
 const settings = (overrides: Partial<Settings> = {}): Settings => ({
   ...Env.settings(),
   parallelApiKey: "pk-test",
   parallelBaseUrl: "https://parallel.test",
-  searxngUrl: "https://searxng.test",
   ...overrides,
 });
 
@@ -84,37 +83,63 @@ describe("ParallelExtract", () => {
   });
 });
 
-describe("FallbackWebSearch", () => {
-  const page = (service: string): SearchPage => ({ hits: [], excerpted: false, report: { service, outcome: "ok", parts: [] } });
+describe("ParallelTask", () => {
+  const replies = (...bodies: Array<[number, unknown] | Error>) => {
+    const fetch = vi.fn(async () => {
+      const next = bodies.shift()!;
+      if (next instanceof Error) throw next;
+      return json(next[0], next[1]);
+    });
+    vi.stubGlobal("fetch", fetch);
+    return fetch;
+  };
 
-  it("goes to the fallback only when the primary can answer nothing at all", async () => {
-    const fallback: WebSearch = { find: vi.fn(async () => page("SearXNG")) };
-    const dead: WebSearch = { find: async () => { throw new ServiceUnavailableError("parallel", "402"); } };
-    expect((await new FallbackWebSearch(dead, fallback).find("q", 3, undefined, { domains: ["fda.gov"] })).report.service).toBe("SearXNG");
-    expect(fallback.find).toHaveBeenCalledWith("q", 3, undefined, { domains: ["fda.gov"] });
+  it("creates a run, polls its status until completed, and reads the result", async () => {
+    const fetch = replies([202, { run_id: "trun_1", status: "queued" }], [200, { status: "running" }], [200, { status: "completed" }], [200, { output: { content: {} } }]);
+    const { runId, result } = await new ParallelTask(new ParallelApi(settings()), 0, 60).run({ processor: "pro" });
+    expect(runId).toBe("trun_1");
+    expect(result).toEqual({ output: { content: {} } });
+    const urls = fetch.mock.calls.map((call) => String((call as unknown[])[0]));
+    expect(urls).toEqual([
+      "https://parallel.test/v1/tasks/runs",
+      "https://parallel.test/v1/tasks/runs/trun_1",
+      "https://parallel.test/v1/tasks/runs/trun_1",
+      "https://parallel.test/v1/tasks/runs/trun_1/result",
+    ]);
+  });
 
-    const broken: WebSearch = { find: async () => { throw new Error("500"); } };
-    await expect(new FallbackWebSearch(broken, fallback).find("q", 3)).rejects.toThrow("500");
+  it("asks the status again when one read fails in transit, as a poll on 2026-10-02 did with 'fetch failed'", async () => {
+    replies([202, { run_id: "trun_2" }], new TypeError("fetch failed"), [200, { status: "completed" }], [200, { output: {} }]);
+    expect((await new ParallelTask(new ParallelApi(settings()), 0, 60).run({})).runId).toBe("trun_2");
+  });
+
+  it("fails on a failed run, and stops at once when Parallel can answer nothing", async () => {
+    replies([202, { run_id: "trun_3" }], [200, { status: "failed" }]);
+    await expect(new ParallelTask(new ParallelApi(settings()), 0, 60).run({})).rejects.toThrow(/trun_3 ended failed/);
+    replies([202, { run_id: "trun_4" }], [402, { message: "Insufficient credit" }]);
+    await expect(new ParallelTask(new ParallelApi(settings()), 0, 60).run({})).rejects.toBeInstanceOf(ServiceUnavailableError);
   });
 });
 
-describe("a scoped search on SearXNG", () => {
-  it("keeps only hits on the scope's sites, subdomains included, since SearXNG has no site filter", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () =>
-      json(200, { results: [
-        { url: "https://www.fda.gov/food/x", title: "FDA", content: "a" },
-        { url: "https://blog.example/fda.gov-claims", title: "Blog", content: "b" },
-        { url: "https://consumer.ftc.gov/y", title: "FTC", content: "c" },
-      ] }),
-    ));
-    const found = await new Searxng(settings()).find("supplement claims", 10, undefined, { domains: ["fda.gov", "ftc.gov"] });
-    expect(found.hits.map((hit) => hit.title)).toEqual(["FDA", "FTC"]);
-    expect(found.excerpted).toBe(false);
-  });
-
-  it("matches a site exactly or as a parent domain, never as a substring", () => {
-    expect(Domains.within("https://asa.org.uk/x", ["asa.org.uk"])).toBe(true);
-    expect(Domains.within("https://notasa.org.uk/x", ["asa.org.uk"])).toBe(false);
-    expect(Domains.within("https://anything.example", undefined)).toBe(true);
+describe("ParallelCompetitorDiscovery", () => {
+  it("asks about the champion's customer and returns each brand with the page Parallel cited for it", async () => {
+    const task = { run: vi.fn(async () => ({
+      runId: "trun_9",
+      result: { output: {
+        content: { competitors: [{ brand: "PureCrest", name: "PureCrest", url: "https://trypurecrest.com/", form: "Cream", market: "US", icp_as_printed: "under the breasts" }] },
+        basis: [{ field: "competitors.0", citations: [{ url: "https://trypurecrest.com/", excerpts: ["Zinc Oxide 15%"] }] }],
+      } },
+    })) };
+    const question = { product: "Healora Intertrigo Relief Cream", url: "https://healora.com", icp: "adults with skin-fold rash", form: "topical", actives: ["Zinc Oxide (15%)"], markets: "US, UK" };
+    const report = await new ParallelCompetitorDiscovery(task as unknown as ParallelTask, "pro").discover(question);
+    const body = (task.run.mock.calls[0] as unknown as [Record<string, any>])[0];
+    expect(body.processor).toBe("pro");
+    expect(body.input).toContain("Its customer, as its own page puts it: adults with skin-fold rash.");
+    expect(body.task_spec.output_schema.json_schema.properties.competitors.description).toMatch(/not a competitor, even when it shares an ingredient/);
+    expect(report).toEqual({
+      processor: "pro",
+      taskRunId: "trun_9",
+      candidates: [{ brand: "PureCrest", name: "PureCrest", url: "https://trypurecrest.com/", form: "Cream", market: "US", icp_as_printed: "under the breasts", evidence_url: "https://trypurecrest.com/", evidence: "Zinc Oxide 15%" }],
+    });
   });
 });

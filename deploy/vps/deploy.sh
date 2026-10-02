@@ -35,14 +35,13 @@ echo "==> ship image (docker save | ssh docker load)"
 docker save mra:latest | gzip -1 | ssh "$REMOTE" 'gunzip | docker load'
 
 echo "==> sync compose files"
-ssh "$REMOTE" "mkdir -p ~/$REMOTE_DIR/searxng"
 rsync -az deploy/vps/docker-compose.yaml deploy/vps/mra-users.sh deploy/vps/mra-snapshot.sh \
   "$REMOTE:$REMOTE_DIR/"
 ssh "$REMOTE" "rm -f ~/$REMOTE_DIR/change-password.sh"
-rsync -az searxng/settings.yml "$REMOTE:$REMOTE_DIR/searxng/settings.yml"
+ssh "$REMOTE" "rm -rf ~/$REMOTE_DIR/searxng"
 
 echo "==> up"
-ssh "$REMOTE" "cd ~/$REMOTE_DIR && docker compose up -d && \
+ssh "$REMOTE" "cd ~/$REMOTE_DIR && docker compose up -d --remove-orphans && \
   for _ in \$(seq 1 30); do \
     [ \"\$(docker inspect -f '{{.State.Health.Status}}' mra 2>/dev/null)\" = healthy ] && break; sleep 2; \
   done; docker compose ps"

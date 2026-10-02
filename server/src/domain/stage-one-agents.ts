@@ -10,14 +10,16 @@ export interface StageOneAgentSpec {
   node: Node | null;
   records: readonly FindingKind[];
   amazon: boolean;
+  discovery: boolean;
+  ads: boolean;
   maxTurns: number;
 }
 
 export const STAGE_ONE_AGENT_SPECS: Readonly<Record<StageOneAgent, StageOneAgentSpec>> = {
-  champion: { node: null, records: ["source", "competitor_reference", "gap"], amazon: true, maxTurns: 10 },
-  product: { node: "product_data", records: ["source", "attribute", "node_status", "gap"], amazon: false, maxTurns: 15 },
-  competitors: { node: "competitors", records: ["source", "competitor", "saturation", "node_status", "gap"], amazon: true, maxTurns: 20 },
-  category: { node: "category_data", records: ["source", "measurement", "attribute", "node_status", "gap"], amazon: false, maxTurns: 15 },
+  champion: { node: null, records: ["source", "competitor_reference", "gap"], amazon: true, discovery: false, ads: false, maxTurns: 10 },
+  product: { node: "product_data", records: ["source", "attribute", "node_status", "gap"], amazon: false, discovery: false, ads: true, maxTurns: 15 },
+  competitors: { node: "competitors", records: ["source", "competitor", "saturation", "node_status", "gap"], amazon: true, discovery: true, ads: true, maxTurns: 20 },
+  category: { node: "category_data", records: ["source", "measurement", "attribute", "node_status", "gap"], amazon: false, discovery: false, ads: true, maxTurns: 15 },
 };
 
 export interface StageOnePlan {

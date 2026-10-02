@@ -996,7 +996,7 @@ describe("the two steps of a stage-1 run", () => {
   const genre = { product: "magnesium glycinate", url: "", market: "", notes: "" };
   const championPart = () => ({
     sources: [{ ...productPacket().sources[0], node: "product_data" }],
-    competitor_reference: { name: "MagnaCalm Glycinate", form: "capsule", actives: ["magnesium glycinate"], source_id: "sha256:aaa" },
+    competitor_reference: { name: "MagnaCalm Glycinate", form: "capsule", actives: ["magnesium glycinate"], icp: "adults with a cough", source_id: "sha256:aaa" },
     gaps: [{ node: "product_data", missing: "champion ranking unavailable: no Amazon search in this test" }],
   });
   const categoryPart = () => ({
@@ -1178,11 +1178,11 @@ describe("the Amazon listings of a completed stage-1 run", () => {
       brief,
       sources: [{ ...productPacket().sources[0], node: "competitors" }],
       attributes: [],
-      competitor_reference: { name: "Mullevia Mullein Drops", form: "liquid", actives: ["mullein"], source_id: "sha256:aaa" },
+      competitor_reference: { name: "Mullevia Mullein Drops", form: "liquid", actives: ["mullein"], icp: "adults with a cough", source_id: "sha256:aaa" },
       competitors: [
         {
           id: "c1", name: "Herb Pharm Mullein Blend", brand: "Herb Pharm", url: "https://herb-pharm.com/mullein",
-          relation: "direct", form: "liquid", shared_actives: ["mullein"], source_id: "sha256:aaa",
+          relation: "direct", form: "liquid", shared_actives: ["mullein"], icp_as_printed: "for coughs and chest congestion", source_id: "sha256:aaa",
           active_ingredients: [{ name_as_printed: "Mullein", name_normalised: "mullein" }],
         },
       ],

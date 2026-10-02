@@ -88,7 +88,7 @@ function rosterPacket(): Record<string, any> {
         relation: "direct",
         form: "capsule",
         active_ingredients: [active],
-        shared_actives: ["magnesium glycinate"],
+        shared_actives: ["magnesium glycinate"], icp_as_printed: "for restless nights",
         source_id: "sha256:aaa",
       },
       {
@@ -98,7 +98,7 @@ function rosterPacket(): Record<string, any> {
         relation: "indirect",
         form: "spray",
         active_ingredients: [active],
-        shared_actives: ["Magnesium Glycinate"],
+        shared_actives: ["Magnesium Glycinate"], icp_as_printed: "for restless nights",
         source_id: "sha256:aaa",
       },
     ],

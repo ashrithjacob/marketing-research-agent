@@ -35,21 +35,3 @@ export class ServiceUnavailableError extends Error {
     this.name = "ServiceUnavailableError";
   }
 }
-
-/** Whether a url sits on one of a list of sites, a subdomain included. */
-export class Domains {
-  static within(url: string, domains: readonly string[] | undefined): boolean {
-    Trace.tick(import.meta.url, "Domains.within");
-    if (!domains || domains.length === 0) return true;
-    let host: string;
-    try {
-      host = new URL(url).hostname.toLowerCase();
-    } catch {
-      return false;
-    }
-    return domains.some((domain) => {
-      const site = domain.toLowerCase().replace(/^www\./, "");
-      return host === site || host.endsWith(`.${site}`);
-    });
-  }
-}

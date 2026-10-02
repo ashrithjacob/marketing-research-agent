@@ -11,18 +11,6 @@
 name: mra
 
 services:
-  searxng:
-    image: searxng/searxng:latest
-    container_name: mra-searxng
-    restart: unless-stopped
-    expose: ["8080"]              # private compose network only
-    volumes:
-      # A stock SearXNG refuses format=json, which is the only format
-      # web_search asks for. This file turns it on.
-      - ./searxng/settings.yml:/etc/searxng/settings.yml:ro
-    environment:
-      - SEARXNG_SECRET=${SEARXNG_SECRET:?SEARXNG_SECRET is not set}
-
   mra:
     image: mra:latest
     # Built on the laptop and shipped with `docker load` — see deploy.sh for
@@ -33,7 +21,6 @@ services:
     # Always-on, unlike the local stack. A restart still kills any run in
     # flight — the agent lives in this process — and recover() marks it failed.
     restart: unless-stopped
-    depends_on: [searxng]
     # Never `ports:` — Docker publishes past ufw. Caddy reaches it over `edge`.
     expose: ["8000"]
     networks: [default, edge]
@@ -54,14 +41,17 @@ services:
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:?OPENROUTER_API_KEY is not set}
       - MRA_MODEL=${MRA_MODEL:?MRA_MODEL must be set in .env - the model id lives only there}
       - MRA_BACKUP_MODELS=${MRA_BACKUP_MODELS:-}
-      - SEARXNG_URL=http://searxng:8080
       - FIRECRAWL_API_KEY=${FIRECRAWL_API_KEY:?FIRECRAWL_API_KEY is not set}
       # Fallback page reader, used only when Firecrawl can fetch nothing at all
       # (out of credits, key refused, or no key). Optional: blank disables it.
       - CRAWL4AI_API_KEY=${CRAWL4AI_API_KEY:-}
-      # Product truth (stage 2) searches and reads through Parallel. Optional:
-      # blank falls back to SearXNG for search and Crawl4AI for reading.
-      - PARALLEL_API_KEY=${PARALLEL_API_KEY:-}
+      # Every web_search, stage 1 and product truth, goes to Parallel, and
+      # product truth reads pages through it too. Required: without it no
+      # agent can search at all.
+      - PARALLEL_API_KEY=${PARALLEL_API_KEY:?PARALLEL_API_KEY is not set}
+      # Meta ad search for the product, competitors and category agents
+      # (ad_library_search). Optional: blank and the tool is not offered.
+      - TRENDTRACK_API_KEY=${TRENDTRACK_API_KEY:-}
       # Cheap pre-read gate over every fetch; empty disables. Fails open.
       - MRA_GATE_MODEL=${MRA_GATE_MODEL:-}
       - MRA_GATE_CHAR_LIMIT=${MRA_GATE_CHAR_LIMIT:-4000}

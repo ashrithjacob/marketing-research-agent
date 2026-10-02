@@ -9,8 +9,8 @@ deploy steps are about **agentchat**, a different app. Use the ones below.
 
 - **https://marketing.vanis.ai**, not chat.vanis.ai. It shares the Hetzner VPS
   (`ssh owui`) and Caddy with agentchat and nothing else.
-- Container `mra` (app and agent in one process) plus `mra-searxng`, compose
-  stack `~/mra-compose`, on its own `edge` network.
+- Container `mra` (app and agent in one process), compose stack
+  `~/mra-compose`, on its own `edge` network. Search is Parallel's cloud API.
 - The agent runs in-process through `pi-agent-core`. No hermes.
 - Ops: `../setup.md` §5a. How a run works, end to end: `workings.md`. Why
   stage 1 is four agents (champion, then product/competitors/category side by
@@ -102,7 +102,7 @@ every rule in that file at once.
 | `domain` | Types, zod schemas, `interface` ports. No I/O. | `trace` (owns `zod`) |
 | `config` | `Settings`, the only reader of `process.env` | `trace` |
 | `extract` | Packet parsing and validation. Pure. | `trace`, `domain` |
-| `adapters` | Apify, Firecrawl, SearXNG, OpenRouter prices, SQLite, corpus | `trace`, `domain`, `config` |
+| `adapters` | Apify, Firecrawl, Parallel, OpenRouter prices, SQLite, corpus | `trace`, `domain`, `config` |
 | `agent` | Prompt building, tools, the run loop | `trace`, `domain`, `config`, `extract`, `adapters` |
 | `http` | Routes, auth, app wiring | everything above |
 | `main.ts` | Entry point. Wiring only. | everything |

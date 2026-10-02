@@ -14,7 +14,7 @@ is the rulebook. If it and this file disagree, the file wins.
 1. **Name the data first.** A concept crossing a class boundary becomes a type or
    zod schema in `domain/`. Everything else depends on it, so it goes in first.
 2. **Name the boundary.** Talking to anything outside the process — OpenRouter,
-   Apify, SearXNG, SQLite, the corpus on disk — means an `interface` in
+   Apify, Parallel, SQLite, the corpus on disk — means an `interface` in
    `domain/ports.ts` and one adapter class in `adapters/` implementing it.
 3. **Pick the layer** from the table in CLAUDE.md. If it fits none, stop and ask.
    Don't invent a layer to make it fit.

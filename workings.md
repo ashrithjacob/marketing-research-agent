@@ -37,9 +37,8 @@ mra container — one Node process (server/src, layered — see CLAUDE.md)
    └─ config/       Settings — the only reader of process.env
         │
         ├──▶ OpenRouter            the model (MRA_MODEL); /models prices; /generation cost
-        ├──▶ searxng:8080          web_search (container on the same network)
         ├──▶ api.firecrawl.dev     web_fetch
-        ├──▶ api.parallel.ai       product truth's search and page reads (stage 2, §2f)
+        ├──▶ api.parallel.ai       web_search, every stage; product truth's page reads (§2f)
         ├──▶ Apify                 amazon_find_product; the listing lookup after stage 1; review mining's pulls (stage 3)
         └──▶ /corpus               every fetched body, content-addressed (volume corpus)
 ```
@@ -270,8 +269,10 @@ done by saturation now (`CompletenessCheck`).
 
 | Tool | Backed by | What it returns to the model | Side effect |
 |---|---|---|---|
-| `web_search` | SearXNG `GET /search?format=json` | numbered titles, urls, snippets (default 10, max 25) | none |
+| `web_search` | Parallel `POST /v1/search` (SearXNG until 2026-10-01) | numbered titles, urls, and the passages Parallel read off each page (default 10, max 25); these choose what to fetch and are not citable in stage 1 | none |
 | `web_fetch` | Firecrawl `POST /v2/scrape` (markdown, main content) | header (`source_id`, url, title, `archived`) + the page text, cut at `MRA_FETCH_CHAR_LIMIT` (25 000; was 60 000 until a run's context reached 208k tokens) | body written to `/corpus/runs/<runId>/sources/<sha256>` |
+| `discover_competitors` (competitors agent only, once) | Parallel Task API `POST /v1/tasks/runs`, processor `MRA_DISCOVERY_PROCESSOR` (default `pro`, $0.10 a call), polled every 10 s until done (`MRA_DISCOVERY_TIMEOUT_SECONDS`, 900) | brands selling to the champion's `icp`, each with its page, form, market and who it says it is for: **candidates**, which the agent must `web_fetch` before recording | the answer written to the corpus; its `source_id` comes back |
+| `ad_library_search` (product, competitors, category; only with `TRENDTRACK_API_KEY`) | Trendtrack `POST /v1/ads/query`: Meta ads by reach, `adCountries` = the markets the agent passes as ISO codes; one credit per ad (5 ads cost 5 credits, measured 2026-10-02) | the match count, then per ad: advertiser page, landing domain (which names the brand behind a persona page), first and last seen, countries, reach, copy | the search and every ad archived, each with its own `source_id` |
 | `amazon_find_product` | Apify `junglee/free-amazon-product-scraper` | asin, stars, `reviewsCount`, title, url — most-reviewed first | none |
 | `record_*` — the kinds in the agent's spec (`STAGE_ONE_AGENT_SPECS`): the champion gets `record_source`, `record_reference`, `record_gap`; product `record_source`, `record_attribute`, `record_node_status`, `record_gap`; category those and `record_measurement`; competitors `record_source`, `record_competitor`, `record_saturation`, `record_node_status`, `record_gap` | the **run ledger** (`research_findings`, one SQLite row per finding, written at once, tagged with the writer's `agent_id`) | `RECORDED <row id>` (`src3`, `ex14`, …), `(replaces <id>)` when it supersedes the agent's *own* earlier row with the same key, or `NOT RECORDED — <problem>` | the row is checked against its section's zod schema and the agent's node *before* it is written (`extract/finding-check.ts`); a refused row writes nothing. The champion row belongs to every stage-1 run, so it is never out of scope |
 | `retract` | the run ledger | `RETRACTED <id>`, or `NOT RETRACTED — <why>` | marks the row retracted with the reason; rows are never deleted. **Only the agent that wrote a row may retract it** |
@@ -316,7 +317,7 @@ the packet carries it once, as last recorded (`PacketAssembly.payloads`).
 the process (`adapters/service-queue.ts`, wrapped round the adapter behind its port
 in `adapters/throttled.ts`, built once in `App`): Firecrawl 2
 (`MRA_FIRECRAWL_CONCURRENCY`, the plan's `maxConcurrency` measured 2026-09-29),
-SearXNG 2 (`MRA_SEARCH_CONCURRENCY`), Apify 16 (`MRA_APIFY_CONCURRENCY`, now shared
+Parallel 4 (`MRA_PARALLEL_CONCURRENCY`, search and extract share it), Apify 16 (`MRA_APIFY_CONCURRENCY`, now shared
 across tools, runs and the stage-2 listing lookup). Each admitted call writes a
 `ServiceQueue.admitted {service, waited_ms}` trace line.
 
@@ -333,7 +334,7 @@ The `source_id` is `sha256:` + the hash of the exact bytes written to disk, so
 matches. If the write fails (unwritable or missing volume), the tool still returns
 the text, with `archived: false` and an instruction to record a gap.
 
-A tool that throws (Firecrawl 4xx, SearXNG down, Apify 402) is handed back to the
+A tool that throws (Firecrawl 4xx, Parallel 401/402, Apify 402) is handed back to the
 model as an error result; the run carries on.
 
 **Except a Firecrawl rate limit, which is waited out.** Firecrawl limits requests
@@ -597,16 +598,24 @@ billed costs arrive on calls it already has.
 
 ### §2c — competitors: direct and indirect
 
-`spec-stage-1.md` §2.2: a **direct** competitor shares an active ingredient with the
-product and has the same form; an **indirect** one shares an active and has a
-different form. A brand that solves the same problem with a *different* active is
-neither — it becomes a gap ("same problem, different active"), because whether
-another molecule is a substitute is a stage-2 judgement.
+`spec-stage-1.md` §2.2, since 2026-10-01: a competitor is any product sold to the
+champion's customer — its `icp`, the people and the problem its own page names —
+in the brief's markets, whatever its actives. A **direct** one has the champion's
+form; an **indirect** one has another. A baby diaper cream with zinc oxide is not a
+competitor of an adult skin-fold cream with zinc oxide; a skin-fold soap with no
+ingredient in common is. Before that day a competitor had to share an active, and
+a brand with a different one was gapped as "same problem, different active".
+
+Code checks what it can: the champion's `icp` and each competitor's
+`icp_as_printed` are non-empty (`CompetitorIcp`, refused at `record_competitor`
+and again at `finish`), `shared_actives` are picks from the champion's list
+(possibly none), and `relation` agrees with the forms. Whether the two customers
+match is the agent's call, with both quotes on the row.
 
 The packet carries this as two things (`domain/packet.ts`):
 
 - `competitor_reference` — the product being compared against, read off its own
-  page: `name`, `form`, `form_as_printed`, `actives` (normalised names), `source_id`.
+  page: `name`, `form`, `form_as_printed`, `actives` (normalised names), `icp`, `source_id`.
   A competitors-only run has no product-data attributes to lean on, so the node
   records the two facts the test needs itself.
 - `competitors[]` — one strict row each: `name`, `brand`, `url`, `relation`,
@@ -783,9 +792,12 @@ result count, each that did not with SearXNG's reason, and an outcome — `ok`,
 `degraded` (some failed), or `failed` (no results and at least one engine
 failed). Measured on local run `424c91a9` (2026-09-27): every search was
 `degraded` — Google CSE 20 results, Brave "too many requests", DuckDuckGo
-"CAPTCHA". The report goes to the page only; what the model reads is unchanged,
-so a `failed` search still reaches it as "No results". Firecrawl and Apify do
-not report yet. `Firecrawl.scrape` reads only the page title from Firecrawl's
+"CAPTCHA". The report went to the page only; what the model read was unchanged,
+so a `failed` search reached it as "No results" — which is how run `8e627d92`
+(Healora, 2026-10-01) lost every competitor search and found its competitors on
+Amazon alone. SearXNG was removed that day; search is Parallel, which throws
+when it can answer nothing, so the model sees an error instead. Firecrawl and
+Apify do not report yet. `Firecrawl.scrape` reads only the page title from Firecrawl's
 metadata, so whether the site itself served the page is not checked (see "A bot
 wall is not detected on `web_fetch`" below); what Firecrawl sends back for a
 refused page has not been measured here.

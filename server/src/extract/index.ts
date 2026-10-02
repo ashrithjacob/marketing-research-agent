@@ -8,6 +8,7 @@ export * from "./champion-check.js";
 export * from "./citation-check.js";
 export * from "./completeness-check.js";
 export * from "./competitor-check.js";
+export * from "./competitor-icp.js";
 export * from "./shared-actives.js";
 export * from "./row-picks.js";
 export * from "./dose-bands.js";

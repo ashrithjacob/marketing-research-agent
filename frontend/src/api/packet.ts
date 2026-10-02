@@ -107,6 +107,7 @@ export interface Competitor {
   form_as_printed?: string;
   active_ingredients: ActiveIngredient[];
   shared_actives: string[];
+  icp_as_printed?: string;
   dose_per_serving?: string;
   positioning_copy?: string;
   price?: string;

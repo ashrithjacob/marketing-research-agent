@@ -39,8 +39,8 @@ Before the HTTP response even returns (`RunSupervisor.start()`, which hands off 
 4. `StageOneRun` starts; each agent is built when its step starts, with its own
    system prompt (tools it has, the shared ledger), its own task
    (`agent/prompt/text/tasks.ts`: fields, where to look, when to stop), and — for
-   step 2 — the champion row copied in. Product and category record only their
-   fixed fields (`domain/node-fields.ts`), refused otherwise. Every LLM call is logged under its `agent_id`,
+   step 2 — the champion row copied in. Product and category must fill their
+   fixed fields (`domain/node-fields.ts`); other keys are allowed after them, not refused. Every LLM call is logged under its `agent_id`,
    `seq` numbered across the run. Row becomes `running`, SSE opens, the browser
    follows `GET /runs/:id/events?after=0`.
 
@@ -60,8 +60,10 @@ Tool calls in the real run (36 total):
 
 | Tool | Count | Where it actually went |
 |---|---|---|
-| `web_search` | 17 | SearXNG container → aggregates Google/Bing/DDG etc. |
+| `web_search` | 17 | SearXNG container then; Parallel's cloud API since 2026-10-01 |
 | `web_fetch` | 13 | Firecrawl cloud API → brand/retailer/market-research pages |
+| `ad_library_search` | — | Trendtrack Meta ad index, product/competitors/category, since 2026-10-02; only with `TRENDTRACK_API_KEY` |
+| `discover_competitors` | — | Parallel Task API, `pro`, once per competitors agent since 2026-10-02: candidates only |
 | `amazon_find_product` | 3 | Apify actor → amazon.com (always .com, whatever the market) |
 | `amazon_reviews` | 1 | Apify actor → amazon.com reviews |
 | `validate_packet` | 2 | local — the same validator that settles the run (retired 2026-09-29; `record_*` and `finish` now, see below) |
@@ -130,7 +132,7 @@ non-empty, scope respected (`packet.ready` `via: "ledger"`).
 | One agent tab ◐ `incomplete` | That agent never passed its `finish`; its problems are in its `packet.checked` events, and the run is `invalid` with them. | `agent.ended`, `packet.checked {agent_id}` |
 | Step-2 agents' prompts lack a champion | Step 1 was skipped (url brief, no competitors) or the champion recorded no reference. | `agent.started` order; `read_ledger` of `champion` |
 | `completed` but `ended_early` | The stream died, but the ledger already made a valid packet. The packet stands. | `run.ended_early` payload |
-| Lots of red tool rows | Firecrawl 4xx / SearXNG down / Apify 402 — handed to the model as errors, run continues. | `tool.completed` payloads with `error` |
+| Lots of red tool rows | Firecrawl 4xx / Parallel 401/402 / Apify 402 — handed to the model as errors, run continues. | `tool.completed` payloads with `error` |
 | `succeeded`-looking run with wrong product | Research about the wrong subject: the brief is copied from the run now, so look at what the rows are about, not `brief.product`. | the sources' urls; the `name` attribute on a site brief |
 | Zero excerpts | See `workings.md` §2 — excerpts aren't checked against archived bodies; zero means the agent didn't quote, which is a prompt/scope issue, not a validator one. | `mra watch` counts while live |
 | Cost looks wrong | Calc (pi-ai × live rates, `usage.pricing.source`) vs Billed (`/generation` per `gen-…` id, 404s for ~4s after each turn; `billed.resolved < turns` = undercount). Apify is separate and never in either. | `usage` on the run, `/runs/<id>/logs` page |

@@ -385,11 +385,12 @@ describe("validation: competitors, direct and indirect", () => {
       form: "capsule",
       form_as_printed: "90 capsules",
       actives: ["magnesium glycinate"],
+      icp: "adults who struggle to fall asleep",
       source_id: "sha256:ref",
     };
     data.competitors = [
-      { id: "c1", name: "CalmWell 400", url: "https://calmwell.example/p", relation: "direct", form: "capsule", active_ingredients: [active], shared_actives: ["magnesium glycinate"], positioning_copy: "Sleep through.", source_id: "sha256:cw", ad_source_ids: ["sha256:ad"] },
-      { id: "c2", name: "SleepMist spray", url: "https://sleepmist.example/p", relation: "indirect", form: "spray", active_ingredients: [active], shared_actives: ["Magnesium Glycinate"], source_id: "sha256:sm" },
+      { id: "c1", name: "CalmWell 400", url: "https://calmwell.example/p", relation: "direct", form: "capsule", active_ingredients: [active], shared_actives: ["magnesium glycinate"], icp_as_printed: "for restless nights", positioning_copy: "Sleep through.", source_id: "sha256:cw", ad_source_ids: ["sha256:ad"] },
+      { id: "c2", name: "SleepMist spray", url: "https://sleepmist.example/p", relation: "indirect", form: "spray", active_ingredients: [active], shared_actives: ["Magnesium Glycinate"], icp_as_printed: "for restless nights", source_id: "sha256:sm" },
     ];
     return data;
   };
@@ -452,12 +453,29 @@ describe("validation: competitors, direct and indirect", () => {
   });
 
   it("rejects a shared active the reference product does not have", () => {
-    // Same problem, different molecule: neither class, and a gap instead.
     const data = withCompetitors();
     const melatonin = { name_as_printed: "Melatonin", name_normalised: "melatonin" };
     data.competitors[0].active_ingredients = [melatonin];
     data.competitors[0].shared_actives = ["melatonin"];
-    expect(() => packets.validate(data)).toThrow(/is neither direct nor indirect/);
+    expect(() => packets.validate(data)).toThrow(/If this product has none of them, shared_actives is \[\]/);
+  });
+
+  it("accepts a competitor for the champion's customer that shares none of its actives", () => {
+    // Run 8e627d92 (Healora): Veloma, a soap sold for the same skin-fold rash, was
+    // gapped as "same problem, different active" while baby diaper creams were listed.
+    const data = withCompetitors();
+    data.competitors[0].active_ingredients = [{ name_as_printed: "Melatonin", name_normalised: "melatonin" }];
+    data.competitors[0].shared_actives = [];
+    expect(packets.validate(data).competitors[0]!.shared_actives).toEqual([]);
+  });
+
+  it("needs each side to say who its customer is", () => {
+    const data = withCompetitors();
+    data.competitors[0].icp_as_printed = "";
+    expect(() => packets.validate(data)).toThrow(/competitor 'CalmWell 400' has no icp_as_printed/);
+    const noIcp = withCompetitors();
+    noIcp.competitor_reference.icp = "";
+    expect(() => packets.validate(noIcp)).toThrow(/the champion records no icp/);
   });
 
   it("takes shared actives as picks from the champion's list, whatever the competitor's page calls them", () => {
@@ -534,13 +552,14 @@ describe("validation: the champion is the genre's most-bought", () => {
       form: "capsule",
       form_as_printed: "90 capsules",
       actives: ["magnesium glycinate"],
+      icp: "adults who struggle to fall asleep",
       source_id: "sha256:ref",
       reviews_count: 18453,
       runner_up_name: "CalmWell 400",
       runner_up_reviews: 9211,
     };
     data.competitors = [
-      { id: "c1", name: "CalmWell 400", url: "https://calmwell.example/p", relation: "direct", form: "capsule", active_ingredients: [active], shared_actives: ["magnesium glycinate"], positioning_copy: "Sleep through.", market: "UK", source_id: "sha256:cw", ad_source_ids: [] },
+      { id: "c1", name: "CalmWell 400", url: "https://calmwell.example/p", relation: "direct", form: "capsule", active_ingredients: [active], shared_actives: ["magnesium glycinate"], icp_as_printed: "for restless nights", positioning_copy: "Sleep through.", market: "UK", source_id: "sha256:cw", ad_source_ids: [] },
     ];
     return data;
   };

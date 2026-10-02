@@ -108,9 +108,51 @@ attribute has a value or a gap. **A missing COA is a gap, not a zero.**
 
 ### 2.2 competitors
 
-Two classes, and the distinction is mechanical rather than a judgement:
+**Current rule (2026-10-01): a competitor sells to the champion's customer.**
+The champion records its `icp` (ideal customer profile): who its own page says
+it is for and the problem it solves. A competitor is any product sold to that
+customer in the brief's markets, **whatever its actives**, and records
+`icp_as_printed`, who its own page says it is for. Form alone splits the classes:
 
 | Class | Test |
+|---|---|
+| **Direct** | the champion's customer, **same** form |
+| **Indirect** | the champion's customer, **different** form |
+
+`shared_actives` is still recorded, and is `[]` when a competitor shares none.
+Code checks that both sides wrote down their customer (`extract/competitor-icp.ts`,
+at write time and at `finish`) and that `relation` agrees with the forms; whether
+the two customers are the same is the agent's judgement, with both quotes on the
+row for a human to audit.
+
+Why: run `8e627d92` (Healora, an adult skin-fold rash cream with 15% zinc oxide)
+listed ten baby diaper creams as direct competitors, because they are topical
+and contain zinc oxide, and gapped Veloma, a soap sold for the same skin-fold
+rash, as "same problem, different active". The client's definition: a
+competitor sells the same thing to the same people in the same market; an
+indirect one sells something different to the same people.
+
+**Finding candidates: Parallel first (2026-10-02).** The competitors agent calls
+`discover_competitors` once before searching: one Parallel Task API run, processor
+`pro`, asked for brands selling to the champion's `icp` in the brief's markets.
+What it names are candidates; the agent reads each one's own page and records
+it through the same checks as any other row. Measured on Healora the same day,
+one call each with the same brief and schema: `pro` returned 10 same-customer
+brands, 9 not on Amazon, in 84 s for $0.10; `ultra` returned 11, in 6 min for
+$0.30; the two lists shared 3 brands, and neither shared one with run
+`8e627d92`, whose 21 competitors were 20 Amazon listings. Both left ingredient
+strength out on 8–9 of their rows and cite one unarchived snippet per brand,
+which is why Parallel finds and the agent reads, rather than Parallel's rows
+going into the packet.
+
+**Superseded twice on 2026-10-01.** The rule below this paragraph, from
+2026-09-11, defined both classes by a shared active ingredient. The first
+revision that day kept the shared active and added "in the champion's market"
+as a prompt-only rule, with no field to check. The second, above, drops the
+shared active and records the customer on both sides. The original reasoning
+follows, kept because the mechanical-test argument still holds for form:
+
+| Class | Test (superseded) |
 |---|---|
 | **Direct** | same active ingredient **and** same form |
 | **Indirect** | same active ingredient, **different** form — the same problem solved in another format |
@@ -154,12 +196,12 @@ category this runs on. The options, none chosen yet: per-category vocabularies c
 from the brief; `form` as free text with a normalisation step; or keeping `other` as
 the honest escape hatch it now is and accepting that outside supplements the
 direct/indirect split is the agent's call, audited rather than enforced. Revisit when
-a third category needs it. **A brand that shares the problem but not the ingredient is neither**:
+a third category needs it. ~~**A brand that shares the problem but not the ingredient is neither**:
 capture it as a source if it is useful, and gap it as "same problem, different active"
-rather than inventing a third class here. Deciding whether a different molecule is a
-substitute is a stage-2 judgement.
+rather than inventing a third class here.~~ Superseded 2026-10-01: such a brand is a
+competitor when it sells to the champion's customer (top of §2.2).
 
-Per competitor: `name · url · relation ∈ {direct, indirect} · active_ingredients[] ·
+Per competitor: `name · url · relation ∈ {direct, indirect} · active_ingredients[] · shared_actives (may be empty) · icp_as_printed ·
 form · dose_per_serving · positioning_copy (verbatim) · price · price_per_dose ·
 ad_library_entries`.
 

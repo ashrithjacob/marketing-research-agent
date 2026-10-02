@@ -52,7 +52,7 @@ const listing = (asin: string, brand: string, title: string): AmazonListing => (
 });
 
 const competitor = (id: string, name: string, brand: string, url: string) => ({
-  id, name, brand, url, relation: "direct", form: "liquid", shared_actives: ["mullein"], source_id: "sha256:aaa",
+  id, name, brand, url, relation: "direct", form: "liquid", shared_actives: ["mullein"], icp_as_printed: "for coughs and chest congestion", source_id: "sha256:aaa",
   active_ingredients: [{ name_as_printed: "Mullein", name_normalised: "mullein" }],
 });
 
@@ -64,7 +64,7 @@ function seedStageOne(extra: Array<ReturnType<typeof competitor>> = [], rows: Ta
     status: "completed",
     packet: minimalPacket({
       brief,
-      competitor_reference: { name: "Mullevia Mullein Drops", form: "liquid", actives: ["mullein"], source_id: "sha256:aaa" },
+      competitor_reference: { name: "Mullevia Mullein Drops", form: "liquid", actives: ["mullein"], icp: "adults with a cough", source_id: "sha256:aaa" },
       competitors: [
         competitor("c1", "Herb Pharm Mullein", "Herb Pharm", "https://herb-pharm.com/mullein"),
         competitor("c2", "Herbify Mullein Extract", "Herbify", "https://myherbify.com/product/mullein"),

@@ -5,7 +5,7 @@ import { Corpus } from "../../adapters/corpus.js";
 import { OpenRouterGate } from "../../adapters/fetch-gate.js";
 import type { ServiceClients } from "../../adapters/service-clients.js";
 import type { Settings } from "../../config/index.js";
-import type { FindingKind } from "../../domain/index.js";
+import type { DiscoveryQuestion, FindingKind } from "../../domain/index.js";
 
 import type { AgentRoster } from "../agent-roster.js";
 import type { DoneCheck } from "../done-check.js";
@@ -18,6 +18,8 @@ import { FinishTool } from "./finish-tool.js";
 import { ReadLedgerTool, WaitForTool } from "./ledger-read-tools.js";
 import { RecordTool, RetractTool } from "./ledger-tools.js";
 import { FindProductTool } from "./find-product-tool.js";
+import { DiscoverCompetitorsTool } from "./discover-competitors-tool.js";
+import { AdLibraryTool } from "./ad-library-tool.js";
 import { WebFetchTool } from "./web-fetch-tool.js";
 import { TracedTool } from "./traced-tool.js";
 import { WebSearchTool } from "./web-search-tool.js";
@@ -42,6 +44,8 @@ export interface ToolsetOptions {
   onFetch?: (record: FetchRecord) => void;
   onApifyCharge?: (charge: ActorCharge) => void;
   productSearch?: boolean;
+  discover?: DiscoveryQuestion;
+  ads?: boolean;
   evidence?: boolean;
   subject?: string;
   market?: string;
@@ -67,7 +71,21 @@ export class ResearchToolset {
     const runner = bare && onCharge ? new MeteredActorRunner(bare, onCharge) : bare;
     const web = this.options.evidence ? this.evidenceTools() : this.webTools();
     const search = runner ? [new FindProductTool(new AmazonProducts(runner)).tool()] : [];
-    return [...web, ...search, ...this.ledgerTools()];
+    return [...web, ...this.discoveryTools(), ...this.adTools(), ...search, ...this.ledgerTools()];
+  }
+
+  private adTools(): AgentTool<any>[] {
+    Trace.line(import.meta.url, "ResearchToolset.adTools");
+    const { services, ads, settings, runId } = this.options;
+    if (!ads || !services.ads) return [];
+    return [new AdLibraryTool(services.ads, new Corpus(settings.corpusPath), runId).tool()];
+  }
+
+  private discoveryTools(): AgentTool<any>[] {
+    Trace.line(import.meta.url, "ResearchToolset.discoveryTools");
+    const { services, discover, settings, runId } = this.options;
+    if (!discover || !services.discovery) return [];
+    return [new DiscoverCompetitorsTool(services.discovery, discover, new Corpus(settings.corpusPath), runId).tool()];
   }
 
   private webTools(): AgentTool<any>[] {

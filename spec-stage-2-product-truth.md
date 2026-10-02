@@ -97,12 +97,12 @@ run as today and checks that a completed stage-2 run shares it.
 | finding sources | **Parallel Search** (`POST /v1/search`, `x-api-key`; `objective` + 3–6-word `search_queries`, `advanced_settings.max_results`) | one dose-vs-study query: 200 in **2.4 s**, 5 results with focused excerpts — including drugs.com's *"Clinical data are lacking to provide dosing recommendations"* for mullein. **$5 / 1,000** searches (advanced), $1 / 1,000 (fast) |
 | reading a page in full | **Parallel Extract** (`POST /v1beta/extract`, header `parallel-beta: search-extract-2025-10-10`, `urls`, `objective`, `excerpts`, `full_content`) | the Mullevia product page in **23 s**, 19,469 chars, **the full USD bundle table** ($26.95…$179.75) that Crawl4AI missed. **$1 / 1,000** URLs |
 | regulator and platform rules | Parallel Search with `source_policy` limited to official domains (fda.gov, ftc.gov, asa.org.uk, tga.gov.au, canada.ca, ad-policy pages of Meta, Google, TikTok, Amazon) | not yet measured |
-| fallback without a Parallel key | **SearXNG** (free, ours) for search; Parallel or Crawl4AI for reading | SearXNG gives snippets only, so it cannot replace reading |
+| fallback without a Parallel key | ~~**SearXNG** (free, ours) for search~~ — removed 2026-10-01, so no search fallback; Crawl4AI for reading | SearXNG's engines blocked the VPS and it answered a blocked search with an empty 200; see `../setup.md` §5c |
 
 Every excerpt and extracted page is archived under its sha256 like a
 `web_fetch` today, so "cite only what was read" still holds.
 
-**SearXNG upkeep.** The VPS runs `searxng/searxng:latest` as pulled on
+**SearXNG upkeep** (moot since 2026-10-01, SearXNG removed). The VPS ran `searxng/searxng:latest` as pulled on
 2026-09-11 (`VERSION_STRING = "2026.9.11+61d660276"`); `latest` means whichever
 day it was last pulled. Plan: pin a dated tag in both compose files and update
 it on purpose, following the SearXNG update guide, with `setup.md` recording the

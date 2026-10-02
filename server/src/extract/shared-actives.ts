@@ -12,8 +12,7 @@ export class SharedActives {
       .map(
         (active) =>
           `${label} lists '${active}' as shared, but shared_actives must be copied word for word from the ` +
-          `champion's actives: ${championActives.join(", ")}. If this product has none of them it is neither ` +
-          'direct nor indirect — gap it as "same problem, different active"',
+          `champion's actives: ${championActives.join(", ")}. If this product has none of them, shared_actives is []`,
       );
   }
 }

@@ -10,7 +10,6 @@ export interface Settings {
   model: string;
   backupModels: string[];
 
-  searxngUrl: string;
   firecrawlApiKey: string;
   firecrawlBaseUrl: string;
   crawl4aiApiKey: string;
@@ -19,10 +18,14 @@ export interface Settings {
   parallelApiKey: string;
   parallelBaseUrl: string;
   parallelConcurrency: number;
+  discoveryProcessor: string;
+  discoveryTimeoutSeconds: number;
+  trendtrackApiKey: string;
+  trendtrackBaseUrl: string;
+  trendtrackConcurrency: number;
   webTimeoutSeconds: number;
   fetchCharLimit: number;
   firecrawlConcurrency: number;
-  searchConcurrency: number;
   gateModel: string;
   gateCharLimit: number;
   gateTimeoutSeconds: number;

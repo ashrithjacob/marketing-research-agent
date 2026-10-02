@@ -11,7 +11,7 @@ import {
 import { PromptBlocks } from "./blocks.js";
 import { AMAZON_SEARCH_TOOL } from "./text/amazon-search.js";
 import { RECORD_TOOLS } from "./text/record-tools.js";
-import { AGENT_ROLES, SYSTEM_PROMPT, WAIT_FOR_TOOL } from "./text/system.js";
+import { AD_LIBRARY_TOOL, AGENT_ROLES, DISCOVER_TOOL, SYSTEM_PROMPT, WAIT_FOR_TOOL } from "./text/system.js";
 import { CATEGORY_TASK, CHAMPION_GENRE_TASK, CHAMPION_URL_TASK, COMPETITORS_TASK, PRODUCT_TASK } from "./text/tasks.js";
 import { Trace } from "../../trace/index.js";
 
@@ -31,12 +31,14 @@ const TASKS: Readonly<Record<Exclude<StageOneAgent, "champion">, string>> = {
 
 /** Each stage-1 agent's own system prompt and task: its role, its fields, where to look and when to stop. */
 export class PromptBuilder {
-  system(agent: StageOneAgent, options: { amazon: boolean; waits: boolean }): string {
+  system(agent: StageOneAgent, options: { amazon: boolean; waits: boolean; discovery?: boolean; ads?: boolean }): string {
     Trace.line(import.meta.url, "PromptBuilder.system", { agent, options });
     const records = RECORD_TOOLS.filter((tool) => STAGE_ONE_AGENT_SPECS[agent].records.includes(tool.kind)).map((tool) => tool.name);
     return SYSTEM_PROMPT.replace("{agent}", agent)
       .replace("{role}", AGENT_ROLES[agent])
       .replace("{record_tools}", PromptBlocks.code(records))
+      .replace("{discovery}", options.discovery ? DISCOVER_TOOL : "")
+      .replace("{ad_library}", options.ads ? AD_LIBRARY_TOOL : "")
       .replace("{amazon_search}", options.amazon ? AMAZON_SEARCH_TOOL : "")
       .replace("{wait_for}", options.waits ? WAIT_FOR_TOOL : "");
   }

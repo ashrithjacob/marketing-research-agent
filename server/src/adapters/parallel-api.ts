@@ -4,17 +4,27 @@ import { Trace } from "../trace/index.js";
 
 import { Http } from "./http.js";
 
-/** One POST to Parallel with the account key; no key, a rejected key or no credit means Parallel can answer nothing. */
+/** One request to Parallel with the account key; no key, a rejected key or no credit means Parallel can answer nothing. */
 export class ParallelApi {
   constructor(private readonly settings: Settings) {}
 
   async post(path: string, body: Record<string, unknown>, headers: Record<string, string>, signal?: AbortSignal): Promise<Record<string, unknown>> {
     Trace.line(import.meta.url, "ParallelApi.post", { path });
+    return this.send(path, { method: "POST", headers: { "Content-Type": "application/json", ...headers }, body: JSON.stringify(body) }, signal);
+  }
+
+  async get(path: string, signal?: AbortSignal): Promise<Record<string, unknown>> {
+    Trace.line(import.meta.url, "ParallelApi.get", { path });
+    return this.send(path, { method: "GET", headers: {} }, signal);
+  }
+
+  private async send(path: string, init: RequestInit & { headers: Record<string, string> }, signal?: AbortSignal): Promise<Record<string, unknown>> {
+    Trace.line(import.meta.url, "ParallelApi.send", { path, method: init.method });
     const { parallelApiKey, parallelBaseUrl, webTimeoutSeconds } = this.settings;
     if (!parallelApiKey) throw new ServiceUnavailableError("parallel", "PARALLEL_API_KEY is not set");
     const response = await Http.withTimeout(
       `${parallelBaseUrl.replace(/\/$/, "")}${path}`,
-      { method: "POST", headers: { "x-api-key": parallelApiKey, "Content-Type": "application/json", ...headers }, body: JSON.stringify(body) },
+      { ...init, headers: { "x-api-key": parallelApiKey, ...init.headers } },
       webTimeoutSeconds,
       signal,
     );

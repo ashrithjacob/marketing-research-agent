@@ -202,7 +202,7 @@ generic gaps table:
 | Tile | Shows | Where its data comes from |
 |---|---|---|
 | Product data (open by default) | attributes, SVG bars for numeric measurements, excerpts, gaps | packet rows with `node: 'product_data'` |
-| Competitors | direct/indirect groups, each competitor's site link and its Amazon listing or "not on Amazon — <why>" (`run-view/amazon-link.tsx`, also on the champion line), social-proof review-count chart, excerpts, gaps | `packet.competitors`, `measurements`, `listings` on `GET /runs/:id` (re-judged by today's matcher on each read) |
+| Competitors | direct/indirect groups, each competitor's site link, the champion's actives it shares (none shown when it shares none), **for:** who its own page says it is for (`icp_as_printed`), and its Amazon listing or "not on Amazon — <why>" (`run-view/amazon-link.tsx`, also on the champion line), social-proof review-count chart, excerpts, gaps | `packet.competitors`, `measurements`, `listings` on `GET /runs/:id` (re-judged by today's matcher on each read) |
 | Category data | market-size/CAGR bar charts, every figure with its period, gaps | `measurements` with `node: 'category_data'` |
 | Ingredients (stage 2, `run-view/truth/IngredientsTile.tsx`) | one card per active: amount on the label (or "no amount stated"), pathway, time to effect, magnitude, a `carrier` badge on the actives the story rests on | `packet.actives`, `packet.mechanisms` |
 | Dose vs study (stage 2) | active · ours per day · studied per day · ratio · class · form match · study; an unassessable row says why | `packet.doses`, computed by `extract/dose-bands.ts` |
@@ -305,9 +305,9 @@ action, joined by a line, top to bottom.
      with status and time, red when 4xx/5xx or an error), timed from the call's
      start — the `inside` lines on `tool.completed` (`workings.md` §2e). Above
      them, a service line when the service reported more than a status, e.g.
-     **SearXNG · 1 of 3 answered ✓ google cse — 20 results ✗ brave — too many
-     requests**. Such a search is marked **DEGRADED** (amber), or **EMPTY** when
-     nothing answered, although the tool itself succeeded.
+     **Parallel · search — 10 results**. A search with failed parts is marked
+     **DEGRADED** (amber), or **EMPTY** when nothing answered. Parallel reports
+     one part; the multi-engine case was SearXNG's, removed 2026-10-01.
   4. **→ the results go into turn #N's prompt**, in the order asked for.
 
   At the bottom, *Full LLM call* is the previous view (`logs/CallView.tsx`):

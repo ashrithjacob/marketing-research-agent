@@ -166,7 +166,7 @@ export function productPacket(overrides: Record<string, unknown> = {}): Record<s
 export function genreRun(packet: Record<string, any> = productPacket()): AssistantMessage[] {
   const champion = {
     sources: [{ ...minimalPacket().sources[0], node: "product_data" }],
-    competitor_reference: { name: "MagnaCalm Glycinate", form: "capsule", actives: ["magnesium glycinate"], source_id: "sha256:aaa" },
+    competitor_reference: { name: "MagnaCalm Glycinate", form: "capsule", actives: ["magnesium glycinate"], icp: "adults with a cough", source_id: "sha256:aaa" },
     gaps: [{ node: "product_data", missing: "champion ranking unavailable: no Amazon search in tests" }],
   };
   return [...recorded(champion), ...recorded(packet)];

@@ -13,6 +13,7 @@ import {
   type Node,
   type ResearchStore,
   type StageOneAgent,
+  type DiscoveryQuestion,
 } from "../domain/index.js";
 import { Trace } from "../trace/index.js";
 
@@ -68,6 +69,8 @@ export class StageOneAgentFactory {
     const findings = new RunFindings(this.store.findings, run.runId, id, [StageOnePlans.nodeOf(id, run.nodes)]);
     const champion = findings.live().find((row) => row.kind === "competitor_reference")?.payload ?? null;
     const amazon = spec.amazon && this.services.actors !== null;
+    const ads = spec.ads && this.services.ads !== null;
+    const discover = spec.discovery && champion && this.services.discovery ? StageOneAgentFactory.question(champion, run.brief) : undefined;
     const waits = id !== "champion";
     const steps = new ToolSteps();
     const check = DoneChecks.of(id, findings, run.brief, run.nodes);
@@ -85,6 +88,8 @@ export class StageOneAgentFactory {
       runId: run.runId,
       services: this.services,
       productSearch: amazon,
+      ...(discover ? { discover } : {}),
+      ads,
       subject: run.brief.product || run.brief.url,
       market: run.brief.market,
       steps,
@@ -101,11 +106,23 @@ export class StageOneAgentFactory {
     const agent = new Agent({
       streamFn,
       sessionId: `research-${run.runId}-${id}`,
-      initialState: { systemPrompt: this.prompts.system(id, { amazon, waits }), model: run.chain.current, tools },
+      initialState: { systemPrompt: this.prompts.system(id, { amazon, waits, discovery: discover !== undefined, ads }), model: run.chain.current, tools },
       finishTurn: budget.finishTurn,
     });
     const instructions = this.prompts.instructions(id, { ...run, champion });
     const closeOnLimit = id === "champion" ? null : () => new LimitClose(findings, new RowRepair(this.store.findings, run.runId, run.nodes), check, node, spec.maxTurns).close();
     return { agent, instructions, steps, check, budget, closeOnLimit };
+  }
+
+  private static question(champion: Record<string, unknown>, brief: Brief): DiscoveryQuestion {
+    Trace.line(import.meta.url, "StageOneAgentFactory.question", { champion: champion.name });
+    return {
+      product: String(champion.name ?? ""),
+      url: brief.url,
+      icp: String(champion.icp ?? ""),
+      form: String(champion.form ?? ""),
+      actives: Array.isArray(champion.actives) ? champion.actives.map(String) : [],
+      markets: brief.market,
+    };
   }
 }

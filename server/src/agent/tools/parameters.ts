@@ -49,3 +49,16 @@ export const waitForParameters = Type.Object({
   agent: Type.String({ description: "The agent whose row you need: champion, product, competitors or category." }),
   kind: Type.String({ description: "The kind of row you need, e.g. attribute." }),
 });
+
+export const discoverParameters = Type.Object({});
+
+export const adSearchParameters = Type.Object({
+  query: Type.String({ description: "What to look for: the customer's problem in the ads' own words, a brand name, or a domain." }),
+  search_in: Type.Optional(
+    Type.Union([Type.Literal("ad_copy"), Type.Literal("brand"), Type.Literal("domain")], { description: "Where to look: ad_copy (default), brand, or domain." }),
+  ),
+  countries: Type.Optional(
+    Type.Array(Type.String({ pattern: "^[A-Za-z]{2}$" }), { description: "ISO 3166-1 alpha-2 codes of the brief's markets, e.g. [\"US\", \"GB\"]. Leave out for every country." }),
+  ),
+  max_results: Type.Optional(Type.Number({ description: "How many ads to return (default 10, max 20). Each costs one credit." })),
+});

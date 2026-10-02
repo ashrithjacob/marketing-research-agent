@@ -1,4 +1,4 @@
-# The whole marketing research agent: cockpit, agent and search. One file, one
+# The whole marketing research agent: cockpit and agent. One file, one
 # command:
 #
 #     cp .env.example .env   # fill in the keys, first time only
@@ -7,7 +7,7 @@
 #
 #     docker compose down    # stop it; the volumes keep your runs
 #
-# Two containers, two volumes. Nothing on the host, nothing in systemd, nothing
+# One container, two volumes. Nothing on the host, nothing in systemd, nothing
 # that has to be running when you are not using it.
 #
 # **Superseded:** this stack used to be four containers — the cockpit, its own
@@ -15,32 +15,12 @@
 # search backend, and SearXNG. The harness now runs inside the cockpit process
 # (pi-agent-core), so `hermes` and `hermes-config` are gone, and with them the
 # whole class of failure where the agent's web access depended on which backend
-# hermes had auto-detected. See README.md and spec-stage-1.md §10.
+# hermes had auto-detected. See README.md and spec-stage-1.md §10. SearXNG
+# went on 2026-10-01: search engines blocked it (CAPTCHA, rate limits) and
+# every search came back empty; search is Parallel's cloud API now.
 name: mra
 
 services:
-  # Stage 1 is a web-search agent, so its search tool matters more than most.
-  # SearXNG is a self-hosted, free metasearch engine — one container, no API
-  # key, no per-query cost. It aggregates Google/Bing/DuckDuckGo/etc without
-  # sending your queries to any single one of them as the vendor of record.
-  #
-  # Search only: SearXNG does not fetch page content, only search results.
-  # That's what Firecrawl is for — a cloud API, called directly by `mra`.
-  searxng:
-    image: searxng/searxng:latest
-    container_name: mra-searxng
-    restart: on-failure
-    expose: ["8080"]              # container network only; never published
-    volumes:
-      # `use_default_settings: true` inside — a small override, not a fork of
-      # SearXNG's own config. See the file for what had to change and why:
-      # a stock SearXNG refuses `format=json`, which is the only format the
-      # web_search tool asks for.
-      - ./searxng/settings.yml:/etc/searxng/settings.yml:ro
-    environment:
-      # Real secret, not the placeholder committed in settings.yml.
-      - SEARXNG_SECRET=${SEARXNG_SECRET}
-
   mra:
     build:
       context: .
@@ -54,7 +34,6 @@ services:
     # restarting kills any run in progress; the server marks such a run
     # `failed` on the way back up rather than leaving it stuck on `running`.
     restart: on-failure
-    depends_on: [searxng]
     # Bound to 127.0.0.1, not 0.0.0.0: with no password set
     # (MRA_APP_PASSWORD_HASH below) anyone on your network would otherwise
     # reach an unauthenticated agent with web access.
@@ -93,18 +72,19 @@ services:
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
       - MRA_MODEL=${MRA_MODEL:?MRA_MODEL must be set in .env - the model id lives only there}
       - MRA_BACKUP_MODELS=${MRA_BACKUP_MODELS:-}
-      # Search by service name on this network; page content from Firecrawl's
-      # cloud API. Leave FIRECRAWL_API_KEY blank and web_fetch fails loudly on
-      # every call, which is more useful than a run that quietly records
-      # nothing but search snippets.
-      - SEARXNG_URL=http://searxng:8080
+      # Page content from Firecrawl's cloud API. Leave FIRECRAWL_API_KEY blank
+      # and web_fetch fails loudly on every call, which is more useful than a
+      # run that quietly records nothing but search snippets.
       - FIRECRAWL_API_KEY=${FIRECRAWL_API_KEY}
       # Fallback page reader: used only when Firecrawl can fetch nothing at all
       # (out of credits, key refused, or no key). Blank disables the fallback.
       - CRAWL4AI_API_KEY=${CRAWL4AI_API_KEY:-}
-      # Product truth (stage 2) searches and reads through Parallel. Blank falls
-      # back to SearXNG for search and Crawl4AI for reading.
+      # Every web_search, stage 1 and product truth, goes to Parallel, and
+      # product truth reads pages through it too. Blank: every search fails.
       - PARALLEL_API_KEY=${PARALLEL_API_KEY:-}
+      # Meta ad search for the product, competitors and category agents
+      # (ad_library_search). Blank: the tool is not offered.
+      - TRENDTRACK_API_KEY=${TRENDTRACK_API_KEY:-}
       # Cheap pre-read gate: every fetched page passes a small model before it
       # reaches the researcher's context. Empty disables the gate (tools then
       # behave as before). :free models cost nothing but can rate-limit; the

@@ -67,16 +67,14 @@ machine.
 ## Layout
 
 ```
-docker-compose.yaml   the whole stack, one file: cockpit and search —
+docker-compose.yaml   the whole stack, one file —
                        `docker compose up` and done
-searxng/settings.yml  the one override SearXNG needs (JSON output is off by
-                       default) — see the file for why
 server/src/
   settings.ts     every env var, MRA_-prefixed (plus APIFY_TOKEN)
   schema.ts       the run contract; .strict() is the guarantee, not tidiness
   packet.ts       find the JSON in the output (forgiving), then validate (not)
   prompt.ts       brief + admission policy + judgements -> instructions
-  tools.ts        web_search (SearXNG) + web_fetch (Firecrawl, auto-archiving)
+  tools.ts        web_search (Parallel) + web_fetch (Firecrawl, auto-archiving)
                   + the three Apify review tools
   apify.ts        the Apify boundary: Amazon + Trustpilot reviews, and costs
   http.ts         fetch-with-deadline and a bounded concurrency pool
@@ -109,19 +107,18 @@ cd marketing-research-agent
 cp .env.example .env
 ```
 
-Four values go in `.env`. Two are secrets you generate, two are API keys you
+Four values go in `.env`. One is a secret you generate, three are API keys you
 paste:
 
 ```bash
-# generate these two
 openssl rand -hex 32    # -> MRA_JWT_SECRET
-openssl rand -hex 32    # -> SEARXNG_SECRET
 ```
 
 | Key | Where from |
 |---|---|
 | `OPENROUTER_API_KEY` | https://openrouter.ai/keys — inference |
 | `FIRECRAWL_API_KEY` | https://www.firecrawl.dev/app/api-keys — page fetching, free tier |
+| `PARALLEL_API_KEY` | https://platform.parallel.ai — every `web_search`; blank and every search fails |
 
 A fourth is optional:
 
@@ -145,26 +142,14 @@ docker compose up -d --build
 open http://localhost:8080
 ```
 
-First `up` pulls ~100 MB for SearXNG and builds the cockpit image, which
-compiles `better-sqlite3` from source on alpine — a couple of minutes, once.
+First `up` builds the cockpit image, which compiles `better-sqlite3` from
+source on alpine — a couple of minutes, once.
 
 ### Check it came up clean
 
-Two things, because one of them fails quietly:
-
 ```bash
-# 1. searxng and mra should both be Up.
-docker compose ps
-
-# 2. Should return JSON, not HTML and not a 403.
-docker compose exec mra node -e \
-  "fetch('http://searxng:8080/search?q=test&format=json').then(r=>r.text()).then(t=>console.log(t.slice(0,200)))"
+docker compose ps    # mra should be Up
 ```
-
-Check 2 is the one worth doing: SearXNG ships with JSON output **disabled**, and
-`searxng/settings.yml` is what turns it on. If that mount ever fails, every
-`web_search` call throws on a 403 — loudly, which is the point, but the message
-names SearXNG rather than the config file that caused it.
 
 ### Stop it
 
@@ -177,7 +162,7 @@ archived page. Rarely what you want.
 
 ### Review mining, locally
 
-The three review tools need one key and nothing else — no container, no SearXNG,
+The three review tools need one key and nothing else — no container,
 no Trustpilot browser. Put `APIFY_TOKEN` in `.env`, then:
 
 ```bash
@@ -230,7 +215,7 @@ docker compose up -d --build mra  # rebuild just the cockpit after a code change
 
 | Symptom | Likely cause |
 |---|---|
-| Every `web_search` fails with a 403 | SearXNG JSON disabled — the `searxng/settings.yml` mount failed (check 2 above) |
+| Every `web_search` fails | `PARALLEL_API_KEY` unset, refused (401) or out of credit (402); the error says which |
 | Every `web_fetch` fails | `FIRECRAWL_API_KEY` unset or out of quota; the error names Firecrawl and the status |
 | A run says `failed` with "the server restarted" | exactly what it says — the agent runs in this process, so a rebuild or restart kills a run in flight |
 | Login succeeds then immediately logs out | `MRA_COOKIE_SECURE=true` over plain `http://localhost`; `.env.example` sets it false for this reason |
@@ -288,10 +273,13 @@ matters. Two pieces, wired in as one container plus one API key:
   card with no allowance: ~$0.005 per Amazon review on the $19 plan ($0.006 on FREE), and the FREE plan stops at
   $5/month. Unset leaves `review_mining` gapped rather than faked. Full
   measurements in `spec-review-mining.md`.
-- **SearXNG** — a free, self-hosted metasearch engine, one container
-  (`searxng`, ~100 MB), no API key, no per-query cost. It aggregates several
-  search engines without handing your queries to any one of them as the
-  vendor of record.
+- **Parallel** — search, as a cloud API (`PARALLEL_API_KEY`, $5 per 1,000
+  searches). Each result comes with passages Parallel read off the page.
+  **Superseded:** search was SearXNG, a free self-hosted metasearch container,
+  until 2026-10-01. The engines it aggregates block a datacenter IP (DuckDuckGo
+  CAPTCHA, Brave and Google CSE rate limits), and it answers a fully blocked
+  search with an empty `200`, so the agent was told "No results" and fell back
+  to Amazon for every competitor (run `8e627d92`, `../setup.md` §5c).
 - **Firecrawl** — fetches a found page's content, cleaned up for an LLM to
   read. Wired to their **cloud API** (`FIRECRAWL_API_KEY`, free tier
   available) rather than self-hosted: their own stack is 5+ containers (an
@@ -301,7 +289,7 @@ matters. Two pieces, wired in as one container plus one API key:
   dependency; not done here.
 
 **No manual step required, and no auto-detect to get wrong.** `tools.ts` calls
-SearXNG for search and Firecrawl for content, always, by name. The previous
+Parallel for search and Firecrawl for content, always, by name. The previous
 stack had to correct hermes's own backend auto-detect with a one-shot
 `hermes-config` container, because with both configured hermes preferred
 Firecrawl for search too and silently skipped SearXNG. That whole service is
