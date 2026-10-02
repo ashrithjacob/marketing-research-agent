@@ -1,7 +1,7 @@
 import {
   AD_PLATFORMS,
   Findings,
-  PRODUCT_TRUTH_AGENT_SPECS,
+  Roles,
   type Active,
   type Finding,
   type FindingKind,
@@ -33,7 +33,7 @@ export class ProductTruthCoverage {
 
   open(agent: ProductTruthAgent): OpenItem[] {
     Trace.line(import.meta.url, "ProductTruthCoverage.open", { agent });
-    const node = PRODUCT_TRUTH_AGENT_SPECS[agent].node;
+    const node = Roles.node(Roles.of(agent), []);
     return this.items(agent)
       .filter((item) => !item.filled && !this.gapped(item.key))
       .map((item) => ({

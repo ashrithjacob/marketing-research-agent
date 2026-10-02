@@ -181,11 +181,15 @@ All of this happens **before the HTTP response is sent**:
 6. **`StageOneRun`** (`agent/stage-one-run.ts`) is created and started **without
    awaiting it**. The row becomes `running`, `run.started {model, nodes}` is
    written, and the endpoint returns the run summary. Each agent is built when its
-   step starts, by `StageOneAgentFactory` (`agent/stage-one-agent-factory.ts`):
+   step starts, by `ResearchAgentFactory` (`agent/research-agent-factory.ts`) from
+   its `RoleSpec` in `ROLES` (`domain/research-roles.ts`) — the same factory builds
+   the stage-2 agents:
    - a `pi-agent-core` `Agent`, session id `research-<runId>-<agent>`, the run's
      model (step 4);
    - its **system prompt** (`PromptBuilder.system`): who it is, that four agents
-     share one ledger, and only the tools it has. `category` has its own system
+     share one ledger, and only the tools it has — each research tool the
+     `ToolRegistry` built brings its own prompt line, and a tool whose service is
+     not configured is neither built nor listed. `category` has its own system
      prompt; the other three share one;
    - its **user turn** (`PromptBuilder.instructions`): the shared gathering rules
      with *its own* task in them → standing judgements → the brief → for a step-2
@@ -232,7 +236,7 @@ facts after them (decided 2026-10-01; refusing them, decision 11, was reversed t
 same day). `finish` names every field
 that has neither a row nor a gap starting with its name.
 
-**Each agent has a turn limit** (`maxTurns` in `STAGE_ONE_AGENT_SPECS`: champion
+**Each agent has a turn limit** (`maxTurns` on its `RoleSpec` in `ROLES`: champion
 10, product 15, category 15, competitors 20 — one turn is one model reply; set by
 the operator 2026-10-01). The
 prompt states it. `TurnBudget` counts turns through pi-agent-core's own
@@ -274,7 +278,7 @@ done by saturation now (`CompletenessCheck`).
 | `discover_competitors` (competitors agent only, once) | Parallel Task API `POST /v1/tasks/runs`, processor `MRA_DISCOVERY_PROCESSOR` (default `pro`, $0.10 a call), polled every 10 s until done (`MRA_DISCOVERY_TIMEOUT_SECONDS`, 900) | brands selling to the champion's `icp`, each with its page, form, market and who it says it is for: **candidates**, which the agent must `web_fetch` before recording | the answer written to the corpus; its `source_id` comes back |
 | `ad_library_search` (product, competitors, category; only with `TRENDTRACK_API_KEY`) | Trendtrack `POST /v1/ads/query`: Meta ads by reach, `adCountries` = the markets the agent passes as ISO codes; one credit per ad (5 ads cost 5 credits, measured 2026-10-02) | the match count, then per ad: advertiser page, landing domain (which names the brand behind a persona page), first and last seen, countries, reach, copy | the search and every ad archived, each with its own `source_id` |
 | `amazon_find_product` | Apify `junglee/free-amazon-product-scraper` | asin, stars, `reviewsCount`, title, url — most-reviewed first | none |
-| `record_*` — the kinds in the agent's spec (`STAGE_ONE_AGENT_SPECS`): the champion gets `record_source`, `record_reference`, `record_gap`; product `record_source`, `record_attribute`, `record_node_status`, `record_gap`; category those and `record_measurement`; competitors `record_source`, `record_competitor`, `record_saturation`, `record_node_status`, `record_gap` | the **run ledger** (`research_findings`, one SQLite row per finding, written at once, tagged with the writer's `agent_id`) | `RECORDED <row id>` (`src3`, `ex14`, …), `(replaces <id>)` when it supersedes the agent's *own* earlier row with the same key, or `NOT RECORDED — <problem>` | the row is checked against its section's zod schema and the agent's node *before* it is written (`extract/finding-check.ts`); a refused row writes nothing. The champion row belongs to every stage-1 run, so it is never out of scope |
+| `record_*` — the kinds its role may write, derived from what it must deliver (`RoleRecords.of`): the champion gets `record_source`, `record_reference`, `record_gap`; product `record_source`, `record_attribute`, `record_node_status`, `record_gap`; category those and `record_measurement`; competitors `record_source`, `record_competitor`, `record_saturation`, `record_node_status`, `record_gap` | the **run ledger** (`research_findings`, one SQLite row per finding, written at once, tagged with the writer's `agent_id`) | `RECORDED <row id>` (`src3`, `ex14`, …), `(replaces <id>)` when it supersedes the agent's *own* earlier row with the same key, or `NOT RECORDED — <problem>` | the row is checked against its section's zod schema and the agent's node *before* it is written (`extract/finding-check.ts`); a refused row writes nothing. The champion row belongs to every stage-1 run, so it is never out of scope |
 | `retract` | the run ledger | `RETRACTED <id>`, or `NOT RETRACTED — <why>` | marks the row retracted with the reason; rows are never deleted. **Only the agent that wrote a row may retract it** |
 | `read_ledger` | the run ledger | every agent's live rows, one line each as `<id> [<agent>] <kind>: <payload>`, filterable by `agent` and `kind`, the newest 60 | none |
 | `wait_for` — step-2 agents only | the run ledger, polled every 15 s (`LEDGER_POLL_MS`) | `READY` with the rows once the named agent has recorded a row of that kind; `NOT AVAILABLE` if that agent has ended without one, the run is stopping, or 40 checks (10 min) pass — the cap that keeps two agents waiting on each other from waiting forever | none |
@@ -772,7 +776,7 @@ response event fires in the socket's context, not the caller's, so the tap
 captures the run context when the request starts and writes the `←` line inside
 it.
 
-**Lines inside a tool call carry its id.** `ResearchToolset` wraps every tool
+**Lines inside a tool call carry its id.** `ResearchAgentFactory` wraps every tool
 (`TracedTool`), so each call runs in its own nested scope,
 `Trace.withinTool(toolCallId, …)`. Every line written inside it — the tool's own
 functions, the adapter it calls, and the `→`/`←` lines of each HTTP request it

@@ -17,20 +17,12 @@ change only your own.
 
 Your tools:
 
-- \`web_search\` — titles, urls and snippets. A snippet is never a source.
-- \`web_fetch\` — one page's text, archived; the result carries the \`source_id\` to cite.
-{discovery}{ad_library}{amazon_search}- {record_tools} — write one row into the ledger, checked as it is written.
+{tools}- {record_tools} — write one row into the ledger, checked as it is written.
   \`retract\` withdraws one of your rows.
 - \`read_ledger\` — read any agent's rows.
 {wait_for}- \`finish\` — check your part of the ledger. FINISHED ends your work; otherwise it lists what to fix.`;
 
 export const AGENT_ROLES: Readonly<Record<keyof typeof ROLES, string>> = ROLES;
-
-export const DISCOVER_TOOL =
-  "- `discover_competitors` — once: a research pass over the whole web names brands selling to the champion's customer. Candidates to fetch, never facts to record.\n";
-
-export const AD_LIBRARY_TOOL =
-  "- `ad_library_search` — Meta ads, live and past: who advertises, the copy, where each ad lands, when it ran, its reach. Each ad is archived and citable as an `ad_library` source. Costs a credit per ad.\n";
 
 export const WAIT_FOR_TOOL =
   "- `wait_for` — wait until another agent has recorded a row you cannot go on without.\n";

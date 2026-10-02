@@ -1,7 +1,7 @@
 import {
   Findings,
   PRODUCT_TRUTH_AGENTS,
-  PRODUCT_TRUTH_AGENT_SPECS,
+  Roles,
   STAGE_NODES,
   productTruthPacketSchema,
   type Brief,
@@ -62,7 +62,7 @@ export class ProductTruthRunAssembly implements RunAssembly {
   private nodes(): NodeReport[] {
     Trace.line(import.meta.url, "ProductTruthRunAssembly.nodes");
     return STAGE_NODES[2].map((node) => {
-      const open = PRODUCT_TRUTH_AGENTS.filter((id) => PRODUCT_TRUTH_AGENT_SPECS[id].node === node).flatMap((id) => this.check(id));
+      const open = PRODUCT_TRUTH_AGENTS.filter((id) => Roles.of(id).deliverable.node === node).flatMap((id) => this.check(id));
       const done = open.length === 0;
       return { node, status: done ? "complete" : "incomplete", done_criterion_met: done, why: done ? "every item recorded or gapped" : open.map((p) => p.text).join("; ") };
     });

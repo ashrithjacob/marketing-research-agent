@@ -107,6 +107,30 @@ classDiagram
     class DiscoveryReport {
       <<interface>>
     }
+    class DiscoveryQuestions {
+      of()
+    }
+    class FieldSpec {
+      <<interface>>
+    }
+    class ItemPart {
+      <<interface>>
+    }
+    class ItemNeed {
+      <<interface>>
+    }
+    class FieldsDeliverable {
+      <<interface>>
+    }
+    class ListDeliverable {
+      <<interface>>
+    }
+    class PerItemDeliverable {
+      <<interface>>
+    }
+    class Deliverables {
+      kinds()
+    }
     class FindingDraft {
       <<interface>>
     }
@@ -230,9 +254,6 @@ classDiagram
       <<interface>>
       admit()
     }
-    class ProductTruthAgentSpec {
-      <<interface>>
-    }
     class RunHead {
       <<interface>>
     }
@@ -263,6 +284,15 @@ classDiagram
     }
     class RejectKinds {
       effective()
+    }
+    class RoleSpec {
+      <<interface>>
+    }
+    class Roles {
+      of()
+      stage()
+      node()
+      scope()
     }
     class AnalysedReview {
       <<interface>>
@@ -312,6 +342,9 @@ classDiagram
     class StoredRunReview {
       <<interface>>
     }
+    class RoleRecords {
+      of()
+    }
     class ServicePart {
       <<interface>>
     }
@@ -320,9 +353,6 @@ classDiagram
     }
     class ServiceReports {
       is()
-    }
-    class StageOneAgentSpec {
-      <<interface>>
     }
     class StageOnePlan {
       <<interface>>
@@ -787,6 +817,9 @@ classDiagram
     }
     class BilledCosts {
     }
+    class BuiltAgent {
+      <<interface>>
+    }
     class DoneCheck {
       <<interface>>
       problems()
@@ -866,12 +899,6 @@ classDiagram
     class ModelPricing {
       apply()
     }
-    class ProductTruthRunContext {
-      <<interface>>
-    }
-    class ProductTruthAgentFactory {
-      build()
-    }
     class ProductTruthDone {
       problems()
     }
@@ -902,6 +929,19 @@ classDiagram
       steer()
       resume()
     }
+    class RoleBriefing {
+      <<interface>>
+      system()
+      instructions()
+    }
+    class StageOneBriefing {
+      system()
+      instructions()
+    }
+    class ProductTruthBriefing {
+      system()
+      instructions()
+    }
     class TruthBlocks {
       stageOne()
       actives()
@@ -913,6 +953,12 @@ classDiagram
     class ProductTruthPrompts {
       system()
       instructions()
+    }
+    class RoleContext {
+      <<interface>>
+    }
+    class ResearchAgentFactory {
+      build()
     }
     class RetryPolicy {
       <<interface>>
@@ -1000,6 +1046,10 @@ classDiagram
     class ReviewPuller {
       pullAll()
     }
+    class RoleChecks {
+      done()
+      closer()
+    }
     class RowRepair {
       repair()
     }
@@ -1039,15 +1089,6 @@ classDiagram
       lookUpListings()
       recordBilling()
     }
-    class StageOneRunContext {
-      <<interface>>
-    }
-    class BuiltAgent {
-      <<interface>>
-    }
-    class StageOneAgentFactory {
-      build()
-    }
     class StageOneHandoff {
       forBrief()
       forRun()
@@ -1078,15 +1119,6 @@ classDiagram
     class EvidenceSearchTool {
       tool()
     }
-    class LedgerOptions {
-      <<interface>>
-    }
-    class ToolsetOptions {
-      <<interface>>
-    }
-    class ResearchToolset {
-      build()
-    }
     class FindProductTool {
       tool()
     }
@@ -1110,6 +1142,21 @@ classDiagram
     }
     class RetractTool {
       tool()
+    }
+    class LedgerOptions {
+      <<interface>>
+    }
+    class LedgerToolset {
+      build()
+    }
+    class BuiltTool {
+      <<interface>>
+    }
+    class ToolContext {
+      <<interface>>
+    }
+    class ToolRegistry {
+      build()
     }
     class TracedTool {
       wrap()
@@ -1262,14 +1309,16 @@ classDiagram
   ModelChain --> Pricing
   OperatorInputs --> FindingLedger
   ModelPricing --> OpenRouterPrices
-  ProductTruthAgentFactory --> Settings
-  ProductTruthAgentFactory --> ResearchStore
-  ProductTruthAgentFactory --> ServiceClients
-  ProductTruthAgentFactory --> ProductTruthPrompts
   ProductTruthDone --> RunFindings
   ProductTruthRunAssembly --> FindingLedger
-  ProductTruthRun --> ProductTruthAgentFactory
+  ProductTruthRun --> ResearchAgentFactory
   ProductTruthRun --> ProductTruthBrief
+  StageOneBriefing --> PromptBuilder
+  StageOneBriefing --> Judgement
+  ProductTruthBriefing --> ProductTruthPrompts
+  ProductTruthBriefing --> Judgement
+  ResearchAgentFactory --> ResearchStore
+  ResearchAgentFactory --> ToolRegistry
   IssueSlices --> IssueTally
   NewIssueMerge --> StructuredAsk
   ReviewAnalysisJob --> StructuredAsk
@@ -1304,10 +1353,6 @@ classDiagram
   RunWrapUp --> ResearchStore
   RunWrapUp --> LiveRuns
   RunWrapUp --> StageOneListings
-  StageOneAgentFactory --> Settings
-  StageOneAgentFactory --> ResearchStore
-  StageOneAgentFactory --> ServiceClients
-  StageOneAgentFactory --> PromptBuilder
   StageOneHandoff --> ResearchStore
   StageOneListings --> TargetListings
   StageOneListings --> ActorRunner
@@ -1321,7 +1366,6 @@ classDiagram
   DiscoverCompetitorsTool --> Corpus
   EvidenceSearchTool --> WebSearch
   EvidenceSearchTool --> Corpus
-  ResearchToolset --> ToolsetOptions
   FindProductTool --> AmazonProducts
   FinishTool --> DoneCheck
   ReadLedgerTool --> RunFindings
@@ -1329,6 +1373,9 @@ classDiagram
   WaitForTool --> AgentRoster
   RecordTool --> RunFindings
   RetractTool --> RunFindings
+  LedgerToolset --> LedgerOptions
+  ToolRegistry --> ServiceClients
+  ToolRegistry --> Settings
   WebFetchTool --> Settings
   WebFetchTool --> PageFetcher
   WebFetchTool --> Corpus
@@ -1433,6 +1480,7 @@ classDiagram
 | `agent` | `agent/agent-roster.ts` | AgentRoster |
 | `agent` | `agent/agent-team.ts` | TeamMember, AgentTeam |
 | `agent` | `agent/billed-costs.ts` | BilledCosts |
+| `agent` | `agent/built-agent.ts` | BuiltAgent |
 | `agent` | `agent/done-check.ts` | DoneCheck, NodeDone, ChampionDone, DoneChecks |
 | `agent` | `agent/errors.ts` | RunError |
 | `agent` | `agent/event-recorder.ts` | TurnEnd, AgentEventRecorder |
@@ -1445,15 +1493,16 @@ classDiagram
 | `agent` | `agent/model-chain.ts` | ModelChain |
 | `agent` | `agent/operator-inputs.ts` | OperatorInputs |
 | `agent` | `agent/pricing.ts` | ModelPricing |
-| `agent` | `agent/product-truth-agent-factory.ts` | ProductTruthRunContext, ProductTruthAgentFactory |
 | `agent` | `agent/product-truth-done.ts` | ProductTruthDone |
 | `agent` | `agent/product-truth-run-assembly.ts` | ProductTruthRunAssembly |
 | `agent` | `agent/product-truth-run.ts` | ProductTruthBrief, ProductTruthRun |
 | `agent` | `agent/prompt/blocks.ts` | PromptBlocks |
 | `agent` | `agent/prompt/builder.ts` | AgentInstructions, PromptBuilder |
 | `agent` | `agent/prompt/messages.ts` | AgentMessages |
+| `agent` | `agent/prompt/role-briefing.ts` | RoleBriefing, StageOneBriefing, ProductTruthBriefing |
 | `agent` | `agent/prompt/truth-blocks.ts` | TruthBlocks |
 | `agent` | `agent/prompt/truth-builder.ts` | TruthInstructions, ProductTruthPrompts |
+| `agent` | `agent/research-agent-factory.ts` | RoleContext, ResearchAgentFactory |
 | `agent` | `agent/retry.ts` | RetryPolicy, Retries |
 | `agent` | `agent/review-analysis/analysis-prompts.ts` | AnalysisPrompts |
 | `agent` | `agent/review-analysis/issue-slices.ts` | IssueSlices |
@@ -1471,6 +1520,7 @@ classDiagram
 | `agent` | `agent/review-mining-plan.ts` | ReviewMiningPlanner |
 | `agent` | `agent/review-mining-run-assembly.ts` | ReviewMiningRunAssembly |
 | `agent` | `agent/review-puller.ts` | PullJob, PullEvents, ReviewPuller |
+| `agent` | `agent/role-checks.ts` | RoleChecks |
 | `agent` | `agent/row-repair.ts` | RowRepair |
 | `agent` | `agent/run-assembly.ts` | Assembled, RunAssembly |
 | `agent` | `agent/run-end.ts` | RunEnd |
@@ -1478,7 +1528,6 @@ classDiagram
 | `agent` | `agent/run-launcher.ts` | RunKinds, RunLauncher |
 | `agent` | `agent/run-supervisor.ts` | RunSupervisor |
 | `agent` | `agent/run-wrap-up.ts` | RunWrapUp |
-| `agent` | `agent/stage-one-agent-factory.ts` | StageOneRunContext, BuiltAgent, StageOneAgentFactory |
 | `agent` | `agent/stage-one-handoff.ts` | StageOneHandoff |
 | `agent` | `agent/stage-one-listings.ts` | StageOneListings |
 | `agent` | `agent/stage-one-run-assembly.ts` | StageOneRunAssembly |
@@ -1488,12 +1537,13 @@ classDiagram
 | `agent` | `agent/tools/ad-library-tool.ts` | AdLibraryTool |
 | `agent` | `agent/tools/discover-competitors-tool.ts` | DiscoverCompetitorsTool |
 | `agent` | `agent/tools/evidence-search-tool.ts` | EvidenceSearchTool |
-| `agent` | `agent/tools/factory.ts` | LedgerOptions, ToolsetOptions, ResearchToolset |
 | `agent` | `agent/tools/find-product-tool.ts` | FindProductTool |
 | `agent` | `agent/tools/finish-tool.ts` | FinishTool |
 | `agent` | `agent/tools/lanes.ts` | FetchRecord |
 | `agent` | `agent/tools/ledger-read-tools.ts` | LedgerRows, ReadLedgerTool, WaitForTool |
 | `agent` | `agent/tools/ledger-tools.ts` | RecordTool, RetractTool |
+| `agent` | `agent/tools/ledger-toolset.ts` | LedgerOptions, LedgerToolset |
+| `agent` | `agent/tools/registry.ts` | BuiltTool, ToolContext, ToolRegistry |
 | `agent` | `agent/tools/traced-tool.ts` | TracedTool |
 | `agent` | `agent/tools/web-fetch-tool.ts` | WebFetchTool |
 | `agent` | `agent/tools/web-search-tool.ts` | WebSearchTool |
@@ -1506,22 +1556,24 @@ classDiagram
 | `domain` | `domain/ad-library.ts` | AdQuery, AdHit, AdPage |
 | `domain` | `domain/brief.ts` | Briefs |
 | `domain` | `domain/check-problem.ts` | RowRef, CheckProblem, CheckProblems |
-| `domain` | `domain/competitor-discovery.ts` | CompetitorCandidate, DiscoveryQuestion, DiscoveryReport |
+| `domain` | `domain/competitor-discovery.ts` | CompetitorCandidate, DiscoveryQuestion, DiscoveryReport, DiscoveryQuestions |
+| `domain` | `domain/deliverable.ts` | FieldSpec, ItemPart, ItemNeed, FieldsDeliverable, ListDeliverable, PerItemDeliverable, Deliverables |
 | `domain` | `domain/findings.ts` | FindingDraft, Finding, Findings |
 | `domain` | `domain/logs.ts` | RunEvent, Judgement, PacketCheck, RunUpdate, LlmCallRecord, Generation, LlmCall |
 | `domain` | `domain/node-fields.ts` | NodeFieldSet, NodeFields |
 | `domain` | `domain/nodes.ts` | Stages |
 | `domain` | `domain/packet-rows.ts` | PacketRowSet, PacketRows |
 | `domain` | `domain/ports.ts` | ProductCatalog, AccountDirectory, AmazonListingSource, TargetListings, FindingLedger, PageFetcher, WebSearch, AdLibrary, CompetitorDiscovery, ResearchStore, GateVerdict, FetchGate |
-| `domain` | `domain/product-truth-agents.ts` | ProductTruthAgentSpec |
 | `domain` | `domain/products.ts` | RunHead, Product, ProductSummary, ProductFolders |
 | `domain` | `domain/records.ts` | Clock, Ids, ResearchRun, RunSummary, Runs |
 | `domain` | `domain/reject-kinds.ts` | RejectKinds |
+| `domain` | `domain/research-roles.ts` | RoleSpec, Roles |
 | `domain` | `domain/review-analysis.ts` | AnalysedReview, CleaningTally, IssueQuote, ProductIssue, ProductVoice, RankedIssue, IssueSlice, ReviewAnalysis |
 | `domain` | `domain/review-mining.ts` | BestsellerRank, AmazonListing, TrustpilotSummary, TargetListing |
 | `domain` | `domain/reviews.ts` | LedgerPull, LedgerReview, ReviewLedgerSnapshot, StoredRunReview |
+| `domain` | `domain/role-records.ts` | RoleRecords |
 | `domain` | `domain/service-report.ts` | ServicePart, ServiceReport, ServiceReports |
-| `domain` | `domain/stage-one-agents.ts` | StageOneAgentSpec, StageOnePlan, StageOnePlans |
+| `domain` | `domain/stage-one-agents.ts` | StageOnePlan, StageOnePlans |
 | `domain` | `domain/web.ts` | SearchHit, SearchPage, SearchScope, FetchedPage, ServiceUnavailableError |
 | `extract` | `extract/brief-check.ts` | BriefCheck |
 | `extract` | `extract/champion-check.ts` | ChampionCheck |

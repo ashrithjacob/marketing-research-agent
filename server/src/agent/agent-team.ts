@@ -13,7 +13,7 @@ import type { TurnEnd } from "./event-recorder.js";
 import type { LiveRuns } from "./live-runs.js";
 import type { ModelChain } from "./model-chain.js";
 import type { RetryPolicy } from "./retry.js";
-import type { BuiltAgent } from "./stage-one-agent-factory.js";
+import type { BuiltAgent } from "./built-agent.js";
 import { UsageTotals } from "./usage.js";
 
 /** One agent of a run and the agents whose end it waits for. */

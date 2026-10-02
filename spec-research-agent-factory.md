@@ -897,3 +897,40 @@ real run (no runs were made while building).
 - Judgement applications are now counted on any completed run, not only stage 1.
 - A review-mining run killed by a restart still loses its reviews: they are held
   in memory until the end (`ReviewLedger`).
+
+**Phase 1 (2026-10-03).** `ROLES` (`domain/research-roles.ts`), the nine
+deliverables (`domain/role-deliverables.ts`, already written in full, though
+nothing enforces them yet), `RoleRecords`, `ToolRegistry`
+(`agent/tools/registry.ts`), `LedgerToolset`, `ResearchAgentFactory`,
+`BuiltAgent` in its own module. Deleted: both factories, `ResearchToolset`, both
+spec tables, the `{discovery}` / `{ad_library}` / `{amazon_search}`
+placeholders and `text/amazon-search.ts`. Checked: the system prompt of all nine
+roles is byte-identical to the previous commit's, rendered from both trees; and
+`RoleRecords.of` equals the old `records` lists (`tests/roles.test.ts`).
+
+- **`wait_for` is a tool name, not derived from `waitsFor`.** `waitsFor` orders
+  the agents (stage 2's old `after`); `wait_for` lets an agent wait on a sibling
+  running beside it. Stage-1 node roles have both; stage-2 roles never had the
+  tool, and deriving it from `waitsFor` would have given it to them.
+- **The champion's deliverable is `fields` with `node: null`**, one field filled
+  by its `competitor_reference` row. `Roles.node(role, runNodes)` resolves a null
+  node as `StageOnePlans.nodeOf` did: competitors when in scope, else the run's
+  first node.
+- **`FieldSpec.record` is any finding kind**, not only attribute or measurement:
+  formula's actives and regimen and cogs's prices are `fields` too. An attribute
+  fills a field by its `key`, a measurement by its `metric`, any other kind by
+  having a live row; `{ kind: "number_on_latest" }` asks for the latest row's
+  field to be a number (the regimen's two counts).
+- **Formula and cogs_refills are `fields`, not `per_item`**: neither repeats per
+  anything. `per_item` covers mechanism, dose_vs_study and claim_limits. An
+  `ItemNeed` names the row fields that match it to its item (`["active"]`,
+  `["market", "platform"]`) and, optionally, a field that must be set;
+  dose_vs_study's items are only actives with an amount and not in a blend
+  (`only: { present: "amount", absent: "in_blend" }`).
+- **Stage-2 roles write under every stage-2 node** (`Roles.scope`), as before:
+  their rows file by kind, so the formula's regimen lands under cogs_refills.
+- **Prompts stay per stage** (`PromptBuilder`, `ProductTruthPrompts`), reached
+  through a per-run `RoleBriefing` (`StageOneBriefing`, `ProductTruthBriefing`)
+  that the run puts in the `RoleContext`. The factory has no stage-specific input.
+- **Which finish check and closer** a role gets is still chosen by its
+  `consistency` (`RoleChecks`) until phases 3–5 split presence from consistency.

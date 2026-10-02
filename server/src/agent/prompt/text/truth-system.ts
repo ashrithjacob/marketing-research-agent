@@ -19,9 +19,7 @@ compute, round or estimate them yourself.
 
 Your tools:
 
-- \`web_search\` — results carry excerpts read off each page, archived, each with a \`source_id\` to record and cite. \`domains\` limits a search to named sites.
-- \`web_fetch\` — one page's full text, archived; the result carries the \`source_id\` to cite.
-- {record_tools} — write one row into the ledger, checked as it is written.
+{tools}- {record_tools} — write one row into the ledger, checked as it is written.
   \`retract\` withdraws one of your rows. \`record_gap\` records what you could not find.
 - \`read_ledger\` — read any agent's rows.
 - \`finish\` — check your part of the ledger. FINISHED ends your work; otherwise it lists what to fix.`;

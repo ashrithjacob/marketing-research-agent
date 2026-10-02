@@ -6,7 +6,7 @@ import type { LiveRuns } from "./live-runs.js";
 import type { ModelChain } from "./model-chain.js";
 import { AgentMessages } from "./prompt/index.js";
 import { Retries, type RetryPolicy } from "./retry.js";
-import type { BuiltAgent } from "./stage-one-agent-factory.js";
+import type { BuiltAgent } from "./built-agent.js";
 
 export type AgentEnd = "complete" | "incomplete" | "failed" | "cancelled";
 

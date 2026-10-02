@@ -2,7 +2,8 @@ import type { OpenRouterPrices } from "../adapters/index.js";
 import {
   Briefs,
   PRODUCT_TRUTH_AGENTS,
-  PRODUCT_TRUTH_AGENT_SPECS,
+  Roles,
+  STAGE_NODES,
   type Brief,
   type Judgement,
   type ProductTruthAgent,
@@ -18,7 +19,8 @@ import { CallSequence } from "./llm-call-log.js";
 import type { LiveRuns } from "./live-runs.js";
 import type { ModelChain } from "./model-chain.js";
 import { OperatorInputs } from "./operator-inputs.js";
-import type { ProductTruthAgentFactory, ProductTruthRunContext } from "./product-truth-agent-factory.js";
+import { ProductTruthBriefing, ProductTruthPrompts } from "./prompt/index.js";
+import type { ResearchAgentFactory, RoleContext } from "./research-agent-factory.js";
 import { ProductTruthRunAssembly } from "./product-truth-run-assembly.js";
 import type { RetryPolicy } from "./retry.js";
 import { RunEnd, type RunEnding } from "./run-end.js";
@@ -40,7 +42,7 @@ export class ProductTruthRun {
   private readonly team: AgentTeam;
 
   constructor(
-    private readonly deps: { store: ResearchStore; runs: LiveRuns; costs: OpenRouterPrices; retry: RetryPolicy; factory: ProductTruthAgentFactory },
+    private readonly deps: { store: ResearchStore; runs: LiveRuns; costs: OpenRouterPrices; retry: RetryPolicy; factory: ResearchAgentFactory },
     private readonly run: ProductTruthBrief,
   ) {
     Trace.line(import.meta.url, "ProductTruthRun.constructor", { runId: run.runId });
@@ -63,13 +65,22 @@ export class ProductTruthRun {
     const { runId, sourceRunId, brief, chain } = this.run;
     const team = this.team;
     const markets = Briefs.markets(brief);
-    const context: ProductTruthRunContext = { ...this.run, markets, sequence: new CallSequence(), roster: new AgentRoster(), onCall: team.onCall, onChecked: team.onChecked };
+    const context: RoleContext = {
+      ...this.run,
+      nodes: STAGE_NODES[2],
+      markets,
+      briefing: new ProductTruthBriefing(new ProductTruthPrompts(), this.run),
+      sequence: new CallSequence(),
+      roster: new AgentRoster(),
+      onCall: team.onCall,
+      onChecked: team.onChecked,
+    };
     const assembly = new ProductTruthRunAssembly(store.findings, runId, { sourceRunId, brief, markets });
     let ending: RunEnding;
     let output = "";
     try {
       new OperatorInputs(store.findings, runId).record(this.run.inputs);
-      const outcomes = await team.run(ProductTruthRun.members(), (id) => factory.build(id, context), context.roster);
+      const outcomes = await team.run(ProductTruthRun.members(), (id) => factory.build(Roles.of(id), context), context.roster);
       const errors = outcomes.filter((o) => o.error).map((o) => `${o.agentId}: ${o.error}`).join("; ");
       ending = { kind: "settled", errorMessage: errors || undefined };
       output = AgentTeam.output(outcomes);
@@ -88,6 +99,6 @@ export class ProductTruthRun {
 
   private static members(): TeamMember<ProductTruthAgent>[] {
     Trace.line(import.meta.url, "ProductTruthRun.members");
-    return PRODUCT_TRUTH_AGENTS.map((id) => ({ id, after: PRODUCT_TRUTH_AGENT_SPECS[id].after }));
+    return PRODUCT_TRUTH_AGENTS.map((id) => ({ id, after: Roles.of(id).waitsFor as ProductTruthAgent[] }));
   }
 }

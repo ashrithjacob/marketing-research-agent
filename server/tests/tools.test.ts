@@ -25,18 +25,23 @@ import {
 import { Env, type Settings } from "../src/config/index.js";
 import {
   DiscoverCompetitorsTool,
-  ResearchToolset,
+  LedgerToolset,
+  ToolRegistry,
   WebFetchTool,
+  type ToolContext,
 } from "../src/agent/tools/index.js";
 import { AgentRoster, ChampionDone, NodeDone, RunFindings } from "../src/agent/index.js";
 import { ServiceClients } from "../src/adapters/index.js";
 import {
   STAGE_NODES,
-  STAGE_ONE_AGENT_SPECS,
+  RoleRecords,
+  Roles,
   StageOnePlans,
   locatorSchema,
+  type DiscoveryQuestion,
   type Node,
   type StageOneAgent,
+  type ToolName,
 } from "../src/domain/index.js";
 import { MemoryLedger, minimalPacket, productPacket, reviewPacket, services } from "./fixtures.js";
 
@@ -61,8 +66,12 @@ afterEach(() => {
   rmSync(dir, { recursive: true, force: true });
 });
 
+/** The research tools a role naming `names` is built with, as the agent gets them. */
+const research = (svc: ServiceClients, names: readonly ToolName[], run: Partial<ToolContext> = {}) =>
+  new ToolRegistry(svc, settings).build(names, { runId: "r", subject: "", market: "", discovery: null, ...run }).map((built) => built.tool);
+
 const tools = (runId = "run-1") => {
-  const list = new ResearchToolset({ settings, runId, services: services(settings) }).build();
+  const list = research(services(settings), ["web_search", "web_fetch"], { runId });
   return {
     search: list.find((t) => t.name === "web_search")!,
     fetch: list.find((t) => t.name === "web_fetch")!,
@@ -152,12 +161,13 @@ describe("discover_competitors", () => {
   });
 
   it("is offered only to an agent given a question, and only with a discovery service", () => {
-    const names = (options: Partial<ConstructorParameters<typeof ResearchToolset>[0]>) =>
-      new ResearchToolset({ settings, runId: "r", services: services(settings), ...options }).build().map((t) => t.name);
+    const names = (svc: ServiceClients, discovery: DiscoveryQuestion | null) =>
+      research(svc, Roles.of("competitors").tools, { discovery }).map((t) => t.name);
     const withDiscovery = new ServiceClients(services(settings).pages, services(settings).search, null, undefined, { discover: async () => report });
-    expect(names({ discover: question })).not.toContain("discover_competitors");
-    expect(names({ services: withDiscovery })).not.toContain("discover_competitors");
-    expect(names({ services: withDiscovery, discover: question })).toContain("discover_competitors");
+    expect(names(services(settings), question)).not.toContain("discover_competitors");
+    expect(names(withDiscovery, null)).not.toContain("discover_competitors");
+    expect(names(withDiscovery, question)).toContain("discover_competitors");
+    expect(research(withDiscovery, Roles.of("product").tools, { discovery: question }).map((t) => t.name)).not.toContain("discover_competitors");
   });
 });
 
@@ -356,36 +366,29 @@ describe("Amazon product search", () => {
   it("is withheld entirely when no Apify token is configured", () => {
     // Withheld rather than stubbed: an agent told it has a tool that always
     // throws burns turns rediscovering that.
-    const names = new ResearchToolset({ settings, runId: "run-x", services: services(settings, null), productSearch: true })
-      .build()
-      .map((t) => t.name);
+    const names = research(services(settings, null), Roles.of("champion").tools).map((t) => t.name);
     expect(names).toEqual(["web_search", "web_fetch"]);
   });
 
   it("is withheld from a run that does not cover competitors, token or not", () => {
-    const names = new ResearchToolset({ settings, runId: "run-x", services: services(settings, runner([])) })
-      .build()
-      .map((t) => t.name);
+    const names = research(services(settings, runner([])), Roles.of("category").tools).map((t) => t.name);
     expect(names).toEqual(["web_search", "web_fetch"]);
   });
 
   it("is the only Apify tool a competitors run gets", () => {
-    const names = new ResearchToolset({ settings, runId: "run-x", services: services(settings, runner([])), productSearch: true })
-      .build()
-      .map((t) => t.name);
+    const names = research(services(settings, runner([])), Roles.of("competitors").tools).map((t) => t.name);
     expect(names).toEqual(["web_search", "web_fetch", "amazon_find_product"]);
   });
 
   it("orders found products by reviewsCount so the agent spends on the right one", async () => {
-    const list = new ResearchToolset({
-      settings,
-      runId: "run-x",
-      productSearch: true,
-      services: services(settings, runner([
+    const list = research(
+      services(settings, runner([
         { asin: "B0THIN", title: "four reviews", stars: 5, reviewsCount: 4 },
         { asin: "B0GOOD", title: "sixty one reviews", stars: 3.9, reviewsCount: 61 },
       ])),
-    }).build();
+      ["amazon_find_product"],
+      { runId: "run-x" },
+    );
     const result = await list.find((t) => t.name === "amazon_find_product")!.execute("1", { query: "intertrigo cream" });
     expect((result.details as any).products[0].asin).toBe("B0GOOD");
     expect((result.content[0] as any).text).toContain("reviews=61");
@@ -463,18 +466,13 @@ describe("the ledger tools", () => {
         ? new ChampionDone(findings, brief)
         : new NodeDone(findings, { brief, node, champion: agent === "competitors" ? "champion" : null });
     const checked: Array<{ valid: boolean; problems: readonly string[] }> = [];
-    const list = new ResearchToolset({
-      settings,
-      runId: "run-l",
-      services: services(settings),
-      ledger: {
-        findings,
-        records: STAGE_ONE_AGENT_SPECS[agent].records,
-        check,
-        onChecked: (v, problems) => checked.push({ valid: v, problems }),
-        ...(options.roster ? { roster: options.roster } : {}),
-        ...(options.pollMs !== undefined ? { pollMs: options.pollMs } : {}),
-      },
+    const list = new LedgerToolset({
+      findings,
+      records: RoleRecords.of(Roles.of(agent)),
+      check,
+      onChecked: (v, problems) => checked.push({ valid: v, problems }),
+      ...(options.roster ? { roster: options.roster } : {}),
+      ...(options.pollMs !== undefined ? { pollMs: options.pollMs } : {}),
     }).build();
     const tool = (name: string) => list.find((t) => t.name === name)!;
     return { ledger, tool, names: list.map((t) => t.name), checked };
@@ -482,7 +480,7 @@ describe("the ledger tools", () => {
   const text = (result: any) => result.content[0].text as string;
 
   it("gives each agent only its own record kinds, and wait_for only with a roster", () => {
-    const bare = new ResearchToolset({ settings, runId: "r", services: services(settings) }).build().map((t) => t.name);
+    const bare = research(services(settings), Roles.of("product").tools).map((t) => t.name);
     expect(bare).not.toContain("finish");
     const product = ledgerTools("product").names;
     expect(product).toEqual(expect.arrayContaining(["record_attribute", "record_node_status", "read_ledger", "finish"]));
@@ -762,7 +760,7 @@ describe("the service queues", () => {
     });
     const shared = ServiceClients.forSettings({ ...settings, firecrawlConcurrency: 2 });
     const fetches = [1, 2, 3].map((n) =>
-      new ResearchToolset({ settings, runId: `run-q${n}`, services: shared }).build().find((t) => t.name === "web_fetch")!,
+      research(shared, ["web_fetch"], { runId: `run-q${n}` }).find((t) => t.name === "web_fetch")!,
     );
     const results = await Promise.all(fetches.map((f, n) => f.execute(String(n), { url: `https://a.example/${n}` })));
     expect(results).toHaveLength(3);

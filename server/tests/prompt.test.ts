@@ -17,12 +17,13 @@ import {
   PRODUCT_ATTRIBUTES,
   SOURCE_KINDS,
   STAGE_NODES,
-  STAGE_ONE_AGENT_SPECS,
+  Roles,
   briefSchema,
 } from "../src/domain/index.js";
 import type { Judgement, StageOneAgent } from "../src/domain/index.js";
 import { AgentMessages, PromptBuilder } from "../src/agent/prompt/index.js";
 import { RECORD_TOOLS } from "../src/agent/prompt/text/record-tools.js";
+import { AD_LIBRARY_LINE, AMAZON_SEARCH_LINE, DISCOVER_LINE, WEB_FETCH_LINE, WEB_SEARCH_LINE } from "../src/agent/prompt/text/tool-lines.js";
 
 const prompts = new PromptBuilder();
 
@@ -51,7 +52,11 @@ const build = (overrides: Record<string, unknown> = {}, agent: StageOneAgent = "
 
 const AGENTS = ["champion", "product", "competitors", "category"] as const;
 
-const system = (agent: StageOneAgent, options: { amazon: boolean; waits: boolean; discovery?: boolean; ads?: boolean } = { amazon: true, waits: true }) => prompts.system(agent, options);
+/** The system prompt of an agent built with web search and fetch, then whichever of discovery, ads and Amazon search it was given, in the registry's order. */
+const system = (agent: StageOneAgent, options: { amazon: boolean; waits: boolean; discovery?: boolean; ads?: boolean } = { amazon: true, waits: true }) => {
+  const lines = [WEB_SEARCH_LINE, WEB_FETCH_LINE, options.discovery ? DISCOVER_LINE : "", options.ads ? AD_LIBRARY_LINE : "", options.amazon ? AMAZON_SEARCH_LINE : ""];
+  return prompts.system(agent, { tools: lines.join(""), waits: options.waits });
+};
 
 describe("the record examples", () => {
   it("are each a record the ledger accepts", () => {
@@ -103,7 +108,7 @@ describe("the product agent", () => {
   });
 
   it("tells every agent its turn limit, and what happens when it runs out", () => {
-    const turns = (agent: StageOneAgent) => STAGE_ONE_AGENT_SPECS[agent].maxTurns;
+    const turns = (agent: StageOneAgent) => Roles.of(agent).maxTurns;
     expect(build()).toMatch(new RegExp(`You have ${turns("product")} turns[\\s\\S]*every field still open is recorded as a gap for you`));
     expect(build({}, "category")).toContain(`You have ${turns("category")} turns`);
     expect(build({}, "competitors")).toContain(`You have ${turns("competitors")} turns`);

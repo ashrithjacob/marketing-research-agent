@@ -9,20 +9,18 @@ import { RunError } from "./errors.js";
 import type { LiveRuns } from "./live-runs.js";
 import { ModelChain } from "./model-chain.js";
 import { ModelPricing } from "./pricing.js";
-import type { ProductTruthAgentFactory } from "./product-truth-agent-factory.js";
 import { ProductTruthRun } from "./product-truth-run.js";
 import { RunEnd } from "./run-end.js";
 import type { RetryPolicy } from "./retry.js";
 import type { ReviewMiningJob } from "./review-mining-job.js";
-import type { StageOneAgentFactory } from "./stage-one-agent-factory.js";
+import type { ResearchAgentFactory } from "./research-agent-factory.js";
 import type { StageOneHandoff } from "./stage-one-handoff.js";
 import type { StageOneListings } from "./stage-one-listings.js";
 import { StageOneRun } from "./stage-one-run.js";
 
 export interface RunKinds {
-  stageOne: StageOneAgentFactory;
+  factory: ResearchAgentFactory;
   listings: StageOneListings;
-  truth: ProductTruthAgentFactory;
   handoff: StageOneHandoff;
   mining: ReviewMiningJob;
 }
@@ -61,8 +59,8 @@ export class RunLauncher {
     const deps = { store, runs, costs, retry };
     const brief = { runId: run.id, brief: request.brief, rejectKinds, judgements, chain };
     const team = stage === 2
-      ? new ProductTruthRun({ ...deps, factory: kinds.truth }, { ...brief, ...this.source(run, request, workspaceId), inputs: productTruthInputsSchema.parse(request.inputs ?? {}) })
-      : new StageOneRun({ ...deps, factory: kinds.stageOne, listings: kinds.listings }, { ...brief, nodes });
+      ? new ProductTruthRun({ ...deps, factory: kinds.factory }, { ...brief, ...this.source(run, request, workspaceId), inputs: productTruthInputsSchema.parse(request.inputs ?? {}) })
+      : new StageOneRun({ ...deps, factory: kinds.factory, listings: kinds.listings }, { ...brief, nodes });
     this.store.updateRun(run.id, { agent_run_id: run.id, session_id: `research-${run.id}`, status: "running" });
     this.runs.emit(run.id, "run.started", { model: this.settings.model, nodes });
     const done = Trace.within(run.id, header, () => team.start());

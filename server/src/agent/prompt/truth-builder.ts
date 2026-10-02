@@ -1,5 +1,6 @@
 import {
-  PRODUCT_TRUTH_AGENT_SPECS,
+  RoleRecords,
+  Roles,
   type Brief,
   type Judgement,
   type ProductTruthAgent,
@@ -32,10 +33,12 @@ const TASKS: Readonly<Record<ProductTruthAgent, string>> = {
 
 /** Each product-truth agent's system prompt and task, with what stage 1 and the agents before it recorded. */
 export class ProductTruthPrompts {
-  system(agent: ProductTruthAgent): string {
+  /** `tools` is the prompt line of each research tool the agent was built with, in order. */
+  system(agent: ProductTruthAgent, tools: string): string {
     Trace.line(import.meta.url, "ProductTruthPrompts.system", { agent });
-    const records = TRUTH_RECORD_TOOLS.filter((tool) => PRODUCT_TRUTH_AGENT_SPECS[agent].records.includes(tool.kind)).map((tool) => tool.name);
-    return TRUTH_SYSTEM_PROMPT.replace("{agent}", agent).replace("{role}", TRUTH_ROLES[agent]).replace("{record_tools}", PromptBlocks.code(records));
+    const kinds = RoleRecords.of(Roles.of(agent));
+    const records = TRUTH_RECORD_TOOLS.filter((tool) => kinds.includes(tool.kind)).map((tool) => tool.name);
+    return TRUTH_SYSTEM_PROMPT.replace("{agent}", agent).replace("{role}", TRUTH_ROLES[agent]).replace("{record_tools}", PromptBlocks.code(records)).replace("{tools}", tools);
   }
 
   instructions(agent: ProductTruthAgent, options: TruthInstructions): string {
@@ -52,7 +55,7 @@ export class ProductTruthPrompts {
 
   private static limit(agent: ProductTruthAgent): string {
     Trace.line(import.meta.url, "ProductTruthPrompts.limit", { agent });
-    const turns = PRODUCT_TRUTH_AGENT_SPECS[agent].maxTurns;
+    const turns = Roles.of(agent).maxTurns;
     return `## Your limit\n\nYou have ${turns} turns — one turn is one reply from you, however many tools it calls. After the last, you stop, and everything still open is recorded as a gap for you. Put several tool calls in one turn where you can.`;
   }
 }

@@ -14,11 +14,11 @@ import {
 import { Trace } from "../trace/index.js";
 
 import { LiveRuns, type Subscriber } from "./live-runs.js";
-import { AgentMessages, ProductTruthPrompts, PromptBuilder } from "./prompt/index.js";
-import { ProductTruthAgentFactory } from "./product-truth-agent-factory.js";
+import { AgentMessages } from "./prompt/index.js";
+import { ResearchAgentFactory } from "./research-agent-factory.js";
+import { ToolRegistry } from "./tools/index.js";
 import { StageOneHandoff } from "./stage-one-handoff.js";
 import { DEFAULT_RETRY, type RetryPolicy } from "./retry.js";
-import { StageOneAgentFactory } from "./stage-one-agent-factory.js";
 import { StageOneListings } from "./stage-one-listings.js";
 import { ReviewMiningJob } from "./review-mining-job.js";
 import { RunError } from "./errors.js";
@@ -53,9 +53,8 @@ export class RunSupervisor {
     this.models = options.models ?? RunSupervisor.defaultModels();
     const services = options.services ?? ServiceClients.forSettings(options.settings);
     this.launcher = new RunLauncher(this.store, this.settings, this.models, this.costs, this.runs, options.retry ?? DEFAULT_RETRY, {
-      stageOne: new StageOneAgentFactory(this.settings, this.store, this.models, services, new PromptBuilder()),
+      factory: new ResearchAgentFactory(this.store, this.models, new ToolRegistry(services, this.settings)),
       listings: new StageOneListings(this.store.listings, services.actors, services.pages, this.settings.apifyConcurrency),
-      truth: new ProductTruthAgentFactory(this.settings, this.store, this.models, services, new ProductTruthPrompts()),
       handoff: new StageOneHandoff(this.store),
       mining: new ReviewMiningJob(this.store, this.runs, this.settings, services.actors, options.pullRetryDelayMs),
     });

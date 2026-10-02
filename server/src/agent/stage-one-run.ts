@@ -1,5 +1,5 @@
 import type { OpenRouterPrices } from "../adapters/index.js";
-import { StageOnePlans, type ResearchStore, type StageOneAgent, type StageOnePlan } from "../domain/index.js";
+import { Briefs, Roles, StageOnePlans, type ResearchStore, type StageOneAgent, type StageOnePlan } from "../domain/index.js";
 import { Trace } from "../trace/index.js";
 
 import { AgentRoster } from "./agent-roster.js";
@@ -9,11 +9,12 @@ import type { LiveRuns } from "./live-runs.js";
 import type { RetryPolicy } from "./retry.js";
 import { RunEnd, type RunEnding } from "./run-end.js";
 import { RunWrapUp } from "./run-wrap-up.js";
-import type { StageOneAgentFactory, StageOneRunContext } from "./stage-one-agent-factory.js";
+import { PromptBuilder, StageOneBriefing } from "./prompt/index.js";
+import type { ResearchAgentFactory, RoleContext } from "./research-agent-factory.js";
 import type { StageOneListings } from "./stage-one-listings.js";
 import { StageOneRunAssembly } from "./stage-one-run-assembly.js";
 
-type RunBrief = Pick<StageOneRunContext, "runId" | "brief" | "nodes" | "rejectKinds" | "judgements" | "chain" | "pollMs">;
+type RunBrief = Pick<RoleContext, "runId" | "brief" | "nodes" | "rejectKinds" | "judgements" | "chain" | "pollMs">;
 
 /** One stage-1 run: the champion agent alone, then one agent per node side by side, all on one ledger, settled once from it when the last one ends. */
 export class StageOneRun {
@@ -25,7 +26,7 @@ export class StageOneRun {
       runs: LiveRuns;
       costs: OpenRouterPrices;
       retry: RetryPolicy;
-      factory: StageOneAgentFactory;
+      factory: ResearchAgentFactory;
       listings?: StageOneListings;
     },
     private readonly run: RunBrief,
@@ -49,8 +50,10 @@ export class StageOneRun {
     const { store, runs, factory } = this.deps;
     const { runId, brief, nodes, chain } = this.run;
     const team = this.team;
-    const context: StageOneRunContext = {
+    const context: RoleContext = {
       ...this.run,
+      markets: Briefs.markets(brief),
+      briefing: new StageOneBriefing(new PromptBuilder(), this.run),
       sequence: new CallSequence(),
       roster: new AgentRoster(),
       onCall: team.onCall,
@@ -62,7 +65,7 @@ export class StageOneRun {
     let ending: RunEnding;
     let output = "";
     try {
-      const outcomes = await team.run(StageOneRun.members(StageOnePlans.of(brief, nodes)), (id) => factory.build(id, context), context.roster);
+      const outcomes = await team.run(StageOneRun.members(StageOnePlans.of(brief, nodes)), (id) => factory.build(Roles.of(id), context), context.roster);
       const errors = outcomes.filter((o) => o.error).map((o) => `${o.agentId}: ${o.error}`).join("; ");
       ending = { kind: "settled", errorMessage: errors || undefined };
       output = AgentTeam.output(outcomes);
