@@ -5,7 +5,7 @@ export const CHAMPION_DELIVERABLE: FieldsDeliverable = {
   shape: "fields",
   node: null,
   fields: [
-    { key: "competitor_reference", record: "competitor_reference", required: true, describe: "the champion: name, form, actives, icp, the page it cites" },
+    { key: "competitor_reference", record: "competitor_reference", required: true, describe: "the champion: name, form, actives, icp, the page it cites", how: "record it with record_reference, then call finish" },
   ],
 };
 
@@ -69,9 +69,9 @@ export const FORMULA_DELIVERABLE: FieldsDeliverable = {
   shape: "fields",
   node: "dose_vs_study",
   fields: [
-    { key: "actives", record: "active", required: true, describe: "record each active with record_active" },
-    { key: "servings_per_day", record: "regimen", required: true, describe: "record it with record_regimen", rule: { kind: "number_on_latest" } },
-    { key: "servings_per_container", record: "regimen", required: true, describe: "record it with record_regimen", rule: { kind: "number_on_latest" } },
+    { key: "actives", record: "active", required: true, describe: "each active ingredient: name, amount per serving, unit and form as printed", how: "record each active with record_active" },
+    { key: "servings_per_day", record: "regimen", required: true, describe: "servings a day, from the label's main directions", how: "record it with record_regimen", rule: { kind: "number_on_latest" } },
+    { key: "servings_per_container", record: "regimen", required: true, describe: "servings in one container", how: "record it with record_regimen", rule: { kind: "number_on_latest" } },
   ],
 };
 
@@ -83,6 +83,7 @@ export const MECHANISM_DELIVERABLE: PerItemDeliverable = {
     { key: "mechanism", record: "mechanism", match: ["active"], describe: "record it with record_mechanism" },
     { key: "time_to_effect", record: "mechanism", match: ["active"], field: "time_to_effect", describe: "record it on its mechanism row" },
   ],
+  oneMarked: { key: "carrier", record: "mechanism", field: "story_weight", value: "carrier", describe: "mark the active the product's story rests on as story_weight \"carrier\"" },
 };
 
 export const DOSE_DELIVERABLE: PerItemDeliverable = {
@@ -102,5 +103,5 @@ export const CLAIMS_DELIVERABLE: PerItemDeliverable = {
 export const COGS_DELIVERABLE: FieldsDeliverable = {
   shape: "fields",
   node: "cogs_refills",
-  fields: [{ key: "prices", record: "price_point", required: true, describe: "record each price with record_price" }],
+  fields: [{ key: "prices", record: "price_point", required: true, describe: "every price the product sells at", how: "record each price with record_price" }],
 };

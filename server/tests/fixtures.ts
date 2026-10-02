@@ -2,7 +2,7 @@ import type { AssistantMessage, ToolCall } from "@earendil-works/pi-ai";
 import { fauxAssistantMessage, fauxToolCall } from "@earendil-works/pi-ai/providers/faux";
 
 import { ServiceClients } from "../src/adapters/index.js";
-import { Findings, PRODUCT_DELIVERABLE, STAGE_NODES, type Finding, type FindingDraft, type FindingLedger, type PageFetcher, type ResearchStore } from "../src/domain/index.js";
+import { Findings, PRODUCT_DELIVERABLE, STAGE_NODES, type ChargeDraft, type ChargeMeter, type Finding, type FindingDraft, type FindingLedger, type PageFetcher, type ResearchStore } from "../src/domain/index.js";
 import type { ActorRunner } from "../src/adapters/apify/index.js";
 import type { Settings } from "../src/config/index.js";
 
@@ -187,6 +187,11 @@ export function completeProductTruth(store: ResearchStore, sourceRunId: string):
 export function services(settings: Settings, actors: ActorRunner | null = null, pages?: PageFetcher): ServiceClients {
   const real = ServiceClients.forSettings(settings);
   return new ServiceClients(pages ?? real.pages, real.search, actors);
+}
+
+/** A meter for a tool whose spend the test does not read. */
+export class NoCharges implements ChargeMeter {
+  charge(_draft: ChargeDraft): void {}
 }
 
 /** The run ledger held in memory, for tests that need the port and not SQLite. */

@@ -13,7 +13,7 @@ import {
 import { ProductTruthAssembly, RowBlame, type NodeReport } from "../extract/index.js";
 import { Trace } from "../trace/index.js";
 
-import { ProductTruthDone } from "./product-truth-done.js";
+import { RoleChecks } from "./role-checks.js";
 import type { Assembled, RunAssembly } from "./run-assembly.js";
 import { RowRepair } from "./row-repair.js";
 import { RunFindings } from "./run-findings.js";
@@ -56,7 +56,7 @@ export class ProductTruthRunAssembly implements RunAssembly {
   private check(id: ProductTruthAgent): CheckProblem[] {
     Trace.line(import.meta.url, "ProductTruthRunAssembly.check", { id });
     const findings = new RunFindings(this.ledger, this.runId, id, STAGE_NODES[2], this.run.markets);
-    return new ProductTruthDone(findings, id, this.run.markets).problems();
+    return RoleChecks.done(Roles.of(id), findings, { brief: this.run.brief, nodes: STAGE_NODES[2], markets: this.run.markets }).problems();
   }
 
   private nodes(): NodeReport[] {

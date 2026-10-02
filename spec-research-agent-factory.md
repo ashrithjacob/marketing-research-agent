@@ -1,6 +1,6 @@
 # One research agent, many roles — spec
 
-**Status:** being built, see §13 · **Date:** 2026-10-03, revised the same day (`records`
+**Status:** built 2026-10-03, phases 0–5, not yet seen on a run (§13) · **Date:** 2026-10-03, revised the same day (`records`
 derived, `contract` renamed `consistency`, §7 and §8 added) · **Parents:** `workings.md` (how a run
 works), `spec-stage-1.md` §2 (what stage 1 delivers), `spec-stage-2-product-truth.md`
 (what product truth delivers). Layer rules: `CLAUDE.md` and
@@ -1007,3 +1007,43 @@ role's deliverable check instead of looking one up by node, so
   could not fix. `ChampionCheck` now flags a champion with no `icp` on its own
   row, so the champion agent cannot finish without one and settlement retracts
   such a row.
+
+**Phase 5 (2026-10-03).** `PerItemCheck` (`extract/per-item-check.ts`);
+`RoleDone` (`agent/role-done.ts`) for every role, built by `RoleChecks.done`;
+the consistency checks named for what they are — `NodeContract`,
+`ChampionContract`, `TruthContract` (`agent/done-check.ts`); one `LimitClose`.
+Deleted: `ProductTruthCoverage`, `ProductTruthDone`, `TruthLimitClose`,
+`DoneChecks`, `NodeDone`, `ChampionDone`. `product-truth-run.test.ts` passes
+unchanged; `product-truth.test.ts`'s coverage cases now go through
+`DeliverableChecks.of(Roles.of(agent).deliverable, markets)` with the same
+inputs and the same expected keys. New tests in `tests/deliverables.test.ts`.
+
+- **The carrier rule is a deliverable rule, `oneMarked`**: across a per-item
+  deliverable, at least one row of a kind has a field set to a value, gap-able by
+  its key ("carrier"), vacuous when no such row exists — exactly what
+  `ProductTruthCoverage` did. Not a `FieldRule` (it is not about one field) and not
+  consistency (consistency is never gapped).
+- **`FieldSpec.how`**: what `finish` tells the agent to do ("record each active
+  with record_active"), kept apart from `describe`, which is what the prompt table
+  shows. Stage 2's messages are word for word as before.
+- **A stage-2 `fields` gap must be on the role's own node** (formula's on
+  dose_vs_study, cogs's on cogs_refills), as both tasks and the turn-limit closer
+  file them; `ProductTruthCoverage` took a gap on any node. `per_item` gaps still
+  count on any node.
+- **The champion's "no champion is recorded" is now its deliverable's**:
+  "`competitor_reference` is neither recorded nor gapped — record it with
+  record_reference, then call finish, or record_gap …". So a champion that cannot
+  be found can be gapped and the agent finishes, where before it ran out its
+  turns and ended with the same empty reference.
+- **Turn-limit gaps read "the N-turn limit"** in both stages; stage 1's said
+  "N-call limit", though the limit has counted turns since 2026-10-01. A stage-2
+  role (`node_status` not among its records) gets no "research stopped" gap and no
+  status, as before.
+
+**Not yet seen working.** Rule 4 asks for one run per phase; none was made while
+building (asked not to). The checks that would show it, none needing Apify: a url
+brief on `product_data,category_data` (`mra run "https://…"
+product_data,category_data`) — its rail cost table, its logs tabs' rows, the
+product and category tables in its first prompt; then Stop pressed halfway on a
+second one, its packet shown. Competitors (phase 4) and the champion spend Apify:
+ask first.

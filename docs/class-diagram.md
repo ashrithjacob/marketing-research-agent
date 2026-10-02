@@ -97,9 +97,6 @@ classDiagram
       <<interface>>
       charge()
     }
-    class NoCharges {
-      charge()
-    }
     class ServiceUse {
       <<interface>>
     }
@@ -148,6 +145,9 @@ classDiagram
       <<interface>>
     }
     class ListDeliverable {
+      <<interface>>
+    }
+    class OneMarked {
       <<interface>>
     }
     class PerItemDeliverable {
@@ -311,7 +311,6 @@ classDiagram
     }
     class Roles {
       of()
-      stage()
       node()
       scope()
     }
@@ -492,6 +491,12 @@ classDiagram
     class PacketAssembly {
       draft()
     }
+    class Item {
+      <<interface>>
+    }
+    class PerItemCheck {
+      missing()
+    }
     class ProductEconomics {
       of()
       churn()
@@ -502,16 +507,6 @@ classDiagram
     }
     class ProductTruthAssembly {
       draft()
-    }
-    class OpenItem {
-      <<interface>>
-    }
-    class Item {
-      <<interface>>
-    }
-    class ProductTruthCoverage {
-      open()
-      actives()
     }
     class ReviewAssembly {
       expand()
@@ -883,14 +878,14 @@ classDiagram
       <<interface>>
       problems()
     }
-    class NodeDone {
+    class NodeContract {
       problems()
     }
-    class ChampionDone {
+    class ChampionContract {
       problems()
     }
-    class DoneChecks {
-      of()
+    class TruthContract {
+      problems()
     }
     class RunError {
     }
@@ -957,9 +952,6 @@ classDiagram
     }
     class ModelPricing {
       apply()
-    }
-    class ProductTruthDone {
-      problems()
     }
     class ProductTruthRunAssembly {
       assemble()
@@ -1108,9 +1100,15 @@ classDiagram
     class ReviewPuller {
       pullAll()
     }
+    class CheckedRun {
+      <<interface>>
+    }
     class RoleChecks {
       done()
       closer()
+    }
+    class RoleDone {
+      problems()
     }
     class RowRepair {
       repair()
@@ -1231,9 +1229,6 @@ classDiagram
     }
     class WebSearchTool {
       tool()
-    }
-    class TruthLimitClose {
-      close()
     }
     class TurnBudget {
     }
@@ -1378,9 +1373,9 @@ classDiagram
   AgentTeam --> ModelChain
   BilledCosts --> ResearchStore
   BilledCosts --> LiveRuns
-  NodeDone --> RunFindings
-  NodeDone --> DeliverableCheck
-  ChampionDone --> RunFindings
+  NodeContract --> RunFindings
+  ChampionContract --> RunFindings
+  TruthContract --> RunFindings
   AgentEventRecorder --> LiveRuns
   AgentEventRecorder --> ToolSteps
   InvalidRunResettle --> ResearchStore
@@ -1392,7 +1387,6 @@ classDiagram
   LiveRuns --> ResearchStore
   OperatorInputs --> FindingLedger
   ModelPricing --> OpenRouterPrices
-  ProductTruthDone --> RunFindings
   ProductTruthRunAssembly --> FindingLedger
   ProductTruthRun --> ResearchAgentFactory
   ProductTruthRun --> ProductTruthBrief
@@ -1423,6 +1417,9 @@ classDiagram
   ReviewMiningRunAssembly --> ReviewLedger
   ReviewMiningRunAssembly --> PullFailure
   ReviewPuller --> PullEvents
+  RoleDone --> RunFindings
+  RoleDone --> DeliverableCheck
+  RoleDone --> DoneCheck
   RowRepair --> FindingLedger
   RunEnd --> ResearchStore
   RunEnd --> LiveRuns
@@ -1466,15 +1463,12 @@ classDiagram
   WebFetchTool --> Corpus
   WebFetchTool --> FetchGate
   WebSearchTool --> WebSearch
-  TruthLimitClose --> RunFindings
-  TruthLimitClose --> RowRepair
-  TruthLimitClose --> DoneCheck
   PacketError --> CheckProblem
   FieldsCheck --> FieldsDeliverable
   ListCheck --> ListDeliverable
   PacketAssembly --> Finding
+  PerItemCheck --> PerItemDeliverable
   ProductTruthAssembly --> Finding
-  ProductTruthCoverage --> Finding
   ReviewAssembly --> ReviewLedgerSnapshot
   ReviewMiningPacket --> ReviewLedgerSnapshot
   ReviewMiningPacket --> PullFailure
@@ -1571,7 +1565,7 @@ classDiagram
 | `agent` | `agent/agent-team.ts` | TeamMember, AgentTeam |
 | `agent` | `agent/billed-costs.ts` | BilledCosts |
 | `agent` | `agent/built-agent.ts` | BuiltAgent |
-| `agent` | `agent/done-check.ts` | DoneCheck, NodeDone, ChampionDone, DoneChecks |
+| `agent` | `agent/done-check.ts` | DoneCheck, NodeContract, ChampionContract, TruthContract |
 | `agent` | `agent/errors.ts` | RunError |
 | `agent` | `agent/event-recorder.ts` | TurnEnd, AgentEventRecorder |
 | `agent` | `agent/frames.ts` | EventFrame, Frames |
@@ -1583,7 +1577,6 @@ classDiagram
 | `agent` | `agent/model-chain.ts` | ModelChain |
 | `agent` | `agent/operator-inputs.ts` | OperatorInputs |
 | `agent` | `agent/pricing.ts` | ModelPricing |
-| `agent` | `agent/product-truth-done.ts` | ProductTruthDone |
 | `agent` | `agent/product-truth-run-assembly.ts` | ProductTruthRunAssembly |
 | `agent` | `agent/product-truth-run.ts` | ProductTruthBrief, ProductTruthRun |
 | `agent` | `agent/prompt/blocks.ts` | PromptBlocks |
@@ -1611,7 +1604,8 @@ classDiagram
 | `agent` | `agent/review-mining-plan.ts` | ReviewMiningPlanner |
 | `agent` | `agent/review-mining-run-assembly.ts` | ReviewMiningRunAssembly |
 | `agent` | `agent/review-puller.ts` | PullJob, PullEvents, ReviewPuller |
-| `agent` | `agent/role-checks.ts` | RoleChecks |
+| `agent` | `agent/role-checks.ts` | CheckedRun, RoleChecks |
+| `agent` | `agent/role-done.ts` | RoleDone |
 | `agent` | `agent/row-repair.ts` | RowRepair |
 | `agent` | `agent/run-assembly.ts` | Assembled, RunAssembly |
 | `agent` | `agent/run-end.ts` | RunEnd |
@@ -1639,7 +1633,6 @@ classDiagram
 | `agent` | `agent/tools/traced-tool.ts` | TracedTool |
 | `agent` | `agent/tools/web-fetch-tool.ts` | WebFetchTool |
 | `agent` | `agent/tools/web-search-tool.ts` | WebSearchTool |
-| `agent` | `agent/truth-limit-close.ts` | TruthLimitClose |
 | `agent` | `agent/turn-budget.ts` | TurnBudget |
 | `agent` | `agent/usage.ts` | UsageTotals |
 | `config` | `config/settings-shape.ts` | ServicePrices, Settings |
@@ -1647,11 +1640,11 @@ classDiagram
 | `domain` | `domain/accounts.ts` | Workspace, Account, AccountListing, Principal, Scope |
 | `domain` | `domain/ad-library.ts` | AdQuery, AdHit, AdPage |
 | `domain` | `domain/brief.ts` | Briefs |
-| `domain` | `domain/charges.ts` | ChargeDraft, Charge, ChargeMeter, NoCharges, ServiceUse |
+| `domain` | `domain/charges.ts` | ChargeDraft, Charge, ChargeMeter, ServiceUse |
 | `domain` | `domain/check-problem.ts` | RowRef, CheckProblem, CheckProblems |
 | `domain` | `domain/competitor-discovery.ts` | CompetitorCandidate, DiscoveryQuestion, DiscoveryReport, DiscoveryQuestions |
 | `domain` | `domain/cost-report.ts` | CostCell, CostRow, CostReport |
-| `domain` | `domain/deliverable.ts` | FieldSpec, ItemPart, ItemNeed, FieldsDeliverable, ListDeliverable, PerItemDeliverable, Deliverables |
+| `domain` | `domain/deliverable.ts` | FieldSpec, ItemPart, ItemNeed, FieldsDeliverable, ListDeliverable, OneMarked, PerItemDeliverable, Deliverables |
 | `domain` | `domain/findings.ts` | FindingDraft, Finding, Findings |
 | `domain` | `domain/logs.ts` | RunEvent, Judgement, PacketCheck, RunUpdate, LlmCallRecord, Generation, LlmCall |
 | `domain` | `domain/nodes.ts` | Stages |
@@ -1686,9 +1679,9 @@ classDiagram
 | `extract` | `extract/market-check.ts` | MarketCheck |
 | `extract` | `extract/names.ts` | Names, BrandLabels, Relations |
 | `extract` | `extract/packet-assembly.ts` | PacketAssembly |
+| `extract` | `extract/per-item-check.ts` | Item, PerItemCheck |
 | `extract` | `extract/product-economics.ts` | ProductEconomics |
 | `extract` | `extract/product-truth-assembly.ts` | NodeReport, ProductTruthAssembly |
-| `extract` | `extract/product-truth-coverage.ts` | OpenItem, Item, ProductTruthCoverage |
 | `extract` | `extract/review-assembly.ts` | ReviewAssembly |
 | `extract` | `extract/review-mining-offer.ts` | TrustpilotDomain, ReviewMiningOffer |
 | `extract` | `extract/review-mining-packet.ts` | PullFailure, ReviewMiningPacket |

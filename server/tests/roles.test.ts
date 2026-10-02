@@ -26,7 +26,7 @@ describe("what each role may write", () => {
 
 describe("how roles wait and file", () => {
   it("starts each stage-2 role after the one it reads, as the old `after` lists did", () => {
-    expect(Object.fromEntries(Roles.stage(2).map((role) => [role.id, role.waitsFor]))).toEqual({
+    expect(Object.fromEntries(ROLES.filter((role) => role.stage === 2).map((role) => [role.id, role.waitsFor]))).toEqual({
       formula: [],
       mechanism: ["formula"],
       dose_vs_study: ["formula"],

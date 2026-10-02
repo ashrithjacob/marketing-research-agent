@@ -113,7 +113,8 @@ row is checked against its section's schema and the run's scope when written,
 and a bad one comes back `NOT RECORDED — <problem>` on that small turn. Every
 row carries the `agent_id` that wrote it; an agent reads every row
 (`read_ledger`, `wait_for`) but replaces or retracts only its own. An agent's
-`finish` checks **its own part** — `ChampionDone`, or its rows against its node
+`finish` checks **its own part** — its deliverable (`RoleDone`, from its role in
+`domain/research-roles.ts`), then `ChampionContract`, or its rows against its node
 (competitors' with the champion's) — and a pass ends that agent only. When the
 last agent ends, each agent's check runs again and `PacketAssembly` builds the
 packet from every live row for the run-wide rules: cited source_ids exist,

@@ -73,11 +73,6 @@ export class Roles {
     return ROLES.find((role) => role.id === id)!;
   }
 
-  static stage(stage: 1 | 2): RoleSpec[] {
-    Trace.line(import.meta.url, "Roles.stage", { stage });
-    return ROLES.filter((role) => role.stage === stage);
-  }
-
   /** The node a role's rows are filed under: its deliverable's, or for the champion, which has none, competitors when that is in scope and otherwise the run's first node. */
   static node(role: RoleSpec, runNodes: readonly Node[]): Node {
     Trace.line(import.meta.url, "Roles.node", { role: role.id, runNodes });

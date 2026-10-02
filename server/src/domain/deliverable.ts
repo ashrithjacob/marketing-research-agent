@@ -13,6 +13,8 @@ export interface FieldSpec {
   record: FindingKind;
   required: boolean;
   describe: string;
+  /** What `finish` tells the agent to do about it, where "record it" is not enough. */
+  how?: string;
   rule?: FieldRule;
 }
 
@@ -51,11 +53,21 @@ export interface ListDeliverable {
   stop: { kind: "saturation"; quietRun: number };
 }
 
+/** Across all items: at least one row of `record` has `field` equal to `value` (one active the product's story rests on). */
+export interface OneMarked {
+  key: string;
+  record: FindingKind;
+  field: string;
+  value: string;
+  describe: string;
+}
+
 export interface PerItemDeliverable {
   shape: "per_item";
   node: Node;
   over: ItemSource;
   needs: readonly ItemNeed[];
+  oneMarked?: OneMarked;
 }
 
 /** What a role must leave in the ledger before it is done, compulsory and optional; its prompt table, its finish check and its turn-limit gaps are read from this. */

@@ -30,7 +30,7 @@ import {
   WebFetchTool,
   type ToolContext,
 } from "../src/agent/tools/index.js";
-import { AgentRoster, DoneChecks, RunFindings } from "../src/agent/index.js";
+import { AgentRoster, RoleChecks, RunFindings } from "../src/agent/index.js";
 import { ServiceClients } from "../src/adapters/index.js";
 import {
   STAGE_NODES,
@@ -38,13 +38,12 @@ import {
   Roles,
   StageOnePlans,
   locatorSchema,
-  NoCharges,
   type DiscoveryQuestion,
   type Node,
   type StageOneAgent,
   type ToolName,
 } from "../src/domain/index.js";
-import { MemoryLedger, minimalPacket, productPacket, reviewPacket, services } from "./fixtures.js";
+import { MemoryLedger, minimalPacket, productPacket, reviewPacket, services, NoCharges } from "./fixtures.js";
 
 let dir: string;
 let settings: Settings;
@@ -462,7 +461,7 @@ describe("the ledger tools", () => {
     const ledger = options.ledger ?? new MemoryLedger();
     const node = StageOnePlans.nodeOf(agent, nodes);
     const findings = new RunFindings(ledger, "run-l", agent, [node]);
-    const check = DoneChecks.of(agent, findings, brief, nodes);
+    const check = RoleChecks.done(Roles.of(agent), findings, { brief, nodes, markets: [] });
     const checked: Array<{ valid: boolean; problems: readonly string[] }> = [];
     const list = new LedgerToolset({
       findings,
@@ -703,7 +702,7 @@ describe("the ledger tools", () => {
 
   it("finishes the champion once its reference is recorded with its ranking", async () => {
     const { tool } = ledgerTools("champion");
-    expect(text(await tool("finish").execute("0", {}))).toContain("1. no champion is recorded");
+    expect(text(await tool("finish").execute("0", {}))).toContain("1. `competitor_reference` is neither recorded nor gapped — record it with record_reference, then call finish");
     const source = { ...minimalPacket().sources[0], node: "competitors" };
     await tool("record_source").execute("1", { item: source });
     const reference = { name: "MagnaCalm Glycinate", form: "capsule", actives: ["magnesium glycinate"], icp: "adults who sleep badly", source_id: "sha256:aaa" };

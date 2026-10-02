@@ -17,9 +17,9 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { OpenRouterPrices } from "../src/adapters/index.js";
 import { RunSupervisor } from "../src/agent/index.js";
-import { COMPETITORS_DELIVERABLE, CheckProblems, RejectKinds, StageOnePlans } from "../src/domain/index.js";
+import { COMPETITORS_DELIVERABLE, CheckProblems, RejectKinds, Roles, StageOnePlans } from "../src/domain/index.js";
 import { DEFAULT_RETRY, Retries } from "../src/agent/retry.js";
-import { DoneChecks } from "../src/agent/done-check.js";
+import { RoleChecks } from "../src/agent/role-checks.js";
 import { DeliverableChecks } from "../src/extract/index.js";
 import { LimitClose } from "../src/agent/limit-close.js";
 import { RowRepair } from "../src/agent/row-repair.js";
@@ -1080,7 +1080,7 @@ describe("the two steps of a stage-1 run", () => {
     expect(limit.gapped).toHaveLength(10);
     const run = store.getRun(runId)!;
     expect(run.status).toBe("completed");
-    expect((run.packet as any).gaps.map((g: any) => g.missing)).toContain("price: not found within the 15-call limit");
+    expect((run.packet as any).gaps.map((g: any) => g.missing)).toContain("price: not found within the 15-turn limit");
     expect((run.packet as any).nodes[0]).toMatchObject({ node: "product_data", status: "incomplete" });
   });
 
@@ -1116,8 +1116,8 @@ describe("the two steps of a stage-1 run", () => {
     findings.record("saturation", curve("direct"));
     findings.record("saturation", curve("indirect"));
     findings.record("node_status", statusRow);
-    const check = DoneChecks.of("competitors", findings, genre, ["competitors"]);
-    const closed = new LimitClose(findings, new RowRepair(store.findings, runId, ["competitors"]), check, DeliverableChecks.of(COMPETITORS_DELIVERABLE), "competitors", 20).close();
+    const check = RoleChecks.done(Roles.of("competitors"), findings, { brief: genre, nodes: ["competitors"], markets: [] });
+    const closed = new LimitClose(findings, new RowRepair(store.findings, runId, ["competitors"]), check, DeliverableChecks.of(COMPETITORS_DELIVERABLE, []), { node: "competitors", limit: 20, reports: true }).close();
     expect(closed.retracted.map((id) => id.replace(/\d+$/, ""))).toEqual(["sat", "sat", "ns"]);
     expect(findings.own().find((row) => row.kind === "node_status")!.payload).toMatchObject({ status: "incomplete" });
     expect(CheckProblems.texts(check.problems()).filter((p) => /saturation|complete with no/.test(p))).toEqual([]);
@@ -1128,7 +1128,7 @@ describe("the two steps of a stage-1 run", () => {
     const findings = new RunFindings(store.findings, runId, "competitors", ["competitors"]);
     findings.record("saturation", { node: "competitors", class: "direct", curve: [{ source_id: "sha256:never-recorded", new_themes: 0, cumulative_themes: 1 }] });
     findings.record("node_status", { node: "competitors", status: "complete", done_criterion_met: true, why: "saturated" });
-    const check = DoneChecks.of("competitors", findings, genre, ["competitors"]);
+    const check = RoleChecks.done(Roles.of("competitors"), findings, { brief: genre, nodes: ["competitors"], markets: [] });
     new RowRepair(store.findings, runId, ["competitors"]).repair(() => check.problems(), "when the run settled");
     expect(findings.own().filter((row) => row.kind === "node_status").map((row) => row.payload)).toEqual([
       expect.objectContaining({ status: "incomplete", why: "its status was retracted when the run settled" }),

@@ -1,5 +1,6 @@
 import {
   Briefs,
+  Roles,
   STAGE_ONE_AGENTS,
   StageOnePlans,
   briefSchema,
@@ -11,7 +12,7 @@ import {
 } from "../domain/index.js";
 import { Trace } from "../trace/index.js";
 
-import { DoneChecks } from "./done-check.js";
+import { RoleChecks } from "./role-checks.js";
 import type { LiveRuns } from "./live-runs.js";
 import { ProductTruthRunAssembly } from "./product-truth-run-assembly.js";
 import { RunFindings } from "./run-findings.js";
@@ -36,7 +37,7 @@ export class StoredRunAssembly {
     Trace.line(import.meta.url, "StoredRunAssembly.partProblems", { runId });
     const wrote = new Set(store.findings.list(runId).map((row) => row.agent_id));
     return STAGE_ONE_AGENTS.filter((id) => wrote.has(id)).flatMap((id) =>
-      DoneChecks.of(id, new RunFindings(store.findings, runId, id, [StageOnePlans.nodeOf(id, nodes)]), brief, nodes)
+      RoleChecks.done(Roles.of(id), new RunFindings(store.findings, runId, id, [StageOnePlans.nodeOf(id, nodes)]), { brief, nodes, markets: Briefs.markets(brief) })
         .problems()
         .map((problem) => ({ ...problem, text: `${id}: ${problem.text}` })),
     );

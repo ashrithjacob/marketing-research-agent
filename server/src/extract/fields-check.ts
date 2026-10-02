@@ -49,6 +49,6 @@ export class FieldsCheck implements DeliverableCheck {
     Trace.line(import.meta.url, "FieldsCheck.complaint", { key: field.key });
     const gap = `record_gap with missing "${field.key}: <why>"`;
     if (field.rule?.kind === "distinct_periods") return `\`${field.key}\` needs rows for at least ${field.rule.min} different years to be a trend — record them, or ${gap}`;
-    return `\`${field.key}\` is neither recorded nor gapped — record it, or ${gap}`;
+    return `\`${field.key}\` is neither recorded nor gapped — ${field.how ?? "record it"}, or ${gap}`;
   }
 }

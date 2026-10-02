@@ -1,5 +1,3 @@
-import { Trace } from "../trace/index.js";
-
 export const COST_SERVICES = ["openrouter", "apify", "parallel", "trendtrack", "firecrawl", "crawl4ai"] as const;
 export type CostService = (typeof COST_SERVICES)[number];
 
@@ -25,13 +23,6 @@ export interface Charge extends ChargeDraft {
 /** Where a paid call reports what it cost, bound to one run and one agent. */
 export interface ChargeMeter {
   charge(draft: ChargeDraft): void;
-}
-
-/** A meter for code that spends nothing, or whose spend nobody reads. */
-export class NoCharges implements ChargeMeter {
-  charge(draft: ChargeDraft): void {
-    Trace.line(import.meta.url, "NoCharges.charge", { service: draft.service });
-  }
 }
 
 /** What a service reported a call used, before it is priced. */

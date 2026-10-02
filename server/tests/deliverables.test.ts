@@ -7,8 +7,10 @@ import { describe, expect, it } from "vitest";
 
 import { DeliverableTable, PromptBuilder } from "../src/agent/prompt/index.js";
 import { RunFindings } from "../src/agent/run-findings.js";
+import { RoleChecks } from "../src/agent/role-checks.js";
+import { RowRepair } from "../src/agent/row-repair.js";
 import { MemoryLedger } from "./fixtures.js";
-import { CATEGORY_DELIVERABLE, COMPETITORS_DELIVERABLE, FORMULA_DELIVERABLE, PRODUCT_DELIVERABLE, STAGE_NODES, briefSchema, type Finding, type FindingKind } from "../src/domain/index.js";
+import { CATEGORY_DELIVERABLE, COMPETITORS_DELIVERABLE, FORMULA_DELIVERABLE, PRODUCT_DELIVERABLE, Roles, STAGE_NODES, briefSchema, type Finding, type FindingKind } from "../src/domain/index.js";
 import { FieldsCheck, ListCheck } from "../src/extract/index.js";
 
 let seq = 0;
@@ -119,5 +121,26 @@ describe("a competitor row missing a required part", () => {
     const competitor = { id: "c1", name: "Herbify", url: "https://herbify.example", relation: "direct", form: "liquid", active_ingredients: [{ name_as_printed: "Mullein", name_normalised: "mullein" }], shared_actives: [], icp_as_printed: "for coughs", source_id: "sha256:a" };
     expect(findings.record("competitor", competitor)).toEqual({ problems: "competitor 'Herbify' has no form_as_printed — record what the product physically is, as printed" });
     expect(findings.record("competitor", { ...competitor, form_as_printed: "1 fl oz drops" })).toHaveProperty("recorded");
+  });
+});
+
+describe("one LimitClose for every role", () => {
+  it("gaps a stage-2 role's open items under its node and writes no status, as TruthLimitClose did", () => {
+    const ledger = new MemoryLedger();
+    const formula = new RunFindings(ledger, "r", "formula", STAGE_NODES[2]);
+    formula.record("source", { id: "sha256:label", url: "https://mullevia.com", title: "Label", kind: "brand_page", node: "dose_vs_study" });
+    formula.record("active", { name: "Mullein", amount: null, unit: "", form: "leaf extract", in_blend: false, source_id: "sha256:label" });
+    const mechanism = new RunFindings(ledger, "r", "mechanism", STAGE_NODES[2]);
+    const role = Roles.of("mechanism");
+    const run = { brief: briefSchema.parse({ product: "Mullevia" }), nodes: STAGE_NODES[2], markets: [] };
+    const close = RoleChecks.closer(role, mechanism, new RowRepair(ledger, "r", STAGE_NODES[2]), RoleChecks.done(role, mechanism, run), run)!;
+    expect(close()).toEqual({ gapped: ["mechanism: Mullein"], retracted: [] });
+    expect(mechanism.own().map((row) => [row.kind, row.payload.node, row.payload.missing])).toEqual([["gap", "mechanism", "mechanism: Mullein: not found within the 15-turn limit"]]);
+  });
+
+  it("stops the champion without closing anything: it has no node of its own", () => {
+    const champion = new RunFindings(new MemoryLedger(), "r", "champion", ["competitors"]);
+    const run = { brief: briefSchema.parse({ product: "mullein drops" }), nodes: ["competitors"] as const, markets: [] };
+    expect(RoleChecks.closer(Roles.of("champion"), champion, new RowRepair(new MemoryLedger(), "r", ["competitors"]), RoleChecks.done(Roles.of("champion"), champion, run), run)).toBeNull();
   });
 });

@@ -12,11 +12,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { Corpus } from "../src/adapters/corpus.js";
 import { TrendtrackAds } from "../src/adapters/trendtrack-ads.js";
 import { AdLibraryTool, ToolRegistry } from "../src/agent/tools/index.js";
-import { NoCharges, Roles } from "../src/domain/index.js";
+import { Roles } from "../src/domain/index.js";
 import { ServiceClients } from "../src/adapters/index.js";
 import { Env, type Settings } from "../src/config/index.js";
 import { ServiceUnavailableError, type AdPage } from "../src/domain/index.js";
-import { services } from "./fixtures.js";
+import { services, NoCharges } from "./fixtures.js";
 
 const settings = (overrides: Partial<Settings> = {}): Settings => ({
   ...Env.settings(),

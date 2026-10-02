@@ -1,36 +1,43 @@
-import { Roles, type Brief, type Node, type ProductTruthAgent, type RoleSpec, type StageOneAgent } from "../domain/index.js";
+import { RoleRecords, Roles, type Brief, type Node, type RoleSpec } from "../domain/index.js";
 import { DeliverableChecks } from "../extract/index.js";
 import { Trace } from "../trace/index.js";
 
-import { DoneChecks, type DoneCheck } from "./done-check.js";
+import { ChampionContract, NodeContract, TruthContract, type DoneCheck } from "./done-check.js";
 import { LimitClose, type LimitClosed } from "./limit-close.js";
-import { ProductTruthDone } from "./product-truth-done.js";
+import { RoleDone } from "./role-done.js";
 import type { RowRepair } from "./row-repair.js";
 import type { RunFindings } from "./run-findings.js";
-import { TruthLimitClose } from "./truth-limit-close.js";
 
-/** Which finish check a role's consistency names, and what closes it at its turn limit: the champion has no node to close. */
+export interface CheckedRun {
+  brief: Brief;
+  nodes: readonly Node[];
+  markets: readonly string[];
+}
+
+/** A role's finish check — its deliverable, then the consistency its `consistency` names — and what closes it at its turn limit. */
 export class RoleChecks {
-  static done(role: RoleSpec, findings: RunFindings, run: { brief: Brief; nodes: readonly Node[]; markets: readonly string[] }): DoneCheck {
+  static done(role: RoleSpec, findings: RunFindings, run: CheckedRun): DoneCheck {
     Trace.line(import.meta.url, "RoleChecks.done", { role: role.id });
-    if (role.consistency === "product_truth") return new ProductTruthDone(findings, role.id as ProductTruthAgent, run.markets);
-    return DoneChecks.of(role.id as StageOneAgent, findings, run.brief, run.nodes);
+    return new RoleDone(findings, DeliverableChecks.of(role.deliverable, run.markets), RoleChecks.consistency(role, findings, run));
   }
 
-  static closer(role: RoleSpec, findings: RunFindings, repair: RowRepair, check: DoneCheck, run: { nodes: readonly Node[]; markets: readonly string[] }): (() => LimitClosed) | null {
+  /** The champion has no node of its own to gap and report, so its turn limit only stops it. */
+  static closer(role: RoleSpec, findings: RunFindings, repair: RowRepair, check: DoneCheck, run: CheckedRun): (() => LimitClosed) | null {
     Trace.line(import.meta.url, "RoleChecks.closer", { role: role.id });
+    if (role.consistency === "champion") return null;
+    const part = { node: Roles.node(role, run.nodes), limit: role.maxTurns, reports: RoleRecords.of(role).includes("node_status") };
+    return () => new LimitClose(findings, repair, check, DeliverableChecks.of(role.deliverable, run.markets), part).close();
+  }
+
+  private static consistency(role: RoleSpec, findings: RunFindings, run: CheckedRun): DoneCheck {
+    Trace.line(import.meta.url, "RoleChecks.consistency", { role: role.id, consistency: role.consistency });
     switch (role.consistency) {
       case "champion":
-        return null;
-      case "stage_one_node": {
-        const deliverable = role.deliverable;
-        if (deliverable.shape === "per_item") return null;
-        return () => new LimitClose(findings, repair, check, DeliverableChecks.of(deliverable), Roles.node(role, run.nodes), role.maxTurns).close();
-      }
-      case "product_truth": {
-        const part = { agent: role.id as ProductTruthAgent, node: Roles.node(role, run.nodes), markets: run.markets };
-        return () => new TruthLimitClose(findings, repair, check, part, role.maxTurns).close();
-      }
+        return new ChampionContract(findings, run.brief);
+      case "stage_one_node":
+        return new NodeContract(findings, { brief: run.brief, node: Roles.node(role, run.nodes), champion: role.id === "competitors" ? "champion" : null });
+      case "product_truth":
+        return new TruthContract(findings);
     }
   }
 }

@@ -6,8 +6,8 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { DOSE_BANDS, type Active, type DoseStudy, type Finding, type FindingKind, type Mechanism } from "../src/domain/index.js";
-import { DoseBands, ProductEconomics, ProductTruthCoverage, RowPicks, TruthCitations } from "../src/extract/index.js";
+import { DOSE_BANDS, Roles, type Active, type ProductTruthAgent, type DoseStudy, type Finding, type FindingKind, type Mechanism } from "../src/domain/index.js";
+import { DeliverableChecks, DoseBands, ProductEconomics, RowPicks, TruthCitations } from "../src/extract/index.js";
 
 const MULLEVIA = ["Wildcrafted Mullein leaf", "Ginger", "Bromelain", "Cordyceps", "Lemon Peel"];
 const active = (name: string, amount: number | null = null, unit = "", in_blend = false): Active => ({ name, amount, unit, form: "", in_blend, source_id: "sha256:label" });
@@ -84,25 +84,25 @@ describe("economics", () => {
 });
 
 describe("what each agent must leave recorded or gapped", () => {
+  /** What a stage-2 role's deliverable still lacks, as its finish check reads it. */
+  const open = (agent: ProductTruthAgent, rows: Finding[], markets: string[]) => DeliverableChecks.of(Roles.of(agent).deliverable, markets).missing(rows);
   const actives = MULLEVIA.map((name) => row("active", active(name)));
 
   it("asks the formula for actives and both regimen numbers, each closed by a row or a gap", () => {
-    const empty = new ProductTruthCoverage([], ["US"]);
-    expect(empty.open("formula").map((i) => i.key)).toEqual(["actives", "servings_per_day", "servings_per_container"]);
-    const done = new ProductTruthCoverage([
+    expect(open("formula", [], ["US"]).map((i) => i.key)).toEqual(["actives", "servings_per_day", "servings_per_container"]);
+    const done = open("formula", [
       ...actives,
       row("regimen", { ...regimen, servings_per_container: null }),
       row("gap", { node: "dose_vs_study", missing: "servings_per_container: bottle size not stated anywhere" }),
     ], ["US"]);
-    expect(done.open("formula")).toEqual([]);
+    expect(done).toEqual([]);
   });
 
   it("asks the mechanism agent for every active, a time to effect for each, and one carrier", () => {
-    const coverage = new ProductTruthCoverage([
+    const keys = open("mechanism", [
       ...actives,
       row("mechanism", { active: "wildcrafted mullein LEAF", pathway: "p", time_to_effect: null, magnitude: "m", story_weight: "supporting", source_id: "s" }, "mechanism"),
-    ], []);
-    const keys = coverage.open("mechanism").map((i) => i.key);
+    ], []).map((i) => i.key);
     expect(keys).toContain("time_to_effect: Wildcrafted Mullein leaf");
     expect(keys).toContain("mechanism: Ginger");
     expect(keys).toContain("carrier");
@@ -110,15 +110,15 @@ describe("what each agent must leave recorded or gapped", () => {
   });
 
   it("asks for a study only for actives with an amount outside a blend — none on Mullevia", () => {
-    expect(new ProductTruthCoverage(actives, []).open("dose_vs_study")).toEqual([]);
-    const stated = new ProductTruthCoverage([row("active", active("Bromelain", 100, "mg")), row("active", active("Ginger", 50, "mg", true))], []);
-    expect(stated.open("dose_vs_study").map((i) => i.key)).toEqual(["dose: Bromelain"]);
+    expect(open("dose_vs_study", actives, [])).toEqual([]);
+    const stated = open("dose_vs_study", [row("active", active("Bromelain", 100, "mg")), row("active", active("Ginger", 50, "mg", true))], []);
+    expect(stated.map((i) => i.key)).toEqual(["dose: Bromelain"]);
   });
 
   it("asks for every market in the brief on both Meta and Google Ads", () => {
-    const keys = new ProductTruthCoverage([], ["US", "UK"]).open("claim_limits").map((i) => i.key);
+    const keys = open("claim_limits", [], ["US", "UK"]).map((i) => i.key);
     expect(keys).toEqual(["claims: US / meta", "claims: US / google_ads", "claims: UK / meta", "claims: UK / google_ads"]);
-    expect(new ProductTruthCoverage([], []).open("claim_limits").map((i) => i.key)).toEqual(["claims: market"]);
+    expect(open("claim_limits", [], []).map((i) => i.key)).toEqual(["claims: market"]);
   });
 });
 
