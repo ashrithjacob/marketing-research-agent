@@ -4,7 +4,6 @@ import { openrouterProvider } from "@earendil-works/pi-ai/providers/openrouter";
 import { OpenRouterPrices, ServiceClients } from "../adapters/index.js";
 import type { Settings } from "../config/index.js";
 import {
-  Clock,
   type Judgement,
   type ResearchStore,
   type RunRequest,
@@ -24,7 +23,9 @@ import { StageOneListings } from "./stage-one-listings.js";
 import { ReviewMiningJob } from "./review-mining-job.js";
 import { RunError } from "./errors.js";
 import { InvalidRunResettle } from "./invalid-run-resettle.js";
+import { RunEnd } from "./run-end.js";
 import { RunLauncher } from "./run-launcher.js";
+import { StoredRunAssembly } from "./stored-run-assembly.js";
 
 /** Owns a research run for its whole life: one Agent per run, in this process. */
 export class RunSupervisor {
@@ -80,16 +81,13 @@ export class RunSupervisor {
     return this.launcher.launch(request, workspaceId);
   }
 
+  /** Every run a restart left unfinished ends from its ledger, so what its agents found is shown; no model or paid tool is called. */
   recoverRunsKilledByRestart(): void {
     Trace.line(import.meta.url, "RunSupervisor.recoverRunsKilledByRestart");
+    const end = new RunEnd(this.store, this.runs);
     for (const run of this.store.listRuns(Scope.everything, 200)) {
       if (TERMINAL_STATUSES.has(run.status)) continue;
-      this.store.updateRun(run.id, {
-        status: "failed",
-        error: "the server restarted while this run was in progress; the run did not survive it",
-        ended_at: Clock.nowIso(),
-      });
-      this.runs.emit(run.id, "run.failed", { error: "server restarted mid-run" });
+      end.end(StoredRunAssembly.of(this.store, this.runs, run), { kind: "restarted" });
     }
   }
 

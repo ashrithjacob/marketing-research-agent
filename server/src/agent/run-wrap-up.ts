@@ -14,15 +14,15 @@ export class RunWrapUp {
     private readonly listings?: StageOneListings,
   ) {}
 
-  /** After a completed competitors run, never before: an Apify search can wait minutes, and must not hold the run's status. */
+  /** After a completed competitors run, never before: an Apify search can wait minutes, and must not hold the run's status. A failure here is an event; it never changes the status. */
   async lookUpListings(nodes: readonly Node[]): Promise<void> {
     Trace.line(import.meta.url, "RunWrapUp.lookUpListings", { nodes });
     const { store, runs, runId, listings } = this;
-    if (!listings?.available || !nodes.includes("competitors")) return;
-    const run = store.getRun(runId);
-    const packet = stagePacketSchema.safeParse(run?.packet);
-    if (run?.status !== "completed" || !packet.success) return;
     try {
+      if (!listings?.available || !nodes.includes("competitors")) return;
+      const run = store.getRun(runId);
+      const packet = stagePacketSchema.safeParse(run?.packet);
+      if (run?.status !== "completed" || !packet.success) return;
       const rows = await listings.lookUp(runId, packet.data, (charge) =>
         runs.emit(runId, "apify.charged", { actor: charge.actor, usd: charge.usd, status: charge.status }),
       );

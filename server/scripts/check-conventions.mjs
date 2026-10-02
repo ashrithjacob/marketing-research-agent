@@ -423,6 +423,57 @@ function checkSecrets() {
   }
 }
 
+// --- 8. a run reaches its final status in one place -----------------------
+//
+// Four endings once lost what a run had collected — a restart, Stop, a thrown
+// error, an unparseable packet — because each wrote `failed` or `cancelled`
+// itself and skipped assembling the ledger. `RunEnd` assembles first and then
+// sets the status, so only it may write a final one. A non-final literal
+// (`"running"`, `"stopping"`) is fine anywhere; a variable might be final, so
+// it is refused too.
+const RUN_END_FILE = "server/src/agent/run-end.ts";
+const FINAL_STATUSES = new Set(["completed", "invalid", "failed", "cancelled"]);
+
+/** The text of a call's argument list, from the "(" at `open` to its matching ")". */
+function callArguments(text, open) {
+  let depth = 0;
+  for (let i = open; i < text.length; i += 1) {
+    if (text[i] === "(") depth += 1;
+    if (text[i] === ")") depth -= 1;
+    if (depth === 0) return text.slice(open, i + 1);
+  }
+  return text.slice(open);
+}
+
+function checkRunEndsInOnePlace() {
+  const root = join(REPO, "server", "src");
+  if (!existsSync(root)) {
+    skipped.push("run-ends-in-one-place: no server/src");
+    return;
+  }
+  for (const full of serverSources(root)) {
+    const rel = relative(REPO, full);
+    if (rel === RUN_END_FILE) continue;
+    const text = readFileSync(full, "utf8");
+    const call = /\.updateRun\(/g;
+    let m;
+    while ((m = call.exec(text))) {
+      const args = callArguments(text, m.index + m[0].length - 1);
+      const status = /[{,]\s*status\s*(?::\s*("[^"]*"|[^,}\s]+))?\s*[,}]/.exec(args);
+      if (!status) continue;
+      const literal = status[1]?.startsWith('"') ? status[1].slice(1, -1) : null;
+      if (literal !== null && !FINAL_STATUSES.has(literal)) continue;
+      fail(
+        rel, text.slice(0, m.index).split("\n").length, "run-ends-in-one-place",
+        `sets a run's status to ${literal ? `"${literal}"` : "a value that may be final"} outside ` +
+        "agent/run-end.ts. A final status written here skips assembling the ledger, so " +
+        "whatever the run found is not shown. End the run with RunEnd.end (or RunEnd.refuse " +
+        "before it starts).",
+      );
+    }
+  }
+}
+
 const checks = [
   ["client-server-field-parity", checkClientServerFieldParity],
   ["env-declared-in-settings", checkEnvDeclaration],
@@ -432,6 +483,7 @@ const checks = [
   ["compose-env-quoted", checkComposeEnvStrings],
   ["app-domain", checkAppDomain],
   ["no-secrets", checkSecrets],
+  ["run-ends-in-one-place", checkRunEndsInOnePlace],
 ];
 
 for (const [, fn] of checks) fn();

@@ -2,7 +2,7 @@ import type { Models } from "@earendil-works/pi-ai";
 
 import type { OpenRouterPrices } from "../adapters/index.js";
 import type { Settings } from "../config/index.js";
-import { Clock, RejectKinds, Scope, Stages, productTruthInputsSchema, type ResearchRun, type ResearchStore, type RunRequest, type StagePacket } from "../domain/index.js";
+import { RejectKinds, Scope, Stages, productTruthInputsSchema, type ResearchRun, type ResearchStore, type RunRequest, type StagePacket } from "../domain/index.js";
 import { Trace } from "../trace/index.js";
 
 import { RunError } from "./errors.js";
@@ -11,6 +11,7 @@ import { ModelChain } from "./model-chain.js";
 import { ModelPricing } from "./pricing.js";
 import type { ProductTruthAgentFactory } from "./product-truth-agent-factory.js";
 import { ProductTruthRun } from "./product-truth-run.js";
+import { RunEnd } from "./run-end.js";
 import type { RetryPolicy } from "./retry.js";
 import type { ReviewMiningJob } from "./review-mining-job.js";
 import type { StageOneAgentFactory } from "./stage-one-agent-factory.js";
@@ -75,8 +76,7 @@ export class RunLauncher {
     const resolved = ModelChain.resolve([this.settings.model, ...this.settings.backupModels], this.models, new ModelPricing(this.costs));
     if (!("unknown" in resolved)) return resolved.chain;
     const error = `unknown model ${JSON.stringify(resolved.unknown)} for provider openrouter`;
-    this.store.updateRun(runId, { status: "failed", error, ended_at: Clock.nowIso() });
-    this.runs.emit(runId, "run.failed", { error });
+    new RunEnd(this.store, this.runs).refuse(runId, error);
     throw new RunError(error);
   }
 
@@ -86,7 +86,7 @@ export class RunLauncher {
     const found = this.kinds.handoff.forBrief(request.brief, Scope.of(workspaceId));
     if (!found) {
       const error = "product truth reads a completed stage-1 run, and this brief has none";
-      this.store.updateRun(run.id, { status: "failed", error, ended_at: Clock.nowIso() });
+      new RunEnd(this.store, this.runs).refuse(run.id, error);
       throw new RunError(error);
     }
     this.store.updateRun(run.id, { source_run_id: found.run.id });

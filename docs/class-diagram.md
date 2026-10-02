@@ -400,6 +400,7 @@ classDiagram
     }
     class LatestRows {
       payloads()
+      rows()
     }
     class MarketCheck {
       problems()
@@ -457,6 +458,12 @@ classDiagram
     class ReviewMiningRoster {
       of()
       select()
+    }
+    class PacketSection {
+      <<interface>>
+    }
+    class RowBlame {
+      problems()
     }
     class RowPicks {
       problems()
@@ -813,10 +820,6 @@ classDiagram
     class InvalidRunResettle {
       resettleAll()
     }
-    class LedgerPacket {
-      assemble()
-      isEmpty()
-    }
     class LimitClosed {
       <<interface>>
     }
@@ -872,14 +875,14 @@ classDiagram
     class ProductTruthDone {
       problems()
     }
+    class ProductTruthRunAssembly {
+      assemble()
+    }
     class ProductTruthBrief {
       <<interface>>
     }
     class ProductTruthRun {
       start()
-    }
-    class ProductTruthSettlement {
-      settle()
     }
     class PromptBlocks {
       code()
@@ -983,9 +986,8 @@ classDiagram
     class ReviewMiningPlanner {
       plan()
     }
-    class ReviewMiningSettlement {
-      settle()
-      fail()
+    class ReviewMiningRunAssembly {
+      assemble()
     }
     class PullJob {
       <<interface>>
@@ -1001,6 +1003,17 @@ classDiagram
     class RowRepair {
       repair()
     }
+    class Assembled {
+      <<interface>>
+    }
+    class RunAssembly {
+      <<interface>>
+      assemble()
+    }
+    class RunEnd {
+      end()
+      refuse()
+    }
     class RunFindings {
       record()
       retract()
@@ -1013,10 +1026,6 @@ classDiagram
     }
     class RunLauncher {
       launch()
-    }
-    class RunSettlement {
-      settle()
-      resettle()
     }
     class RunSupervisor {
       start()
@@ -1047,8 +1056,14 @@ classDiagram
     class StageOneListings {
       lookUp()
     }
+    class StageOneRunAssembly {
+      assemble()
+    }
     class StageOneRun {
       start()
+    }
+    class StoredRunAssembly {
+      of()
     }
     class ToolSteps {
       start()
@@ -1240,7 +1255,6 @@ classDiagram
   AgentEventRecorder --> ToolSteps
   InvalidRunResettle --> ResearchStore
   InvalidRunResettle --> LiveRuns
-  LedgerPacket --> FindingLedger
   LimitClose --> RunFindings
   LimitClose --> RowRepair
   LimitClose --> DoneCheck
@@ -1253,10 +1267,9 @@ classDiagram
   ProductTruthAgentFactory --> ServiceClients
   ProductTruthAgentFactory --> ProductTruthPrompts
   ProductTruthDone --> RunFindings
+  ProductTruthRunAssembly --> FindingLedger
   ProductTruthRun --> ProductTruthAgentFactory
   ProductTruthRun --> ProductTruthBrief
-  ProductTruthSettlement --> ResearchStore
-  ProductTruthSettlement --> LiveRuns
   IssueSlices --> IssueTally
   NewIssueMerge --> StructuredAsk
   ReviewAnalysisJob --> StructuredAsk
@@ -1273,11 +1286,14 @@ classDiagram
   ReviewMiningListings --> TargetListings
   ReviewMiningListings --> AmazonListingSource
   ReviewMiningListings --> TrustpilotProfiles
-  ReviewMiningSettlement --> ResearchStore
-  ReviewMiningSettlement --> LiveRuns
-  ReviewMiningSettlement --> ReviewLedger
+  ReviewMiningRunAssembly --> ResearchStore
+  ReviewMiningRunAssembly --> LiveRuns
+  ReviewMiningRunAssembly --> ReviewLedger
+  ReviewMiningRunAssembly --> PullFailure
   ReviewPuller --> PullEvents
   RowRepair --> FindingLedger
+  RunEnd --> ResearchStore
+  RunEnd --> LiveRuns
   RunFindings --> FindingLedger
   RunLauncher --> ResearchStore
   RunLauncher --> Settings
@@ -1285,10 +1301,6 @@ classDiagram
   RunLauncher --> LiveRuns
   RunLauncher --> RetryPolicy
   RunLauncher --> RunKinds
-  RunSettlement --> ResearchStore
-  RunSettlement --> LiveRuns
-  RunSettlement --> LedgerPacket
-  RunSettlement --> RowRepair
   RunWrapUp --> ResearchStore
   RunWrapUp --> LiveRuns
   RunWrapUp --> StageOneListings
@@ -1300,6 +1312,8 @@ classDiagram
   StageOneListings --> TargetListings
   StageOneListings --> ActorRunner
   StageOneListings --> PageFetcher
+  StageOneRunAssembly --> FindingLedger
+  StageOneRunAssembly --> CheckProblem
   AdLibraryTool --> AdLibrary
   AdLibraryTool --> Corpus
   DiscoverCompetitorsTool --> CompetitorDiscovery
@@ -1330,6 +1344,7 @@ classDiagram
   ReviewAssembly --> ReviewLedgerSnapshot
   ReviewMiningPacket --> ReviewLedgerSnapshot
   ReviewMiningPacket --> PullFailure
+  RowBlame --> Finding
   PacketValidator --> ReviewLedgerSnapshot
   AccountCommands --> AccountDirectory
   App --> AmazonListingSource
@@ -1423,7 +1438,6 @@ classDiagram
 | `agent` | `agent/event-recorder.ts` | TurnEnd, AgentEventRecorder |
 | `agent` | `agent/frames.ts` | EventFrame, Frames |
 | `agent` | `agent/invalid-run-resettle.ts` | InvalidRunResettle |
-| `agent` | `agent/ledger-packet.ts` | LedgerPacket |
 | `agent` | `agent/limit-close.ts` | LimitClosed, LimitClose |
 | `agent` | `agent/listing-match.ts` | ListingMatch |
 | `agent` | `agent/live-runs.ts` | RunControl, Live, LiveRuns |
@@ -1433,8 +1447,8 @@ classDiagram
 | `agent` | `agent/pricing.ts` | ModelPricing |
 | `agent` | `agent/product-truth-agent-factory.ts` | ProductTruthRunContext, ProductTruthAgentFactory |
 | `agent` | `agent/product-truth-done.ts` | ProductTruthDone |
+| `agent` | `agent/product-truth-run-assembly.ts` | ProductTruthRunAssembly |
 | `agent` | `agent/product-truth-run.ts` | ProductTruthBrief, ProductTruthRun |
-| `agent` | `agent/product-truth-settlement.ts` | ProductTruthSettlement |
 | `agent` | `agent/prompt/blocks.ts` | PromptBlocks |
 | `agent` | `agent/prompt/builder.ts` | AgentInstructions, PromptBuilder |
 | `agent` | `agent/prompt/messages.ts` | AgentMessages |
@@ -1455,18 +1469,21 @@ classDiagram
 | `agent` | `agent/review-mining-job.ts` | ReviewMiningJob |
 | `agent` | `agent/review-mining-listings.ts` | ReviewMiningListings |
 | `agent` | `agent/review-mining-plan.ts` | ReviewMiningPlanner |
-| `agent` | `agent/review-mining-settlement.ts` | ReviewMiningSettlement |
+| `agent` | `agent/review-mining-run-assembly.ts` | ReviewMiningRunAssembly |
 | `agent` | `agent/review-puller.ts` | PullJob, PullEvents, ReviewPuller |
 | `agent` | `agent/row-repair.ts` | RowRepair |
+| `agent` | `agent/run-assembly.ts` | Assembled, RunAssembly |
+| `agent` | `agent/run-end.ts` | RunEnd |
 | `agent` | `agent/run-findings.ts` | RunFindings |
 | `agent` | `agent/run-launcher.ts` | RunKinds, RunLauncher |
-| `agent` | `agent/run-settlement.ts` | RunSettlement |
 | `agent` | `agent/run-supervisor.ts` | RunSupervisor |
 | `agent` | `agent/run-wrap-up.ts` | RunWrapUp |
 | `agent` | `agent/stage-one-agent-factory.ts` | StageOneRunContext, BuiltAgent, StageOneAgentFactory |
 | `agent` | `agent/stage-one-handoff.ts` | StageOneHandoff |
 | `agent` | `agent/stage-one-listings.ts` | StageOneListings |
+| `agent` | `agent/stage-one-run-assembly.ts` | StageOneRunAssembly |
 | `agent` | `agent/stage-one-run.ts` | StageOneRun |
+| `agent` | `agent/stored-run-assembly.ts` | StoredRunAssembly |
 | `agent` | `agent/tool-steps.ts` | ToolSteps |
 | `agent` | `agent/tools/ad-library-tool.ts` | AdLibraryTool |
 | `agent` | `agent/tools/discover-competitors-tool.ts` | DiscoverCompetitorsTool |
@@ -1528,6 +1545,7 @@ classDiagram
 | `extract` | `extract/review-mining-offer.ts` | TrustpilotDomain, ReviewMiningOffer |
 | `extract` | `extract/review-mining-packet.ts` | PullFailure, ReviewMiningPacket |
 | `extract` | `extract/review-mining-roster.ts` | ReviewMiningRoster |
+| `extract` | `extract/row-blame.ts` | PacketSection, RowBlame |
 | `extract` | `extract/row-picks.ts` | RowPicks |
 | `extract` | `extract/scope-check.ts` | ScopeCheck |
 | `extract` | `extract/shared-actives.ts` | SharedActives |

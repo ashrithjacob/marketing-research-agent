@@ -17,7 +17,8 @@ import { ReviewLedger } from "./review-ledger.js";
 import { ReviewPuller, type PullJob } from "./review-puller.js";
 import { StageOneHandoff } from "./stage-one-handoff.js";
 import { ReviewMiningListings } from "./review-mining-listings.js";
-import { ReviewMiningSettlement } from "./review-mining-settlement.js";
+import { ReviewMiningRunAssembly } from "./review-mining-run-assembly.js";
+import { RunEnd, type RunEnding } from "./run-end.js";
 
 /** Review mining (stage 3), with no model in it: the offered targets' listings, their pulls, the computed packet. */
 export class ReviewMiningJob {
@@ -36,12 +37,29 @@ export class ReviewMiningJob {
     Trace.line(import.meta.url, "ReviewMiningJob.start", { runId, targets: request.targets });
     const stop = new AbortController();
     const ledger = new ReviewLedger();
-    const settlement = new ReviewMiningSettlement(this.store, this.runs, runId, ledger);
+    let mined: { targets: MiningTarget[]; failures: PullFailure[] } = { targets: [], failures: [] };
+    const assembly = new ReviewMiningRunAssembly(this.store, this.runs, runId, request.brief, ledger, () => mined);
     const done = this.mine(runId, request, ledger, stop.signal).then(
-      (mined) => settlement.settle(request.brief, mined.targets, mined.failures, stop.signal.aborted),
-      (error: unknown) => settlement.fail(error, stop.signal.aborted),
-    ).catch((error: unknown) => settlement.fail(error, false));
+      (result) => {
+        mined = result;
+        this.end(assembly, { kind: "settled" });
+      },
+      (error: unknown) => {
+        const message = error instanceof Error ? error.message : String(error);
+        this.end(assembly, stop.signal.aborted ? { kind: "stopped", reason: message } : { kind: "crashed", error: message });
+      },
+    );
     return { abort: () => stop.abort(new Error("stopped by the operator")), done };
+  }
+
+  private end(assembly: ReviewMiningRunAssembly, ending: RunEnding): void {
+    Trace.line(import.meta.url, "ReviewMiningJob.end", { runId: assembly.runId, ending: ending.kind });
+    try {
+      new RunEnd(this.store, this.runs).end(assembly, ending);
+    } finally {
+      this.runs.closeSubscribers(assembly.runId);
+      this.runs.remove(assembly.runId);
+    }
   }
 
   private async mine(

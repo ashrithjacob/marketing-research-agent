@@ -17,6 +17,7 @@ import { Trace } from "../trace/index.js";
 import { DoseBands } from "./dose-bands.js";
 import { LatestRows } from "./latest-rows.js";
 import { ProductEconomics } from "./product-economics.js";
+import type { PacketSection } from "./row-blame.js";
 
 export interface NodeReport {
   node: string;
@@ -27,6 +28,16 @@ export interface NodeReport {
 
 /** Builds the product-truth packet from the ledger: the agents' rows as recorded, and every ratio, class, day count and margin computed here, never by a model. */
 export class ProductTruthAssembly {
+  static readonly SECTIONS: Readonly<Record<string, PacketSection>> = {
+    sources: { kind: "source", one: false },
+    actives: { kind: "active", one: false },
+    regimen: { kind: "regimen", one: true },
+    mechanisms: { kind: "mechanism", one: false },
+    claim_limits: { kind: "claim_limit", one: false },
+    prices: { kind: "price_point", one: false },
+    gaps: { kind: "gap", one: false },
+  };
+
   private readonly live: readonly Finding[];
 
   constructor(rows: readonly Finding[]) {

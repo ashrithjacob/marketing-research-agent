@@ -719,7 +719,7 @@ So the reviews never pass through the model at all:
 3. `PacketValidator` (`extract/validator.ts`) takes the ledger snapshot. Before
    checking, `ReviewAssembly` (`extract/review-assembly.ts`) adds one source per
    pull and one excerpt per review, verbatim, and swaps handles for hashes.
-   `finish` and `RunSettlement` use the same class, so they cannot disagree.
+   `finish` and the run's ending (`ReviewMiningRunAssembly`) use the same class, so they cannot disagree.
 4. Reviews are stored **raw**: `axis` null, `themes` empty. Coding them, and
    screening reviews about a different product, belong to a later stage.
 5. When the run ends, however it ends, `RunWatch` saves the ledger to SQLite:
@@ -917,10 +917,14 @@ Worth knowing, because the prompt or a spec can suggest otherwise:
   but a UK-only or AU-only run still gets amazon.com listings and prices. The brief
   tells the agent to use each market's own listing where a site serves several, so
   the honest record of the difference is a gap entry.
-- **A restart kills a live run.** The agent lives in this process; `recover()` marks
-  anything left `running`/`queued`/`stopping` as `failed` on startup.
+- **A restart kills a live run.** The agent lives in this process. On startup
+  `recoverRunsKilledByRestart()` ends anything left `running`/`queued`/`stopping`
+  through `RunEnd` (`agent/run-end.ts`): the ledger is assembled and the packet
+  stored, then the run is marked `failed`, so a stage-1 or stage-2 run a deploy
+  killed still shows what its agents recorded. A review-mining run's reviews are
+  held in memory and are lost.
 - **Billing is lost for a run killed by a restart.** The lookups live in the
-  process; `recoverRunsKilledByRestart()` marks the run failed and it has no `usage.billed`.
+  process; a run ended by `recoverRunsKilledByRestart()` has no `usage.billed`.
 - *Fixed 2026-09-18:* the cockpit's "Tokens" line was always "—". The server sends
   `usage` as `{input, output, cacheRead, totalTokens, cost: {...}}`; `RunView.tsx`
   read `usage.total_tokens`, and `frontend/src/api.ts` declared that field too (optional), so

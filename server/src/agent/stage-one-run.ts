@@ -1,18 +1,17 @@
 import type { OpenRouterPrices } from "../adapters/index.js";
-import { Clock, StageOnePlans, type ResearchStore, type StageOneAgent, type StageOnePlan } from "../domain/index.js";
+import { StageOnePlans, type ResearchStore, type StageOneAgent, type StageOnePlan } from "../domain/index.js";
 import { Trace } from "../trace/index.js";
 
 import { AgentRoster } from "./agent-roster.js";
 import { AgentTeam, type TeamMember } from "./agent-team.js";
-import { LedgerPacket } from "./ledger-packet.js";
 import { CallSequence } from "./llm-call-log.js";
 import type { LiveRuns } from "./live-runs.js";
 import type { RetryPolicy } from "./retry.js";
-import { RowRepair } from "./row-repair.js";
-import { RunSettlement } from "./run-settlement.js";
+import { RunEnd, type RunEnding } from "./run-end.js";
 import { RunWrapUp } from "./run-wrap-up.js";
 import type { StageOneAgentFactory, StageOneRunContext } from "./stage-one-agent-factory.js";
 import type { StageOneListings } from "./stage-one-listings.js";
+import { StageOneRunAssembly } from "./stage-one-run-assembly.js";
 
 type RunBrief = Pick<StageOneRunContext, "runId" | "brief" | "nodes" | "rejectKinds" | "judgements" | "chain" | "pollMs">;
 
@@ -59,22 +58,21 @@ export class StageOneRun {
       onChecked: team.onChecked,
     };
     const wrapUp = new RunWrapUp(store, runs, runId, this.deps.listings);
+    const assembly = new StageOneRunAssembly(store.findings, runId, { brief, nodes }, () => team.partProblems());
+    let ending: RunEnding;
+    let output = "";
     try {
       const outcomes = await team.run(StageOneRun.members(StageOnePlans.of(brief, nodes)), (id) => factory.build(id, context), context.roster);
       const errors = outcomes.filter((o) => o.error).map((o) => `${o.agentId}: ${o.error}`).join("; ");
-      const ledger = new LedgerPacket(store.findings, runId, { brief, nodes });
-      new RunSettlement(store, runs, runId, ledger, new RowRepair(store.findings, runId, nodes)).settle(
-        AgentTeam.output(outcomes),
-        { ...team.totals, pricing: chain.pricing },
-        errors || undefined,
-        () => team.partProblems(),
-      );
-      await wrapUp.lookUpListings(nodes);
+      ending = { kind: "settled", errorMessage: errors || undefined };
+      output = AgentTeam.output(outcomes);
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
       console.error(`research run ${runId}: stage 1 failed`, error);
-      store.updateRun(runId, { status: "failed", error: `agent failed: ${message}`, usage: { ...team.totals, pricing: chain.pricing }, ended_at: Clock.nowIso() });
-      runs.emit(runId, "run.failed", { error: message });
+      ending = { kind: "crashed", error: `agent failed: ${error instanceof Error ? error.message : String(error)}` };
+    }
+    try {
+      new RunEnd(store, runs).end(assembly, ending, { output, usage: { ...team.totals, pricing: chain.pricing } });
+      await wrapUp.lookUpListings(nodes);
     } finally {
       await wrapUp.recordBilling(team.billing);
       runs.closeSubscribers(runId);

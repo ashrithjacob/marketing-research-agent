@@ -1,7 +1,6 @@
 import type { OpenRouterPrices } from "../adapters/index.js";
 import {
   Briefs,
-  Clock,
   PRODUCT_TRUTH_AGENTS,
   PRODUCT_TRUTH_AGENT_SPECS,
   type Brief,
@@ -20,8 +19,9 @@ import type { LiveRuns } from "./live-runs.js";
 import type { ModelChain } from "./model-chain.js";
 import { OperatorInputs } from "./operator-inputs.js";
 import type { ProductTruthAgentFactory, ProductTruthRunContext } from "./product-truth-agent-factory.js";
-import { ProductTruthSettlement } from "./product-truth-settlement.js";
+import { ProductTruthRunAssembly } from "./product-truth-run-assembly.js";
 import type { RetryPolicy } from "./retry.js";
+import { RunEnd, type RunEnding } from "./run-end.js";
 import { RunWrapUp } from "./run-wrap-up.js";
 
 export interface ProductTruthBrief {
@@ -64,16 +64,21 @@ export class ProductTruthRun {
     const team = this.team;
     const markets = Briefs.markets(brief);
     const context: ProductTruthRunContext = { ...this.run, markets, sequence: new CallSequence(), roster: new AgentRoster(), onCall: team.onCall, onChecked: team.onChecked };
+    const assembly = new ProductTruthRunAssembly(store.findings, runId, { sourceRunId, brief, markets });
+    let ending: RunEnding;
+    let output = "";
     try {
       new OperatorInputs(store.findings, runId).record(this.run.inputs);
       const outcomes = await team.run(ProductTruthRun.members(), (id) => factory.build(id, context), context.roster);
       const errors = outcomes.filter((o) => o.error).map((o) => `${o.agentId}: ${o.error}`).join("; ");
-      new ProductTruthSettlement(store, runs, runId, { sourceRunId, brief, markets }).settle(AgentTeam.output(outcomes), { ...team.totals, pricing: chain.pricing }, errors || undefined);
+      ending = { kind: "settled", errorMessage: errors || undefined };
+      output = AgentTeam.output(outcomes);
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
       console.error(`research run ${runId}: product truth failed`, error);
-      store.updateRun(runId, { status: "failed", error: `agent failed: ${message}`, usage: { ...team.totals, pricing: chain.pricing }, ended_at: Clock.nowIso() });
-      runs.emit(runId, "run.failed", { error: message });
+      ending = { kind: "crashed", error: `agent failed: ${error instanceof Error ? error.message : String(error)}` };
+    }
+    try {
+      new RunEnd(store, runs).end(assembly, ending, { output, usage: { ...team.totals, pricing: chain.pricing } });
     } finally {
       await new RunWrapUp(store, runs, runId).recordBilling(team.billing);
       runs.closeSubscribers(runId);

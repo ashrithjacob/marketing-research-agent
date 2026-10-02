@@ -373,3 +373,28 @@ describe("scans reach into subdirectories", () => {
     expect(rules()).toContain("env-declared-in-settings");
   });
 });
+
+describe("run-ends-in-one-place", () => {
+  // The restart path wrote `failed` itself and nobody remembered it skipped the
+  // ledger: every run a deploy killed showed nothing of what it had found.
+  it("catches a final status written outside run-end.ts", () => {
+    write("server/src/agent/run-supervisor.ts", [
+      "this.store.updateRun(run.id, {",
+      '  status: "failed",',
+      '  error: "the server restarted",',
+      "});",
+    ].join("\n"));
+    expect(rules()).toContain("run-ends-in-one-place");
+  });
+
+  it("catches a status passed through a variable, which may be final", () => {
+    write("server/src/agent/settlement.ts", "this.store.updateRun(this.runId, { status, error });\n");
+    expect(rules()).toContain("run-ends-in-one-place");
+  });
+
+  it("allows a non-final status anywhere, and any status in run-end.ts", () => {
+    write("server/src/agent/run-launcher.ts", 'this.store.updateRun(run.id, { status: "running" });\n');
+    write("server/src/agent/run-end.ts", 'this.store.updateRun(runId, { status: "failed", error });\nthis.store.updateRun(runId, { status, error });\n');
+    expect(rules()).not.toContain("run-ends-in-one-place");
+  });
+});

@@ -20,6 +20,7 @@ import { CompetitorCheck } from "./competitor-check.js";
 import { CompletenessCheck } from "./completeness-check.js";
 import { PacketError } from "./errors.js";
 import { ReviewAssembly } from "./review-assembly.js";
+import type { RowBlame } from "./row-blame.js";
 import { ScopeCheck } from "./scope-check.js";
 import type { PacketCheck, PacketContext } from "./check.js";
 import { Trace } from "../trace/index.js";
@@ -90,11 +91,12 @@ export class PacketValidator {
     return packet;
   }
 
-  /** The packet as parsed, with every problem the checks find in it; the packet is null only when it does not parse at all. */
+  /** The packet as parsed, with every problem the checks find in it; the packet is null only when it does not parse at all, and `blame` then names the rows that broke it. */
   inspect(
     data: unknown,
     scope: readonly Node[] = STAGE_NODES[1],
     brief?: { product?: unknown; url?: unknown; market?: unknown },
+    blame?: RowBlame,
   ): { packet: StagePacket | null; problems: CheckProblem[] } {
     Trace.line(import.meta.url, "PacketValidator.inspect", { data, scope, brief });
     const assembled =
@@ -102,7 +104,7 @@ export class PacketValidator {
         ? this.assembly.expand(data as Record<string, unknown>)
         : data;
     const parsed = stagePacketSchema.safeParse(assembled);
-    if (!parsed.success) return { packet: null, problems: ZodProblems.list(parsed.error).map(CheckProblems.of) };
+    if (!parsed.success) return { packet: null, problems: blame ? blame.problems(parsed.error) : ZodProblems.list(parsed.error).map(CheckProblems.of) };
     const packet = parsed.data;
 
     const context: PacketContext = {

@@ -15,6 +15,7 @@ export * from "./dose-bands.js";
 export * from "./product-economics.js";
 export * from "./product-truth-coverage.js";
 export * from "./latest-rows.js";
+export * from "./row-blame.js";
 export * from "./product-truth-assembly.js";
 export * from "./truth-citations.js";
 export * from "./review-mining-roster.js";

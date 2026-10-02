@@ -10,9 +10,22 @@ import {
 import { Trace } from "../trace/index.js";
 
 import { LatestRows } from "./latest-rows.js";
+import type { PacketSection } from "./row-blame.js";
 
 /** Builds the packet from the run ledger, the way ReviewAssembly builds its review half: the model never writes it. */
 export class PacketAssembly {
+  static readonly SECTIONS: Readonly<Record<string, PacketSection>> = {
+    sources: { kind: "source", one: false },
+    excerpts: { kind: "excerpt", one: false },
+    measurements: { kind: "measurement", one: false },
+    attributes: { kind: "attribute", one: false },
+    competitor_reference: { kind: "competitor_reference", one: true },
+    competitors: { kind: "competitor", one: false },
+    saturation: { kind: "saturation", one: false },
+    nodes: { kind: "node_status", one: false },
+    gaps: { kind: "gap", one: false },
+  };
+
   private readonly live: readonly Finding[];
 
   constructor(rows: readonly Finding[]) {

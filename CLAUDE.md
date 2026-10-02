@@ -176,7 +176,7 @@ as a saved image over the same connection.
 
 ## Things that will bite you
 
-The first five are enforced by `server/scripts/check-conventions.mjs`, each with
+The first six are enforced by `server/scripts/check-conventions.mjs`, each with
 a test in `server/tests/conventions.test.ts` proving the rule still bites. When
 you find yourself giving the same correction twice, the second one belongs in
 that file rather than in this list.
@@ -197,6 +197,10 @@ that file rather than in this list.
 - **Every env var this service reads is declared in `settings.ts`.** *Enforced
   both directions: no `process.env` elsewhere, and nothing handed to the
   container that settings.ts does not read.*
+- **A run reaches a final status only through `RunEnd`** (`agent/run-end.ts`),
+  which assembles the ledger and stores the packet before setting the status.
+  Writing `failed` or `cancelled` anywhere else hides what the run found.
+  *Enforced: `run-ends-in-one-place`.*
 
 Still only written down, because no rule catches them:
 
@@ -207,7 +211,8 @@ Still only written down, because no rule catches them:
 - **In tests, a text-only faux reply ends the agent loop after one turn.** For a
   multi-turn run, give the earlier turns a `fauxToolCall(...)` with
   `stopReason: "toolUse"`.
-- **A server restart kills live runs.** `recover()` marks them failed, and any
+- **A server restart kills live runs.** `recoverRunsKilledByRestart()` ends them
+  `failed` through `RunEnd`, which still shows the packet their rows make; any
   billed-cost lookups still pending are lost.
 - **A URL in the brief belongs in `brief.url`, never `brief.product`.** An agent
   handed `https://…` as a product name searches for that literal string and
@@ -224,7 +229,7 @@ Still only written down, because no rule catches them:
 
 | Layer | Where | Catches |
 |---|---|---|
-| Hard rules | `server/scripts/check-conventions.mjs` (+ its tests) | the five bugs above, at `mra check` time |
+| Hard rules | `server/scripts/check-conventions.mjs` (+ its tests) | the six bugs above, at `mra check` time |
 | The gate | `.claude/hooks/gate-stop.sh` | a turn ending with the gate red |
 | Guards | `.claude/hooks/guard-edit.sh`, `guard-bash.sh` | hand-editing `dist`, writing `.env`, building on the VPS |
 | Orientation | `.claude/hooks/session-brief.sh` | "is it running?", "is it deployed?" asked out loud |
