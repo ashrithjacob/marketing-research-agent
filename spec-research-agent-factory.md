@@ -959,3 +959,27 @@ calls, `ModelChain.pricing`, the frontend's `Pricing` type.
 - **The cost table refreshes by polling** `/costs` every 5 s while the run is
   live, then once at the end, rather than folding `run.charged` events in the
   browser.
+
+**Phase 3 (2026-10-03).** `FieldsCheck` (`extract/fields-check.ts`) replaces
+`NodeFields.missing` in `NodeDone` and `LimitClose`; `DeliverableTable`
+(`agent/prompt/deliverable-table.ts`) renders the product and category tables
+in place of the hand-written ones (`{deliverable}` in `PRODUCT_TASK`,
+`CATEGORY_TASK`); `/config`'s `required_fields` reads the deliverables. Deleted:
+`domain/node-fields.ts` (`NodeFields`, `CATEGORY_MEASUREMENTS`,
+`CATEGORY_ATTRIBUTES`, `TREND_YEARS`) and `PRODUCT_ATTRIBUTES`. Tests:
+`tests/deliverables.test.ts`, including every row of the old product table word
+for word.
+
+What the prompt now says differently, diffed against the previous commit: the
+table header is "field | what to record" for both; the trend rule reads "at least
+3 different years" (was "three"); and each table is followed by its optional
+fields under "May also be recorded" (`ad_activity`, `ad_claims`;
+`meta_ads_matching`). `/config` lists category's fields in the table's order
+(`search_volume`, `category_size`, `seasonality`), so the run view's category tile
+does too.
+
+- **A row counts only on the deliverable's node**, as `NodeFields` did; a kind
+  with no `node` (an active, a regimen) counts wherever it is.
+- **The competitors and champion parts are still checked as before** in this
+  phase: `FieldsCheck.missingOn(node, rows)` finds the stage-1 `fields`
+  deliverable for a node, and competitors' is a `list`.

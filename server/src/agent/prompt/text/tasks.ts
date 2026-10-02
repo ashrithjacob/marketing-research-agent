@@ -42,18 +42,7 @@ Fill in these ten fields for the product below. They come first. A fact worth
 keeping that none of the ten covers may be recorded too, as an attribute with a
 key you name — after the ten, never instead of them. No quotes, no market figures.
 
-| key | value |
-|---|---|
-| \`name\` | the name as the product's own page writes it, nothing appended |
-| \`brand\` | the brand |
-| \`form\` | the form as the page states it (drops, capsules, gummies…) |
-| \`dose_per_serving\` | the active amount per serving, with its unit |
-| \`servings_per_container\` | servings per pack |
-| \`full_ingredient_panel\` | every ingredient as listed, in order |
-| \`price\` | price and currency for each pack size sold |
-| \`subscription_terms\` | subscribe price, frequency, minimum orders, how to cancel — or "none offered" |
-| \`claims_made_on_own_site\` | the claims the product page makes, word for word, separated by " \\| " |
-| \`coa_present\` | "yes — <where>" if a certificate of analysis is published, else "no" |
+{deliverable}
 
 Where to look, in order: the product page; the same page's Shopify \`.json\`
 (\`<product url>.json\`) for prices and variants; the site's FAQ, refund and
@@ -91,11 +80,7 @@ category worth keeping may be recorded too — a measurement with a \`metric\` y
 name, or an attribute with a \`key\` you name — after the three, never instead
 of them.
 
-| field | record as |
-|---|---|
-| \`search_volume\` | \`record_measurement\`, \`metric\` "search_volume" (or "search_volume: <keyword>"), \`unit\` "searches", \`period\` the year or month ("2023", "2024-11"). One row per period. Rows for **at least three different years** make the trend. |
-| \`category_size\` | \`record_measurement\`, \`metric\` "category_size: <segment the source names>", \`value\` as stated, \`unit\` currency and scale ("USD billion"), \`period\` the year it is for |
-| \`seasonality\` | \`record_attribute\`, \`key\` "seasonality", the months or season demand peaks, in the source's words |
+{deliverable}
 
 Where to look: keyword and trend pages that publish history (Exploding Topics
 topic pages, Glimpse), articles that reprint a trend chart with dates;

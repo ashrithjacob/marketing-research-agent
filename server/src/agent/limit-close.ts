@@ -1,4 +1,5 @@
-import { NodeFields, type Node } from "../domain/index.js";
+import type { Node } from "../domain/index.js";
+import { FieldsCheck } from "../extract/index.js";
 import { Trace } from "../trace/index.js";
 
 import type { DoneCheck } from "./done-check.js";
@@ -30,7 +31,7 @@ export class LimitClose {
     Trace.line(import.meta.url, "LimitClose.gapOpen", { node: this.node });
     const { findings, node } = this;
     const why = `not found within the ${this.limit}-call limit`;
-    const open = NodeFields.missing(node, findings.own());
+    const open = FieldsCheck.missingOn(node, findings.own()).map((missing) => missing.key);
     for (const field of open) findings.record("gap", { node, missing: `${field}: ${why}`, would_need: "a longer search" });
     const own = findings.own();
     if (!own.some((row) => row.kind === "gap")) findings.record("gap", { node, missing: `research stopped: ${why}`, would_need: "a longer search" });

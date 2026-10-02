@@ -206,7 +206,7 @@ describe("config", () => {
     expect(missing.model).toBe(MODEL_ID);
     // The run view splits each tile into these fields and "Also found" (workings_stage1.md 13, 15).
     expect(missing.required_fields.product_data).toEqual(expect.arrayContaining(["name", "price", "coa_present"]));
-    expect(missing.required_fields.category_data).toEqual(["seasonality", "search_volume", "category_size"]);
+    expect(missing.required_fields.category_data).toEqual(["search_volume", "category_size", "seasonality"]);
 
     mkdirSync(settings.corpusPath, { recursive: true });
     const present = (await (await get("/api/research/config")).json()) as any;

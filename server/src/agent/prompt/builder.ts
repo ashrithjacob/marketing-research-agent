@@ -10,6 +10,7 @@ import {
 } from "../../domain/index.js";
 
 import { PromptBlocks } from "./blocks.js";
+import { DeliverableTable } from "./deliverable-table.js";
 import { RECORD_TOOLS } from "./text/record-tools.js";
 import { AGENT_ROLES, SYSTEM_PROMPT, WAIT_FOR_TOOL } from "./text/system.js";
 import { CATEGORY_TASK, CHAMPION_GENRE_TASK, CHAMPION_URL_TASK, COMPETITORS_TASK, PRODUCT_TASK } from "./text/tasks.js";
@@ -57,7 +58,9 @@ export class PromptBuilder {
   private static task(agent: StageOneAgent, { brief, nodes }: AgentInstructions): string {
     Trace.line(import.meta.url, "PromptBuilder.task", { agent });
     const text = agent === "champion" ? (brief.url.trim() ? CHAMPION_URL_TASK : CHAMPION_GENRE_TASK) : TASKS[agent];
-    return text.replaceAll("{node}", StageOnePlans.nodeOf(agent, nodes)).replaceAll("{forms}", PromptBlocks.code(FORMS));
+    const deliverable = Roles.of(agent).deliverable;
+    const table = deliverable.shape === "fields" ? DeliverableTable.render(deliverable) : "";
+    return text.replaceAll("{node}", StageOnePlans.nodeOf(agent, nodes)).replaceAll("{forms}", PromptBlocks.code(FORMS)).replace("{deliverable}", table);
   }
 
   private static limit(agent: StageOneAgent): string {

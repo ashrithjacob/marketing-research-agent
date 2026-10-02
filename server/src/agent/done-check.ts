@@ -1,5 +1,5 @@
-import { CheckProblems, NodeFields, StageOnePlans, TREND_YEARS, stagePacketSchema, type Brief, type CheckProblem, type Finding, type Node, type StageOneAgent } from "../domain/index.js";
-import { ChampionCheck, PacketAssembly, PacketError, PacketValidator, ZodProblems } from "../extract/index.js";
+import { CheckProblems, StageOnePlans, stagePacketSchema, type Brief, type CheckProblem, type Finding, type Node, type StageOneAgent } from "../domain/index.js";
+import { ChampionCheck, FieldsCheck, PacketAssembly, PacketError, PacketValidator, ZodProblems } from "../extract/index.js";
 import { Trace } from "../trace/index.js";
 
 import type { RunFindings } from "./run-findings.js";
@@ -20,11 +20,7 @@ export class NodeDone implements DoneCheck {
     const { brief, node, champion } = this.run;
     const rows = this.findings.live().filter((row) => row.agent_id === this.findings.agentId || row.agent_id === champion);
     const draft = new PacketAssembly(rows).draft({ runId: this.findings.runId, brief, nodes: [node] });
-    const unfilled = NodeFields.missing(node, rows).map((field) =>
-      CheckProblems.of(field === "search_volume"
-        ? `\`search_volume\` needs rows for at least ${TREND_YEARS} different years to be a trend — record them, or record_gap with missing "search_volume: <why>"`
-        : `\`${field}\` is neither recorded nor gapped — record it, or record_gap with missing "${field}: <why>"`),
-    );
+    const unfilled = FieldsCheck.missingOn(node, rows).map((missing) => CheckProblems.of(missing.text));
     try {
       new PacketValidator().validate(draft, [node], brief);
       return unfilled;

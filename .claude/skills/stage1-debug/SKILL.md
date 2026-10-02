@@ -40,7 +40,7 @@ Before the HTTP response even returns (`RunSupervisor.start()`, which hands off 
    system prompt (tools it has, the shared ledger), its own task
    (`agent/prompt/text/tasks.ts`: fields, where to look, when to stop), and — for
    step 2 — the champion row copied in. Product and category must fill their
-   fixed fields (`domain/node-fields.ts`); other keys are allowed after them, not refused. Every LLM call is logged under its `agent_id`,
+   fixed fields (their deliverable in `domain/role-deliverables.ts`, checked by `extract/fields-check.ts`); other keys are allowed after them, not refused. Every LLM call is logged under its `agent_id`,
    `seq` numbered across the run. Row becomes `running`, SSE opens, the browser
    follows `GET /runs/:id/events?after=0`.
 

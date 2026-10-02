@@ -1,7 +1,7 @@
-import type { Deliverable } from "./deliverable.js";
+import type { FieldsDeliverable, ListDeliverable, PerItemDeliverable } from "./deliverable.js";
 import { AD_PLATFORMS } from "./product-truth-rows.js";
 
-export const CHAMPION_DELIVERABLE: Deliverable = {
+export const CHAMPION_DELIVERABLE: FieldsDeliverable = {
   shape: "fields",
   node: null,
   fields: [
@@ -9,7 +9,7 @@ export const CHAMPION_DELIVERABLE: Deliverable = {
   ],
 };
 
-export const PRODUCT_DELIVERABLE: Deliverable = {
+export const PRODUCT_DELIVERABLE: FieldsDeliverable = {
   shape: "fields",
   node: "product_data",
   fields: [
@@ -28,7 +28,7 @@ export const PRODUCT_DELIVERABLE: Deliverable = {
   ],
 };
 
-export const CATEGORY_DELIVERABLE: Deliverable = {
+export const CATEGORY_DELIVERABLE: FieldsDeliverable = {
   shape: "fields",
   node: "category_data",
   fields: [
@@ -50,7 +50,7 @@ export const CATEGORY_DELIVERABLE: Deliverable = {
   ],
 };
 
-export const COMPETITORS_DELIVERABLE: Deliverable = {
+export const COMPETITORS_DELIVERABLE: ListDeliverable = {
   shape: "list",
   node: "competitors",
   item: "competitor",
@@ -65,7 +65,7 @@ export const COMPETITORS_DELIVERABLE: Deliverable = {
   stop: { kind: "saturation", quietRun: 3 },
 };
 
-export const FORMULA_DELIVERABLE: Deliverable = {
+export const FORMULA_DELIVERABLE: FieldsDeliverable = {
   shape: "fields",
   node: "dose_vs_study",
   fields: [
@@ -75,7 +75,7 @@ export const FORMULA_DELIVERABLE: Deliverable = {
   ],
 };
 
-export const MECHANISM_DELIVERABLE: Deliverable = {
+export const MECHANISM_DELIVERABLE: PerItemDeliverable = {
   shape: "per_item",
   node: "mechanism",
   over: { from: "ledger", kind: "active", by: "name" },
@@ -85,21 +85,21 @@ export const MECHANISM_DELIVERABLE: Deliverable = {
   ],
 };
 
-export const DOSE_DELIVERABLE: Deliverable = {
+export const DOSE_DELIVERABLE: PerItemDeliverable = {
   shape: "per_item",
   node: "dose_vs_study",
   over: { from: "ledger", kind: "active", by: "name", only: { present: "amount", absent: "in_blend" } },
   needs: [{ key: "dose", record: "dose_study", match: ["active"], describe: "record its studied dose with record_dose_study" }],
 };
 
-export const CLAIMS_DELIVERABLE: Deliverable = {
+export const CLAIMS_DELIVERABLE: PerItemDeliverable = {
   shape: "per_item",
   node: "claim_limits",
   over: { from: "markets", times: AD_PLATFORMS },
   needs: [{ key: "claims", record: "claim_limit", match: ["market", "platform"], describe: "record its permitted and forbidden claims with record_claim_limits" }],
 };
 
-export const COGS_DELIVERABLE: Deliverable = {
+export const COGS_DELIVERABLE: FieldsDeliverable = {
   shape: "fields",
   node: "cogs_refills",
   fields: [{ key: "prices", record: "price_point", required: true, describe: "record each price with record_price" }],

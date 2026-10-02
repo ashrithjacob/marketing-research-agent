@@ -27,7 +27,6 @@ export * from "./review-analysis.js";
 export * from "./service-report.js";
 export * from "./stage-one-agents.js";
 export * from "./product-truth-agents.js";
-export * from "./node-fields.js";
 export * from "./deliverable.js";
 export * from "./role-deliverables.js";
 export * from "./research-roles.js";

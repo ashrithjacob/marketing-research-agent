@@ -14,7 +14,6 @@ import { FindingCheck, PacketError, PacketValidator } from "../src/extract/index
 import {
   FORMS,
   NODES,
-  PRODUCT_ATTRIBUTES,
   SOURCE_KINDS,
   STAGE_NODES,
   Roles,
@@ -23,6 +22,7 @@ import {
 import type { Judgement, StageOneAgent } from "../src/domain/index.js";
 import { AgentMessages, PromptBuilder } from "../src/agent/prompt/index.js";
 import { RECORD_TOOLS } from "../src/agent/prompt/text/record-tools.js";
+import { PRODUCT_FIELDS } from "./fixtures.js";
 import { AD_LIBRARY_LINE, AMAZON_SEARCH_LINE, DISCOVER_LINE, WEB_FETCH_LINE, WEB_SEARCH_LINE } from "../src/agent/prompt/text/tool-lines.js";
 
 const prompts = new PromptBuilder();
@@ -103,7 +103,7 @@ describe("what every agent is told about sources", () => {
 describe("the product agent", () => {
   it("is given its ten fields first, and may keep other facts after them", () => {
     const text = build();
-    for (const key of PRODUCT_ATTRIBUTES) expect(text).toContain(`| \`${key}\` |`);
+    for (const key of PRODUCT_FIELDS) expect(text).toContain(`| \`${key}\` |`);
     expect(text).toMatch(/after the ten, never instead of them/);
   });
 
@@ -137,7 +137,7 @@ describe("the category agent", () => {
     const text = build({}, "category");
     expect(text).toMatch(/after the three, never instead\s+of them/);
     for (const field of ["search_volume", "category_size", "seasonality"]) expect(text).toContain(`| \`${field}\` |`);
-    expect(text).toMatch(/at least three different years/);
+    expect(text).toMatch(/at least 3 different years/);
     expect(text).toMatch(/Exploding Topics/);
     expect(text).not.toMatch(/excerpt/i);
   });

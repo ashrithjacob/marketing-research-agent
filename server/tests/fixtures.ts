@@ -2,7 +2,7 @@ import type { AssistantMessage, ToolCall } from "@earendil-works/pi-ai";
 import { fauxAssistantMessage, fauxToolCall } from "@earendil-works/pi-ai/providers/faux";
 
 import { ServiceClients } from "../src/adapters/index.js";
-import { Findings, PRODUCT_ATTRIBUTES, STAGE_NODES, type Finding, type FindingDraft, type FindingLedger, type PageFetcher, type ResearchStore } from "../src/domain/index.js";
+import { Findings, PRODUCT_DELIVERABLE, STAGE_NODES, type Finding, type FindingDraft, type FindingLedger, type PageFetcher, type ResearchStore } from "../src/domain/index.js";
 import type { ActorRunner } from "../src/adapters/apify/index.js";
 import type { Settings } from "../src/config/index.js";
 
@@ -153,9 +153,12 @@ export function recorded(packet: Record<string, any>, options: { responseId?: st
   ];
 }
 
+/** The ten fields the product agent must fill, as its deliverable names them. */
+export const PRODUCT_FIELDS: string[] = PRODUCT_DELIVERABLE.fields.filter((f) => f.required).map((f) => f.key);
+
 /** A product_data part the product agent can finish: dose recorded, the other nine checklist fields gapped. */
 export function productPacket(overrides: Record<string, unknown> = {}): Record<string, any> {
-  const gaps = PRODUCT_ATTRIBUTES.filter((key) => key !== "dose_per_serving").map((key) => ({
+  const gaps = PRODUCT_FIELDS.filter((key) => key !== "dose_per_serving").map((key) => ({
     node: "product_data",
     missing: `${key}: not published on the product page`,
   }));

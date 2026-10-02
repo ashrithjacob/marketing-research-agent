@@ -3,7 +3,7 @@ import { stat } from "node:fs/promises";
 import type { Hono } from "hono";
 
 import type { Settings } from "../config/index.js";
-import { DEFAULT_REJECTED_KINDS, NodeFields } from "../domain/index.js";
+import { CATEGORY_DELIVERABLE, DEFAULT_REJECTED_KINDS, PRODUCT_DELIVERABLE, type FieldsDeliverable } from "../domain/index.js";
 import type { ApiEnv } from "./api-env.js";
 import { Trace } from "../trace/index.js";
 
@@ -26,8 +26,8 @@ export class ConfigRoute {
         corpus_path: this.settings.corpusPath,
         corpus_mounted: corpusMounted,
         required_fields: {
-          product_data: NodeFields.all("product_data"),
-          category_data: NodeFields.all("category_data"),
+          product_data: ConfigRoute.required(PRODUCT_DELIVERABLE),
+          category_data: ConfigRoute.required(CATEGORY_DELIVERABLE),
         },
         review_mining: {
           configured: Boolean(this.settings.apifyToken),
@@ -35,5 +35,11 @@ export class ConfigRoute {
         },
       });
     });
+  }
+
+  /** The fields a checklist role must fill, from its deliverable. */
+  private static required(deliverable: FieldsDeliverable): string[] {
+    Trace.line(import.meta.url, "ConfigRoute.required", { node: deliverable.node });
+    return deliverable.fields.filter((field) => field.required).map((field) => field.key);
   }
 }

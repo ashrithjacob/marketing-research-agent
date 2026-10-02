@@ -190,15 +190,6 @@ classDiagram
     class LlmCall {
       <<interface>>
     }
-    class NodeFieldSet {
-      <<interface>>
-    }
-    class NodeFields {
-      of()
-      all()
-      fieldOf()
-      missing()
-    }
     class Stages {
       of()
       covering()
@@ -461,6 +452,14 @@ classDiagram
       coerce()
     }
     class PacketError {
+    }
+    class Missing {
+      <<interface>>
+    }
+    class FieldsCheck {
+      missingOn()
+      missing()
+      gapped()
     }
     class FindingCheck {
       check()
@@ -978,6 +977,9 @@ classDiagram
       system()
       instructions()
     }
+    class DeliverableTable {
+      render()
+    }
     class AgentMessages {
       steer()
       resume()
@@ -1459,6 +1461,7 @@ classDiagram
   TruthLimitClose --> RowRepair
   TruthLimitClose --> DoneCheck
   PacketError --> CheckProblem
+  FieldsCheck --> FieldsDeliverable
   PacketAssembly --> Finding
   ProductTruthAssembly --> Finding
   ProductTruthCoverage --> Finding
@@ -1575,6 +1578,7 @@ classDiagram
 | `agent` | `agent/product-truth-run.ts` | ProductTruthBrief, ProductTruthRun |
 | `agent` | `agent/prompt/blocks.ts` | PromptBlocks |
 | `agent` | `agent/prompt/builder.ts` | AgentInstructions, PromptBuilder |
+| `agent` | `agent/prompt/deliverable-table.ts` | DeliverableTable |
 | `agent` | `agent/prompt/messages.ts` | AgentMessages |
 | `agent` | `agent/prompt/role-briefing.ts` | RoleBriefing, StageOneBriefing, ProductTruthBriefing |
 | `agent` | `agent/prompt/truth-blocks.ts` | TruthBlocks |
@@ -1640,7 +1644,6 @@ classDiagram
 | `domain` | `domain/deliverable.ts` | FieldSpec, ItemPart, ItemNeed, FieldsDeliverable, ListDeliverable, PerItemDeliverable, Deliverables |
 | `domain` | `domain/findings.ts` | FindingDraft, Finding, Findings |
 | `domain` | `domain/logs.ts` | RunEvent, Judgement, PacketCheck, RunUpdate, LlmCallRecord, Generation, LlmCall |
-| `domain` | `domain/node-fields.ts` | NodeFieldSet, NodeFields |
 | `domain` | `domain/nodes.ts` | Stages |
 | `domain` | `domain/packet-rows.ts` | PacketRowSet, PacketRows |
 | `domain` | `domain/ports.ts` | ProductCatalog, AccountDirectory, AmazonListingSource, TargetListings, ChargeLedger, FindingLedger, PageFetcher, WebSearch, AdLibrary, CompetitorDiscovery, ResearchStore, GateVerdict, FetchGate |
@@ -1666,6 +1669,7 @@ classDiagram
 | `extract` | `extract/dose-bands.ts` | DoseBands |
 | `extract` | `extract/draft.ts` | PacketDraft |
 | `extract` | `extract/errors.ts` | PacketError |
+| `extract` | `extract/fields-check.ts` | Missing, FieldsCheck |
 | `extract` | `extract/finding-check.ts` | FindingCheck |
 | `extract` | `extract/latest-rows.ts` | LatestRows |
 | `extract` | `extract/market-check.ts` | MarketCheck |

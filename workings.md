@@ -224,11 +224,14 @@ the rejected kinds), standing judgements, the brief, and for step 2 the champion
 | Agent | Records | Task | Done when |
 |---|---|---|---|
 | `champion` | source, reference, gap | genre brief: `amazon_find_product` with the genre, the most-reviewed listing is the champion and the next is the runner-up; read its page, `record_reference` with the ranking and `amazon_url`. Url brief: fetch the site, then `amazon_find_product` for its Amazon listing | `ChampionDone`: a reference citing a source it recorded, and for a genre brief the ranking `ChampionCheck` demands (or a "champion ranking unavailable" gap) |
-| `product` | source, attribute, node status, gap | the ten `PRODUCT_ATTRIBUTES`, one attribute each, from the product page, its Shopify `.json`, FAQ and policy pages; other facts may follow as attributes with their own key, never instead of the ten | `NodeDone`: every one of the ten recorded or gapped as "<key>: <why>", and its rows pass the contract for `product_data` |
+| `product` | source, attribute, node status, gap | the ten required fields of `PRODUCT_DELIVERABLE` (`domain/role-deliverables.ts`), one attribute each, from the product page, its Shopify `.json`, FAQ and policy pages; other facts may follow as attributes with their own key, never instead of the ten | `NodeDone`: every one of the ten recorded or gapped as "<key>: <why>", and its rows pass the contract for `product_data` |
 | `competitors` | source, competitor, saturation, node status, gap | the direct/indirect search of §2c, measured against the champion row | `NodeDone` over its own rows **plus the champion's**: both saturation curves |
 | `category` | source, measurement, attribute, node status, gap | `search_volume` (rows for three or more years), `category_size: <segment>`, `seasonality`; two failed routes to a field and it is gapped; other category facts may follow, never instead of the three | `NodeDone`: all three recorded or gapped, the trend three distinct years |
 
-**The required fields are enforced, not only asked for** (`domain/node-fields.ts`).
+**The required fields are enforced, not only asked for.** They are declared once,
+in each role's deliverable (`domain/role-deliverables.ts`), which renders the
+task's field table (`DeliverableTable`) and is checked by `FieldsCheck`
+(`extract/fields-check.ts`).
 `finish` names every required field that has neither a row nor a gap starting with
 its name, and the turn limit (below) gaps them if the agent runs out. Other keys
 are kept: both agents try for their required fields first and may record other

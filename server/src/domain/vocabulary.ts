@@ -46,19 +46,6 @@ export const DEFAULT_REJECTED_KINDS: readonly SourceKind[] = [
   "ai_generated",
 ] as const;
 
-export const PRODUCT_ATTRIBUTES: readonly string[] = [
-  "name",
-  "brand",
-  "form",
-  "dose_per_serving",
-  "servings_per_container",
-  "full_ingredient_panel",
-  "price",
-  "subscription_terms",
-  "claims_made_on_own_site",
-  "coa_present",
-] as const;
-
 export const FORMS = [
   "capsule",
   "tablet",
