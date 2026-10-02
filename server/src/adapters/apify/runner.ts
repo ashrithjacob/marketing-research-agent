@@ -1,4 +1,5 @@
 import type { Settings } from "../../config/index.js";
+import type { ChargeMeter } from "../../domain/index.js";
 import { Trace } from "../../trace/index.js";
 
 /** Apify said the account is out of credit: a billing limit, not an absence of reviews, and not worth retrying. */
@@ -20,12 +21,6 @@ export interface ActorRun {
   usageUsd?: number | null;
 }
 
-export interface ActorCharge {
-  actor: string;
-  usd: number;
-  status: string;
-}
-
 export interface ActorRunner {
   run(
     actorId: string,
@@ -35,11 +30,11 @@ export interface ActorRunner {
   ): Promise<ActorRun>;
 }
 
-/** Reports every actor run's charge, so a run's crawler spend is known even when the tool then fails. */
+/** Reports every actor run's charge, as Apify billed it, so a run's crawler spend is known even when the tool then fails. */
 export class MeteredActorRunner implements ActorRunner {
   constructor(
     private readonly inner: ActorRunner,
-    private readonly onCharge: (charge: ActorCharge) => void,
+    private readonly meter: ChargeMeter,
   ) {}
 
   async run(
@@ -51,7 +46,7 @@ export class MeteredActorRunner implements ActorRunner {
     Trace.line(import.meta.url, "MeteredActorRunner.run", { actorId, input, maxTotalChargeUsd });
     const result = await this.inner.run(actorId, input, maxTotalChargeUsd, signal);
     if (typeof result.usageUsd === "number" && Number.isFinite(result.usageUsd)) {
-      this.onCharge({ actor: actorId, usd: result.usageUsd, status: result.status });
+      this.meter.charge({ service: "apify", item: actorId, units: 1, usd: result.usageUsd, basis: "billed" });
     }
     return result;
   }

@@ -68,7 +68,7 @@ describe("ParallelExtract", () => {
     const fetch = vi.fn(async () => json(200, { results: [{ url: "https://mullevia.com/p", title: "Mullevia", full_content: "$26.95 one bottle" }], errors: [] }));
     vi.stubGlobal("fetch", fetch);
     const page = await new ParallelExtract(new ParallelApi(settings())).scrape("https://mullevia.com/p");
-    expect(page).toEqual({ text: "$26.95 one bottle", title: "Mullevia" });
+    expect(page).toEqual({ text: "$26.95 one bottle", title: "Mullevia", reader: "parallel_extract" });
     const [url, init] = fetch.mock.calls[0] as unknown as [string, RequestInit];
     expect(url).toBe("https://parallel.test/v1beta/extract");
     expect((init.headers as Record<string, string>)["parallel-beta"]).toBe("search-extract-2025-10-10");

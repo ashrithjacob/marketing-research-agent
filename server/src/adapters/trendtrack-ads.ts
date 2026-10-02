@@ -46,7 +46,9 @@ export class TrendtrackAds implements AdLibrary {
     const error = `Trendtrack returned ${response.status}: ${String(payload.message ?? JSON.stringify(payload.error ?? "no body"))}`.slice(0, 300);
     if (response.status === 401 || response.status === 402 || response.status === 403) throw new ServiceUnavailableError("trendtrack", error);
     if (!response.ok) throw new Error(error);
-    return { hits: (payload.data ?? []).map(TrendtrackAds.hit), total: Number(payload.pagination?.total ?? payload.data?.length ?? 0) };
+    const hits = (payload.data ?? []).map(TrendtrackAds.hit);
+    const credits = Number(response.headers.get("x-credits-used") ?? hits.length);
+    return { hits, total: Number(payload.pagination?.total ?? payload.data?.length ?? 0), credits: Number.isFinite(credits) ? credits : hits.length };
   }
 
   private static hit(ad: TrendtrackAd): AdHit {

@@ -87,6 +87,22 @@ classDiagram
       label()
       key()
     }
+    class ChargeDraft {
+      <<interface>>
+    }
+    class Charge {
+      <<interface>>
+    }
+    class ChargeMeter {
+      <<interface>>
+      charge()
+    }
+    class NoCharges {
+      charge()
+    }
+    class ServiceUse {
+      <<interface>>
+    }
     class RowRef {
       <<interface>>
     }
@@ -109,6 +125,15 @@ classDiagram
     }
     class DiscoveryQuestions {
       of()
+    }
+    class CostCell {
+      <<interface>>
+    }
+    class CostRow {
+      <<interface>>
+    }
+    class CostReport {
+      <<interface>>
     }
     class FieldSpec {
       <<interface>>
@@ -212,6 +237,11 @@ classDiagram
     class TargetListings {
       <<interface>>
       save()
+      list()
+    }
+    class ChargeLedger {
+      <<interface>>
+      add()
       list()
     }
     class FindingLedger {
@@ -377,6 +407,9 @@ classDiagram
     }
   }
   namespace config {
+    class ServicePrices {
+      <<interface>>
+    }
     class Settings {
       <<interface>>
     }
@@ -386,8 +419,9 @@ classDiagram
       list()
       backups()
       number()
+      optionalNumber()
+      prices()
       flag()
-      settings()
     }
   }
   namespace extract {
@@ -415,6 +449,9 @@ classDiagram
     }
     class CompletenessCheck {
       problems()
+    }
+    class CostReports {
+      of()
     }
     class DoseBands {
       classOf()
@@ -545,9 +582,6 @@ classDiagram
     class ActorRun {
       <<interface>>
     }
-    class ActorCharge {
-      <<interface>>
-    }
     class ActorRunner {
       <<interface>>
       run()
@@ -599,6 +633,18 @@ classDiagram
       withTimeout()
       pool()
     }
+    class MeteredWebSearch {
+      find()
+    }
+    class MeteredPageFetcher {
+      scrape()
+    }
+    class MeteredAdLibrary {
+      search()
+    }
+    class MeteredDiscovery {
+      discover()
+    }
     class OpenRouterGeneration {
       parse()
     }
@@ -627,6 +673,9 @@ classDiagram
     }
     class ParallelExtract {
       scrape()
+    }
+    class ParallelUsage {
+      <<interface>>
     }
     class ParallelResult {
       <<interface>>
@@ -685,6 +734,10 @@ classDiagram
     class CallLog {
       add()
       setGeneration()
+      list()
+    }
+    class ChargeTable {
+      add()
       list()
     }
     class PacketCheckLog {
@@ -1077,6 +1130,9 @@ classDiagram
     class RunLauncher {
       launch()
     }
+    class RunMeter {
+      charge()
+    }
     class RunSupervisor {
       start()
       recoverRunsKilledByRestart()
@@ -1174,6 +1230,7 @@ classDiagram
     }
     class UsageTotals {
       empty()
+      tokens()
       add()
     }
   }
@@ -1196,6 +1253,9 @@ classDiagram
       register()
     }
     class CorpusRoute {
+      register()
+    }
+    class CostRoute {
       register()
     }
     class EventStream {
@@ -1256,11 +1316,24 @@ classDiagram
   AmazonListingLookup --> ActorRunner
   AmazonProducts --> ActorRunner
   MeteredActorRunner --> ActorRunner
+  MeteredActorRunner --> ChargeMeter
   TrustpilotReviews --> ActorRunner
   Crawl4ai --> Settings
   FallbackPageFetcher --> PageFetcher
   OpenRouterGate --> Settings
   Firecrawl --> Settings
+  MeteredWebSearch --> WebSearch
+  MeteredWebSearch --> ServicePrices
+  MeteredWebSearch --> ChargeMeter
+  MeteredPageFetcher --> PageFetcher
+  MeteredPageFetcher --> ServicePrices
+  MeteredPageFetcher --> ChargeMeter
+  MeteredAdLibrary --> AdLibrary
+  MeteredAdLibrary --> ServicePrices
+  MeteredAdLibrary --> ChargeMeter
+  MeteredDiscovery --> CompetitorDiscovery
+  MeteredDiscovery --> ServicePrices
+  MeteredDiscovery --> ChargeMeter
   ParallelApi --> Settings
   ParallelCompetitorDiscovery --> ParallelTask
   ParallelExtract --> ParallelApi
@@ -1306,7 +1379,6 @@ classDiagram
   LimitClose --> RowRepair
   LimitClose --> DoneCheck
   LiveRuns --> ResearchStore
-  ModelChain --> Pricing
   OperatorInputs --> FindingLedger
   ModelPricing --> OpenRouterPrices
   ProductTruthDone --> RunFindings
@@ -1350,6 +1422,8 @@ classDiagram
   RunLauncher --> LiveRuns
   RunLauncher --> RetryPolicy
   RunLauncher --> RunKinds
+  RunMeter --> ResearchStore
+  RunMeter --> LiveRuns
   RunWrapUp --> ResearchStore
   RunWrapUp --> LiveRuns
   RunWrapUp --> StageOneListings
@@ -1400,6 +1474,7 @@ classDiagram
   ConfigRoute --> Settings
   CorpusRoute --> ResearchStore
   CorpusRoute --> Settings
+  CostRoute --> ResearchStore
   EventStream --> ResearchStore
   EventStream --> RunSupervisor
   JudgementRoutes --> ResearchStore
@@ -1432,7 +1507,7 @@ classDiagram
 | `adapters` | `adapters/apify/fields.ts` | Field, ReviewKey |
 | `adapters` | `adapters/apify/listing-lookup.ts` | AmazonListingLookup |
 | `adapters` | `adapters/apify/products.ts` | AmazonProducts |
-| `adapters` | `adapters/apify/runner.ts` | ApifyCreditError, ActorRun, ActorCharge, ActorRunner, MeteredActorRunner, ApifyActorRunner, ActorRunners |
+| `adapters` | `adapters/apify/runner.ts` | ApifyCreditError, ActorRun, ActorRunner, MeteredActorRunner, ApifyActorRunner, ActorRunners |
 | `adapters` | `adapters/apify/trustpilot-reviews.ts` | TrustpilotReviews |
 | `adapters` | `adapters/apify/types.ts` | ReviewExcerpt, ReviewResult, AmazonProduct |
 | `adapters` | `adapters/corpus.ts` | Corpus |
@@ -1441,12 +1516,13 @@ classDiagram
 | `adapters` | `adapters/fetch-gate.ts` | OpenRouterGate |
 | `adapters` | `adapters/firecrawl.ts` | FirecrawlPayload, Firecrawl |
 | `adapters` | `adapters/http.ts` | Http |
+| `adapters` | `adapters/metered.ts` | MeteredWebSearch, MeteredPageFetcher, MeteredAdLibrary, MeteredDiscovery |
 | `adapters` | `adapters/openrouter-generation.ts` | OpenRouterGeneration |
 | `adapters` | `adapters/openrouter-prices.ts` | OpenRouterPrices |
 | `adapters` | `adapters/parallel-api.ts` | ParallelApi |
 | `adapters` | `adapters/parallel-discovery.ts` | Basis, ParallelCompetitorDiscovery |
 | `adapters` | `adapters/parallel-extract.ts` | ExtractResult, ExtractError, ParallelExtract |
-| `adapters` | `adapters/parallel-search.ts` | ParallelResult, ParallelSearch |
+| `adapters` | `adapters/parallel-search.ts` | ParallelUsage, ParallelResult, ParallelSearch |
 | `adapters` | `adapters/parallel-task.ts` | ParallelTask |
 | `adapters` | `adapters/rate-limit-wait.ts` | RateLimitWait |
 | `adapters` | `adapters/rates.ts` | Rates, Pricing, Billed, Money |
@@ -1455,6 +1531,7 @@ classDiagram
 | `adapters` | `adapters/service-queue.ts` | Waiter, ServiceQueue |
 | `adapters` | `adapters/sqlite/account-table.ts` | AccountTable |
 | `adapters` | `adapters/sqlite/call-log.ts` | CallLog |
+| `adapters` | `adapters/sqlite/charge-table.ts` | ChargeTable |
 | `adapters` | `adapters/sqlite/check-log.ts` | PacketCheckLog |
 | `adapters` | `adapters/sqlite/event-log.ts` | EventLog |
 | `adapters` | `adapters/sqlite/finding-table.ts` | FindingTable |
@@ -1526,6 +1603,7 @@ classDiagram
 | `agent` | `agent/run-end.ts` | RunEnd |
 | `agent` | `agent/run-findings.ts` | RunFindings |
 | `agent` | `agent/run-launcher.ts` | RunKinds, RunLauncher |
+| `agent` | `agent/run-meter.ts` | RunMeter |
 | `agent` | `agent/run-supervisor.ts` | RunSupervisor |
 | `agent` | `agent/run-wrap-up.ts` | RunWrapUp |
 | `agent` | `agent/stage-one-handoff.ts` | StageOneHandoff |
@@ -1550,20 +1628,22 @@ classDiagram
 | `agent` | `agent/truth-limit-close.ts` | TruthLimitClose |
 | `agent` | `agent/turn-budget.ts` | TurnBudget |
 | `agent` | `agent/usage.ts` | UsageTotals |
-| `config` | `config/settings-shape.ts` | Settings |
+| `config` | `config/settings-shape.ts` | ServicePrices, Settings |
 | `config` | `config/settings.ts` | Env |
 | `domain` | `domain/accounts.ts` | Workspace, Account, AccountListing, Principal, Scope |
 | `domain` | `domain/ad-library.ts` | AdQuery, AdHit, AdPage |
 | `domain` | `domain/brief.ts` | Briefs |
+| `domain` | `domain/charges.ts` | ChargeDraft, Charge, ChargeMeter, NoCharges, ServiceUse |
 | `domain` | `domain/check-problem.ts` | RowRef, CheckProblem, CheckProblems |
 | `domain` | `domain/competitor-discovery.ts` | CompetitorCandidate, DiscoveryQuestion, DiscoveryReport, DiscoveryQuestions |
+| `domain` | `domain/cost-report.ts` | CostCell, CostRow, CostReport |
 | `domain` | `domain/deliverable.ts` | FieldSpec, ItemPart, ItemNeed, FieldsDeliverable, ListDeliverable, PerItemDeliverable, Deliverables |
 | `domain` | `domain/findings.ts` | FindingDraft, Finding, Findings |
 | `domain` | `domain/logs.ts` | RunEvent, Judgement, PacketCheck, RunUpdate, LlmCallRecord, Generation, LlmCall |
 | `domain` | `domain/node-fields.ts` | NodeFieldSet, NodeFields |
 | `domain` | `domain/nodes.ts` | Stages |
 | `domain` | `domain/packet-rows.ts` | PacketRowSet, PacketRows |
-| `domain` | `domain/ports.ts` | ProductCatalog, AccountDirectory, AmazonListingSource, TargetListings, FindingLedger, PageFetcher, WebSearch, AdLibrary, CompetitorDiscovery, ResearchStore, GateVerdict, FetchGate |
+| `domain` | `domain/ports.ts` | ProductCatalog, AccountDirectory, AmazonListingSource, TargetListings, ChargeLedger, FindingLedger, PageFetcher, WebSearch, AdLibrary, CompetitorDiscovery, ResearchStore, GateVerdict, FetchGate |
 | `domain` | `domain/products.ts` | RunHead, Product, ProductSummary, ProductFolders |
 | `domain` | `domain/records.ts` | Clock, Ids, ResearchRun, RunSummary, Runs |
 | `domain` | `domain/reject-kinds.ts` | RejectKinds |
@@ -1582,6 +1662,7 @@ classDiagram
 | `extract` | `extract/competitor-check.ts` | CompetitorCheck |
 | `extract` | `extract/competitor-icp.ts` | CompetitorIcp |
 | `extract` | `extract/completeness-check.ts` | CompletenessCheck |
+| `extract` | `extract/cost-reports.ts` | CostReports |
 | `extract` | `extract/dose-bands.ts` | DoseBands |
 | `extract` | `extract/draft.ts` | PacketDraft |
 | `extract` | `extract/errors.ts` | PacketError |
@@ -1609,6 +1690,7 @@ classDiagram
 | `http` | `http/call-stats.ts` | CallStats |
 | `http` | `http/config-route.ts` | ConfigRoute |
 | `http` | `http/corpus-route.ts` | CorpusRoute |
+| `http` | `http/cost-route.ts` | CostRoute |
 | `http` | `http/event-stream.ts` | EventStream |
 | `http` | `http/frontend.ts` | Frontend |
 | `http` | `http/judgement-routes.ts` | JudgementRoutes |

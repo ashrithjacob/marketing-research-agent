@@ -15,6 +15,7 @@ import type { StoredPacketRows } from "./packet-rows.js";
 import type { ReviewAnalysis } from "./review-analysis.js";
 import type { AmazonListing, TargetListing } from "./review-mining.js";
 import type { ReviewLedgerSnapshot, StoredRunReview } from "./reviews.js";
+import type { Charge } from "./charges.js";
 import type { Finding, FindingDraft } from "./findings.js";
 import type { FetchedPage, SearchPage, SearchScope } from "./web.js";
 import type { DiscoveryQuestion, DiscoveryReport } from "./competitor-discovery.js";
@@ -34,12 +35,7 @@ export interface AccountDirectory {
   addWorkspace(name: string): Workspace;
   workspace(id: string): Workspace | null;
   workspaceNamed(name: string): Workspace | null;
-  addAccount(input: {
-    username: string;
-    passwordHash: string;
-    workspaceId: string;
-    isAdmin: boolean;
-  }): Account;
+  addAccount(input: { username: string; passwordHash: string; workspaceId: string; isAdmin: boolean }): Account;
   get(accountId: string): Account | null;
   byUsername(username: string): Account | null;
   list(): AccountListing[];
@@ -58,6 +54,12 @@ export interface AmazonListingSource {
 export interface TargetListings {
   save(listing: TargetListing): void;
   list(sourceRunId: string): TargetListing[];
+}
+
+/** Every charge a run made, appended as each call returns. */
+export interface ChargeLedger {
+  add(charge: Omit<Charge, "created_at">): Charge;
+  list(runId: string): Charge[];
 }
 
 /** What a run has found, one row per finding, written as it is found. Rows are retracted, never deleted. */
@@ -91,6 +93,7 @@ export interface ResearchStore {
   readonly products: ProductCatalog;
   readonly listings: TargetListings;
   readonly findings: FindingLedger;
+  readonly charges: ChargeLedger;
   readonly accounts: AccountDirectory;
   createRun(input: {
     workspaceId: string;

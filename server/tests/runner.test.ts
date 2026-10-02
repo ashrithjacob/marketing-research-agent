@@ -369,7 +369,7 @@ describe("cost", () => {
     return new OpenRouterPrices({ apiKey: "k", fetch, lookupDelaysMs: [] });
   }
 
-  it("hands pi-ai the live rates, and records which rates priced the run", async () => {
+  it("hands pi-ai the live rates, and keeps no calculated dollar figure on the run or its calls", async () => {
     const costs = costsFrom(() => ({
       status: 200,
       body: { data: [{ id: MODEL_ID, pricing: { prompt: "0.000001", completion: "0.000002" } }] },
@@ -389,8 +389,10 @@ describe("cost", () => {
     expect(seen.input).toBeCloseTo(1, 10);
     expect(seen.output).toBeCloseTo(2, 10);
     const usage = store.getRun(runId)!.usage as any;
-    expect(usage.pricing.source).toBe("openrouter-live");
     expect(usage.totalTokens).toBeGreaterThan(0);
+    expect(usage.cost).toBeUndefined();
+    expect(usage.pricing).toBeUndefined();
+    expect(store.listLlmCalls(runId).map((call) => (call.usage as any).cost)).toEqual([undefined, undefined]);
   });
 
   it("records what OpenRouter billed for every turn, after the run settles", async () => {
@@ -412,9 +414,7 @@ describe("cost", () => {
     const usage = run.usage as any;
     expect(usage.billed.total).toBeCloseTo(0.03, 10);
     expect(usage.billed).toMatchObject({ turns: 2, resolved: 2 });
-    // The calculated side survives the billed merge.
     expect(usage.totalTokens).toBeGreaterThan(0);
-    expect(usage.pricing.source).toBe("pi-ai-snapshot");
     const kinds = store.listEvents(runId).map((e) => e.kind);
     expect(kinds.indexOf("run.billed")).toBeGreaterThan(kinds.indexOf("run.completed"));
   });
@@ -1226,7 +1226,7 @@ describe("the Amazon listings of a completed stage-1 run", () => {
     expect(rows.find((r) => r.target_id === "product")).toMatchObject({ matches: false, mismatch: "brand" });
     const events = store.listEvents(runId);
     expect(events.find((e) => e.kind === "packet.listings")!.payload).toEqual({ total: 2, matched: 1 });
-    expect(events.filter((e) => e.kind === "apify.charged")).toHaveLength(2);
+    expect(store.charges.list(runId).map((c) => [c.agent_id, c.service, c.usd])).toEqual([[null, "apify", 0.01], [null, "apify", 0.01]]);
   });
 
   it("reads the Trustpilot score only of a target that will be mined there", async () => {

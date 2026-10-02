@@ -19,6 +19,8 @@ export * from "./packet-rows.js";
 export * from "./logs.js";
 export * from "./reject-kinds.js";
 export * from "./accounts.js";
+export * from "./charges.js";
+export * from "./cost-report.js";
 export * from "./ports.js";
 export * from "./reviews.js";
 export * from "./review-analysis.js";

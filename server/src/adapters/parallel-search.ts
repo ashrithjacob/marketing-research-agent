@@ -1,7 +1,12 @@
-import type { SearchHit, SearchPage, SearchScope, WebSearch } from "../domain/index.js";
+import type { SearchHit, SearchPage, SearchScope, ServiceUse, WebSearch } from "../domain/index.js";
 import { Trace } from "../trace/index.js";
 
 import type { ParallelApi } from "./parallel-api.js";
+
+interface ParallelUsage {
+  name?: string;
+  count?: number;
+}
 
 interface ParallelResult {
   url?: string;
@@ -31,7 +36,16 @@ export class ParallelSearch implements WebSearch {
     return {
       hits,
       excerpted: true,
+      use: ParallelSearch.use(body.usage as ParallelUsage[] | undefined),
       report: { service: "Parallel", outcome: "ok", parts: [{ name: "search", ok: true, detail: `${hits.length} result${hits.length === 1 ? "" : "s"}` }] },
     };
+  }
+
+  /** Parallel reports a search's use as named counts, e.g. `[{"name":"sku_search","count":1}]`; one search when it reports none. */
+  private static use(usage: ParallelUsage[] | undefined): ServiceUse {
+    Trace.line(import.meta.url, "ParallelSearch.use", { usage });
+    const counted = (usage ?? []).filter((entry) => typeof entry.count === "number");
+    if (counted.length === 0) return { item: "search", units: 1 };
+    return { item: counted.map((entry) => entry.name ?? "search").join("+"), units: counted.reduce((sum, entry) => sum + (entry.count ?? 0), 0) };
   }
 }

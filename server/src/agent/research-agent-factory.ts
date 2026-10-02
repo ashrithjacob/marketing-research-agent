@@ -1,12 +1,12 @@
 import { Agent } from "@earendil-works/pi-agent-core";
 import type { Models } from "@earendil-works/pi-ai";
 
-import type { ActorCharge } from "../adapters/apify/index.js";
 import {
   DiscoveryQuestions,
   RoleRecords,
   Roles,
   type Brief,
+  type ChargeMeter,
   type Judgement,
   type LlmCall,
   type Node,
@@ -42,7 +42,7 @@ export interface RoleContext {
   pollMs?: number;
   onCall: (call: LlmCall) => void;
   onChecked: (agentId: string, valid: boolean, problems: readonly string[]) => void;
-  onApifyCharge?: (charge: ActorCharge) => void;
+  meter: (agentId: string) => ChargeMeter;
 }
 
 /** Builds the agent for any role: its tools by name, its prompt around them, its record kinds, its finish check, its turn limit. */
@@ -64,7 +64,7 @@ export class ResearchAgentFactory {
       subject: run.brief.product || run.brief.url,
       market: run.brief.market,
       discovery: DiscoveryQuestions.of(findings.live(), run.brief),
-      ...(run.onApifyCharge ? { onApifyCharge: run.onApifyCharge } : {}),
+      meter: run.meter(role.id),
     });
     const ledger = new LedgerToolset({
       findings,

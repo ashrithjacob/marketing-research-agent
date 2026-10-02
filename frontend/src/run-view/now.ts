@@ -1,4 +1,4 @@
-import type { Billed, Pricing, ResearchNode, RunDetail, RunEvent } from '../api';
+import type { ResearchNode, RunDetail, RunEvent } from '../api';
 import { STAGE_NAMES, STAGE_NODES, scopeLabel, stageOfNode, type CollectingStage } from '../stages';
 
 /** The stage a run collects: the server's record, else inferred from its nodes. */
@@ -45,20 +45,4 @@ export function nowPanel(
     title: `Stage ${stage} · ${where}`,
     sub: stage === 2 ? 'the product in isolation — code computes every number' : 'gathering only — no conclusions drawn here',
   };
-}
-
-export function pricingNote(pricing: Pricing | undefined): string {
-  if (!pricing) return 'Priced before rates were recorded';
-  const r = pricing.rates;
-  const rates = `$${r.input ?? '?'}/$${r.output ?? '?'}/$${r.cacheRead ?? '?'} per M input/output/cache read`;
-  return pricing.source === 'openrouter-live'
-    ? `OpenRouter list prices fetched ${new Date(pricing.fetched_at).toLocaleString()}: ${rates}`
-    : `pi-ai's bundled price snapshot, which may be stale: ${rates}`;
-}
-
-/** Billing is read back after the run settles, so "pending" is a real state. */
-export function billedText(billed: Billed | undefined, live: boolean): string {
-  if (!billed) return live ? 'after the run' : '—';
-  const partial = billed.resolved < billed.turns ? ` (${billed.resolved} of ${billed.turns} turns)` : '';
-  return `$${billed.total.toFixed(4)}${partial}`;
 }

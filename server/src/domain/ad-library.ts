@@ -28,4 +28,6 @@ export interface AdHit {
 export interface AdPage {
   hits: AdHit[];
   total: number;
+  /** Credits the request used, as the service's own header reports them. */
+  credits?: number;
 }

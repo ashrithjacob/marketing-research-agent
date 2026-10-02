@@ -18,6 +18,7 @@ import { ReviewPuller, type PullJob } from "./review-puller.js";
 import { StageOneHandoff } from "./stage-one-handoff.js";
 import { ReviewMiningListings } from "./review-mining-listings.js";
 import { ReviewMiningRunAssembly } from "./review-mining-run-assembly.js";
+import { RunMeter } from "./run-meter.js";
 import { RunEnd, type RunEnding } from "./run-end.js";
 
 /** Review mining (stage 3), with no model in it: the offered targets' listings, their pulls, the computed packet. */
@@ -77,9 +78,7 @@ export class ReviewMiningJob {
       throw new Error(`product truth has not completed on stage-1 run ${source.run.id}, so review mining cannot start`);
     }
     this.store.updateRun(runId, { source_run_id: source.run.id });
-    const runner = new MeteredActorRunner(this.actors, (charge) =>
-      this.runs.emit(runId, "apify.charged", { actor: charge.actor, usd: charge.usd, status: charge.status }),
-    );
+    const runner = new MeteredActorRunner(this.actors, new RunMeter(this.store, this.runs, runId, null));
     const roster = ReviewMiningRoster.of(source.packet);
     const listings = await new ReviewMiningListings(this.store.listings, new AmazonListingLookup(runner), this.settings.apifyConcurrency)
       .ensure(source.run.id, roster);

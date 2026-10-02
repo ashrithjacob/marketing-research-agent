@@ -934,3 +934,28 @@ roles is byte-identical to the previous commit's, rendered from both trees; and
   that the run puts in the `RoleContext`. The factory has no stage-specific input.
 - **Which finish check and closer** a role gets is still chosen by its
   `consistency` (`RoleChecks`) until phases 3–5 split presence from consistency.
+
+**Phase 2 (2026-10-03).** `Charge` and `ChargeMeter` (`domain/charges.ts`),
+`research_charges` (`adapters/sqlite/charge-table.ts`), the wrappers
+(`adapters/metered.ts`: `MeteredWebSearch`, `MeteredPageFetcher`,
+`MeteredAdLibrary`, `MeteredDiscovery`; `MeteredActorRunner` now takes a meter),
+`RunMeter` (agent layer: writes the charge, emits `run.charged`), `CostReports`
+(`extract/cost-reports.ts`) behind `GET /runs/:id/costs`, the rail's cost table and
+each logs tab's row. Prices in `Settings.prices`. Tests: `tests/charges.test.ts`.
+Deleted: `apify.charged` events, the rail's "Calc. cost" and "Billed" lines, the
+logs page's calculated and Apify stats, `usage.cost` and `usage.pricing` on runs and
+calls, `ModelChain.pricing`, the frontend's `Pricing` type.
+
+- **Units come from the adapters, prices from the wrappers.** A search returns
+  `use` (Parallel's counts), a page its `reader`, an ad page its `credits`; the
+  wrapper built for one agent turns that into a charge. So the process-wide
+  service clients stay shared and throttled, and only the thin wrapper is per agent.
+- **A page is charged to the reader that served it**, which a fallback chain
+  otherwise hides: `FetchedPage.reader` is set by Firecrawl, Crawl4AI and Parallel
+  Extract.
+- **The review analysis still calculates its LLM cost** (`cost_usd`, list price
+  × tokens through `ModelPricing`). It is not a research agent and has no billed
+  lookups; it is the one calculated figure left.
+- **The cost table refreshes by polling** `/costs` every 5 s while the run is
+  live, then once at the end, rather than folding `run.charged` events in the
+  browser.

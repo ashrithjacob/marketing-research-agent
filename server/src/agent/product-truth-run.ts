@@ -24,6 +24,8 @@ import type { ResearchAgentFactory, RoleContext } from "./research-agent-factory
 import { ProductTruthRunAssembly } from "./product-truth-run-assembly.js";
 import type { RetryPolicy } from "./retry.js";
 import { RunEnd, type RunEnding } from "./run-end.js";
+import { RunMeter } from "./run-meter.js";
+import { UsageTotals } from "./usage.js";
 import { RunWrapUp } from "./run-wrap-up.js";
 
 export interface ProductTruthBrief {
@@ -62,7 +64,7 @@ export class ProductTruthRun {
   async start(): Promise<void> {
     Trace.line(import.meta.url, "ProductTruthRun.start", { runId: this.run.runId });
     const { store, runs, factory } = this.deps;
-    const { runId, sourceRunId, brief, chain } = this.run;
+    const { runId, sourceRunId, brief } = this.run;
     const team = this.team;
     const markets = Briefs.markets(brief);
     const context: RoleContext = {
@@ -74,6 +76,7 @@ export class ProductTruthRun {
       roster: new AgentRoster(),
       onCall: team.onCall,
       onChecked: team.onChecked,
+      meter: (agentId) => new RunMeter(store, runs, runId, agentId),
     };
     const assembly = new ProductTruthRunAssembly(store.findings, runId, { sourceRunId, brief, markets });
     let ending: RunEnding;
@@ -89,7 +92,7 @@ export class ProductTruthRun {
       ending = { kind: "crashed", error: `agent failed: ${error instanceof Error ? error.message : String(error)}` };
     }
     try {
-      new RunEnd(store, runs).end(assembly, ending, { output, usage: { ...team.totals, pricing: chain.pricing } });
+      new RunEnd(store, runs).end(assembly, ending, { output, usage: UsageTotals.tokens(team.totals) });
     } finally {
       await new RunWrapUp(store, runs, runId).recordBilling(team.billing);
       runs.closeSubscribers(runId);

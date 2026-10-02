@@ -204,10 +204,10 @@ that file rather than in this list.
 
 Still only written down, because no rule catches them:
 
-- **pi-ai's model prices are a snapshot** frozen into the package. The runner
-  overrides them with OpenRouter's live prices (`server/src/agent/pricing.ts`).
-  The real charge comes from `/generation`, which 404s for about 4s after a
-  turn ends. See `workings.md` §2a.
+- **What a run cost is billed, never calculated.** The LLM figure is OpenRouter's
+  `/generation`, which 404s for about 4s after a turn ends; every other service is
+  a `research_charges` row written as the call returns. pi-ai's own `usage.cost`
+  (list price × tokens) is stripped before anything is stored. See `workings.md` §2a.
 - **In tests, a text-only faux reply ends the agent loop after one turn.** For a
   multi-turn run, give the earlier turns a `fauxToolCall(...)` with
   `stopReason: "toolUse"`.

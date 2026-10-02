@@ -62,6 +62,6 @@ export class Firecrawl implements PageFetcher {
     Trace.line(import.meta.url, "Firecrawl.page");
     const text = payload.data?.markdown ?? "";
     if (!text.trim()) throw new Error("Firecrawl returned an empty body for this url");
-    return { text, title: payload.data?.metadata?.title ?? "" };
+    return { text, title: payload.data?.metadata?.title ?? "", reader: "firecrawl" };
   }
 }

@@ -12,7 +12,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { Corpus } from "../src/adapters/corpus.js";
 import { TrendtrackAds } from "../src/adapters/trendtrack-ads.js";
 import { AdLibraryTool, ToolRegistry } from "../src/agent/tools/index.js";
-import { Roles } from "../src/domain/index.js";
+import { NoCharges, Roles } from "../src/domain/index.js";
 import { ServiceClients } from "../src/adapters/index.js";
 import { Env, type Settings } from "../src/config/index.js";
 import { ServiceUnavailableError, type AdPage } from "../src/domain/index.js";
@@ -84,7 +84,7 @@ describe("ad_library_search", () => {
   it("is offered only to an agent allowed ads, and only when a Trendtrack key built the service", () => {
     const base = settings();
     const names = (svc: ServiceClients, role: "product" | "champion") =>
-      new ToolRegistry(svc, base).build(Roles.of(role).tools, { runId: "r", subject: "", market: "", discovery: null }).map((built) => built.tool.name);
+      new ToolRegistry(svc, base).build(Roles.of(role).tools, { runId: "r", subject: "", market: "", discovery: null, meter: new NoCharges() }).map((built) => built.tool.name);
     const withAds = new ServiceClients(services(base).pages, services(base).search, null, undefined, null, { search: async () => ({ hits: [], total: 0 }) });
     expect(names(services(base), "product")).not.toContain("ad_library_search");
     expect(names(withAds, "champion")).not.toContain("ad_library_search");

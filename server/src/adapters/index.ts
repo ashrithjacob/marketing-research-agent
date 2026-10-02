@@ -8,3 +8,4 @@ export * from "./service-queue.js";
 export * from "./throttled.js";
 export * from "./service-clients.js";
 export * from "./trustpilot-profiles.js";
+export * from "./metered.js";

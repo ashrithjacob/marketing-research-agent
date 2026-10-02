@@ -15,6 +15,8 @@ import { RUN_TAB, agentTabs, eventsFor } from './logs/agents';
 import { Stat, duration } from './logs/parts';
 import { buildSteps } from './logs/steps';
 import { Timeline } from './logs/timeline';
+import { CostCells } from './run-view/CostTable';
+import { useCosts } from './run-view/use-costs';
 
 /** Every action a run took, one box at a time: what it did, then what it cost. */
 type RunInfo = RunSummary & { live: boolean };
@@ -78,7 +80,6 @@ export default function LogsPage({ runId }: { runId: string }) {
         setEvents((current) => [...current, event]);
         if (event.kind === 'llm.call') void refresh('new');
         else if (event.kind === 'run.billed') void refresh('full');
-        else if (event.kind === 'apify.charged') void refresh('new');
         else if (event.kind.startsWith('run.') || event.kind.startsWith('packet.')) {
           void refresh('new');
         }
@@ -111,9 +112,11 @@ export default function LogsPage({ runId }: { runId: string }) {
     }
   }, [events.length, live]);
 
+  const costs = useCosts(runId, live);
   const tabs = useMemo(() => agentTabs(events), [events]);
   const selected = picked ?? tabs[1]?.id ?? RUN_TAB;
   const steps = useMemo(() => buildSteps(eventsFor(events, selected)), [events, selected]);
+  const selectedCost = costs?.rows.find((row) => (row.agent_id ?? RUN_TAB) === selected);
 
   const wallMs = run
     ? run.live
@@ -159,16 +162,8 @@ export default function LogsPage({ runId }: { runId: string }) {
               sub={`${duration(stats.llm_time_ms)} waiting on the model`} />
             <Stat label="Tokens" value={formatTokens(stats.tokens.total)}
               sub={`${formatTokens(stats.tokens.input)} in · ${formatTokens(stats.tokens.cache_read)} cached · ${formatTokens(stats.tokens.output)} out`} />
-            {run.stage === 3 ? (
-              <Stat label="Apify crawler costs"
-                value={stats.apify?.runs ? `$${stats.apify.total.toFixed(4)}` : '—'}
-                sub={stats.apify?.runs
-                  ? `${stats.apify.runs} actor run${stats.apify.runs === 1 ? '' : 's'} charged`
-                  : run.live ? 'charged as each actor run ends' : 'no actor runs charged'} />
-            ) : (
-              <Stat label="Cost (calculated)" value={`$${stats.cost.toFixed(4)}`}
-                sub="token counts × the run's rates" />
-            )}
+            <Stat label="Cost" value={costs ? `$${costs.total_usd.toFixed(4)}` : '—'}
+              sub="every service: billed, or at list price where only units are reported" />
             <Stat label="Billed by OpenRouter"
               value={stats.billed.resolved ? `$${stats.billed.total.toFixed(4)}` : '—'}
               sub={stats.billed.resolved
@@ -180,6 +175,7 @@ export default function LogsPage({ runId }: { runId: string }) {
         )}
 
         {run && tabs.length > 1 && <AgentTabs tabs={tabs} selected={selected} onSelect={setPicked} />}
+        {selectedCost && <CostCells row={selectedCost} />}
 
         {run && steps.length === 0 && (
           <p className="muted">

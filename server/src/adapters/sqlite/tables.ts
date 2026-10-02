@@ -3,11 +3,12 @@ import { dirname } from "node:path";
 
 import Database from "better-sqlite3";
 
-import type { AccountDirectory, FindingLedger, ProductCatalog } from "../../domain/index.js";
+import type { AccountDirectory, ChargeLedger, FindingLedger, ProductCatalog } from "../../domain/index.js";
 import { Trace } from "../../trace/index.js";
 
 import { AccountTable } from "./account-table.js";
 import { CallLog } from "./call-log.js";
+import { ChargeTable } from "./charge-table.js";
 import { PacketCheckLog } from "./check-log.js";
 import { EventLog } from "./event-log.js";
 import { FindingTable } from "./finding-table.js";
@@ -37,6 +38,7 @@ export class SqliteTables {
   readonly accounts: AccountDirectory;
   readonly catalog: ProductCatalog;
   readonly findings: FindingLedger;
+  readonly charges: ChargeLedger;
 
   constructor(readonly db: Database.Database) {
     Trace.line(import.meta.url, "SqliteTables.constructor");
@@ -52,6 +54,7 @@ export class SqliteTables {
     this.packetRows = new PacketRowTable(db);
     this.accounts = new AccountTable(db);
     this.findings = new FindingTable(db);
+    this.charges = new ChargeTable(db);
     this.catalog = new SqliteProductCatalog(this.products, this.runs, this.packetRows);
     new ProductBackfill(db, this.products, this.packetRows).apply();
   }

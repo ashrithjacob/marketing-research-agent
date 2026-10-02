@@ -38,6 +38,7 @@ import {
   Roles,
   StageOnePlans,
   locatorSchema,
+  NoCharges,
   type DiscoveryQuestion,
   type Node,
   type StageOneAgent,
@@ -68,7 +69,7 @@ afterEach(() => {
 
 /** The research tools a role naming `names` is built with, as the agent gets them. */
 const research = (svc: ServiceClients, names: readonly ToolName[], run: Partial<ToolContext> = {}) =>
-  new ToolRegistry(svc, settings).build(names, { runId: "r", subject: "", market: "", discovery: null, ...run }).map((built) => built.tool);
+  new ToolRegistry(svc, settings).build(names, { runId: "r", subject: "", market: "", discovery: null, meter: new NoCharges(), ...run }).map((built) => built.tool);
 
 const tools = (runId = "run-1") => {
   const list = research(services(settings), ["web_search", "web_fetch"], { runId });
@@ -288,7 +289,7 @@ describe("Firecrawl's rate limit", () => {
     await vi.advanceTimersByTimeAsync(13_199);
     expect(at).toHaveLength(1);
     await vi.advanceTimersByTimeAsync(1);
-    await expect(reading).resolves.toEqual({ text: "# page", title: "T" });
+    await expect(reading).resolves.toEqual({ text: "# page", title: "T", reader: "firecrawl" });
     expect(at[1]! - at[0]!).toBe(13_200);
   });
 

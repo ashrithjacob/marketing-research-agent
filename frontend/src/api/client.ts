@@ -1,4 +1,5 @@
 import type { CallsResponse } from './calls';
+import type { CostReport } from './costs';
 import type { Config } from './config';
 import type { Judgement } from './judgements';
 import type { Brief, ProductSummary, ResearchNode, RunDetail, RunSummary } from './runs';
@@ -67,6 +68,8 @@ export const api = {
   /** Every LLM call, or only those after `after` (a seq), plus the run's totals. */
   calls: (id: string, after = 0) =>
     request<CallsResponse>(`/api/research/runs/${id}/calls${after > 0 ? `?after=${after}` : ''}`),
+  /** What each agent, and the run's own code, spent per service. */
+  costs: (id: string) => request<CostReport>(`/api/research/runs/${id}/costs`),
   logsUrl: (id: string) => `/runs/${id}/logs`,
   traceUrl: (id: string) => `/api/research/runs/${id}/trace`,
   stopRun: (id: string) =>

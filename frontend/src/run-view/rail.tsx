@@ -2,7 +2,9 @@ import type { ReactNode } from 'react';
 import { api, TERMINAL_STATUSES, type Judgement, type ProductTruthPacket, type ResearchNode, type RunDetail, type RunSummary, type StagePacket } from '../api';
 import StageRail, { type StageProgress } from '../StageRail';
 import { scopeLabel, type CollectingStage } from '../stages';
-import { billedText, pricingNote, runStage } from './now';
+import { CostTable } from './CostTable';
+import { runStage } from './now';
+import { useCosts } from './use-costs';
 
 /** Where `run` stands: everything is counted on one stage-1 run — the run itself, or the one it built on — never on another stage-1 run's later stages. */
 export function subjectProgress(runs: RunSummary[], run: RunSummary): StageProgress {
@@ -47,6 +49,7 @@ export function RailColumn({
   onSelectRun: (id: string) => void;
   onRunNode: (node: ResearchNode) => void;
 }) {
+  const costs = useCosts(run.id, live);
   return (
   <div className="rail-col">
     <StageRail
@@ -92,18 +95,8 @@ export function RailColumn({
             : '—'}
         </span>
       </div>
-      <div title={pricingNote(run.usage?.pricing)}>
-        Calc. cost{' '}
-        <span>
-          {run.usage?.cost?.total ? `$${run.usage.cost.total.toFixed(4)}` : '—'}
-          {run.usage?.pricing?.source === 'pi-ai-snapshot' ? ' (snapshot prices)' : ''}
-        </span>
-      </div>
-      <div title="What OpenRouter charged, read back per turn from /generation">
-        Billed{' '}
-        <span>{billedText(run.usage?.billed, live)}</span>
-      </div>
     </div>
+    {costs && costs.rows.length > 0 && <CostTable report={costs} />}
 
     <h3 style={{ marginTop: 18 }}>
       Standing judgements <span className="n">{judgements.length}</span>

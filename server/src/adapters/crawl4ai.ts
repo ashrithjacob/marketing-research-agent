@@ -36,6 +36,6 @@ export class Crawl4ai implements PageFetcher {
     if (!response.ok) throw new Error(error);
     const text = payload.markdown ?? "";
     if (!text.trim()) throw new Error("Crawl4AI returned an empty body for this url");
-    return { text, title: payload.title ?? "" };
+    return { text, title: payload.title ?? "", reader: "crawl4ai" };
   }
 }

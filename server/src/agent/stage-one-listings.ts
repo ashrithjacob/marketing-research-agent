@@ -2,10 +2,9 @@ import { TrustpilotProfiles } from "../adapters/index.js";
 import {
   AmazonListingLookup,
   MeteredActorRunner,
-  type ActorCharge,
   type ActorRunner,
 } from "../adapters/apify/index.js";
-import type { PageFetcher, StagePacket, TargetListing, TargetListings } from "../domain/index.js";
+import type { ChargeMeter, PageFetcher, StagePacket, TargetListing, TargetListings } from "../domain/index.js";
 import { ReviewMiningRoster } from "../extract/index.js";
 import { Trace } from "../trace/index.js";
 
@@ -25,10 +24,10 @@ export class StageOneListings {
     return this.actors !== null;
   }
 
-  async lookUp(runId: string, packet: StagePacket, onCharge: (charge: ActorCharge) => void): Promise<TargetListing[]> {
+  async lookUp(runId: string, packet: StagePacket, meter: ChargeMeter): Promise<TargetListing[]> {
     Trace.line(import.meta.url, "StageOneListings.lookUp", { runId });
     if (!this.actors) return [];
-    const source = new AmazonListingLookup(new MeteredActorRunner(this.actors, onCharge));
+    const source = new AmazonListingLookup(new MeteredActorRunner(this.actors, meter));
     return new ReviewMiningListings(this.listings, source, this.concurrency, new TrustpilotProfiles(this.pages)).ensure(runId, ReviewMiningRoster.of(packet));
   }
 }

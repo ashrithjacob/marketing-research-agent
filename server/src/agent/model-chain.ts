@@ -1,21 +1,17 @@
 import type { Agent } from "@earendil-works/pi-agent-core";
 import type { Api, Model, Models, SimpleStreamOptions } from "@earendil-works/pi-ai";
 
-import type { Pricing } from "../adapters/index.js";
 import { Trace } from "../trace/index.js";
 
 import type { ModelPricing } from "./pricing.js";
 
 type PayloadHook = NonNullable<SimpleStreamOptions["onPayload"]>;
 
-/** A run's models in .env order — the primary, then its backups — priced, and which one is answering now. */
+/** A run's models in .env order — the primary, then its backups — at OpenRouter's live rates, and which one is answering now. */
 export class ModelChain {
   private position = 0;
 
-  private constructor(
-    private readonly models: readonly Model<Api>[],
-    readonly pricing: Pricing,
-  ) {}
+  private constructor(private readonly models: readonly Model<Api>[]) {}
 
   static resolve(
     ids: readonly string[],
@@ -23,13 +19,13 @@ export class ModelChain {
     prices: ModelPricing,
   ): { chain: ModelChain } | { unknown: string } {
     Trace.line(import.meta.url, "ModelChain.resolve", { ids });
-    const priced: { model: Model<Api>; pricing: Pricing }[] = [];
+    const priced: Model<Api>[] = [];
     for (const id of ids) {
       const listed = catalogue.getModel("openrouter", id);
       if (!listed) return { unknown: id };
-      priced.push(prices.apply(listed));
+      priced.push(prices.apply(listed).model);
     }
-    return { chain: new ModelChain(priced.map((p) => p.model), priced[0]!.pricing) };
+    return { chain: new ModelChain(priced) };
   }
 
   get current(): Model<Api> {

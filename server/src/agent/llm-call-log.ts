@@ -3,6 +3,7 @@ import { getCurrentSystemPrompt, getCurrentTools, type AssistantMessage, type Me
 
 import type { LlmCall, ResearchStore } from "../domain/index.js";
 import { Trace } from "../trace/index.js";
+import { UsageTotals } from "./usage.js";
 
 /** Numbers a run's LLM calls across all of its agents. */
 export class CallSequence {
@@ -91,7 +92,7 @@ export class LlmCallLog {
                 : failure instanceof Error
                   ? failure.message
                   : String(failure)),
-            usage: (usage ?? {}) as unknown as Record<string, unknown>,
+            usage: UsageTotals.tokens(usage ?? {}) as unknown as Record<string, unknown>,
             response_id: message?.responseId ?? "",
           });
           this.options.onCall?.(call);

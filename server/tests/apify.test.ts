@@ -18,7 +18,6 @@ import { describe, expect, it } from "vitest";
 import {
   AMAZON_REVIEWS_ACTOR,
   AMAZON_SEARCH_ACTOR,
-  type ActorCharge,
   type ActorRunner,
   AmazonProducts,
   MeteredActorRunner,
@@ -28,6 +27,7 @@ import {
   TRUSTPILOT_ACTOR,
   TrustpilotReviews,
 } from "../src/adapters/apify/index.js";
+import type { ChargeDraft } from "../src/domain/index.js";
 
 interface Call {
   actorId: string;
@@ -334,9 +334,9 @@ describe("findAmazonProducts failure handling", () => {
 
 describe("MeteredActorRunner", () => {
   const charged = (usageUsd: number | null | undefined, items: Array<Record<string, unknown>> = []) => {
-    const charges: ActorCharge[] = [];
+    const charges: ChargeDraft[] = [];
     const inner: ActorRunner = { run: async () => ({ status: "SUCCEEDED", items, usageUsd }) };
-    return { runner: new MeteredActorRunner(inner, (c) => charges.push(c)), charges };
+    return { runner: new MeteredActorRunner(inner, { charge: (c) => charges.push(c) }), charges };
   };
 
   it("reports the charge even when the tool then fails on an empty dataset", async () => {
@@ -344,7 +344,7 @@ describe("MeteredActorRunner", () => {
     await expect(
       new AmazonProducts(runner).find({ query: "vitamin d", maxResults: 5 }),
     ).rejects.toThrow(/failed lookup/);
-    expect(charges).toEqual([{ actor: AMAZON_SEARCH_ACTOR, usd: 0.0465, status: "SUCCEEDED" }]);
+    expect(charges).toEqual([{ service: "apify", item: AMAZON_SEARCH_ACTOR, units: 1, usd: 0.0465, basis: "billed" }]);
   });
 
   it("reports nothing when Apify gave no usage figure, rather than a false $0", async () => {

@@ -292,7 +292,7 @@ agents, and only with an Apify token.
 
 **When a competitors run completes**, `RunWrapUp.lookUpListings` looks up the Amazon
 listing of the champion and every competitor (`StageOneListings`, one search each,
-about $0.01, charged to the run as `apify.charged`), matches each with
+about $0.01, charged to the run as a `research_charges` row with no agent), matches each with
 `ListingMatch` (brand, one of its actives, and its form named in the title — a
 liquid by its volume, a powder by its weight), stores the rows in
 `research_target_listings`, and emits `packet.listings {total, matched}`. It runs
@@ -492,11 +492,15 @@ last agent has ended:
 7. Every SSE subscriber gets an end-of-stream, and the run leaves the in-memory
    live map.
 
-### §2a — what a run costs, two ways
+### §2a — what a run costs
 
-The cockpit shows both, because they answer different questions.
+*Since 2026-10-03 the cockpit shows only billed and listed figures, per agent
+(`GET /runs/:id/costs`, below); the calculated LLM cost is no longer stored on a
+run or a call, nor shown. The first bullet is kept for the review analysis, which
+still prices its own calls this way (`cost_usd`), and as the record of why it was
+dropped: an estimate at list price, not what was charged.*
 
-- **Calc. cost** (`usage.cost.total`) — pi-ai prices every turn from `model.cost` ×
+- **Calculated cost, research runs no longer** — pi-ai prices every turn from `model.cost` ×
   the turn's token counts, and `addUsage` sums them. Out of the box `model.cost` is a
   snapshot generated into the pi-ai package when it was published (0.85.1); its
   OpenRouter provider has no `fetchModels`, so it never refreshes. It had drifted:
@@ -517,6 +521,23 @@ The cockpit shows both, because they answer different questions.
   schedule and give up after that. `{total, turns, resolved}` — `resolved < turns`
   means some turns' charges were never read and `total` is an undercount.
   No `OPENROUTER_API_KEY` → no lookups and no `billed` at all, not $0.
+- **Every other service, per agent** — each paid tool call writes one row to
+  `research_charges` as it returns (`RunMeter`, `agent/run-meter.ts`), tagged with
+  the agent whose tool made it, or `agent_id` null for code with no agent (the
+  Amazon listing lookup after stage 1, review mining). The wrappers that write
+  them are in `adapters/metered.ts`, built per agent by `ToolRegistry`; Apify's is
+  `MeteredActorRunner`. `basis` says how the figure was arrived at: Apify
+  **billed** (`usageUsd` per actor run); Parallel **listed** — it reports units
+  (`usage: [{"name":"sku_search","count":1}]` on a search; a Task run reports
+  only its processor), priced from `Settings.prices`; Trendtrack **credits**
+  (`x-credits-used` header) valued per credit; a page **listed** under whichever
+  reader served it (Crawl4AI $0, Firecrawl unpriced until measured, Parallel
+  Extract its list price). `GET /runs/:id/costs` (`CostReports`,
+  `extract/cost-reports.ts`) returns one row per agent with a column for each
+  service its tools can spend in, a `run` row, and totals; the LLM column is the
+  sum of the agent's billed calls, "billed N of M turns" while some are pending.
+  The rail shows the table; each agent's tab on the logs page shows its row.
+  Prices and their sources: `spec-research-agent-factory.md` §8.3.
 - **Where a call's time went** — the same `/generation` record also carries
   `model` (the one that actually answered — not always the one asked for, once
   OpenRouter falls back), `latency` (time to the first token), `generation_time`,
@@ -569,7 +590,7 @@ it. Measured on run `72c65135` (2026-09-27): call 16's input held call 15's
 99,418 characters. The activity page marks such a message "dropped by pi-ai, not
 sent to the model". Each call becomes a `research_llm_calls` row: the
 `agent_id` that made it, `seq` numbered across the whole run by one `CallSequence`
-(a per-agent count would give four calls `seq` 1), start/end time, duration, model, stop reason, error, usage (tokens and calculated cost), the
+(a per-agent count would give four calls `seq` 1), start/end time, duration, model, stop reason, error, usage (tokens; no dollar figure since 2026-10-03), the
 `gen-…` id, and — once `/generation` answers — `billed_cost` and `generation`
 (§2a: time to first token, generation time, reasoning tokens, provider). The logs
 page shows the time to the first token on each row, and the rest on an
@@ -592,8 +613,8 @@ prompt), which the cockpit's trace shows as one line and the logs page uses to k
 there is a new call to fetch.
 
 **The logs page** is `/runs/<id>/logs`, opened from **Logs ↗** on a run in a new
-tab. It shows the run's totals (LLM calls, time taken, tokens, calculated and billed
-cost, tool calls), then **one tab per agent** plus a `run` tab of milestones
+tab. It shows the run's totals (LLM calls, time taken, tokens, total cost from
+`/costs`, billed LLM cost, tool calls), then **one tab per agent** plus a `run` tab of milestones
 (`logs/agents.ts`), opened on the first agent; under the tab, one row per call: expand it for the prompt (what is new, or
 **Show full prompt**) and the answer (thinking, text, tool calls with arguments,
 token counts, cost). It follows the event stream and fetches only calls it has not
@@ -933,7 +954,7 @@ Worth knowing, because the prompt or a spec can suggest otherwise:
   `usage` as `{input, output, cacheRead, totalTokens, cost: {...}}`; `RunView.tsx`
   read `usage.total_tokens`, and `frontend/src/api.ts` declared that field too (optional), so
   `tsc` could not catch it. Both now use pi-ai's field names, and the cockpit also
-  shows the calculated and billed cost (§2a).
+  shows the billed cost (§2a).
 
 ---
 
@@ -1014,9 +1035,9 @@ What the start modal needs to warn you before you pay for a run.
    "counts": {"sources": 10, "rejected": 3, "excerpts": 12,
               "measurements": 15, "attributes": 13, "gaps": 8}}
   ```
-  That is the real Mullein record, from before §2a. A run since then also carries
-  `usage.pricing: {source, fetched_at, rates}` and, once the lookups finish,
-  `usage.billed: {total, turns, resolved}`.
+  That is the real Mullein record, from before §2a. A run since 2026-10-03 carries
+  no `cost` and no `pricing` in `usage`, only token counts and, once the lookups
+  finish, `usage.billed: {total, turns, resolved}`.
   `nodes` is always spelled out: a run from before per-node runs has `[]` in the
   database and is reported as all four, which is what it was.
   `status` is one of `queued`, `running`, `stopping`, `completed`, `invalid`,

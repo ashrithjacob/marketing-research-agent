@@ -171,6 +171,12 @@ h3 .n { color: var(--faint); text-transform: none; letter-spacing: 0.02em; font-
 
 .runmeta { font-size: 12px; color: var(--faint); display: grid; gap: 3px; }
 .runmeta span { color: var(--ink); font-weight: 500; }
+.cost-table { margin-top: 10px; width: 100%; font-size: 11px; border-collapse: collapse; color: var(--faint); }
+.cost-table th, .cost-table td { text-align: right; padding: 2px 4px; white-space: nowrap; }
+.cost-table th:first-child, .cost-table td:first-child { text-align: left; }
+.cost-table td { color: var(--ink); }
+.cost-table .cost-total td { border-top: 1px solid var(--line, #ddd); font-weight: 600; }
+.cost-cells { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; margin: 6px 0 10px; }
 
 /* ---------- now panel ---------- */
 .now {

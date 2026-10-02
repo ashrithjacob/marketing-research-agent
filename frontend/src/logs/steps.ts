@@ -152,7 +152,7 @@ export function buildSteps(events: RunEvent[]): Step[] {
     if (event.kind === 'run.billed' && turn && steps.length > 0) {
       continue;
     }
-    if (event.kind === 'apify.charged') continue;
+    if (event.kind === 'run.charged') continue;
     const { text, cls } = milestoneText(event);
     steps.push({
       key: `ms-${event.id}`,

@@ -30,7 +30,7 @@ describe("Crawl4ai", () => {
     const fetch = vi.fn(async () => json(200, { markdown: "# Mullein drops", title: "Mullevia" }));
     vi.stubGlobal("fetch", fetch);
     const page = await new Crawl4ai(settings()).scrape("https://mullevia.com/p");
-    expect(page).toEqual({ text: "# Mullein drops", title: "Mullevia" });
+    expect(page).toEqual({ text: "# Mullein drops", title: "Mullevia", reader: "crawl4ai" });
     const [url, init] = fetch.mock.calls[0] as unknown as [string, RequestInit];
     expect(url).toBe("https://crawl4ai.test/scrape");
     expect((init.headers as Record<string, string>).Authorization).toBe("Bearer sk_live_test");

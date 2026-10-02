@@ -222,8 +222,8 @@ Source also carries a `node`, so source counts are per tile.
 | Panel | Field | Source |
 |---|---|---|
 | runmeta | tokens | `usage.totalTokens` |
-| runmeta | calculated cost | `usage.cost.total`, priced by `usage.pricing` |
-| runmeta | billed cost | `usage.billed.total` — what OpenRouter actually charged |
+| cost table (rail) | one row per agent and a `run` row: LLM, Apify, Parallel, Trendtrack, pages, total | `GET /api/research/runs/:id/costs`, read every 5s while live (`run-view/use-costs.ts`) |
+| logs page, agent tab | that agent's row of the cost table | the same `/costs` |
 | products page | one card per product | `GET /api/research/products` |
 | run list | one row per run of the product | `GET /api/research/products/:id/runs` |
 

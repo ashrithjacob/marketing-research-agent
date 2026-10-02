@@ -129,7 +129,7 @@ export function TurnCard({ step, call, calls, index, now, isLast }: {
             {new Date(step.startedAt).toLocaleTimeString()}
             {call ? ` · ${(call.duration_ms / 1000).toFixed(1)}s` : ''}
             {call ? ` · ${formatTokens(Number(usage.output ?? 0))} out` : ''}
-            {Number(usage.cost?.total ?? 0) > 0 && ` · $${Number(usage.cost?.total ?? 0).toFixed(4)}`}
+            {call?.billed_cost != null && ` · $${call.billed_cost.toFixed(4)}`}
           </span>
         </summary>
         <div className="tl-body">

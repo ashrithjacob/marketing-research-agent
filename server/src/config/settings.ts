@@ -49,6 +49,25 @@ export class Env {
     return parsed;
   }
 
+  /** A number, or null when unset: a price nobody has measured. */
+  static optionalNumber(name: string): number | null {
+    Trace.line(import.meta.url, "Env.optionalNumber", { name });
+    return process.env[name] === undefined || process.env[name] === "" ? null : Env.number(name, 0);
+  }
+
+  /** `name=number` pairs, comma-separated: "pro=0.10,ultra=0.30". */
+  static prices(name: string, fallback: Readonly<Record<string, number>>): Record<string, number> {
+    Trace.line(import.meta.url, "Env.prices", { name });
+    const pairs = Env.list(name);
+    if (pairs.length === 0) return { ...fallback };
+    return Object.fromEntries(pairs.map((pair) => {
+      const [key, raw] = pair.split("=").map((part) => part.trim());
+      const value = Number(raw);
+      if (!key || !Number.isFinite(value)) throw new Error(`${name} must be name=number pairs, got ${JSON.stringify(pair)}`);
+      return [key, value];
+    }));
+  }
+
   static flag(name: string, fallback: boolean): boolean {
     Trace.line(import.meta.url, "Env.flag", { name, fallback });
     const raw = process.env[name];
@@ -90,6 +109,14 @@ export class Env {
       gateModel: Env.text("MRA_GATE_MODEL", ""),
       gateCharLimit: Env.number("MRA_GATE_CHAR_LIMIT", 4000),
       gateTimeoutSeconds: Env.number("MRA_GATE_TIMEOUT_SECONDS", 12),
+      prices: {
+        parallelSearchUsd: Env.number("MRA_PARALLEL_SEARCH_USD", 0.005),
+        parallelExtractUsd: Env.number("MRA_PARALLEL_EXTRACT_USD", 0.001),
+        parallelTaskUsd: Env.prices("MRA_PARALLEL_TASK_USD", { pro: 0.1, ultra: 0.3 }),
+        trendtrackUsdPerCredit: Env.number("MRA_TRENDTRACK_USD_PER_CREDIT", 0.0089),
+        crawl4aiUsdPerPage: Env.number("MRA_CRAWL4AI_USD_PER_PAGE", 0),
+        firecrawlUsdPerPage: Env.optionalNumber("MRA_FIRECRAWL_USD_PER_PAGE"),
+      },
 
       apifyToken: Env.text("APIFY_TOKEN", ""),
       apifyMaxReviews: Env.number("MRA_APIFY_MAX_REVIEWS", 50),

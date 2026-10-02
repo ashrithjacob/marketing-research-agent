@@ -9,6 +9,7 @@ import { Trace, type TraceFile } from "../trace/index.js";
 import type { ApiEnv } from "./api-env.js";
 import { ConfigRoute } from "./config-route.js";
 import { CorpusRoute } from "./corpus-route.js";
+import { CostRoute } from "./cost-route.js";
 import { EventStream } from "./event-stream.js";
 import { JudgementRoutes } from "./judgement-routes.js";
 import { ReviewAnalysisRoutes } from "./review-analysis-routes.js";
@@ -39,6 +40,7 @@ export class ResearchApi {
     new ScopeGuard(store).register(api);
     const listings = new ReviewMiningListings(store.listings, listingSource, settings.apifyConcurrency, new TrustpilotProfiles(pages));
     new RunRoutes(store, supervisor, handoff, listings).register(api);
+    new CostRoute(store).register(api);
     new ReviewMiningRoutes(handoff, settings, listings).register(api);
     new ReviewAnalysisRoutes(store, supervisor, new ReviewAnalyst(store, settings, supervisor.models, supervisor.costs)).register(api);
     new ProductRoutes(store).register(api);

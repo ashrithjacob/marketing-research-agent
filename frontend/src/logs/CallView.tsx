@@ -24,7 +24,7 @@ export function CallView({ call, calls, index }: { call: LlmCall; calls: LlmCall
           {formatTokens((usage.input ?? 0) + (usage.cacheRead ?? 0))} in ·{' '}
           {formatTokens(usage.output ?? 0)} out
         </span>
-        <span>${(usage.cost?.total ?? 0).toFixed(4)}</span>
+        <span>{call.billed_cost !== null ? `$${call.billed_cost.toFixed(4)}` : 'billing…'}</span>
         <span className="call-stop">{failed ? `error: ${call.error}` : call.stop_reason}</span>
         <span className="call-what">
           {toolCalls.length
@@ -96,9 +96,8 @@ export function CallView({ call, calls, index }: { call: LlmCall; calls: LlmCall
           <div className="call-usage">
             input {usage.input ?? 0} · cache read {usage.cacheRead ?? 0} · cache write{' '}
             {usage.cacheWrite ?? 0} · output {usage.output ?? 0}
-            {usage.reasoning ? ` (of which reasoning ${usage.reasoning})` : ''} · calculated $
-            {(usage.cost?.total ?? 0).toFixed(6)}
-            {call.billed_cost !== null ? ` · billed $${call.billed_cost.toFixed(6)}` : ''}
+            {usage.reasoning ? ` (of which reasoning ${usage.reasoning})` : ''}
+            {call.billed_cost !== null ? ` · billed $${call.billed_cost.toFixed(6)}` : ' · not billed yet'}
           </div>
           {call.generation && <GenerationLine generation={call.generation} />}
         </section>

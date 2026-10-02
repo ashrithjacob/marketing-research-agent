@@ -1,11 +1,12 @@
 import type { AgentTool } from "@earendil-works/pi-agent-core";
 
-import { AmazonProducts, MeteredActorRunner, type ActorCharge, type ActorRunner } from "../../adapters/apify/index.js";
+import { AmazonProducts, MeteredActorRunner } from "../../adapters/apify/index.js";
 import { Corpus } from "../../adapters/corpus.js";
 import { OpenRouterGate } from "../../adapters/fetch-gate.js";
+import { MeteredAdLibrary, MeteredDiscovery, MeteredPageFetcher, MeteredWebSearch } from "../../adapters/metered.js";
 import type { ServiceClients } from "../../adapters/service-clients.js";
 import type { Settings } from "../../config/index.js";
-import type { DiscoveryQuestion, ToolName } from "../../domain/index.js";
+import type { ChargeMeter, DiscoveryQuestion, ToolName } from "../../domain/index.js";
 import { Trace } from "../../trace/index.js";
 
 import {
@@ -37,11 +38,11 @@ export interface ToolContext {
   subject: string;
   market: string;
   discovery: DiscoveryQuestion | null;
-  onApifyCharge?: (charge: ActorCharge) => void;
+  meter: ChargeMeter;
   onFetch?: (record: FetchRecord) => void;
 }
 
-/** Builds the research tools a role names, in its order; a tool whose service is not configured, or whose input the run lacks, is left out, not stubbed. `wait_for` is a ledger tool and is built with the ledger's. */
+/** Builds the research tools a role names, in its order, each charging what it spends to the agent's meter; a tool whose service is not configured, or whose input the run lacks, is left out, not stubbed. `wait_for` is a ledger tool and is built with the ledger's. */
 export class ToolRegistry {
   constructor(
     private readonly services: ServiceClients,
@@ -59,34 +60,33 @@ export class ToolRegistry {
   private one(name: ToolName, run: ToolContext): BuiltTool | null {
     Trace.line(import.meta.url, "ToolRegistry.one", { name });
     const { services, settings } = this;
+    const { prices } = settings;
+    const { meter } = run;
     const corpus = new Corpus(settings.corpusPath);
     switch (name) {
       case "web_search":
-        return { tool: new WebSearchTool(services.search).tool(), line: WEB_SEARCH_LINE };
+        return { tool: new WebSearchTool(new MeteredWebSearch(services.search, prices, meter)).tool(), line: WEB_SEARCH_LINE };
       case "web_fetch": {
         const gate = settings.gateModel ? new OpenRouterGate(settings) : undefined;
-        return { tool: new WebFetchTool(settings, services.pages, corpus, run.runId, run.onFetch, gate, run.subject, run.market).tool(), line: WEB_FETCH_LINE };
+        const pages = new MeteredPageFetcher(services.pages, prices, meter);
+        return { tool: new WebFetchTool(settings, pages, corpus, run.runId, run.onFetch, gate, run.subject, run.market).tool(), line: WEB_FETCH_LINE };
       }
       case "evidence_search":
-        return { tool: new EvidenceSearchTool(services.evidence.search, corpus, run.runId).tool(), line: EVIDENCE_SEARCH_LINE };
-      case "evidence_fetch":
-        return { tool: new WebFetchTool(settings, services.evidence.pages, corpus, run.runId, run.onFetch, undefined, run.subject, run.market).tool(), line: EVIDENCE_FETCH_LINE };
+        return { tool: new EvidenceSearchTool(new MeteredWebSearch(services.evidence.search, prices, meter), corpus, run.runId).tool(), line: EVIDENCE_SEARCH_LINE };
+      case "evidence_fetch": {
+        const pages = new MeteredPageFetcher(services.evidence.pages, prices, meter);
+        return { tool: new WebFetchTool(settings, pages, corpus, run.runId, run.onFetch, undefined, run.subject, run.market).tool(), line: EVIDENCE_FETCH_LINE };
+      }
       case "discover_competitors":
         return services.discovery && run.discovery
-          ? { tool: new DiscoverCompetitorsTool(services.discovery, run.discovery, corpus, run.runId).tool(), line: DISCOVER_LINE }
+          ? { tool: new DiscoverCompetitorsTool(new MeteredDiscovery(services.discovery, prices, meter), run.discovery, corpus, run.runId).tool(), line: DISCOVER_LINE }
           : null;
       case "ad_library_search":
-        return services.ads ? { tool: new AdLibraryTool(services.ads, corpus, run.runId).tool(), line: AD_LIBRARY_LINE } : null;
+        return services.ads ? { tool: new AdLibraryTool(new MeteredAdLibrary(services.ads, prices, meter), corpus, run.runId).tool(), line: AD_LIBRARY_LINE } : null;
       case "amazon_find_product":
-        return services.actors ? { tool: new FindProductTool(new AmazonProducts(this.runner(run))).tool(), line: AMAZON_SEARCH_LINE } : null;
+        return services.actors ? { tool: new FindProductTool(new AmazonProducts(new MeteredActorRunner(services.actors, meter))).tool(), line: AMAZON_SEARCH_LINE } : null;
       case "wait_for":
         return null;
     }
-  }
-
-  private runner(run: ToolContext): ActorRunner {
-    Trace.line(import.meta.url, "ToolRegistry.runner");
-    const actors = this.services.actors!;
-    return run.onApifyCharge ? new MeteredActorRunner(actors, run.onApifyCharge) : actors;
   }
 }

@@ -51,13 +51,6 @@ export interface RunCounts {
   competitors?: { direct: number; indirect: number };
 }
 
-/** Mirrors `server/src/adapters/rates.ts`. Rates are dollars per million tokens. */
-export interface Pricing {
-  source: 'openrouter-live' | 'pi-ai-snapshot';
-  fetched_at: string;
-  rates: { input?: number; output?: number; cacheRead?: number; cacheWrite?: number };
-}
-
 export interface Billed {
   total: number;
   turns: number;
@@ -72,8 +65,6 @@ export interface Usage {
   cacheWrite?: number;
   reasoning?: number;
   totalTokens?: number;
-  cost?: { input: number; output: number; cacheRead: number; cacheWrite: number; total: number };
-  pricing?: Pricing;
   billed?: Billed;
 }
 

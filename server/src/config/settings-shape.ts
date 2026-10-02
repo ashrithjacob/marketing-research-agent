@@ -1,3 +1,13 @@
+/** What each paid service's unit costs, for services that report units and not dollars; null where the price is not known. */
+export interface ServicePrices {
+  parallelSearchUsd: number;
+  parallelExtractUsd: number;
+  parallelTaskUsd: Readonly<Record<string, number>>;
+  trendtrackUsdPerCredit: number;
+  crawl4aiUsdPerPage: number;
+  firecrawlUsdPerPage: number | null;
+}
+
 /** Everything the service is configured with; read once from the environment by `Env.settings()`. */
 export interface Settings {
   appUser: string;
@@ -29,6 +39,7 @@ export interface Settings {
   gateModel: string;
   gateCharLimit: number;
   gateTimeoutSeconds: number;
+  prices: ServicePrices;
 
   apifyToken: string;
   apifyMaxReviews: number;

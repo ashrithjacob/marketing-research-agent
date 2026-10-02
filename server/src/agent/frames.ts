@@ -48,7 +48,6 @@ export class Frames {
       input_tokens: usage.input ?? 0,
       output_tokens: usage.output ?? 0,
       cache_read_tokens: usage.cacheRead ?? 0,
-      cost: usage.cost?.total ?? 0,
       stop_reason: call.stop_reason,
       tool_calls: content.filter((item) => item?.type === "toolCall").length,
       error: call.error,

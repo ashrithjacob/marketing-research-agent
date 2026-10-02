@@ -8,6 +8,8 @@ import { CallSequence } from "./llm-call-log.js";
 import type { LiveRuns } from "./live-runs.js";
 import type { RetryPolicy } from "./retry.js";
 import { RunEnd, type RunEnding } from "./run-end.js";
+import { RunMeter } from "./run-meter.js";
+import { UsageTotals } from "./usage.js";
 import { RunWrapUp } from "./run-wrap-up.js";
 import { PromptBuilder, StageOneBriefing } from "./prompt/index.js";
 import type { ResearchAgentFactory, RoleContext } from "./research-agent-factory.js";
@@ -48,7 +50,7 @@ export class StageOneRun {
   async start(): Promise<void> {
     Trace.line(import.meta.url, "StageOneRun.start", { runId: this.run.runId });
     const { store, runs, factory } = this.deps;
-    const { runId, brief, nodes, chain } = this.run;
+    const { runId, brief, nodes } = this.run;
     const team = this.team;
     const context: RoleContext = {
       ...this.run,
@@ -57,7 +59,7 @@ export class StageOneRun {
       sequence: new CallSequence(),
       roster: new AgentRoster(),
       onCall: team.onCall,
-      onApifyCharge: (charge) => runs.emit(runId, "apify.charged", { actor: charge.actor, usd: charge.usd, status: charge.status }),
+      meter: (agentId) => new RunMeter(store, runs, runId, agentId),
       onChecked: team.onChecked,
     };
     const wrapUp = new RunWrapUp(store, runs, runId, this.deps.listings);
@@ -74,7 +76,7 @@ export class StageOneRun {
       ending = { kind: "crashed", error: `agent failed: ${error instanceof Error ? error.message : String(error)}` };
     }
     try {
-      new RunEnd(store, runs).end(assembly, ending, { output, usage: { ...team.totals, pricing: chain.pricing } });
+      new RunEnd(store, runs).end(assembly, ending, { output, usage: UsageTotals.tokens(team.totals) });
       await wrapUp.lookUpListings(nodes);
     } finally {
       await wrapUp.recordBilling(team.billing);

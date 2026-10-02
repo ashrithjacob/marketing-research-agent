@@ -2,6 +2,7 @@ import type Database from "better-sqlite3";
 
 import { AccountTable } from "./account-table.js";
 import { CallLog } from "./call-log.js";
+import { ChargeTable } from "./charge-table.js";
 import { FindingTable } from "./finding-table.js";
 import { SqliteMigrations } from "./migrations.js";
 import { PacketRowTable } from "./packet-row-table.js";
@@ -18,7 +19,7 @@ export class SqliteSchema {
     db.exec(CallLog.DDL);
     SqliteMigrations.apply(db);
     db.exec(SqliteSchema.INDEXES);
-    for (const ddl of [PacketRowTable.DDL, ReviewAnalysisTable.DDL, TargetListingTable.DDL, FindingTable.DDL]) db.exec(ddl);
+    for (const ddl of [PacketRowTable.DDL, ReviewAnalysisTable.DDL, TargetListingTable.DDL, FindingTable.DDL, ChargeTable.DDL]) db.exec(ddl);
   }
 
   static readonly INDEXES = `
