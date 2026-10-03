@@ -13,3 +13,4 @@ server/dist/
 # overrides in the README). Never a deploy artefact.
 server/.local/
 TODO.md
+.neon

@@ -18,9 +18,13 @@ export const miningTargetSchema = z
   .strict();
 export type MiningTarget = z.infer<typeof miningTargetSchema>;
 
+/** Reviews asked for per star band on Amazon, and per target on Trustpilot. */
+export const reviewsPerBandSchema = z.number().int().min(1).max(100);
+
 export const reviewMiningEstimateSchema = z
   .object({
     targets: z.number().int(),
+    reviews_per_band: reviewsPerBandSchema,
     reviews_per_target: z.number().int(),
     bands: z.number().int(),
     reviews: z.number().int(),
@@ -54,6 +58,7 @@ export const reviewMiningPlanRequestSchema = z
       })
       .strict(),
     targets: z.array(z.string()).default([]),
+    reviews_per_band: reviewsPerBandSchema.optional(),
   })
   .strict();
 export type ReviewMiningPlanRequest = z.infer<typeof reviewMiningPlanRequestSchema>;

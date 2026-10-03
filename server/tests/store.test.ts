@@ -133,6 +133,21 @@ describe("migration", () => {
     }
   });
 
+  it("adds the requested count to a pull table created before it, and keeps it on save", async () => {
+    const path = join(dir, "pulls.db");
+    const old = new Database(path);
+    old.exec("CREATE TABLE research_review_pulls (id INTEGER PRIMARY KEY AUTOINCREMENT, platform TEXT NOT NULL, listing TEXT NOT NULL, band INTEGER, pulled_at TEXT NOT NULL, result TEXT NOT NULL)");
+    old.close();
+    const migrated = await SqliteStores.open(path);
+    try {
+      const result = { status: "SUCCEEDED", excerpts: [], gap: null, offBand: 0, totalReviews: null, totalRatings: null };
+      await migrated.pulls.save("amazon", "L", 3, 40, result);
+      expect((await migrated.pulls.latest("amazon", "L", 3, "2000"))?.requested).toBe(40);
+    } finally {
+      await migrated.close();
+    }
+  });
+
   it("reads a run from before per-node runs as covering the whole stage", async () => {
     // Its `nodes` column arrives as `[]`, and every such run did all four.
     const run = (await newRun());

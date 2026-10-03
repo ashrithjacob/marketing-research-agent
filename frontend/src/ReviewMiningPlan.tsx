@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { api, RELATION_LABEL, type Brief, type RunSummary, type ReviewMiningPlanResponse, type TargetListing } from './api';
+import { api, RELATION_LABEL, REVIEWS_PER_BAND, type Brief, type RunSummary, type ReviewMiningPlanResponse, type TargetListing } from './api';
 import { ListingLine } from './review-mining/ListingLine';
 
 /** The review-mining go-ahead: the roster stage 1 found, what is approved, and what it costs. */
@@ -21,14 +21,20 @@ export default function ReviewMiningPlan({
   const [listings, setListings] = useState<TargetListing[] | null>(null);
   const [looking, setLooking] = useState(false);
   const [revision, setRevision] = useState(0);
+  const [perBand, setPerBand] = useState('');
+  const asked = Number(perBand);
+  const perBandValid = perBand === '' || (Number.isInteger(asked) && asked >= REVIEWS_PER_BAND.min && asked <= REVIEWS_PER_BAND.max);
+  const reviewsPerBand = perBand === '' || !perBandValid ? undefined : asked;
 
   useEffect(() => {
+    if (!perBandValid) return;
     let cancelled = false;
     api
-      .reviewMiningPlan(brief, selected)
+      .reviewMiningPlan(brief, selected, reviewsPerBand)
       .then((response) => {
         if (cancelled) return;
         setPlan(response);
+        setPerBand((current) => current || String(response.plan?.estimate.reviews_per_band ?? ''));
         setListings((current) => current ?? response.listings ?? []);
         if (response.ready && selected.length === 0) {
           setSelected((response.plan?.offered ?? []).filter((t) => !t.note || t.trustpilot).map((t) => t.id));
@@ -38,7 +44,7 @@ export default function ReviewMiningPlan({
     return () => {
       cancelled = true;
     };
-  }, [selected.join(','), revision]);
+  }, [selected.join(','), revision, reviewsPerBand]);
 
   const lookupNeeded = !!plan?.ready && !!plan.lookup_needed;
 
@@ -63,11 +69,11 @@ export default function ReviewMiningPlan({
   }
 
   async function approve() {
-    if (!plan?.plan || busy) return;
+    if (!plan?.plan || busy || !perBandValid) return;
     setBusy(true);
     setError('');
     try {
-      const run = await api.startRun(brief, ['review_mining'], selected);
+      const run = await api.startRun(brief, ['review_mining'], selected, undefined, reviewsPerBand);
       await onStarted(run);
     } catch (e) {
       setError((e as Error).message);
@@ -130,6 +136,22 @@ export default function ReviewMiningPlan({
                 </label>
               ))}
             </fieldset>
+            <label className="market">
+              Reviews per star band
+              <input
+                type="number"
+                min={REVIEWS_PER_BAND.min}
+                max={REVIEWS_PER_BAND.max}
+                step={1}
+                value={perBand}
+                onChange={(e) => setPerBand(e.target.value)}
+              />
+              <span className="muted small">
+                {perBandValid
+                  ? 'per star on Amazon (1–5 stars), and per target on Trustpilot'
+                  : `a whole number from ${REVIEWS_PER_BAND.min} to ${REVIEWS_PER_BAND.max}; Amazon returns at most ${REVIEWS_PER_BAND.max} per star`}
+              </span>
+            </label>
             {estimate && (
               <p className="muted small">
                 {estimate.reviews} reviews across {estimate.bands} bands for{' '}
@@ -146,7 +168,7 @@ export default function ReviewMiningPlan({
                 className="primary"
                 type="button"
                 onClick={approve}
-                disabled={busy || selected.length === 0}
+                disabled={busy || selected.length === 0 || !perBandValid}
               >
                 {busy ? 'Starting…' : `Approve & mine ${selected.length}`}
               </button>

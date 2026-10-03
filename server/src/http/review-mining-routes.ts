@@ -26,7 +26,7 @@ export class ReviewMiningRoutes {
       const chosen = ReviewMiningRoster.select(offered, found.targets);
       const unscored = offered.some((t) => t.trustpilot && cached.some((row) => row.target_id === t.id && !row.trustpilot));
       const lookupNeeded = this.listings.available && (unscored || roster.some((t) => !cached.some((row) => row.target_id === t.id)));
-      const plan = roster[0] ? new ReviewMiningPlanner(this.settings.apifyMaxReviews).plan(roster[0], offered, chosen, found.run.id) : null;
+      const plan = roster[0] ? new ReviewMiningPlanner(found.reviewsPerBand).plan(roster[0], offered, chosen, found.run.id) : null;
       if (!plan) return c.json({ ready: false, detail: "no target stage 1 found is on Amazon or has its own Trustpilot domain" });
       return c.json({ ready: true, plan, listings: cached, lookup_available: this.listings.available, lookup_needed: lookupNeeded });
     });
@@ -40,7 +40,7 @@ export class ReviewMiningRoutes {
 
   private async source(
     c: Context<ApiEnv>,
-  ): Promise<{ run: ResearchRun; packet: StagePacket; targets: string[] } | { error: Response }> {
+  ): Promise<{ run: ResearchRun; packet: StagePacket; targets: string[]; reviewsPerBand: number } | { error: Response }> {
     Trace.line(import.meta.url, "ReviewMiningRoutes.source");
     const parsed = reviewMiningPlanRequestSchema.safeParse(await c.req.json().catch(() => null));
     if (!parsed.success) {
@@ -66,6 +66,6 @@ export class ReviewMiningRoutes {
         }),
       };
     }
-    return { ...source, targets: parsed.data.targets };
+    return { ...source, targets: parsed.data.targets, reviewsPerBand: parsed.data.reviews_per_band ?? this.settings.apifyMaxReviews };
   }
 }

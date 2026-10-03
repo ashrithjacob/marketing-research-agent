@@ -143,5 +143,5 @@ export interface FetchGate {
 /** Earlier pulls of a listing's star band, from any run in any workspace: reviews are public pages, so one paid pull serves everyone until it is too old. */
 export interface ReviewPullStore {
   latest(platform: ReviewPlatform, listing: string, band: number | null, since: string): Promise<StoredPull | null>;
-  save(platform: ReviewPlatform, listing: string, band: number | null, result: ReviewResult): Promise<void>;
+  save(platform: ReviewPlatform, listing: string, band: number | null, requested: number, result: ReviewResult): Promise<void>;
 }

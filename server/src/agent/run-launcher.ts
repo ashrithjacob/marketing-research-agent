@@ -94,7 +94,12 @@ export class RunLauncher {
   private async launchPipeline(run: ResearchRun, request: RunRequest, workspaceId: string, header: Record<string, unknown>): Promise<string> {
     Trace.line(import.meta.url, "RunLauncher.launchPipeline", { workspaceId, targets: request.targets });
     const job = Trace.within(run.id, header, () =>
-      this.kinds.mining.start(run.id, { brief: request.brief, targets: request.targets ?? [], workspaceId }),
+      this.kinds.mining.start(run.id, {
+        brief: request.brief,
+        targets: request.targets ?? [],
+        reviewsPerBand: request.reviews_per_band ?? this.settings.apifyMaxReviews,
+        workspaceId,
+      }),
     );
     await this.store.updateRun(run.id, { status: "running" });
     this.runs.emit(run.id, "run.started", { model: "", nodes: run.nodes });

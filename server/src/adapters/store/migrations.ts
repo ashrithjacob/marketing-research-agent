@@ -16,6 +16,7 @@ const MIGRATIONS: ReadonlyArray<readonly [string, string, string]> = [
   ["research_runs", "workspace_id", "ALTER TABLE research_runs ADD COLUMN workspace_id TEXT NOT NULL DEFAULT 'admin'"],
   ["research_judgements", "workspace_id", "ALTER TABLE research_judgements ADD COLUMN workspace_id TEXT NOT NULL DEFAULT 'admin'"],
   ["research_llm_calls", "generation", "ALTER TABLE research_llm_calls ADD COLUMN generation TEXT"],
+  ["research_review_pulls", "requested", "ALTER TABLE research_review_pulls ADD COLUMN requested INTEGER"],
   ["research_llm_calls", "agent_id", "ALTER TABLE research_llm_calls ADD COLUMN agent_id TEXT NOT NULL DEFAULT ''"],
   [
     "research_runs",
@@ -28,12 +29,13 @@ const MIGRATIONS: ReadonlyArray<readonly [string, string, string]> = [
   ],
 ];
 
-/** CREATE TABLE IF NOT EXISTS never alters an existing table, so columns migrate here; a change to rows already stored runs once, by name. */
+/** CREATE TABLE IF NOT EXISTS never alters an existing table, so columns migrate here, and a table not yet created gets them from its own DDL; a change to rows already stored runs once, by name. */
 export class StoreMigrations {
   static async apply(db: SqlDatabase): Promise<void> {
     Trace.line(import.meta.url, "StoreMigrations.apply");
     for (const [table, column, ddl] of MIGRATIONS) {
-      if (!(await db.columns(table)).includes(column)) await db.exec(ddl);
+      const columns = await db.columns(table);
+      if (columns.length > 0 && !columns.includes(column)) await db.exec(ddl);
     }
     await StoreMigrations.once(db, "review-mining-is-stage-3", StoreMigrations.reviewMiningIsStageThree);
   }

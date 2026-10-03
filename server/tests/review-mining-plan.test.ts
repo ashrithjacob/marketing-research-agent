@@ -206,6 +206,16 @@ describe("the plan route", () => {
     expect(subsetBody.plan.estimate.targets).toBe(1);
   });
 
+  it("prices the reviews per band the operator asks for, and refuses one out of range", async () => {
+    await seedStageOne();
+    const brief = { product: "magna calm 400mg" };
+    const body = (await (await post("/api/research/review-mining/plan", { brief, reviews_per_band: 20 })).json()) as {
+      plan: { estimate: { reviews_per_band: number; reviews_per_target: number } };
+    };
+    expect(body.plan.estimate).toMatchObject({ reviews_per_band: 20, reviews_per_target: 100 });
+    expect((await post("/api/research/review-mining/plan", { brief, reviews_per_band: 101 })).status).toBe(400);
+  });
+
   it("matches the brief on the subject, not on spelling", async () => {
     await seedStageOne("yoracare bar");
     const response = await post("/api/research/review-mining/plan", {

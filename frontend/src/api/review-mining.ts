@@ -64,6 +64,7 @@ export interface TargetListing {
 
 export interface ReviewMiningEstimate {
   targets: number;
+  reviews_per_band: number;
   reviews_per_target: number;
   bands: number;
   reviews: number;
@@ -72,6 +73,8 @@ export interface ReviewMiningEstimate {
   cost_usd: number;
   arithmetic: string;
 }
+
+export const REVIEWS_PER_BAND = { min: 1, max: 100 } as const;
 
 export interface ReviewMiningPlan {
   source_run_id: string;

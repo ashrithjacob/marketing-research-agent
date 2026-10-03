@@ -97,8 +97,10 @@ this brief.
 
 Opened by **Start stage 3 →** or the review-mining ▶. It says *not ready* until
 product truth has completed on the same stage-1 run. Lists what review mining can
-mine (`plan.offered`, from `POST /review-mining/plan`) with checkboxes and the Apify
-estimate. Each target shows its brand-site link and, under it
+mine (`plan.offered`, from `POST /review-mining/plan`) with checkboxes, a
+**Reviews per star band** number (1–100, starting at `MRA_APIFY_MAX_REVIEWS`; each
+change re-prices the plan, and it is sent as `reviews_per_band` with the run) and the
+Apify estimate. Each target shows its brand-site link and, under it
 (`review-mining/ListingLine.tsx`), either its matched Amazon listing — stars, review
 count, share of 3★, "bought in past month", best-seller rank, price, Amazon's
 Choice, a link — or, for a target mined on Trustpilot, its Trustpilot score and

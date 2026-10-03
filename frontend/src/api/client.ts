@@ -46,15 +46,15 @@ export const api = {
   productRuns: (id: string) =>
     request<{ data: RunSummary[] }>(`/api/research/products/${id}/runs`),
   run: (id: string) => request<RunDetail>(`/api/research/runs/${id}`),
-  startRun: (brief: Brief, nodes: ResearchNode[] = [], targets: string[] = [], inputs?: ProductTruthInputs) =>
+  startRun: (brief: Brief, nodes: ResearchNode[] = [], targets: string[] = [], inputs?: ProductTruthInputs, reviews_per_band?: number) =>
     request<RunSummary>('/api/research/runs', {
       method: 'POST',
-      body: JSON.stringify({ brief, nodes, targets, ...(inputs ? { inputs } : {}) }),
+      body: JSON.stringify({ brief, nodes, targets, ...(inputs ? { inputs } : {}), ...(reviews_per_band ? { reviews_per_band } : {}) }),
     }),
-  reviewMiningPlan: (brief: Brief, targets: string[] = []) =>
+  reviewMiningPlan: (brief: Brief, targets: string[] = [], reviews_per_band?: number) =>
     request<ReviewMiningPlanResponse>('/api/research/review-mining/plan', {
       method: 'POST',
-      body: JSON.stringify({ brief, targets }),
+      body: JSON.stringify({ brief, targets, ...(reviews_per_band ? { reviews_per_band } : {}) }),
     }),
   reviewMiningListings: (brief: Brief) =>
     request<{ listings: TargetListing[] }>('/api/research/review-mining/listings', {

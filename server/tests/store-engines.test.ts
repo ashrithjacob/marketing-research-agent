@@ -108,7 +108,7 @@ describe.each(ENGINES)("the store on %s", (_name, start) => {
 
   it("finds a stored pull by its band, telling no band from band 3", async () => {
     const result = { status: "SUCCEEDED", excerpts: [], gap: null, offBand: 0, totalReviews: null, totalRatings: null };
-    await store.pulls.save("amazon", "L", null, result);
+    await store.pulls.save("amazon", "L", null, 50, result);
     expect(await store.pulls.latest("amazon", "L", 3, "2000")).toBeNull();
     expect((await store.pulls.latest("amazon", "L", null, "2000"))?.result).toEqual(result);
   });

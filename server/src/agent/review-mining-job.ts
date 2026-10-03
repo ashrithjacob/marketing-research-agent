@@ -22,6 +22,14 @@ import { ReviewMiningRunAssembly } from "./review-mining-run-assembly.js";
 import { RunMeter } from "./run-meter.js";
 import { RunEnd, type RunEnding } from "./run-end.js";
 
+/** What the operator approved: whose reviews, and how many per star band. */
+export interface MiningRequest {
+  brief: Brief;
+  targets: readonly string[];
+  reviewsPerBand: number;
+  workspaceId: string;
+}
+
 /** Review mining (stage 3), with no model in it: the offered targets' listings, their pulls, the computed packet. */
 export class ReviewMiningJob {
   static readonly BANDS = [3, 1, 2, 4, 5] as const;
@@ -35,7 +43,7 @@ export class ReviewMiningJob {
     private readonly retryDelayMs = ReviewMiningJob.RETRY_DELAY_MS,
   ) {}
 
-  start(runId: string, request: { brief: Brief; targets: readonly string[]; workspaceId: string }): { abort(): void; done: Promise<void> } {
+  start(runId: string, request: MiningRequest): { abort(): void; done: Promise<void> } {
     Trace.line(import.meta.url, "ReviewMiningJob.start", { runId, targets: request.targets });
     const stop = new AbortController();
     const ledger = new ReviewLedger();
@@ -66,7 +74,7 @@ export class ReviewMiningJob {
 
   private async mine(
     runId: string,
-    request: { brief: Brief; targets: readonly string[]; workspaceId: string },
+    request: MiningRequest,
     ledger: ReviewLedger,
     signal: AbortSignal,
   ): Promise<{ targets: MiningTarget[]; failures: PullFailure[] }> {
@@ -94,11 +102,11 @@ export class ReviewMiningJob {
           this.runs.emit(runId, "tool.completed", { ...ReviewMiningJob.frame(job, attempt), error: error !== "", ...(error ? { error_text: error } : {}), inside: [] }),
       },
     });
-    const reuse = new ReviewReuse(this.store.pulls, this.settings.reviewReuseDays, (label, pulledAt) =>
+    const reuse = new ReviewReuse(this.store.pulls, this.settings.reviewReuseDays, request.reviewsPerBand, (label, pulledAt) =>
       this.runs.emit(runId, "reviews.reused", { target_id: label.target_id, listing: label.listing, band: label.band, pulled_at: pulledAt }),
     );
-    const { reused, toPull } = await reuse.split(this.jobs(targets, runner));
-    const outcomes = [...reused, ...(await puller.pullAll(toPull, signal))];
+    const { reused, toPull } = await reuse.split(this.jobs(targets, runner, request.reviewsPerBand));
+    const outcomes = reuse.settle([...reused, ...(await puller.pullAll(toPull, signal))]);
     const filing = new ReviewFiling(new Corpus(this.settings.corpusPath), runId, ledger);
     const failures: PullFailure[] = [];
     for (const outcome of outcomes) {
@@ -108,11 +116,10 @@ export class ReviewMiningJob {
     return { targets, failures };
   }
 
-  private jobs(targets: readonly MiningTarget[], runner: ActorRunner): PullJob[] {
-    Trace.line(import.meta.url, "ReviewMiningJob.jobs", { targets: targets.length });
+  private jobs(targets: readonly MiningTarget[], runner: ActorRunner, max: number): PullJob[] {
+    Trace.line(import.meta.url, "ReviewMiningJob.jobs", { targets: targets.length, max });
     const amazon = new AmazonReviews(runner);
     const trustpilot = new TrustpilotReviews(runner);
-    const max = this.settings.apifyMaxReviews;
     return targets.flatMap((target): PullJob[] => {
       if (target.amazon_url) {
         return ReviewMiningJob.BANDS.map((star) => ({

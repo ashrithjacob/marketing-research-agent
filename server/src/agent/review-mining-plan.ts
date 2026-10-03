@@ -30,6 +30,7 @@ export class ReviewMiningPlanner {
       targets: [...chosen],
       estimate: {
         targets: chosen.length,
+        reviews_per_band: this.reviewsPerBand,
         reviews_per_target: ReviewMiningPlanner.BANDS * this.reviewsPerBand,
         bands: ReviewMiningPlanner.BANDS,
         reviews: amazonReviews + trustpilotReviews,

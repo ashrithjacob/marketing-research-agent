@@ -36,7 +36,7 @@ describe("reviews stored before pulls were kept", () => {
     await store.saveRunReviews(run.id, ledger(3, "amazon", AMAZON, ["R1", "R2"]));
     const other = await store.createRun({ workspaceId: "client-b", brief: { product: "Mullevia" }, model: "m", rejectKinds: [], judgementIds: [], stage: 3 });
     await store.saveRunReviews(other.id, ledger(null, "trustpilot", "nutratea.co.uk", ["T1"]));
-    await store.pulls.save("amazon", AMAZON, 5, { status: "SUCCEEDED", excerpts: [], gap: "kept already", offBand: 0, totalReviews: null, totalRatings: null });
+    await store.pulls.save("amazon", AMAZON, 5, 50, { status: "SUCCEEDED", excerpts: [], gap: "kept already", offBand: 0, totalReviews: null, totalRatings: null });
     await store.close();
     const raw = new Database(path);
     raw.prepare("DELETE FROM research_migrations WHERE name = ?").run(ReviewPullBackfill.NAME);

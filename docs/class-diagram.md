@@ -1164,6 +1164,9 @@ classDiagram
       saveTo()
       snapshot()
     }
+    class MiningRequest {
+      <<interface>>
+    }
     class ReviewMiningJob {
       start()
     }
@@ -1193,6 +1196,7 @@ classDiagram
     }
     class ReviewReuse {
       split()
+      settle()
     }
     class CheckedRun {
       <<interface>>
@@ -1724,7 +1728,7 @@ classDiagram
 | `agent` | `agent/review-analysis/structured-ask.ts` | StructuredAsk |
 | `agent` | `agent/review-filing.ts` | PullLabel, ReviewFiling |
 | `agent` | `agent/review-ledger.ts` | ReviewLedger |
-| `agent` | `agent/review-mining-job.ts` | ReviewMiningJob |
+| `agent` | `agent/review-mining-job.ts` | MiningRequest, ReviewMiningJob |
 | `agent` | `agent/review-mining-listings.ts` | ReviewMiningListings |
 | `agent` | `agent/review-mining-plan.ts` | ReviewMiningPlanner |
 | `agent` | `agent/review-mining-run-assembly.ts` | ReviewMiningRunAssembly |

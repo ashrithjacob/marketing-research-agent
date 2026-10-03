@@ -79,5 +79,6 @@ export interface StoredRunReview {
 /** A pull's answer as kept for reuse: the review service's own result, and when it was fetched. */
 export interface StoredPull {
   pulled_at: string;
+  requested: number | null;
   result: ReviewResult;
 }

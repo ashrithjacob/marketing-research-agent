@@ -3,6 +3,7 @@ import { z } from "zod";
 import { briefSchema } from "./brief.js";
 import { nodeSchema } from "./nodes.js";
 import { productTruthInputsSchema } from "./product-truth-rows.js";
+import { reviewsPerBandSchema } from "./review-mining.js";
 import { JUDGEMENT_KINDS, sourceKindSchema } from "./vocabulary.js";
 
 export const judgementInSchema = z
@@ -20,6 +21,7 @@ export const runRequestSchema = z
     reject_kinds: z.array(sourceKindSchema).default([]),
     nodes: z.array(nodeSchema).default([]),
     targets: z.array(z.string()).default([]),
+    reviews_per_band: reviewsPerBandSchema.optional(),
     inputs: productTruthInputsSchema.optional(),
   })
   .strict();

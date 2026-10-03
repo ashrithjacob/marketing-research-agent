@@ -99,7 +99,7 @@ const happy: Script = async (actorId, input) => {
   return { status: "SUCCEEDED", items: [review(star, `${input.productUrls[0].url}-${star}`)] };
 };
 
-async function mine(script: Script = happy, targets: string[] = [], workspaceId = "admin"): Promise<{ runId: string; supervisor: RunSupervisor }> {
+async function mine(script: Script = happy, targets: string[] = [], workspaceId = "admin", reviews_per_band?: number): Promise<{ runId: string; supervisor: RunSupervisor }> {
   calls.length = 0;
   const actors = {
     run: async (actorId: string, input: Record<string, any>, cap: number, signal?: AbortSignal) => (calls.push({ actorId, input, cap }), (await script(actorId, input, signal))),
@@ -108,7 +108,7 @@ async function mine(script: Script = happy, targets: string[] = [], workspaceId 
   const models = createModels();
   models.setProvider(faux.provider);
   const supervisor = new RunSupervisor({ store, settings, models, services: services(settings, actors), pullRetryDelayMs: 0 });
-  const request = runRequestSchema.parse({ brief: { url: "https://mullevia.com/products/mullein-drops" }, nodes: ["review_mining"], targets });
+  const request = runRequestSchema.parse({ brief: { url: "https://mullevia.com/products/mullein-drops" }, nodes: ["review_mining"], targets, reviews_per_band });
   const runId = (await supervisor.start(request, workspaceId));
   return { runId, supervisor };
 }
@@ -152,6 +152,24 @@ describe("what stage 2 mines each target from", () => {
     expect(amazon.input.maxReviews).toBe(7);
     expect(amazon.cap).toBe(Spend.capFor(AMAZON_REVIEWS_ACTOR, 7));
     await supervisor.close();
+  });
+
+  it("asks Apify for the reviews per band the operator chose, over the default", async () => {
+    await seedStageOne();
+    const { runId, supervisor } = await mine(happy, [], "admin", 12);
+    await supervisor.waitFor(runId);
+    const amazon = calls.filter((c) => c.actorId === AMAZON_REVIEWS_ACTOR);
+    expect(amazon.map((c) => c.input.maxReviews)).toEqual([12, 12, 12, 12, 12]);
+    expect(amazon[0]!.cap).toBe(Spend.capFor(AMAZON_REVIEWS_ACTOR, 12));
+    expect(calls.find((c) => c.actorId === TRUSTPILOT_ACTOR)!.input.maxItems).toBe(12);
+    await supervisor.close();
+  });
+
+  it("refuses a reviews-per-band outside what the Amazon actor returns", () => {
+    const brief = { url: "https://mullevia.com/products/mullein-drops" };
+    expect(runRequestSchema.safeParse({ brief, nodes: ["review_mining"], reviews_per_band: 101 }).success).toBe(false);
+    expect(runRequestSchema.safeParse({ brief, nodes: ["review_mining"], reviews_per_band: 0 }).success).toBe(false);
+    expect(runRequestSchema.safeParse({ brief, nodes: ["review_mining"], reviews_per_band: 100 }).success).toBe(true);
   });
 
   it("archives each pull under an id that re-hashes to the stored bytes", async () => {
@@ -312,6 +330,70 @@ describe("reusing earlier pulls", () => {
     expect(amazonPulls()).toHaveLength(0);
     expect((await store.listRunReviews(other.runId))).toHaveLength(5);
     await other.supervisor.close();
+  });
+
+  const posting = (tag: string): Script => async (actorId, input) => {
+    if (actorId === TRUSTPILOT_ACTOR) return happy(actorId, input);
+    const star = BANDS.indexOf(input.filterByRatings[0]) + 1;
+    return { status: "SUCCEEDED", items: Array.from({ length: input.maxReviews }, (_, i) => review(star, `${input.productUrls[0].url}-${star}-${tag}${i}`)) };
+  };
+  const plenty = posting("");
+
+  it("pulls again for a bigger ask, and keeps the earlier reviews the new pull no longer returns", async () => {
+    await seedStageOne();
+    const small = await mine(posting("old"), onlyC1, "admin", 5);
+    await small.supervisor.waitFor(small.runId);
+    await small.supervisor.close();
+    const bigger = await mine(posting("new"), onlyC1, "admin", 20);
+    await bigger.supervisor.waitFor(bigger.runId);
+    expect(calls.map((c) => c.input.maxReviews)).toEqual([20, 20, 20, 20, 20]);
+    const keys = (await store.listRunReviews(bigger.runId)).map((r) => r.review_key);
+    expect(keys).toHaveLength(5 * (20 + 5));
+    expect(keys.filter((k) => k.includes("-old"))).toHaveLength(5 * 5);
+    await bigger.supervisor.close();
+
+    const again = await mine(posting("newer"), onlyC1, "admin", 20);
+    await again.supervisor.waitFor(again.runId);
+    expect(amazonPulls()).toHaveLength(0);
+    await again.supervisor.close();
+  });
+
+  it("serves the kept reviews, with a gap, when the pull for a bigger ask fails", async () => {
+    await seedStageOne();
+    const small = await mine(posting("old"), onlyC1, "admin", 5);
+    await small.supervisor.waitFor(small.runId);
+    await small.supervisor.close();
+    const broke = await mine(async () => {
+      throw new ApifyCreditError(AMAZON_REVIEWS_ACTOR);
+    }, onlyC1, "admin", 20);
+    await broke.supervisor.waitFor(broke.runId);
+    expect(await store.listRunReviews(broke.runId)).toHaveLength(5 * 5);
+    const gaps = JSON.stringify((await store.getRun(broke.runId))!.packet);
+    expect(gaps).toMatch(/asked for 20 reviews; the pull for more failed/);
+    await broke.supervisor.close();
+  });
+
+  it("serves a smaller ask from a bigger kept pull, cut to the size asked for", async () => {
+    await seedStageOne();
+    const big = await mine(plenty, onlyC1, "admin", 20);
+    await big.supervisor.waitFor(big.runId);
+    await big.supervisor.close();
+    const small = await mine(plenty, onlyC1, "admin", 3);
+    await small.supervisor.waitFor(small.runId);
+    expect(amazonPulls()).toHaveLength(0);
+    expect(await store.listRunReviews(small.runId)).toHaveLength(5 * 3);
+    await small.supervisor.close();
+  });
+
+  it("serves a bigger ask from a kept pull that asked for as many and found the listing had fewer", async () => {
+    await seedStageOne();
+    const first = await mine(happy, onlyC1, "admin", 30);
+    await first.supervisor.waitFor(first.runId);
+    await first.supervisor.close();
+    const second = await mine(happy, onlyC1, "admin", 30);
+    await second.supervisor.waitFor(second.runId);
+    expect(amazonPulls()).toHaveLength(0);
+    await second.supervisor.close();
   });
 
   it("pulls again once the kept pull is older than the reuse window", async () => {
