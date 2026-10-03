@@ -35,42 +35,33 @@ export function CostCells({ row }: { row: CostRow }) {
   );
 }
 
-/** What each agent and the run's own code spent, per service: OpenRouter as billed, Apify as billed, Parallel at list price, Trendtrack in credits. A dash is a service the agent has no tool for. */
+/** What each agent and the run's own code spent, one block each so it fits a narrow column: the total, then each service it can spend in. OpenRouter and Apify as billed, Parallel at list price, Trendtrack in credits. */
 export function CostTable({ report }: { report: CostReport }) {
-  const shown = COLUMNS.filter((c) => report.totals[c.key]);
+  const totals: CostRow = { agent_id: null, cells: report.totals, total_usd: report.total_usd };
   return (
-    <table className="cost-table">
-      <thead>
-        <tr>
-          <th />
-          {shown.map((c) => (
-            <th key={c.key}>{c.label}</th>
-          ))}
-          <th>Total</th>
-        </tr>
-      </thead>
-      <tbody>
-        {report.rows.map((row) => (
-          <tr key={who(row)}>
-            <td>{who(row)}</td>
-            {shown.map((c) => (
-              <td key={c.key} title={row.cells[c.key]?.detail ?? 'no tool for this service'}>
-                {money(row.cells[c.key])}
-              </td>
-            ))}
-            <td>${row.total_usd.toFixed(4)}</td>
-          </tr>
+    <div className="cost-list">
+      {report.rows.map((row) => (
+        <CostBlock key={who(row)} name={who(row)} row={row} />
+      ))}
+      <CostBlock name="total" row={totals} total />
+    </div>
+  );
+}
+
+function CostBlock({ name, row, total }: { name: string; row: CostRow; total?: boolean }) {
+  return (
+    <div>
+      <div className={`cost-agent${total ? ' total' : ''}`}>
+        <span>{name}</span>
+        <span>${row.total_usd.toFixed(4)}</span>
+      </div>
+      <div className="cost-parts">
+        {COLUMNS.filter((c) => row.cells[c.key]).map((c) => (
+          <span key={c.key} title={row.cells[c.key]!.detail}>
+            {c.label} {money(row.cells[c.key])}
+          </span>
         ))}
-        <tr className="cost-total">
-          <td>total</td>
-          {shown.map((c) => (
-            <td key={c.key} title={report.totals[c.key]?.detail}>
-              {money(report.totals[c.key])}
-            </td>
-          ))}
-          <td>${report.total_usd.toFixed(4)}</td>
-        </tr>
-      </tbody>
-    </table>
+      </div>
+    </div>
   );
 }

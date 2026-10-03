@@ -16,10 +16,10 @@ import { SourceRow } from './packet-sections';
 
 type Focus = CompetitorRelation | 'sources' | 'gaps' | null;
 
-const KINDS: { relation: CompetitorRelation; label: string; tone: 'accent' | 'infer' }[] = [
-  { relation: 'direct', label: 'direct', tone: 'accent' },
-  { relation: 'indirect_form', label: 'indirect by form', tone: 'infer' },
-  { relation: 'indirect_active', label: 'indirect by active', tone: 'infer' },
+const KINDS: { relation: CompetitorRelation; label: string; tone: 'accent' | 'infer'; means: string }[] = [
+  { relation: 'direct', label: 'direct', tone: 'accent', means: "shares an active, in the champion's form" },
+  { relation: 'indirect_form', label: 'indirect by form', tone: 'infer', means: 'shares an active, in another form' },
+  { relation: 'indirect_active', label: 'indirect by active', tone: 'infer', means: "shares none of the champion's actives" },
 ];
 
 function CompetitorRow({ competitor: c, listing }: { competitor: Competitor; listing: TargetListing | undefined }) {
@@ -130,7 +130,7 @@ export function CompetitorsTile({
   return (
     <Tile
       label="Competitors"
-      sub="direct = shares an active, same form · indirect by form = shares an active, other form · indirect by active = shares none"
+      sub="sold to the champion's customer, in three kinds"
       open={focus !== null ? true : undefined}
       onToggle={focus !== null ? () => setFocus(null) : undefined}
       chips={chips}
@@ -148,6 +148,13 @@ export function CompetitorsTile({
       }
     >
       {listing && head}
+      {focus === null && (
+        <div className="comp-kinds">
+          {KINDS.map((k) => (
+            <span key={k.relation}><b>{k.label}</b> — {k.means}</span>
+          ))}
+        </div>
+      )}
       {focus === 'sources' && (
         <div className="src-list">
           {sources.map((source) => (
@@ -168,11 +175,9 @@ export function CompetitorsTile({
                 <div key={relation} className="comp-group">
                   <div className="comp-head">
                     <span className={`comp-tag ${relation}`}>{label}</span>
-                    <span>
-                      {group.length} found
-                      {curve?.stopped_because ? ` · ${curve.stopped_because}` : ''}
-                    </span>
+                    <span>{group.length} found</span>
                   </div>
+                  {curve?.stopped_because && <p className="comp-stopped">Stopped: {curve.stopped_because}</p>}
                   {group.length === 0 && <p className="muted">None recorded.</p>}
                   {group.map((c) => (
                     <CompetitorRow key={c.id} competitor={c} listing={listings.find((l) => l.target_id === c.id)} />
