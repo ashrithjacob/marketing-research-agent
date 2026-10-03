@@ -202,7 +202,7 @@ generic gaps table:
 | Tile | Shows | Where its data comes from |
 |---|---|---|
 | Product data (open by default) | attributes, SVG bars for numeric measurements, excerpts, gaps | packet rows with `node: 'product_data'` |
-| Competitors | direct / indirect by form / indirect by active groups, one chip each, each competitor's site link, the champion's actives it shares (none shown when it shares none), **for:** who its own page says it is for (`icp_as_printed`), and its Amazon listing or "not on Amazon — <why>" (`run-view/amazon-link.tsx`, also on the champion line), social-proof review-count chart, excerpts, gaps | `packet.competitors`, `measurements`, `listings` on `GET /runs/:id` (re-judged by today's matcher on each read) |
+| Competitors | direct / indirect by form / indirect by active groups, one chip each, each competitor's page it was read off and its ads as citations (`run-view/cite.tsx`), each competitor's site link, the champion's actives it shares (none shown when it shares none), **for:** who its own page says it is for (`icp_as_printed`), and its Amazon listing or "not on Amazon — <why>" (`run-view/amazon-link.tsx`, also on the champion line), social-proof review-count chart, excerpts, gaps | `packet.competitors`, `measurements`, `listings` on `GET /runs/:id` (re-judged by today's matcher on each read) |
 | Category data | market-size/CAGR bar charts, every figure with its period, gaps | `measurements` with `node: 'category_data'` |
 | Ingredients (stage 2, `run-view/truth/IngredientsTile.tsx`) | one card per active: amount on the label (or "no amount stated"), pathway, time to effect, magnitude, a `carrier` badge on the actives the story rests on | `packet.actives`, `packet.mechanisms` |
 | Dose vs study (stage 2) | active · ours per day · studied per day · ratio · class · form match · study; an unassessable row says why | `packet.doses`, computed by `extract/dose-bands.ts` |
@@ -222,6 +222,7 @@ Source also carries a `node`, so source counts are per tile.
 | Panel | Field | Source |
 |---|---|---|
 | runmeta | tokens | `usage.totalTokens` |
+| citations | every fact in a stage-1 tile (each field row, each competitor, its ads, the champion line) and stage 2 links the page it was read off, and **read** opens the archived copy the agent actually read; an ad-library search, which is not a web page, links its archived copy only (`run-view/cite.tsx`) | `packet.sources` by `source_id`; `GET /runs/:id/sources/:sourceId` for the archived copy |
 | cost list (rail) | one block per agent and a `run` block: its total, then LLM, Apify, Parallel, Trendtrack and pages, each for the services its tools can spend in (`run-view/CostTable.tsx`) | `GET /api/research/runs/:id/costs`, read every 5s while live (`run-view/use-costs.ts`) |
 | logs page, agent tab | that agent's row of the cost table | the same `/costs` |
 | products page | one card per product | `GET /api/research/products` |

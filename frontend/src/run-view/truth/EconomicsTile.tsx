@@ -1,6 +1,6 @@
 import type { Gap, ProductTruthPacket } from '../../api';
 import { Chip, Tile, TileGaps } from '../tile';
-import { Cite } from './cite';
+import { Cite } from '../cite';
 
 function percent(value: number | null): string {
   return value === null ? '—' : `${(value * 100).toFixed(1)}%`;

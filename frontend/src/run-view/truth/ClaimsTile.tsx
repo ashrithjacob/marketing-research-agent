@@ -1,6 +1,6 @@
 import type { Gap, ProductTruthPacket } from '../../api';
 import { Chip, Tile, TileGaps } from '../tile';
-import { Cite } from './cite';
+import { Cite } from '../cite';
 
 const PLATFORM: Record<string, string> = { meta: 'Meta', google_ads: 'Google Ads' };
 

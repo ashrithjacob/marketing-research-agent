@@ -106,7 +106,7 @@ export function ProductTile({
     >
       {(focus === null || focus === 'facts') && (
         <>
-          <FieldList attributes={attributes} required={required} />
+          <FieldList attributes={attributes} required={required} runId={runId} sources={packet.sources} />
           <MeasurementBars measurements={measurements} />
         </>
       )}
@@ -176,7 +176,7 @@ export function CategoryTile({
         <>
           <MeasurementBars measurements={measurements} />
           <h3>Every figure, with its period</h3>
-          <FieldList attributes={attributes} measurements={measurements} required={required} />
+          <FieldList attributes={attributes} measurements={measurements} required={required} runId={runId} sources={sources} />
         </>
       )}
       {focus === 'sources' && <SourcesFocus runId={runId} sources={sources} />}

@@ -1,6 +1,6 @@
 import type { Gap, ProductTruthPacket } from '../../api';
 import { Chip, Tile, TileGaps } from '../tile';
-import { Cite } from './cite';
+import { Cite } from '../cite';
 
 function effect(time: ProductTruthPacket['mechanisms'][number]['time_to_effect']): string {
   return time ? `${time.value} ${time.unit}` : 'not stated by any source';

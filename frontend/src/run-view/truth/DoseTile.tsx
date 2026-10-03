@@ -1,6 +1,6 @@
 import type { DoseClass, Gap, ProductTruthPacket } from '../../api';
 import { Chip, Tile, TileGaps } from '../tile';
-import { Cite } from './cite';
+import { Cite } from '../cite';
 
 const CLASS_LABEL: Record<DoseClass, string> = {
   at_dose: 'at dose',

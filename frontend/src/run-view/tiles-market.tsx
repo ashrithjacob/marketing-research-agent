@@ -12,6 +12,7 @@ import type {
 import { AmazonLink } from './amazon-link';
 import { BarList } from './charts';
 import { Chip, Tile, TileGaps } from './tile';
+import { Cite, Cites } from './cite';
 import { SourceRow } from './packet-sections';
 
 type Focus = CompetitorRelation | 'sources' | 'gaps' | null;
@@ -22,7 +23,7 @@ const KINDS: { relation: CompetitorRelation; label: string; tone: 'accent' | 'in
   { relation: 'indirect_active', label: 'indirect by active', tone: 'infer', means: "shares none of the champion's actives" },
 ];
 
-function CompetitorRow({ competitor: c, listing }: { competitor: Competitor; listing: TargetListing | undefined }) {
+function CompetitorRow({ competitor: c, listing, runId, sources }: { competitor: Competitor; listing: TargetListing | undefined; runId: string; sources: Source[] }) {
   const ads = c.ad_source_ids?.length ?? 0;
   return (
     <div className="comp">
@@ -44,8 +45,9 @@ function CompetitorRow({ competitor: c, listing }: { competitor: Competitor; lis
             {c.price_per_dose ? ` (${c.price_per_dose})` : ''}
           </span>
         )}
-        {ads > 0 && <span>{ads} ad{ads === 1 ? '' : 's'}</span>}
+        {ads > 0 && <span>{ads} ad{ads === 1 ? '' : 's'}: <Cites runId={runId} ids={c.ad_source_ids ?? []} sources={sources} /></span>}
       </div>
+      <div className="comp-source">read off <Cite runId={runId} id={c.source_id} sources={sources} /></div>
       {c.icp_as_printed && <div className="comp-copy">for: {c.icp_as_printed}</div>}
       {c.positioning_copy && <div className="comp-copy">“{c.positioning_copy}”</div>}
     </div>
@@ -124,7 +126,8 @@ export function CompetitorsTile({
       {reference.reviews_count
         ? ` · ${reference.reviews_count.toLocaleString()} reviews`
         : ''}{' '}
-      <AmazonLink row={listings.find((l) => l.target_id === 'product')} />
+      <AmazonLink row={listings.find((l) => l.target_id === 'product')} />{' '}
+      <Cite runId={runId} id={reference.source_id} sources={packet.sources} />
     </p>
   );
   return (
@@ -180,7 +183,7 @@ export function CompetitorsTile({
                   {curve?.stopped_because && <p className="comp-stopped">Stopped: {curve.stopped_because}</p>}
                   {group.length === 0 && <p className="muted">None recorded.</p>}
                   {group.map((c) => (
-                    <CompetitorRow key={c.id} competitor={c} listing={listings.find((l) => l.target_id === c.id)} />
+                    <CompetitorRow key={c.id} competitor={c} listing={listings.find((l) => l.target_id === c.id)} runId={runId} sources={packet.sources} />
                   ))}
                 </div>
               );

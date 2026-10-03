@@ -876,4 +876,8 @@ details.tl-tool.lane[open] > summary { border-bottom: 1px solid var(--line); }
 .pt-col-head.ok { color: var(--ok); }
 .pt-col-head.bad { color: var(--bad); }
 .churn-bad { color: var(--bad); font-weight: 600; }
-.cite { font-size: 12px; margin-left: 4px; }
+.cite { font-size: 11.5px; margin-left: 4px; white-space: nowrap; }
+.cite a { color: var(--accent); text-decoration: none; }
+.cite a:hover { text-decoration: underline; }
+.cite .archived { color: var(--faint); }
+.comp-source { font-size: 11.5px; color: var(--faint); margin-top: 4px; }
