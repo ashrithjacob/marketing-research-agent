@@ -1,5 +1,4 @@
-import type { ReviewExcerpt } from "../adapters/apify/index.js";
-import type { LedgerPull, LedgerReview, ResearchStore, ReviewLedgerSnapshot } from "../domain/index.js";
+import type { LedgerPull, LedgerReview, ResearchStore, ReviewExcerpt, ReviewLedgerSnapshot } from "../domain/index.js";
 import { Trace } from "../trace/index.js";
 
 import type { LiveRuns } from "./live-runs.js";

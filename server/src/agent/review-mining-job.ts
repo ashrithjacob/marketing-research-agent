@@ -15,6 +15,7 @@ import type { LiveRuns } from "./live-runs.js";
 import { ReviewFiling } from "./review-filing.js";
 import { ReviewLedger } from "./review-ledger.js";
 import { ReviewPuller, type PullJob } from "./review-puller.js";
+import { ReviewReuse } from "./review-reuse.js";
 import { StageOneHandoff } from "./stage-one-handoff.js";
 import { ReviewMiningListings } from "./review-mining-listings.js";
 import { ReviewMiningRunAssembly } from "./review-mining-run-assembly.js";
@@ -93,7 +94,11 @@ export class ReviewMiningJob {
           this.runs.emit(runId, "tool.completed", { ...ReviewMiningJob.frame(job, attempt), error: error !== "", ...(error ? { error_text: error } : {}), inside: [] }),
       },
     });
-    const outcomes = await puller.pullAll(this.jobs(targets, runner), signal);
+    const reuse = new ReviewReuse(this.store.pulls, this.settings.reviewReuseDays, (label, pulledAt) =>
+      this.runs.emit(runId, "reviews.reused", { target_id: label.target_id, listing: label.listing, band: label.band, pulled_at: pulledAt }),
+    );
+    const { reused, toPull } = reuse.split(this.jobs(targets, runner));
+    const outcomes = [...reused, ...(await puller.pullAll(toPull, signal))];
     const filing = new ReviewFiling(new Corpus(this.settings.corpusPath), runId, ledger);
     const failures: PullFailure[] = [];
     for (const outcome of outcomes) {

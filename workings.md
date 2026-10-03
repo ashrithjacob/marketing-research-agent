@@ -714,6 +714,16 @@ things it showed:
 
 ### §2d — stage 3, review mining: a pipeline, and a review ledger no model copies from
 
+**Pulls are paid for once** (since 2026-10-03, operator). Before any pull, the job
+looks in `research_review_pulls` for the same platform, listing (the Amazon URL or
+Trustpilot domain) and star band, from **any workspace** — reviews are public pages,
+so one paid pull serves every customer — younger than `MRA_REVIEW_REUSE_DAYS`
+(183). A kept answer is filed exactly as a fresh one would be, with its original
+`fetched_at`, and the run gets a `reviews.reused` event instead of a pull and a
+charge (`agent/review-reuse.ts`). Reuse is decided before any pull starts, so a band
+already kept is still served when Apify then refuses the rest for lack of credit. A
+fresh answer is kept as it returns; a failed, timed-out or refused pull is not.
+
 Review mining was stage 2 until 2026-10-01 and is stage 3 since; the class
 names below are the ones from before the rename (`StageTwoX` is now
 `ReviewMiningX`, `StageTwoHandoff` is `StageOneHandoff`).

@@ -265,8 +265,8 @@ classDiagram
       updateRun()
       addEvent()
       listEvents()
+      lastEventId()
       listJudgements()
-      addJudgement()
     }
     class GateVerdict {
       <<interface>>
@@ -274,6 +274,11 @@ classDiagram
     class FetchGate {
       <<interface>>
       admit()
+    }
+    class ReviewPullStore {
+      <<interface>>
+      latest()
+      save()
     }
     class RunHead {
       <<interface>>
@@ -305,6 +310,9 @@ classDiagram
     }
     class RejectKinds {
       effective()
+    }
+    class Relations {
+      expected()
     }
     class RoleSpec {
       <<interface>>
@@ -350,6 +358,12 @@ classDiagram
     class TargetListing {
       <<interface>>
     }
+    class ReviewExcerpt {
+      <<interface>>
+    }
+    class ReviewResult {
+      <<interface>>
+    }
     class LedgerPull {
       <<interface>>
     }
@@ -360,6 +374,9 @@ classDiagram
       <<interface>>
     }
     class StoredRunReview {
+      <<interface>>
+    }
+    class StoredPull {
       <<interface>>
     }
     class RoleRecords {
@@ -485,9 +502,6 @@ classDiagram
     class BrandLabels {
       of()
     }
-    class Relations {
-      expected()
-    }
     class PacketAssembly {
       draft()
     }
@@ -598,12 +612,6 @@ classDiagram
     }
     class TrustpilotReviews {
       fetch()
-    }
-    class ReviewExcerpt {
-      <<interface>>
-    }
-    class ReviewResult {
-      <<interface>>
     }
     class AmazonProduct {
       <<interface>>
@@ -745,8 +753,12 @@ classDiagram
       add()
       list()
     }
+    class CompetitorKinds {
+      apply()
+    }
     class EventLog {
       add()
+      lastId()
       list()
     }
     class FindingTable {
@@ -762,6 +774,7 @@ classDiagram
     }
     class SqliteMigrations {
       apply()
+      once()
     }
     class PacketRowTable {
       replace()
@@ -786,6 +799,10 @@ classDiagram
     class ReviewAnalysisTable {
       save()
       get()
+    }
+    class ReviewPullTable {
+      latest()
+      save()
     }
     class ReviewTable {
       save()
@@ -816,9 +833,9 @@ classDiagram
       listRuns()
       updateRun()
       addEvent()
+      lastEventId()
       listEvents()
       listJudgements()
-      addJudgement()
     }
     class SqliteTables {
       open()
@@ -978,6 +995,7 @@ classDiagram
     }
     class DeliverableTable {
       render()
+      stop()
     }
     class AgentMessages {
       steer()
@@ -1099,6 +1117,9 @@ classDiagram
     }
     class ReviewPuller {
       pullAll()
+    }
+    class ReviewReuse {
+      split()
     }
     class CheckedRun {
       <<interface>>
@@ -1417,6 +1438,7 @@ classDiagram
   ReviewMiningRunAssembly --> ReviewLedger
   ReviewMiningRunAssembly --> PullFailure
   ReviewPuller --> PullEvents
+  ReviewReuse --> ReviewPullStore
   RoleDone --> RunFindings
   RoleDone --> DeliverableCheck
   RoleDone --> DoneCheck
@@ -1516,7 +1538,7 @@ classDiagram
 | `adapters` | `adapters/apify/products.ts` | AmazonProducts |
 | `adapters` | `adapters/apify/runner.ts` | ApifyCreditError, ActorRun, ActorRunner, MeteredActorRunner, ApifyActorRunner, ActorRunners |
 | `adapters` | `adapters/apify/trustpilot-reviews.ts` | TrustpilotReviews |
-| `adapters` | `adapters/apify/types.ts` | ReviewExcerpt, ReviewResult, AmazonProduct |
+| `adapters` | `adapters/apify/types.ts` | AmazonProduct |
 | `adapters` | `adapters/corpus.ts` | Corpus |
 | `adapters` | `adapters/crawl4ai.ts` | Crawl4aiPayload, Crawl4ai |
 | `adapters` | `adapters/fallback-fetcher.ts` | FallbackPageFetcher |
@@ -1540,6 +1562,7 @@ classDiagram
 | `adapters` | `adapters/sqlite/call-log.ts` | CallLog |
 | `adapters` | `adapters/sqlite/charge-table.ts` | ChargeTable |
 | `adapters` | `adapters/sqlite/check-log.ts` | PacketCheckLog |
+| `adapters` | `adapters/sqlite/competitor-kinds.ts` | CompetitorKinds |
 | `adapters` | `adapters/sqlite/event-log.ts` | EventLog |
 | `adapters` | `adapters/sqlite/finding-table.ts` | FindingTable |
 | `adapters` | `adapters/sqlite/judgement-table.ts` | JudgementTable |
@@ -1549,6 +1572,7 @@ classDiagram
 | `adapters` | `adapters/sqlite/product-catalog.ts` | SqliteProductCatalog |
 | `adapters` | `adapters/sqlite/product-table.ts` | ProductTable |
 | `adapters` | `adapters/sqlite/review-analysis-table.ts` | ReviewAnalysisTable |
+| `adapters` | `adapters/sqlite/review-pull-table.ts` | ReviewPullTable |
 | `adapters` | `adapters/sqlite/review-table.ts` | ReviewTable |
 | `adapters` | `adapters/sqlite/rows.ts` | Rows |
 | `adapters` | `adapters/sqlite/run-table.ts` | RunTable |
@@ -1604,6 +1628,7 @@ classDiagram
 | `agent` | `agent/review-mining-plan.ts` | ReviewMiningPlanner |
 | `agent` | `agent/review-mining-run-assembly.ts` | ReviewMiningRunAssembly |
 | `agent` | `agent/review-puller.ts` | PullJob, PullEvents, ReviewPuller |
+| `agent` | `agent/review-reuse.ts` | ReviewReuse |
 | `agent` | `agent/role-checks.ts` | CheckedRun, RoleChecks |
 | `agent` | `agent/role-done.ts` | RoleDone |
 | `agent` | `agent/row-repair.ts` | RowRepair |
@@ -1649,14 +1674,15 @@ classDiagram
 | `domain` | `domain/logs.ts` | RunEvent, Judgement, PacketCheck, RunUpdate, LlmCallRecord, Generation, LlmCall |
 | `domain` | `domain/nodes.ts` | Stages |
 | `domain` | `domain/packet-rows.ts` | PacketRowSet, PacketRows |
-| `domain` | `domain/ports.ts` | ProductCatalog, AccountDirectory, AmazonListingSource, TargetListings, ChargeLedger, FindingLedger, PageFetcher, WebSearch, AdLibrary, CompetitorDiscovery, ResearchStore, GateVerdict, FetchGate |
+| `domain` | `domain/ports.ts` | ProductCatalog, AccountDirectory, AmazonListingSource, TargetListings, ChargeLedger, FindingLedger, PageFetcher, WebSearch, AdLibrary, CompetitorDiscovery, ResearchStore, GateVerdict, FetchGate, ReviewPullStore |
 | `domain` | `domain/products.ts` | RunHead, Product, ProductSummary, ProductFolders |
 | `domain` | `domain/records.ts` | Clock, Ids, ResearchRun, RunSummary, Runs |
 | `domain` | `domain/reject-kinds.ts` | RejectKinds |
+| `domain` | `domain/relations.ts` | Relations |
 | `domain` | `domain/research-roles.ts` | RoleSpec, Roles |
 | `domain` | `domain/review-analysis.ts` | AnalysedReview, CleaningTally, IssueQuote, ProductIssue, ProductVoice, RankedIssue, IssueSlice, ReviewAnalysis |
 | `domain` | `domain/review-mining.ts` | BestsellerRank, AmazonListing, TrustpilotSummary, TargetListing |
-| `domain` | `domain/reviews.ts` | LedgerPull, LedgerReview, ReviewLedgerSnapshot, StoredRunReview |
+| `domain` | `domain/reviews.ts` | ReviewExcerpt, ReviewResult, LedgerPull, LedgerReview, ReviewLedgerSnapshot, StoredRunReview, StoredPull |
 | `domain` | `domain/role-records.ts` | RoleRecords |
 | `domain` | `domain/service-report.ts` | ServicePart, ServiceReport, ServiceReports |
 | `domain` | `domain/stage-one-agents.ts` | StageOnePlan, StageOnePlans |
@@ -1677,7 +1703,7 @@ classDiagram
 | `extract` | `extract/latest-rows.ts` | LatestRows |
 | `extract` | `extract/list-check.ts` | ListCheck |
 | `extract` | `extract/market-check.ts` | MarketCheck |
-| `extract` | `extract/names.ts` | Names, BrandLabels, Relations |
+| `extract` | `extract/names.ts` | Names, BrandLabels |
 | `extract` | `extract/packet-assembly.ts` | PacketAssembly |
 | `extract` | `extract/per-item-check.ts` | Item, PerItemCheck |
 | `extract` | `extract/product-economics.ts` | ProductEconomics |

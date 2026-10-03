@@ -1,5 +1,29 @@
 export type ReviewPlatform = "amazon" | "trustpilot";
 
+export interface ReviewExcerpt {
+  text: string;
+  star: number | null;
+  date: string | null;
+  locator: string;
+  title: string;
+  verified: boolean;
+  source: ReviewPlatform;
+  reviewKey: string;
+}
+
+export interface ReviewResult {
+  /** The actor run's final status: SUCCEEDED, or FAILED / TIMED-OUT / ABORTED when the run itself went wrong. */
+  status: string;
+  excerpts: ReviewExcerpt[];
+  gap: string | null;
+  offBand: number;
+  totalReviews: number | null;
+  totalRatings: number | null;
+  /** When the service produced this answer, set only on one reused from an earlier pull; absent means just now. */
+  fetchedAt?: string;
+}
+
+
 export interface LedgerPull {
   handle: string;
   source_id: string;
@@ -50,4 +74,10 @@ export interface StoredRunReview {
   posted_at: string;
   verified: boolean;
   locator: string;
+}
+
+/** A pull's answer as kept for reuse: the review service's own result, and when it was fetched. */
+export interface StoredPull {
+  pulled_at: string;
+  result: ReviewResult;
 }

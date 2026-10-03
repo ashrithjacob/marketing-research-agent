@@ -7,6 +7,7 @@ import { CompetitorKinds } from "./competitor-kinds.js";
 import { FindingTable } from "./finding-table.js";
 import { SqliteMigrations } from "./migrations.js";
 import { PacketRowTable } from "./packet-row-table.js";
+import { ReviewPullTable } from "./review-pull-table.js";
 import { ReviewAnalysisTable } from "./review-analysis-table.js";
 import { TargetListingTable } from "./target-listing-table.js";
 import { Trace } from "../../trace/index.js";
@@ -20,7 +21,7 @@ export class SqliteSchema {
     db.exec(CallLog.DDL);
     SqliteMigrations.apply(db);
     db.exec(SqliteSchema.INDEXES);
-    for (const ddl of [PacketRowTable.DDL, ReviewAnalysisTable.DDL, TargetListingTable.DDL, FindingTable.DDL, ChargeTable.DDL]) db.exec(ddl);
+    for (const ddl of [PacketRowTable.DDL, ReviewAnalysisTable.DDL, TargetListingTable.DDL, FindingTable.DDL, ChargeTable.DDL, ReviewPullTable.DDL]) db.exec(ddl);
     SqliteMigrations.once(db, CompetitorKinds.NAME, () => new CompetitorKinds(db).apply());
   }
 

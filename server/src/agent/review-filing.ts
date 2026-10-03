@@ -1,6 +1,5 @@
-import type { ReviewResult } from "../adapters/apify/index.js";
 import type { Corpus } from "../adapters/corpus.js";
-import { Clock, type ReviewPlatform } from "../domain/index.js";
+import { Clock, type ReviewPlatform, type ReviewResult } from "../domain/index.js";
 import { Trace } from "../trace/index.js";
 
 import type { ReviewLedger } from "./review-ledger.js";
@@ -30,7 +29,7 @@ export class ReviewFiling {
         platform: label.platform,
         listing: label.listing,
         band_requested: label.band,
-        fetched_at: Clock.nowIso(),
+        fetched_at: result.fetchedAt ?? Clock.nowIso(),
         archived,
         total_reviews: result.totalReviews,
         total_ratings: result.totalRatings,

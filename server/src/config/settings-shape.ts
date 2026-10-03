@@ -46,6 +46,7 @@ export interface Settings {
   apifyWaitSeconds: number;
   apifyConcurrency: number;
   apifyPullRetries: number;
+  reviewReuseDays: number;
 
   corpusPath: string;
 

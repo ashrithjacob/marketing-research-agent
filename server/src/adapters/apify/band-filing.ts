@@ -1,4 +1,4 @@
-import type { ReviewExcerpt } from "./types.js";
+import type { ReviewExcerpt } from "../../domain/index.js";
 import { Trace } from "../../trace/index.js";
 
 /** Files every written review under its own rating; a row off the band asked for is kept, and counted. */

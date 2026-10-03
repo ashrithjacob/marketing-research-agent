@@ -123,6 +123,7 @@ export class Env {
       apifyWaitSeconds: Env.number("MRA_APIFY_WAIT_SECONDS", 300),
       apifyConcurrency: Env.number("MRA_APIFY_CONCURRENCY", 16),
       apifyPullRetries: Env.number("MRA_APIFY_PULL_RETRIES", 1),
+      reviewReuseDays: Env.number("MRA_REVIEW_REUSE_DAYS", 183),
 
       corpusPath: Env.text("MRA_CORPUS_PATH", "/corpus"),
 

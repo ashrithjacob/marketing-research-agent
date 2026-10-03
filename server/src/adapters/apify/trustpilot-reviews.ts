@@ -2,7 +2,7 @@ import { Spend, TRUSTPILOT_ACTOR } from "./actors.js";
 import { BandFiling } from "./band-filing.js";
 import { Field, ReviewKey } from "./fields.js";
 import type { ActorRunner } from "./runner.js";
-import type { ReviewExcerpt, ReviewResult } from "./types.js";
+import type { ReviewExcerpt, ReviewResult } from "../../domain/index.js";
 import { Trace } from "../../trace/index.js";
 
 /** Reviews for one company. These review the merchant, never the product. */

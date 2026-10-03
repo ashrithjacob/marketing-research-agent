@@ -57,9 +57,9 @@ const competitor = (id: string, name: string, brand: string, url: string) => ({
 });
 
 /** A completed stage-1 run and the listings its lookup matched: c1 on Amazon, c2 on its own site only, c3 at a retailer only. */
-function seedStageOne(extra: Array<ReturnType<typeof competitor>> = [], rows: TargetListing[] = []): string {
+function seedStageOne(extra: Array<ReturnType<typeof competitor>> = [], rows: TargetListing[] = [], workspaceId = "admin"): string {
   const brief = { product: "", url: "https://mullevia.com/products/mullein-drops", market: "", notes: "" };
-  const run = store.createRun({ workspaceId: "admin", brief, model: "m", rejectKinds: [], judgementIds: [], nodes: ["competitors"], stage: 1 });
+  const run = store.createRun({ workspaceId, brief, model: "m", rejectKinds: [], judgementIds: [], nodes: ["competitors"], stage: 1 });
   store.updateRun(run.id, {
     status: "completed",
     packet: minimalPacket({
@@ -98,7 +98,7 @@ const happy: Script = async (actorId, input) => {
   return { status: "SUCCEEDED", items: [review(star, `${input.productUrls[0].url}-${star}`)] };
 };
 
-async function mine(script: Script = happy, targets: string[] = []): Promise<{ runId: string; supervisor: RunSupervisor }> {
+async function mine(script: Script = happy, targets: string[] = [], workspaceId = "admin"): Promise<{ runId: string; supervisor: RunSupervisor }> {
   calls.length = 0;
   const actors = {
     run: (actorId: string, input: Record<string, any>, cap: number, signal?: AbortSignal) => (calls.push({ actorId, input, cap }), script(actorId, input, signal)),
@@ -108,7 +108,7 @@ async function mine(script: Script = happy, targets: string[] = []): Promise<{ r
   models.setProvider(faux.provider);
   const supervisor = new RunSupervisor({ store, settings, models, services: services(settings, actors), pullRetryDelayMs: 0 });
   const request = runRequestSchema.parse({ brief: { url: "https://mullevia.com/products/mullein-drops" }, nodes: ["review_mining"], targets });
-  const runId = supervisor.start(request, "admin");
+  const runId = supervisor.start(request, workspaceId);
   return { runId, supervisor };
 }
 
@@ -275,5 +275,72 @@ describe("the offer", () => {
   it("drops a target with neither a matched listing nor its own domain", () => {
     const offered = ReviewMiningOffer.of([target("c7", "https://www.chemistwarehouse.com.au/buy/1", "Wanderlust")], []);
     expect(offered).toEqual([]);
+  });
+});
+
+describe("reusing earlier pulls", () => {
+  const onlyC1 = ["c1"];
+  const amazonPulls = () => pulled().filter((p) => p.startsWith("amazon"));
+
+  it("answers a second run's bands from the first run's pulls, with no Apify call, and stores the same reviews for it", async () => {
+    seedStageOne();
+    const first = await mine(happy, onlyC1);
+    await first.supervisor.waitFor(first.runId);
+    expect(amazonPulls()).toHaveLength(5);
+    await first.supervisor.close();
+
+    const second = await mine(happy, onlyC1);
+    await second.supervisor.waitFor(second.runId);
+    expect(amazonPulls()).toHaveLength(0);
+    expect(store.listRunReviews(second.runId).map((r) => r.review_key).sort()).toEqual(store.listRunReviews(first.runId).map((r) => r.review_key).sort());
+    expect(store.listEvents(second.runId).filter((e) => e.kind === "reviews.reused")).toHaveLength(5);
+    expect(store.charges.list(second.runId).filter((c) => c.service === "apify")).toEqual([]);
+    await second.supervisor.close();
+  });
+
+  it("serves another workspace from the same pulls: reviews are public pages", async () => {
+    seedStageOne();
+    const first = await mine(happy, onlyC1);
+    await first.supervisor.waitFor(first.runId);
+    await first.supervisor.close();
+
+    seedStageOne([], [], "client-b");
+    const other = await mine(happy, onlyC1, "client-b");
+    await other.supervisor.waitFor(other.runId);
+    expect(store.getRun(other.runId)!.workspace_id).toBe("client-b");
+    expect(amazonPulls()).toHaveLength(0);
+    expect(store.listRunReviews(other.runId)).toHaveLength(5);
+    await other.supervisor.close();
+  });
+
+  it("pulls again once the kept pull is older than the reuse window", async () => {
+    seedStageOne();
+    const first = await mine(happy, onlyC1);
+    await first.supervisor.waitFor(first.runId);
+    await first.supervisor.close();
+    settings = { ...settings, reviewReuseDays: 0 };
+    const again = await mine(happy, onlyC1);
+    await again.supervisor.waitFor(again.runId);
+    expect(amazonPulls()).toHaveLength(5);
+    await again.supervisor.close();
+  });
+
+  it("never keeps a refused pull, and still serves kept bands when Apify is out of credit", async () => {
+    seedStageOne();
+    const partial = await mine(async (actorId, input, signal) => {
+      if (input.filterByRatings?.[0] === "oneStar") throw new ApifyCreditError(AMAZON_REVIEWS_ACTOR);
+      return happy(actorId, input, signal);
+    }, onlyC1);
+    await partial.supervisor.waitFor(partial.runId);
+    await partial.supervisor.close();
+
+    const broke = await mine(async () => {
+      throw new ApifyCreditError(AMAZON_REVIEWS_ACTOR);
+    }, onlyC1);
+    await broke.supervisor.waitFor(broke.runId);
+    const stars = store.listRunReviews(broke.runId).map((r) => r.star).sort();
+    expect(stars).toEqual([2, 3, 4, 5].filter((s) => store.listRunReviews(partial.runId).some((r) => r.star === s)));
+    expect(amazonPulls()).toEqual([`amazon https://www.amazon.com/dp/B000S86S3M oneStar`]);
+    await broke.supervisor.close();
   });
 });

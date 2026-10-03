@@ -1,6 +1,6 @@
 import {
   Briefs,
-  type AccountDirectory, type ChargeLedger, type FindingLedger, type Generation, type Judgement, type LlmCall,
+  type AccountDirectory, type ChargeLedger, type ReviewPullStore, type FindingLedger, type Generation, type Judgement, type LlmCall,
   type LlmCallRecord, type PacketCheck, type ProductCatalog, type ResearchRun, type ResearchStore,
   type ReviewAnalysis, type ReviewLedgerSnapshot, type RunEvent, type RunUpdate, type Scope,
   type SourceKind, type StoredRunReview, type TargetListings,
@@ -16,6 +16,7 @@ export class SqliteResearchStore implements ResearchStore {
   readonly listings: TargetListings;
   readonly findings: FindingLedger;
   readonly charges: ChargeLedger;
+  readonly pulls: ReviewPullStore;
 
   constructor(path: string) {
     Trace.line(import.meta.url, "SqliteResearchStore.constructor", { path });
@@ -25,6 +26,7 @@ export class SqliteResearchStore implements ResearchStore {
     this.listings = this.tables.listings;
     this.findings = this.tables.findings;
     this.charges = this.tables.charges;
+    this.pulls = this.tables.pulls;
   }
 
   createRun(input: Parameters<ResearchStore["createRun"]>[0]): ResearchRun {

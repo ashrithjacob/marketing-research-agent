@@ -14,7 +14,7 @@ import type { Product, RunHead } from "./products.js";
 import type { StoredPacketRows } from "./packet-rows.js";
 import type { ReviewAnalysis } from "./review-analysis.js";
 import type { AmazonListing, TargetListing } from "./review-mining.js";
-import type { ReviewLedgerSnapshot, StoredRunReview } from "./reviews.js";
+import type { ReviewLedgerSnapshot, ReviewPlatform, ReviewResult, StoredPull, StoredRunReview } from "./reviews.js";
 import type { Charge } from "./charges.js";
 import type { Finding, FindingDraft } from "./findings.js";
 import type { FetchedPage, SearchPage, SearchScope } from "./web.js";
@@ -94,6 +94,7 @@ export interface ResearchStore {
   readonly listings: TargetListings;
   readonly findings: FindingLedger;
   readonly charges: ChargeLedger;
+  readonly pulls: ReviewPullStore;
   readonly accounts: AccountDirectory;
   createRun(input: {
     workspaceId: string;
@@ -111,10 +112,7 @@ export interface ResearchStore {
   listEvents(runId: string, afterId?: number): RunEvent[];
   lastEventId(runId: string): number;
   listJudgements(scope: Scope, activeOnly?: boolean): Judgement[];
-  addJudgement(
-    workspaceId: string,
-    input: { kind: string; text: string; rejects_kinds: SourceKind[] },
-  ): Judgement;
+  addJudgement(workspaceId: string, input: { kind: string; text: string; rejects_kinds: SourceKind[] }): Judgement;
   deleteJudgement(scope: Scope, judgementId: string): boolean;
   bumpJudgement(judgementId: string, by?: number): void;
   addPacketCheck(runId: string, valid: boolean, problems: readonly string[]): PacketCheck;
@@ -139,11 +137,11 @@ export interface GateVerdict {
 
 /** A cheap pre-read filter over fetched bodies; a failing gate admits. */
 export interface FetchGate {
-  admit(input: {
-    url: string;
-    title: string;
-    body: string;
-    subject: string;
-    market: string;
-  }): Promise<GateVerdict>;
+  admit(input: { url: string; title: string; body: string; subject: string; market: string }): Promise<GateVerdict>;
+}
+
+/** Earlier pulls of a listing's star band, from any run in any workspace: reviews are public pages, so one paid pull serves everyone until it is too old. */
+export interface ReviewPullStore {
+  latest(platform: ReviewPlatform, listing: string, band: number | null, since: string): StoredPull | null;
+  save(platform: ReviewPlatform, listing: string, band: number | null, result: ReviewResult): void;
 }

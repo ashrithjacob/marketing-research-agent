@@ -1,24 +1,3 @@
-export interface ReviewExcerpt {
-  text: string;
-  star: number | null;
-  date: string | null;
-  locator: string;
-  title: string;
-  verified: boolean;
-  source: "amazon" | "trustpilot";
-  reviewKey: string;
-}
-
-export interface ReviewResult {
-  /** The actor run's final status: SUCCEEDED, or FAILED / TIMED-OUT / ABORTED when the run itself went wrong. */
-  status: string;
-  excerpts: ReviewExcerpt[];
-  gap: string | null;
-  offBand: number;
-  totalReviews: number | null;
-  totalRatings: number | null;
-}
-
 export interface AmazonProduct {
   asin: string;
   title: string;

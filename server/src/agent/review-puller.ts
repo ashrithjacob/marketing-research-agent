@@ -1,4 +1,5 @@
-import { ApifyCreditError, type ReviewResult } from "../adapters/apify/index.js";
+import { ApifyCreditError } from "../adapters/apify/index.js";
+import type { ReviewResult } from "../domain/index.js";
 import { Http } from "../adapters/http.js";
 import { RateLimitWait } from "../adapters/rate-limit-wait.js";
 import { Trace } from "../trace/index.js";
