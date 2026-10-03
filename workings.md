@@ -202,9 +202,15 @@ All of this happens **before the HTTP response is sent**:
 ### Step 4 — the browser starts following### Step 4 — the browser starts following
 
 `App.tsx` closes the modal, reloads the run list and selects the new run.
-`RunView.tsx` fetches `GET /runs/:id` and opens `GET /runs/:id/events?after=0`
-(SSE). Every event with a kind starting `run.` or `packet.` makes it re-fetch the run,
-which is how the status chip and counters change.
+`RunView.tsx` fetches `GET /runs/:id`, which carries `last_event_id`, and — only
+while the run is live — opens `GET /runs/:id/events?after=<last_event_id>` (SSE), so
+it hears new events only. Every new event with a kind starting `run.` or `packet.`
+makes it re-fetch the run, which is how the status chip and counters change. A
+finished run opens no stream. *Until 2026-10-03* it streamed from `after=0` for every
+run: opening a finished one replayed its whole history (1.6 MB on run 9571639c) and
+re-fetched the run and the product once per old `run.`/`packet.` event — up to 100
+times on the VPS, each a 0.2–0.4 s round trip from India. The Activity log page still
+reads the full history, on purpose.
 
 ### Step 5 — the agents work (`agent/stage-one-run.ts`, `agent/agent-driver.ts`)
 

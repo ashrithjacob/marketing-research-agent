@@ -36,6 +36,7 @@ export class RunRoutes {
         reject_kinds: run.reject_kinds,
         listings: this.judgedListings(run),
         live: this.supervisor.isLive(run.id),
+        last_event_id: this.store.lastEventId(run.id),
       });
     });
     api.get("/runs/:runId/calls", (c) => this.calls(c, c.req.param("runId")));

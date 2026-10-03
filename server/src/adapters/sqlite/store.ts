@@ -56,6 +56,11 @@ export class SqliteResearchStore implements ResearchStore {
     return this.tables.events.add(runId, kind, payload);
   }
 
+  lastEventId(runId: string): number {
+    Trace.line(import.meta.url, "SqliteResearchStore.lastEventId", { runId });
+    return this.tables.events.lastId(runId);
+  }
+
   listEvents(runId: string, afterId = 0): RunEvent[] {
     Trace.line(import.meta.url, "SqliteResearchStore.listEvents", { runId, afterId });
     return this.tables.events.list(runId, afterId);

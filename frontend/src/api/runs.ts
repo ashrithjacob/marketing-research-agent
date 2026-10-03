@@ -112,4 +112,6 @@ export interface RunDetail extends RunSummary {
   output: string;
   reject_kinds: string[];
   live: boolean;
+  /** The newest event this detail already reflects; a viewer listens from here, never replaying the run's history. */
+  last_event_id: number;
 }

@@ -56,9 +56,7 @@ export default function RunView({
 
   const reload = useCallback(async () => {
     try {
-      const [detail, { data }] = await Promise.all([api.run(runId), api.judgements()]);
-      setLoaded(detail);
-      setJudgements(data);
+      setLoaded(await api.run(runId));
     } catch (e) {
       setError((e as Error).message);
     }
@@ -73,10 +71,15 @@ export default function RunView({
   }, [judgementsRev]);
 
   const run = loaded && loaded.id === runId ? loaded : null;
-  const { lastTool, reconnecting } = useRunStream(runId, reload, onChanged, setError);
-
   const packet = run?.packet ?? null;
   const live = !!run && !TERMINAL_STATUSES.has(run.status);
+  const [from, setFrom] = useState<{ runId: string; after: number } | null>(null);
+  useEffect(() => {
+    if (run && from?.runId !== runId) setFrom({ runId, after: run.last_event_id });
+  }, [run, runId, from]);
+  const listenFrom = live && from?.runId === runId ? from.after : null;
+  const { lastTool, reconnecting } = useRunStream(runId, listenFrom, reload, onChanged, setError);
+
   const sources = packet?.sources ?? [];
   const admitted = useMemo(() => sources.filter((s) => s.admitted), [sources]);
   const unarchived = useMemo(

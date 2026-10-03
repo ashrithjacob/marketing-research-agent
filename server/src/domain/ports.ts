@@ -109,6 +109,7 @@ export interface ResearchStore {
   updateRun(runId: string, fields: RunUpdate): void;
   addEvent(runId: string, kind: string, payload: Record<string, unknown>): RunEvent;
   listEvents(runId: string, afterId?: number): RunEvent[];
+  lastEventId(runId: string): number;
   listJudgements(scope: Scope, activeOnly?: boolean): Judgement[];
   addJudgement(
     workspaceId: string,

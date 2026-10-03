@@ -17,6 +17,13 @@ export class EventLog {
     return { id: Number(info.lastInsertRowid), run_id: runId, kind, payload, created_at: now };
   }
 
+  /** The id of the run's newest event, 0 when it has none: where a viewer that already has the run's state starts listening. */
+  lastId(runId: string): number {
+    Trace.line(import.meta.url, "EventLog.lastId", { runId });
+    const row = this.db.prepare("SELECT MAX(id) AS id FROM research_events WHERE run_id = ?").get(runId) as { id: number | null };
+    return row.id ?? 0;
+  }
+
   list(runId: string, afterId = 0): RunEvent[] {
     Trace.line(import.meta.url, "EventLog.list", { runId, afterId });
     const rows = this.db

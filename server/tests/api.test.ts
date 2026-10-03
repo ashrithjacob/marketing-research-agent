@@ -93,6 +93,18 @@ describe("runs", () => {
     expect(read.live).toBe(false);
   });
 
+  it("says which event its state already reflects, so a viewer listens from there and never replays the history", async () => {
+    // Opening a finished run used to stream every event from 0 (1.6 MB on run
+    // 9571639c), and each old run./packet. event re-fetched the run and product.
+    faux.setResponses(genreRun());
+    const { id } = (await (await post("/api/research/runs", { brief: { product: "MagnaCalm" }, nodes: ["product_data"] })).json()) as { id: string };
+    await app.supervisor.waitFor(id);
+    const read = (await (await get(`/api/research/runs/${id}`)).json()) as any;
+    const events = app.store.listEvents(id);
+    expect(read.last_event_id).toBe(events.at(-1)!.id);
+    expect(app.store.listEvents(id, read.last_event_id)).toEqual([]);
+  });
+
   it("refuses a run with neither a product nor a site", async () => {
     const response = await post("/api/research/runs", { brief: { product: "  " } });
     expect(response.status).toBe(400);
