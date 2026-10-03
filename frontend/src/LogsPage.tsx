@@ -116,13 +116,15 @@ export default function LogsPage({ runId }: { runId: string }) {
   const tabs = useMemo(() => agentTabs(events), [events]);
   const selected = picked ?? tabs[1]?.id ?? RUN_TAB;
   const steps = useMemo(() => buildSteps(eventsFor(events, selected)), [events, selected]);
-  const selectedCost = costs?.rows.find((row) => (row.agent_id ?? RUN_TAB) === selected);
+  const selectedCost = selected === RUN_TAB
+    ? costs && { agent_id: null, cells: costs.totals, total_usd: costs.total_usd }
+    : costs?.rows.find((row) => row.agent_id === selected);
+  const scoped = stats && (selected === RUN_TAB ? stats : stats.agents[selected]);
+  const llm = selectedCost?.cells.llm;
 
-  const wallMs = run
-    ? run.live
-      ? Date.now() - new Date(run.created_at).getTime()
-      : (stats?.wall_time_ms ?? 0)
-    : 0;
+  const wallMs = scoped?.open && run?.live && scoped.started_at
+    ? Date.now() - new Date(scoped.started_at).getTime()
+    : (scoped?.wall_time_ms ?? 0);
 
   return (
     <div className="app logs">
@@ -154,27 +156,25 @@ export default function LogsPage({ runId }: { runId: string }) {
 
       <div className="logs-body">
         {!run && !error && <p className="muted">Loading…</p>}
-        {run && stats && (
+        {run && tabs.length > 1 && <AgentTabs tabs={tabs} selected={selected} onSelect={setPicked} />}
+
+        {run && scoped && (
           <div className="logs-stats">
-            <Stat label="LLM calls" value={String(stats.llm_calls)}
-              sub={stats.llm_errors ? `${stats.llm_errors} failed` : run.live ? 'live' : ''} />
+            <Stat label={selected === RUN_TAB ? 'LLM calls' : `${selected} · LLM calls`} value={String(scoped.llm_calls)}
+              sub={scoped.llm_errors ? `${scoped.llm_errors} failed` : run.live ? 'live' : ''} />
             <Stat label="Time taken" value={duration(wallMs)}
-              sub={`${duration(stats.llm_time_ms)} waiting on the model`} />
-            <Stat label="Tokens" value={formatTokens(stats.tokens.total)}
-              sub={`${formatTokens(stats.tokens.input)} in · ${formatTokens(stats.tokens.cache_read)} cached · ${formatTokens(stats.tokens.output)} out`} />
-            <Stat label="Cost" value={costs ? `$${costs.total_usd.toFixed(4)}` : '—'}
-              sub="every service: billed, or at list price where only units are reported" />
-            <Stat label="Billed by OpenRouter"
-              value={stats.billed.resolved ? `$${stats.billed.total.toFixed(4)}` : '—'}
-              sub={stats.billed.resolved
-                ? `${stats.billed.resolved} of ${stats.llm_calls} calls read back`
-                : run.live ? 'read back after each call' : 'not read back'} />
-            <Stat label="Tool calls" value={String(stats.tool_calls)}
-              sub={stats.tool_errors ? `${stats.tool_errors} failed` : ''} />
+              sub={`${duration(scoped.llm_time_ms)} with the model working`} />
+            <Stat label="Tokens" value={formatTokens(scoped.tokens.total)}
+              sub={`${formatTokens(scoped.tokens.input)} in · ${formatTokens(scoped.tokens.cache_read)} cached · ${formatTokens(scoped.tokens.output)} out`} />
+            <Stat label="OpenRouter, billed"
+              value={llm?.usd != null && scoped.billed.resolved ? `$${llm.usd.toFixed(4)}` : '—'}
+              sub={`${scoped.billed.resolved} of ${scoped.llm_calls} calls read back`} />
+            <Stat label="All services" value={selectedCost ? `$${selectedCost.total_usd.toFixed(4)}` : '—'}
+              sub="OpenRouter, Apify, Parallel, Trendtrack, pages" />
+            <Stat label="Tool calls" value={String(scoped.tool_calls)}
+              sub={scoped.tool_errors ? `${scoped.tool_errors} failed` : ''} />
           </div>
         )}
-
-        {run && tabs.length > 1 && <AgentTabs tabs={tabs} selected={selected} onSelect={setPicked} />}
         {selectedCost && <CostCells row={selectedCost} />}
 
         {run && steps.length === 0 && (

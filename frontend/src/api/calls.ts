@@ -80,7 +80,8 @@ export interface LlmCall {
   generation: Generation | null;
 }
 
-export interface CallStats {
+/** One window of a run — the whole run, or one agent from its start to its end. */
+export interface WindowStats {
   llm_calls: number;
   llm_errors: number;
   tokens: { input: number; output: number; cache_read: number; cache_write: number; total: number };
@@ -89,6 +90,14 @@ export interface CallStats {
   wall_time_ms: number;
   tool_calls: number;
   tool_errors: number;
+  /** When the window began; `open` while it has not ended, so the page can keep counting. */
+  started_at: string;
+  open: boolean;
+}
+
+export interface CallStats extends WindowStats {
+  /** Each agent's own calls, tools and time, keyed by agent id. */
+  agents: Record<string, WindowStats>;
 }
 
 export interface CallsResponse {

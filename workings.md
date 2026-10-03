@@ -616,8 +616,13 @@ prompt), which the cockpit's trace shows as one line and the logs page uses to k
 there is a new call to fetch.
 
 **The logs page** is `/runs/<id>/logs`, opened from **Logs ↗** on a run in a new
-tab. It shows the run's totals (LLM calls, time taken, tokens, total cost from
-`/costs`, billed LLM cost, tool calls), then **one tab per agent** plus a `run` tab of milestones
+tab. Its cards follow the selected tab (`CallStats`, `stats.agents`): the run tab
+shows the whole run, an agent's tab only that agent — its LLM calls, its time from
+`agent.started` to `agent.ended`, the time its model was working, tokens,
+OpenRouter's billed cost, every service's cost from `/costs` with the per-service
+row under it, and its tool calls. The run tab's model time counts a minute once
+however many agents had a call in flight then (until 2026-10-03 it summed every
+call, so three agents side by side showed more model time than wall time); then **one tab per agent** plus a `run` tab of milestones
 (`logs/agents.ts`), opened on the first agent; under the tab, one row per call: expand it for the prompt (what is new, or
 **Show full prompt**) and the answer (thinking, text, tool calls with arguments,
 token counts, cost). It follows the event stream and fetches only calls it has not
