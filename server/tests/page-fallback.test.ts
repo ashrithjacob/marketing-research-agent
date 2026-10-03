@@ -59,7 +59,7 @@ describe("Firecrawl out of credits", () => {
 
 describe("FallbackPageFetcher", () => {
   const fetcher = (result: () => Promise<{ text: string; title: string }>): PageFetcher & { calls: number } => {
-    const f = { calls: 0, scrape: async () => (f.calls++, result()) };
+    const f = { calls: 0, scrape: async () => (f.calls++, (await result())) };
     return f;
   };
 

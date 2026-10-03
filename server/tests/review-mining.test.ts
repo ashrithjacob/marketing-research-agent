@@ -41,8 +41,8 @@ beforeEach(() => {
   settings = { ...Env.settings(), model: "faux-model", corpusPath: join(dir, "corpus"), apifyMaxReviews: 7, apifyConcurrency: 1, apifyPullRetries: 1 };
 });
 
-afterEach(() => {
-  store.close();
+afterEach(async () => {
+  await store.close();
   rmSync(dir, { recursive: true, force: true });
 });
 
@@ -57,10 +57,10 @@ const competitor = (id: string, name: string, brand: string, url: string) => ({
 });
 
 /** A completed stage-1 run and the listings its lookup matched: c1 on Amazon, c2 on its own site only, c3 at a retailer only. */
-function seedStageOne(extra: Array<ReturnType<typeof competitor>> = [], rows: TargetListing[] = [], workspaceId = "admin"): string {
+async function seedStageOne(extra: Array<ReturnType<typeof competitor>> = [], rows: TargetListing[] = [], workspaceId = "admin"): Promise<string> {
   const brief = { product: "", url: "https://mullevia.com/products/mullein-drops", market: "", notes: "" };
-  const run = store.createRun({ workspaceId, brief, model: "m", rejectKinds: [], judgementIds: [], nodes: ["competitors"], stage: 1 });
-  store.updateRun(run.id, {
+  const run = (await store.createRun({ workspaceId, brief, model: "m", rejectKinds: [], judgementIds: [], nodes: ["competitors"], stage: 1 }));
+  await store.updateRun(run.id, {
     status: "completed",
     packet: minimalPacket({
       brief,
@@ -73,7 +73,7 @@ function seedStageOne(extra: Array<ReturnType<typeof competitor>> = [], rows: Ta
       ],
     }),
   });
-  const roster = ReviewMiningRoster.of(stagePacketSchema.parse(store.getRun(run.id)!.packet));
+  const roster = ReviewMiningRoster.of(stagePacketSchema.parse((await store.getRun(run.id))!.packet));
   const strategy = (id: string) => ReviewMiningListings.strategy(roster.find((t) => t.id === id)!);
   const row = (target_id: string, found: AmazonListing | null, matches: boolean): TargetListing => ({
     source_run_id: run.id, target_id, query: "", strategy: strategy(target_id), listing: found, matches, mismatch: matches ? "" : "brand", error: "", fetched_at: "",
@@ -84,8 +84,8 @@ function seedStageOne(extra: Array<ReturnType<typeof competitor>> = [], rows: Ta
     row("c2", null, false),
     row("c3", null, false),
     ...rows.map((x) => ({ ...x, source_run_id: run.id, strategy: strategy(x.target_id) })),
-  ]) store.listings.save(r);
-  completeProductTruth(store, run.id);
+  ]) await store.listings.save(r);
+  await completeProductTruth(store, run.id);
   return run.id;
 }
 
@@ -101,14 +101,14 @@ const happy: Script = async (actorId, input) => {
 async function mine(script: Script = happy, targets: string[] = [], workspaceId = "admin"): Promise<{ runId: string; supervisor: RunSupervisor }> {
   calls.length = 0;
   const actors = {
-    run: (actorId: string, input: Record<string, any>, cap: number, signal?: AbortSignal) => (calls.push({ actorId, input, cap }), script(actorId, input, signal)),
+    run: async (actorId: string, input: Record<string, any>, cap: number, signal?: AbortSignal) => (calls.push({ actorId, input, cap }), (await script(actorId, input, signal))),
   };
   const faux = fauxProvider({ provider: "openrouter", models: [{ id: "faux-model" }] });
   const models = createModels();
   models.setProvider(faux.provider);
   const supervisor = new RunSupervisor({ store, settings, models, services: services(settings, actors), pullRetryDelayMs: 0 });
   const request = runRequestSchema.parse({ brief: { url: "https://mullevia.com/products/mullein-drops" }, nodes: ["review_mining"], targets });
-  const runId = supervisor.start(request, workspaceId);
+  const runId = (await supervisor.start(request, workspaceId));
   return { runId, supervisor };
 }
 
@@ -116,7 +116,7 @@ const pulled = () => calls.map((c) => (c.actorId === TRUSTPILOT_ACTOR ? `tp ${c.
 
 describe("what stage 2 mines each target from", () => {
   it("mines Amazon where a listing matched, Trustpilot where only the brand's own site exists, and nothing else, with no model", async () => {
-    seedStageOne();
+    await seedStageOne();
     const { runId, supervisor } = await mine();
     await supervisor.waitFor(runId);
     expect(pulled().sort()).toEqual([
@@ -124,27 +124,27 @@ describe("what stage 2 mines each target from", () => {
       "tp mullevia.com",
       "tp myherbify.com",
     ].sort());
-    const run = store.getRun(runId)!;
+    const run = (await store.getRun(runId))!;
     expect(run).toMatchObject({ status: "completed", packet_source: "pipeline", model: "" });
-    expect(store.listLlmCalls(runId)).toHaveLength(0);
+    expect((await store.listLlmCalls(runId))).toHaveLength(0);
     expect((run.packet as any).nodes[0]).toMatchObject({ node: "review_mining", status: "complete" });
-    expect(store.listRunReviews(runId)).toHaveLength(7);
+    expect((await store.listRunReviews(runId))).toHaveLength(7);
     await supervisor.close();
   });
 
   it("records the stage-1 run it mined, so a later stage 1 does not claim it", async () => {
     // A newer stage-1 run showed the old mining as its own "complete" stage 2.
-    const source = seedStageOne();
+    const source = await seedStageOne();
     const { runId, supervisor } = await mine();
     await supervisor.waitFor(runId);
-    expect(store.getRun(runId)!.source_run_id).toBe(source);
-    seedStageOne();
-    expect(store.getRun(runId)!.source_run_id).toBe(source);
+    expect((await store.getRun(runId))!.source_run_id).toBe(source);
+    await seedStageOne();
+    expect((await store.getRun(runId))!.source_run_id).toBe(source);
     await supervisor.close();
   });
 
   it("asks Apify for MRA_APIFY_MAX_REVIEWS per pull, and sizes the spend cap from it", async () => {
-    seedStageOne();
+    await seedStageOne();
     const { runId, supervisor } = await mine();
     await supervisor.waitFor(runId);
     const amazon = calls.find((c) => c.actorId === AMAZON_REVIEWS_ACTOR)!;
@@ -154,10 +154,10 @@ describe("what stage 2 mines each target from", () => {
   });
 
   it("archives each pull under an id that re-hashes to the stored bytes", async () => {
-    seedStageOne();
+    await seedStageOne();
     const { runId, supervisor } = await mine();
     await supervisor.waitFor(runId);
-    const stored = store.listRunReviews(runId)[0]!;
+    const stored = (await store.listRunReviews(runId))[0]!;
     const bytes = readFileSync(join(settings.corpusPath, "runs", runId, "sources", stored.source_id.slice(7)));
     expect(`sha256:${createHash("sha256").update(bytes).digest("hex")}`).toBe(stored.source_id);
     await supervisor.close();
@@ -165,14 +165,14 @@ describe("what stage 2 mines each target from", () => {
 
   it("mines one listing for one target only: two targets on one listing mine nothing from it, and both are gaps", async () => {
     const twin = listing("B0TWIN0001", "Twin", "Twin Mullein Drops");
-    seedStageOne(
+    await seedStageOne(
       [competitor("c4", "Twin Mullein", "Twin", "https://www.chemistwarehouse.com.au/a"), competitor("c5", "Twin Mullein Two", "Twin", "https://www.chemistwarehouse.com.au/b")],
       [c("c4", twin), c("c5", twin)],
     );
     const { runId, supervisor } = await mine();
     await supervisor.waitFor(runId);
     expect(pulled().some((p) => p.includes("B0TWIN0001"))).toBe(false);
-    const gaps = ((store.getRun(runId)!.packet as any).gaps as Array<{ missing: string }>).map((g) => g.missing);
+    const gaps = (((await store.getRun(runId))!.packet as any).gaps as Array<{ missing: string }>).map((g) => g.missing);
     expect(gaps.filter((g) => g.includes("matched c4 and c5"))).toHaveLength(2);
     await supervisor.close();
   });
@@ -186,7 +186,7 @@ describe("a pull that fails", () => {
   const onlyC1 = ["c1"];
 
   it("retries a transient failure once, and files the retry", async () => {
-    seedStageOne();
+    await seedStageOne();
     let failed = false;
     const { runId, supervisor } = await mine(async (actorId, input, signal) => {
       if (!failed && input.filterByRatings?.[0] === "threeStar") {
@@ -197,17 +197,17 @@ describe("a pull that fails", () => {
     }, onlyC1);
     await supervisor.waitFor(runId);
     expect(pulled().filter((p) => p.endsWith("threeStar"))).toHaveLength(2);
-    expect(store.getRun(runId)!.status).toBe("completed");
+    expect((await store.getRun(runId))!.status).toBe("completed");
     await supervisor.close();
   });
 
   it("gives up after one retry, with a gap naming both errors", async () => {
-    seedStageOne();
+    await seedStageOne();
     const { runId, supervisor } = await mine(async (actorId, input, signal) =>
-      input.filterByRatings?.[0] === "threeStar" ? { status: "FAILED", items: [] } : happy(actorId, input, signal), onlyC1);
+      input.filterByRatings?.[0] === "threeStar" ? { status: "FAILED", items: [] } : (await happy(actorId, input, signal)), onlyC1);
     await supervisor.waitFor(runId);
     expect(pulled().filter((p) => p.endsWith("threeStar"))).toHaveLength(2);
-    const packet = store.getRun(runId)!.packet as any;
+    const packet = (await store.getRun(runId))!.packet as any;
     expect(packet.gaps.map((g: any) => g.missing)).toContain(
       "c1: the pull of https://www.amazon.com/dp/B000S86S3M failed — the Apify run ended FAILED; then the Apify run ended FAILED",
     );
@@ -216,31 +216,31 @@ describe("a pull that fails", () => {
   });
 
   it("does not retry a band that has no written reviews: that is an answer", async () => {
-    seedStageOne();
+    await seedStageOne();
     const { runId, supervisor } = await mine(async (actorId, input, signal) =>
       input.filterByRatings?.[0] === "threeStar"
         ? { status: "SUCCEEDED", items: [{ error: "no_relevant_reviews_found", totalCategoryRatings: 40 }] }
-        : happy(actorId, input, signal), onlyC1);
+        : (await happy(actorId, input, signal)), onlyC1);
     await supervisor.waitFor(runId);
     expect(pulled().filter((p) => p.endsWith("threeStar"))).toHaveLength(1);
-    expect(((store.getRun(runId)!.packet as any).gaps as any[]).map((g) => g.missing).join(" ")).toMatch(/No 3-star reviews with text/);
+    expect((((await store.getRun(runId))!.packet as any).gaps as any[]).map((g) => g.missing).join(" ")).toMatch(/No 3-star reviews with text/);
     await supervisor.close();
   });
 
   it("stops starting pulls once Apify says the account is out of credit", async () => {
-    seedStageOne();
+    await seedStageOne();
     const { runId, supervisor } = await mine(async () => {
       throw new ApifyCreditError(AMAZON_REVIEWS_ACTOR);
     }, onlyC1);
     await supervisor.waitFor(runId);
     expect(calls).toHaveLength(1);
-    const gaps = ((store.getRun(runId)!.packet as any).gaps as any[]).map((g) => g.missing);
+    const gaps = (((await store.getRun(runId))!.packet as any).gaps as any[]).map((g) => g.missing);
     expect(gaps.filter((g: string) => g.includes("out of credit"))).toHaveLength(5);
     await supervisor.close();
   });
 
   it("ends cancelled on Stop, keeping the pulls already done", async () => {
-    seedStageOne();
+    await seedStageOne();
     let release!: () => void;
     const holding = new Promise<void>((r) => (release = r));
     const { runId, supervisor } = await mine(async (actorId, input, signal) => {
@@ -252,10 +252,10 @@ describe("a pull that fails", () => {
     }, onlyC1);
     await holding;
     await new Promise((r) => setTimeout(r, 5));
-    supervisor.stop(runId);
+    await supervisor.stop(runId);
     await supervisor.waitFor(runId);
-    expect(store.getRun(runId)!.status).toBe("cancelled");
-    expect(store.listRunReviews(runId)).toHaveLength(1);
+    expect((await store.getRun(runId))!.status).toBe("cancelled");
+    expect((await store.listRunReviews(runId))).toHaveLength(1);
     await supervisor.close();
   });
 });
@@ -283,7 +283,7 @@ describe("reusing earlier pulls", () => {
   const amazonPulls = () => pulled().filter((p) => p.startsWith("amazon"));
 
   it("answers a second run's bands from the first run's pulls, with no Apify call, and stores the same reviews for it", async () => {
-    seedStageOne();
+    await seedStageOne();
     const first = await mine(happy, onlyC1);
     await first.supervisor.waitFor(first.runId);
     expect(amazonPulls()).toHaveLength(5);
@@ -292,29 +292,29 @@ describe("reusing earlier pulls", () => {
     const second = await mine(happy, onlyC1);
     await second.supervisor.waitFor(second.runId);
     expect(amazonPulls()).toHaveLength(0);
-    expect(store.listRunReviews(second.runId).map((r) => r.review_key).sort()).toEqual(store.listRunReviews(first.runId).map((r) => r.review_key).sort());
-    expect(store.listEvents(second.runId).filter((e) => e.kind === "reviews.reused")).toHaveLength(5);
-    expect(store.charges.list(second.runId).filter((c) => c.service === "apify")).toEqual([]);
+    expect((await store.listRunReviews(second.runId)).map((r) => r.review_key).sort()).toEqual((await store.listRunReviews(first.runId)).map((r) => r.review_key).sort());
+    expect((await store.listEvents(second.runId)).filter((e) => e.kind === "reviews.reused")).toHaveLength(5);
+    expect((await store.charges.list(second.runId)).filter((c) => c.service === "apify")).toEqual([]);
     await second.supervisor.close();
   });
 
   it("serves another workspace from the same pulls: reviews are public pages", async () => {
-    seedStageOne();
+    await seedStageOne();
     const first = await mine(happy, onlyC1);
     await first.supervisor.waitFor(first.runId);
     await first.supervisor.close();
 
-    seedStageOne([], [], "client-b");
+    await seedStageOne([], [], "client-b");
     const other = await mine(happy, onlyC1, "client-b");
     await other.supervisor.waitFor(other.runId);
-    expect(store.getRun(other.runId)!.workspace_id).toBe("client-b");
+    expect((await store.getRun(other.runId))!.workspace_id).toBe("client-b");
     expect(amazonPulls()).toHaveLength(0);
-    expect(store.listRunReviews(other.runId)).toHaveLength(5);
+    expect((await store.listRunReviews(other.runId))).toHaveLength(5);
     await other.supervisor.close();
   });
 
   it("pulls again once the kept pull is older than the reuse window", async () => {
-    seedStageOne();
+    await seedStageOne();
     const first = await mine(happy, onlyC1);
     await first.supervisor.waitFor(first.runId);
     await first.supervisor.close();
@@ -326,7 +326,7 @@ describe("reusing earlier pulls", () => {
   });
 
   it("never keeps a refused pull, and still serves kept bands when Apify is out of credit", async () => {
-    seedStageOne();
+    await seedStageOne();
     const partial = await mine(async (actorId, input, signal) => {
       if (input.filterByRatings?.[0] === "oneStar") throw new ApifyCreditError(AMAZON_REVIEWS_ACTOR);
       return happy(actorId, input, signal);
@@ -338,8 +338,9 @@ describe("reusing earlier pulls", () => {
       throw new ApifyCreditError(AMAZON_REVIEWS_ACTOR);
     }, onlyC1);
     await broke.supervisor.waitFor(broke.runId);
-    const stars = store.listRunReviews(broke.runId).map((r) => r.star).sort();
-    expect(stars).toEqual([2, 3, 4, 5].filter((s) => store.listRunReviews(partial.runId).some((r) => r.star === s)));
+    const stars = (await store.listRunReviews(broke.runId)).map((r) => r.star).sort();
+    const partialReviews = await store.listRunReviews(partial.runId);
+    expect(stars).toEqual([2, 3, 4, 5].filter((s) => partialReviews.some((r) => r.star === s)));
     expect(amazonPulls()).toEqual([`amazon https://www.amazon.com/dp/B000S86S3M oneStar`]);
     await broke.supervisor.close();
   });

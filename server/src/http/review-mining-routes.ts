@@ -21,7 +21,7 @@ export class ReviewMiningRoutes {
       const found = await this.source(c);
       if ("error" in found) return found.error;
       const roster = ReviewMiningRoster.of(found.packet);
-      const cached = this.listings.judged(found.run.id, roster);
+      const cached = await this.listings.judged(found.run.id, roster);
       const offered = ReviewMiningOffer.of(roster, cached);
       const chosen = ReviewMiningRoster.select(offered, found.targets);
       const unscored = offered.some((t) => t.trustpilot && cached.some((row) => row.target_id === t.id && !row.trustpilot));
@@ -47,7 +47,7 @@ export class ReviewMiningRoutes {
       return { error: c.json({ detail: parsed.error.issues.map((i) => i.message).join("; ") }, 400) };
     }
     const brief = Briefs.normalise(parsed.data.brief);
-    const source = this.handoff.forBrief(brief, Scope.of(c.get("principal").workspaceId));
+    const source = await this.handoff.forBrief(brief, Scope.of(c.get("principal").workspaceId));
     if (!source) {
       return {
         error: c.json({
@@ -58,7 +58,7 @@ export class ReviewMiningRoutes {
         }),
       };
     }
-    if (!this.handoff.hasCompleted(2, source.run.id, Scope.of(c.get("principal").workspaceId))) {
+    if (!(await this.handoff.hasCompleted(2, source.run.id, Scope.of(c.get("principal").workspaceId)))) {
       return {
         error: c.json({
           ready: false,

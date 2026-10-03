@@ -12,7 +12,7 @@ export class ScopeGuard {
   register(api: Hono<ApiEnv>): void {
     Trace.line(import.meta.url, "ScopeGuard.register");
     const run: MiddlewareHandler<ApiEnv> = async (c, next) => {
-      const found = this.store.getRun(c.req.param("runId") ?? "");
+      const found = await this.store.getRun(c.req.param("runId") ?? "");
       if (!found || !Scope.forViewer(c.get("principal")).admits(found.workspace_id)) {
         return c.json({ detail: "no such run" }, 404);
       }
@@ -20,7 +20,7 @@ export class ScopeGuard {
     };
     const product: MiddlewareHandler<ApiEnv> = async (c, next) => {
       const scope = Scope.forViewer(c.get("principal"));
-      if (!this.store.products.get(c.req.param("productId") ?? "", scope)) {
+      if (!(await this.store.products.get(c.req.param("productId") ?? "", scope))) {
         return c.json({ detail: "no such product" }, 404);
       }
       await next();

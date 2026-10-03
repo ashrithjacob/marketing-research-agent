@@ -41,7 +41,7 @@ export interface RoleContext {
   briefing: RoleBriefing;
   pollMs?: number;
   onCall: (call: LlmCall) => void;
-  onChecked: (agentId: string, valid: boolean, problems: readonly string[]) => void;
+  onChecked: (agentId: string, valid: boolean, problems: readonly string[]) => Promise<void>;
   meter: (agentId: string) => ChargeMeter;
 }
 
@@ -53,17 +53,18 @@ export class ResearchAgentFactory {
     private readonly tools: ToolRegistry,
   ) {}
 
-  build(role: RoleSpec, run: RoleContext): BuiltAgent {
+  async build(role: RoleSpec, run: RoleContext): Promise<BuiltAgent> {
     Trace.line(import.meta.url, "ResearchAgentFactory.build", { role: role.id, runId: run.runId });
     const findings = new RunFindings(this.store.findings, run.runId, role.id, Roles.scope(role, run.nodes), run.markets);
     const check = RoleChecks.done(role, findings, run);
     const budget = new TurnBudget(role.maxTurns);
     const steps = new ToolSteps();
+    const rows = await findings.rows();
     const research = this.tools.build(role.tools, {
       runId: run.runId,
       subject: run.brief.product || run.brief.url,
       market: run.brief.market,
-      discovery: DiscoveryQuestions.of(findings.live(), run.brief),
+      discovery: DiscoveryQuestions.of(rows, run.brief),
       meter: run.meter(role.id),
     });
     const ledger = new LedgerToolset({
@@ -85,7 +86,7 @@ export class ResearchAgentFactory {
       },
       finishTurn: budget.finishTurn,
     });
-    const instructions = run.briefing.instructions(role, findings.rows());
+    const instructions = run.briefing.instructions(role, rows);
     const closeOnLimit = RoleChecks.closer(role, findings, new RowRepair(this.store.findings, run.runId, run.nodes), check, run);
     return { agent, instructions, steps, check, budget, closeOnLimit };
   }

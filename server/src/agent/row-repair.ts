@@ -12,32 +12,32 @@ export class RowRepair {
   ) {}
 
   /** Retracting one row can break another that leaned on it (a `complete` status on a retracted curve), so this repeats until no row of `owner` (every agent's when unset) fails. */
-  repair(problems: () => readonly CheckProblem[], when: string, owner?: string): string[] {
+  async repair(problems: () => Promise<readonly CheckProblem[]>, when: string, owner?: string): Promise<string[]> {
     Trace.line(import.meta.url, "RowRepair.repair", { when, owner });
     const retracted: string[] = [];
-    let failing = this.failingRows(problems(), owner);
+    let failing = await this.failingRows(await problems(), owner);
     while (failing.size > 0) {
       for (const [row, texts] of failing) {
         const hand = new RunFindings(this.ledger, this.runId, row.agent_id, this.nodes);
-        hand.retract(row.id, `failed its check ${when}`);
-        hand.record("gap", {
+        await hand.retract(row.id, `failed its check ${when}`);
+        await hand.record("gap", {
           node: this.nodeOf(row),
           missing: `${row.kind} ${row.id} retracted ${when}: ${texts.join("; ")}`,
           would_need: "the agent to repair it",
         });
         if (row.kind === "node_status") {
-          hand.record("node_status", { node: this.nodeOf(row), status: "incomplete", done_criterion_met: false, why: `its status was retracted ${when}` });
+          await hand.record("node_status", { node: this.nodeOf(row), status: "incomplete", done_criterion_met: false, why: `its status was retracted ${when}` });
         }
         retracted.push(row.id);
       }
-      failing = this.failingRows(problems(), owner);
+      failing = await this.failingRows(await problems(), owner);
     }
     return retracted;
   }
 
-  private failingRows(problems: readonly CheckProblem[], owner?: string): Map<Finding, string[]> {
+  private async failingRows(problems: readonly CheckProblem[], owner?: string): Promise<Map<Finding, string[]>> {
     Trace.line(import.meta.url, "RowRepair.failingRows", { problems: problems.length, owner });
-    const live = Findings.live(this.ledger.list(this.runId)).filter((row) => owner === undefined || row.agent_id === owner);
+    const live = Findings.live(await this.ledger.list(this.runId)).filter((row) => owner === undefined || row.agent_id === owner);
     const failing = new Map<Finding, string[]>();
     for (const problem of problems) {
       const at = problem.row;

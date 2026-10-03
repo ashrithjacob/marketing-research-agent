@@ -42,16 +42,16 @@ beforeEach(() => {
 
 afterEach(async () => {
   await app.supervisor.close();
-  store.close();
+  await store.close();
   rmSync(dir, { recursive: true, force: true });
 });
 
 const post = (path: string, body: unknown) =>
   app.fetch(new Request(`http://local${path}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) }));
 
-function seedStageOne(): string {
-  const run = store.createRun({ workspaceId: "admin", brief: BRIEF, model: "m", rejectKinds: [], judgementIds: [], nodes: ["product_data", "category_data"], stage: 1 });
-  store.updateRun(run.id, {
+async function seedStageOne(): Promise<string> {
+  const run = (await store.createRun({ workspaceId: "admin", brief: BRIEF, model: "m", rejectKinds: [], judgementIds: [], nodes: ["product_data", "category_data"], stage: 1 }));
+  await store.updateRun(run.id, {
     status: "completed",
     packet: minimalPacket({
       brief: BRIEF,
@@ -107,7 +107,7 @@ function routeByAgent(script: Record<ProductTruthAgent, AssistantMessage[]>, spo
 
 describe("a product-truth run", () => {
   it("runs the five agents in the spec's order and settles one packet, with every number computed by code", async () => {
-    const stageOne = seedStageOne();
+    const stageOne = await seedStageOne();
     const spoke: string[] = [];
     routeByAgent(scripts(), spoke);
     const created = await post("/api/research/runs", {
@@ -121,7 +121,7 @@ describe("a product-truth run", () => {
     expect(nodes).toEqual(["mechanism", "dose_vs_study", "claim_limits", "cogs_refills"]);
     await app.supervisor.waitFor(id);
 
-    const run = store.getRun(id)!;
+    const run = (await store.getRun(id))!;
     expect(run.error).toBe("");
     expect(run.status).toBe("completed");
     expect(run.source_run_id).toBe(stageOne);
@@ -137,11 +137,11 @@ describe("a product-truth run", () => {
     expect(packet.nodes.every((n) => n.status === "complete")).toBe(true);
     expect(packet.gaps.map((g) => g.missing)).toContain("moq: not entered when product truth started");
     expect(packet.guard).toMatch(/not legal advice/);
-    expect(new Set(store.listLlmCalls(id).map((c) => c.agent_id))).toEqual(new Set(["formula", "mechanism", "dose_vs_study", "claim_limits", "cogs_refills"]));
+    expect(new Set((await store.listLlmCalls(id)).map((c) => c.agent_id))).toEqual(new Set(["formula", "mechanism", "dose_vs_study", "claim_limits", "cogs_refills"]));
   });
 
   it("keeps the packet and ends invalid when an agent leaves an item neither recorded nor gapped", async () => {
-    seedStageOne();
+    await seedStageOne();
     const script = scripts();
     script.cogs_refills = [fauxAssistantMessage("I could not find any prices.")];
     routeByAgent(script, []);
@@ -149,7 +149,7 @@ describe("a product-truth run", () => {
     const { id } = (await created.json()) as { id: string };
     await app.supervisor.waitFor(id);
 
-    const run = store.getRun(id)!;
+    const run = (await store.getRun(id))!;
     expect(run.status).toBe("invalid");
     expect(run.error).toMatch(/cogs_refills: `prices` is neither recorded nor gapped/);
     const packet = productTruthPacketSchema.parse(run.packet);

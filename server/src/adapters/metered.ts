@@ -27,7 +27,7 @@ export class MeteredWebSearch implements WebSearch {
     Trace.line(import.meta.url, "MeteredWebSearch.find", { query });
     const page = await this.inner.find(query, maxResults, signal, scope);
     const use = page.use ?? { item: "search", units: 1 };
-    this.meter.charge({ service: "parallel", item: use.item, units: use.units, usd: use.units * this.prices.parallelSearchUsd, basis: "listed" });
+    await this.meter.charge({ service: "parallel", item: use.item, units: use.units, usd: use.units * this.prices.parallelSearchUsd, basis: "listed" });
     return page;
   }
 }
@@ -44,9 +44,9 @@ export class MeteredPageFetcher implements PageFetcher {
     Trace.line(import.meta.url, "MeteredPageFetcher.scrape", { url });
     const page = await this.inner.scrape(url, signal);
     const { prices } = this;
-    if (page.reader === "parallel_extract") this.meter.charge({ service: "parallel", item: "extract", units: 1, usd: prices.parallelExtractUsd, basis: "listed" });
-    if (page.reader === "crawl4ai") this.meter.charge({ service: "crawl4ai", item: "page", units: 1, usd: prices.crawl4aiUsdPerPage, basis: "listed" });
-    if (page.reader === "firecrawl") this.meter.charge({ service: "firecrawl", item: "page", units: 1, usd: prices.firecrawlUsdPerPage, basis: "listed" });
+    if (page.reader === "parallel_extract") await this.meter.charge({ service: "parallel", item: "extract", units: 1, usd: prices.parallelExtractUsd, basis: "listed" });
+    if (page.reader === "crawl4ai") await this.meter.charge({ service: "crawl4ai", item: "page", units: 1, usd: prices.crawl4aiUsdPerPage, basis: "listed" });
+    if (page.reader === "firecrawl") await this.meter.charge({ service: "firecrawl", item: "page", units: 1, usd: prices.firecrawlUsdPerPage, basis: "listed" });
     return page;
   }
 }
@@ -63,7 +63,7 @@ export class MeteredAdLibrary implements AdLibrary {
     Trace.line(import.meta.url, "MeteredAdLibrary.search", { terms: query.terms });
     const page = await this.inner.search(query, signal);
     const credits = page.credits ?? page.hits.length;
-    this.meter.charge({ service: "trendtrack", item: "ads", units: credits, usd: credits * this.prices.trendtrackUsdPerCredit, basis: "credits" });
+    await this.meter.charge({ service: "trendtrack", item: "ads", units: credits, usd: credits * this.prices.trendtrackUsdPerCredit, basis: "credits" });
     return page;
   }
 }
@@ -79,7 +79,7 @@ export class MeteredDiscovery implements CompetitorDiscovery {
   async discover(question: DiscoveryQuestion, signal?: AbortSignal): Promise<DiscoveryReport> {
     Trace.line(import.meta.url, "MeteredDiscovery.discover", { product: question.product });
     const report = await this.inner.discover(question, signal);
-    this.meter.charge({ service: "parallel", item: `task:${report.processor}`, units: 1, usd: this.prices.parallelTaskUsd[report.processor] ?? null, basis: "listed" });
+    await this.meter.charge({ service: "parallel", item: `task:${report.processor}`, units: 1, usd: this.prices.parallelTaskUsd[report.processor] ?? null, basis: "listed" });
     return report;
   }
 }

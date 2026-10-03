@@ -29,9 +29,9 @@ const prices: ServicePrices = {
 };
 
 /** A meter that keeps what it is told. */
-function meter(): { charge: (draft: ChargeDraft) => void; drafts: ChargeDraft[] } {
+function meter(): { charge: (draft: ChargeDraft) => Promise<void>; drafts: ChargeDraft[] } {
   const drafts: ChargeDraft[] = [];
-  return { charge: (draft) => drafts.push(draft), drafts };
+  return { charge: async (draft) => { drafts.push(draft); }, drafts };
 }
 
 const page = { hits: [], excerpted: true, report: { service: "Parallel", outcome: "ok" as const, parts: [] } };
@@ -89,21 +89,21 @@ describe("a charge's agent", () => {
     dir = mkdtempSync(join(tmpdir(), "mra-charges-"));
     store = new SqliteResearchStore(join(dir, "research.db"));
   });
-  afterEach(() => {
-    store.close();
+  afterEach(async () => {
+    await store.close();
     rmSync(dir, { recursive: true, force: true });
   });
 
   it("is the agent whose tool made the call, written to the run's charges and told to the cockpit", async () => {
-    const runId = store.createRun({ workspaceId: "admin", brief: { product: "x" }, model: "m", rejectKinds: [], judgementIds: [] }).id;
+    const runId = (await store.createRun({ workspaceId: "admin", brief: { product: "x" }, model: "m", rejectKinds: [], judgementIds: [] })).id;
     const runs = new LiveRuns(store);
     const settings: Settings = { ...Env.settings(), prices, corpusPath: join(dir, "corpus") };
     const search = { find: async () => ({ ...page, use: { item: "sku_search", units: 2 } }) };
     const svc = new ServiceClients({ scrape: async () => ({ text: "", title: "" }) }, search, null);
     const [built] = new ToolRegistry(svc, settings).build(["web_search"], { runId, subject: "", market: "", discovery: null, meter: new RunMeter(store, runs, runId, "competitors") });
     await built!.tool.execute("1", { query: "best cough drops" });
-    expect(store.charges.list(runId).map((c) => [c.agent_id, c.service, c.units, c.usd, c.basis])).toEqual([["competitors", "parallel", 2, 0.01, "listed"]]);
-    expect(store.listEvents(runId).filter((e) => e.kind === "run.charged").map((e) => e.payload.agent_id)).toEqual(["competitors"]);
+    expect((await store.charges.list(runId)).map((c) => [c.agent_id, c.service, c.units, c.usd, c.basis])).toEqual([["competitors", "parallel", 2, 0.01, "listed"]]);
+    expect((await store.listEvents(runId)).filter((e) => e.kind === "run.charged").map((e) => e.payload.agent_id)).toEqual(["competitors"]);
   });
 });
 

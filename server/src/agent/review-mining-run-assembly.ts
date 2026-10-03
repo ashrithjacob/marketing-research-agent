@@ -19,9 +19,9 @@ export class ReviewMiningRunAssembly implements RunAssembly {
     private readonly mined: () => { targets: readonly MiningTarget[]; failures: readonly PullFailure[] },
   ) {}
 
-  assemble(): Assembled {
+  async assemble(): Promise<Assembled> {
     Trace.line(import.meta.url, "ReviewMiningRunAssembly.assemble", { runId: this.runId });
-    this.ledger.saveTo(this.store, this.runs, this.runId);
+    await this.ledger.saveTo(this.store, this.runs, this.runId);
     const snapshot = this.ledger.snapshot();
     const { targets, failures } = this.mined();
     if (targets.length === 0 && snapshot.pulls.length === 0) return { packet: null, problems: [], retracted: [] };

@@ -28,10 +28,10 @@ const competitor = (id: string, relation: string, form: string, shared: string[]
 });
 
 describe("the competitor-kinds migration", () => {
-  it("relabels old packets, their packet rows and the ledger, and marks an old indirect curve for what it was", () => {
+  it("relabels old packets, their packet rows and the ledger, and marks an old indirect curve for what it was", async () => {
     const store = new SqliteResearchStore(path);
-    const runId = store.createRun({ workspaceId: "admin", brief: { product: "Mullevia" }, model: "m", rejectKinds: [], judgementIds: [] }).id;
-    store.close();
+    const runId = (await store.createRun({ workspaceId: "admin", brief: { product: "Mullevia" }, model: "m", rejectKinds: [], judgementIds: [] })).id;
+    await store.close();
     const db = new Database(path);
     const packet = {
       competitor_reference: reference,
@@ -52,20 +52,20 @@ describe("the competitor-kinds migration", () => {
     db.close();
 
     const reopened = new SqliteResearchStore(path);
-    const stored = reopened.getRun(runId)!.packet as any;
+    const stored = (await reopened.getRun(runId))!.packet as any;
     expect(stored.competitors.map((c: any) => c.relation)).toEqual(["direct", "indirect_form", "indirect_active", "indirect_active"]);
     expect(stored.saturation[0]).toMatchObject({ class: "indirect_form", stopped_because: expect.stringMatching(/^\(an `indirect` curve from before 2026-10-03, counting brands of both indirect kinds\) three quiet sources/) });
-    const rows = reopened.findings.list(runId);
+    const rows = (await reopened.findings.list(runId));
     expect(rows.find((r) => r.kind === "competitor")!.payload.relation).toBe("indirect_active");
     expect(rows.find((r) => r.kind === "saturation")!.payload.class).toBe("indirect_form");
-    reopened.close();
+    await reopened.close();
     const check = new Database(path);
     expect((check.prepare("SELECT relation FROM research_packet_competitors WHERE run_id = ? ORDER BY seq").all(runId) as any[]).map((r) => r.relation)).toEqual(["direct", "indirect_form", "indirect_active", "indirect_active"]);
     check.close();
   });
 
-  it("runs once: a store opened again leaves a relabelled run alone", () => {
-    new SqliteResearchStore(path).close();
+  it("runs once: a store opened again leaves a relabelled run alone", async () => {
+    await new SqliteResearchStore(path).close();
     const db = new Database(path);
     expect(db.prepare("SELECT COUNT(*) AS n FROM research_migrations WHERE name = ?").get(CompetitorKinds.NAME)).toEqual({ n: 1 });
     db.close();

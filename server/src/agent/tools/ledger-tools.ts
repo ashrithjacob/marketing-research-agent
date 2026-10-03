@@ -24,7 +24,7 @@ export class RecordTool {
       parameters: recordParameters,
       async execute(_id, params) {
         Trace.line(import.meta.url, "RecordTool.tool.execute", { name: spec.name });
-        const result = findings.record(spec.kind, params.item, params.entity);
+        const result = await findings.record(spec.kind, params.item, params.entity);
         if ("problems" in result) {
           return {
             content: [{ type: "text", text: `NOT RECORDED — ${result.problems}. Fix this one item and call again.` }],
@@ -55,7 +55,7 @@ export class RetractTool {
       parameters: retractParameters,
       async execute(_id, params) {
         Trace.line(import.meta.url, "RetractTool.tool.execute", { id: params.id });
-        const result = findings.retract(params.id, params.why);
+        const result = await findings.retract(params.id, params.why);
         const text = "retracted" in result ? `RETRACTED ${params.id}` : `NOT RETRACTED — ${result.refused}`;
         return { content: [{ type: "text", text }], details: { retracted: "retracted" in result, id: params.id } };
       },

@@ -12,5 +12,5 @@ export interface BuiltAgent {
   steps: ToolSteps;
   check: DoneCheck;
   budget: TurnBudget;
-  closeOnLimit: (() => LimitClosed) | null;
+  closeOnLimit: (() => Promise<LimitClosed>) | null;
 }

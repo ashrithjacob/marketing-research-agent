@@ -21,38 +21,38 @@ export class RunEnd {
     private readonly runs: LiveRuns,
   ) {}
 
-  end(assembly: RunAssembly, ending: RunEnding, record: { output?: string; usage?: unknown } = {}): FinalStatus {
+  async end(assembly: RunAssembly, ending: RunEnding, record: { output?: string; usage?: unknown } = {}): Promise<FinalStatus> {
     Trace.line(import.meta.url, "RunEnd.end", { runId: assembly.runId, ending: ending.kind });
     const runId = assembly.runId;
-    const run = this.store.getRun(runId);
+    const run = await this.store.getRun(runId);
     const stopped: RunEnding | null = ending.kind === "settled" && run?.status === "stopping" ? { kind: "stopped", reason: ending.errorMessage } : null;
-    this.store.updateRun(runId, { ...record, ...(run?.ended_at ? {} : { ended_at: Clock.nowIso() }) });
-    const { assembled, crash } = RunEnd.assembleOrCrash(assembly);
+    await this.store.updateRun(runId, { ...record, ...(run?.ended_at ? {} : { ended_at: Clock.nowIso() }) });
+    const { assembled, crash } = await RunEnd.assembleOrCrash(assembly);
     const actual = crash ?? stopped ?? ending;
-    if (assembled.packet) this.show(assembly, assembled);
+    if (assembled.packet) await this.show(assembly, assembled);
     const { status, error } = RunEnd.verdict(actual, assembled);
     if (status === "invalid") {
-      this.store.addPacketCheck(runId, false, assembled.problems);
+      await this.store.addPacketCheck(runId, false, assembled.problems);
       this.runs.emit(runId, "packet.invalid", { error });
     }
-    this.store.updateRun(runId, { status, error });
+    await this.store.updateRun(runId, { status, error });
     this.runs.emit(runId, `run.${status}`, status === "completed" ? { usage: record.usage } : error ? { error } : {});
-    if (status === "completed") this.countJudgementApplications(runId, assembled);
+    if (status === "completed") await this.countJudgementApplications(runId, assembled);
     if (status === "completed" && actual.kind === "settled" && actual.errorMessage) this.runs.emit(runId, "run.ended_early", { error: actual.errorMessage });
     return status;
   }
 
   /** A run refused before anything started: no ledger to assemble. */
-  refuse(runId: string, error: string): void {
+  async refuse(runId: string, error: string): Promise<void> {
     Trace.line(import.meta.url, "RunEnd.refuse", { runId, error });
-    this.store.updateRun(runId, { status: "failed", error, ended_at: Clock.nowIso() });
+    await this.store.updateRun(runId, { status: "failed", error, ended_at: Clock.nowIso() });
     this.runs.emit(runId, "run.failed", { error });
   }
 
-  private show(assembly: RunAssembly, assembled: Assembled): void {
+  private async show(assembly: RunAssembly, assembled: Assembled): Promise<void> {
     Trace.line(import.meta.url, "RunEnd.show", { runId: assembly.runId, retracted: assembled.retracted.length });
     const packet = assembled.packet!;
-    this.store.updateRun(assembly.runId, { packet: packet as unknown as Record<string, unknown>, packet_source: assembly.via });
+    await this.store.updateRun(assembly.runId, { packet: packet as unknown as Record<string, unknown>, packet_source: assembly.via });
     this.runs.emit(assembly.runId, "packet.ready", {
       sources: packet.sources?.length ?? 0,
       excerpts: "excerpts" in packet ? packet.excerpts.length : 0,
@@ -62,10 +62,10 @@ export class RunEnd {
     });
   }
 
-  private static assembleOrCrash(assembly: RunAssembly): { assembled: Assembled; crash: RunEnding | null } {
+  private static async assembleOrCrash(assembly: RunAssembly): Promise<{ assembled: Assembled; crash: RunEnding | null }> {
     Trace.line(import.meta.url, "RunEnd.assembleOrCrash", { runId: assembly.runId });
     try {
-      return { assembled: assembly.assemble(), crash: null };
+      return { assembled: await assembly.assemble(), crash: null };
     } catch (error) {
       console.error(`research run ${assembly.runId}: assembling the ledger failed`, error);
       const message = error instanceof Error ? error.message : String(error);
@@ -91,17 +91,17 @@ export class RunEnd {
     }
   }
 
-  private countJudgementApplications(runId: string, assembled: Assembled): void {
+  private async countJudgementApplications(runId: string, assembled: Assembled): Promise<void> {
     Trace.line(import.meta.url, "RunEnd.countJudgementApplications", { runId });
-    const run = this.store.getRun(runId);
+    const run = await this.store.getRun(runId);
     const sources = assembled.packet?.sources ?? [];
     if (!run) return;
-    const byId = new Map(this.store.listJudgements(Scope.of(run.workspace_id)).map((j) => [j.id, j]));
+    const byId = new Map((await this.store.listJudgements(Scope.of(run.workspace_id))).map((j) => [j.id, j]));
     for (const judgementId of run.judgement_ids) {
       const judgement = byId.get(judgementId);
       if (!judgement || judgement.rejects_kinds.length === 0) continue;
       const hits = sources.filter((s) => !s.admitted && judgement.rejects_kinds.includes(s.kind)).length;
-      if (hits > 0) this.store.bumpJudgement(judgementId, hits);
+      if (hits > 0) await this.store.bumpJudgement(judgementId, hits);
     }
   }
 }

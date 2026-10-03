@@ -21,7 +21,7 @@ export class RunWrapUp {
     const { store, runs, runId, listings } = this;
     try {
       if (!listings?.available || !nodes.includes("competitors")) return;
-      const run = store.getRun(runId);
+      const run = await store.getRun(runId);
       const packet = stagePacketSchema.safeParse(run?.packet);
       if (run?.status !== "completed" || !packet.success) return;
       const rows = await listings.lookUp(runId, packet.data, new RunMeter(store, runs, runId, null));
@@ -37,8 +37,8 @@ export class RunWrapUp {
     try {
       const billed = await billing.settle();
       if (!billed) return;
-      const usage = store.getRun(runId)?.usage ?? {};
-      store.updateRun(runId, { usage: { ...usage, billed } });
+      const usage = (await store.getRun(runId))?.usage ?? {};
+      await store.updateRun(runId, { usage: { ...usage, billed } });
       runs.emit(runId, "run.billed", { billed });
     } catch (error) {
       console.error(`research run ${runId}: recording the billed cost failed`, error);

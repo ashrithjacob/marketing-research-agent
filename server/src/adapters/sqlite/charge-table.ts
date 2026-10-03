@@ -22,7 +22,7 @@ CREATE INDEX IF NOT EXISTS research_charges_run ON research_charges(run_id);
 
   constructor(private readonly db: Database.Database) {}
 
-  add(charge: Omit<Charge, "created_at">): Charge {
+  async add(charge: Omit<Charge, "created_at">): Promise<Charge> {
     Trace.line(import.meta.url, "ChargeTable.add", { runId: charge.run_id, agentId: charge.agent_id, service: charge.service });
     const created_at = Clock.nowIso();
     this.db
@@ -31,7 +31,7 @@ CREATE INDEX IF NOT EXISTS research_charges_run ON research_charges(run_id);
     return { ...charge, created_at };
   }
 
-  list(runId: string): Charge[] {
+  async list(runId: string): Promise<Charge[]> {
     Trace.line(import.meta.url, "ChargeTable.list", { runId });
     const rows = this.db.prepare("SELECT * FROM research_charges WHERE run_id = ? ORDER BY id").all(runId) as Array<Record<string, any>>;
     return rows.map((row) => ({

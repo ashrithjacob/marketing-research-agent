@@ -169,11 +169,11 @@ describe("billed cost", () => {
         : { status: 200, body: { data: { total_cost: 0.01 } } },
     );
     const billing = new RunBilling(new OpenRouterPrices({ apiKey: "k", fetch, lookupDelaysMs: [] }));
-    billing.track("gen-a");
-    billing.track("gen-a");
-    billing.track("gen-b");
-    billing.track("gen-bad");
-    billing.track(undefined);
+    await billing.track("gen-a");
+    await billing.track("gen-a");
+    await billing.track("gen-b");
+    await billing.track("gen-bad");
+    await billing.track(undefined);
     const billed = (await billing.settle())!;
     expect(billed.total).toBeCloseTo(0.02, 10);
     expect(billed).toMatchObject({ turns: 3, resolved: 2 });
@@ -182,7 +182,7 @@ describe("billed cost", () => {
 
   it("reports nothing rather than $0 when there was nothing to look up", async () => {
     const billing = new RunBilling(new OpenRouterPrices({ apiKey: "" }));
-    billing.track("gen-a"); // no key: /generation is authenticated, so no lookup
+    await billing.track("gen-a"); // no key: /generation is authenticated, so no lookup
     expect(await billing.settle()).toBeNull();
   });
 });

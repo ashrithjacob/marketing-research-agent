@@ -12,9 +12,9 @@ export class CostRoute {
 
   register(api: Hono<ApiEnv>): void {
     Trace.line(import.meta.url, "CostRoute.register");
-    api.get("/runs/:runId/costs", (c) => {
+    api.get("/runs/:runId/costs", async (c) => {
       const runId = c.req.param("runId");
-      return c.json(CostReports.of(this.store.listLlmCalls(runId), this.store.charges.list(runId)));
+      return c.json(CostReports.of(await this.store.listLlmCalls(runId), await this.store.charges.list(runId)));
     });
   }
 }

@@ -14,13 +14,13 @@ export class ReviewReuse {
   ) {}
 
   /** Splits the jobs before any is pulled, so a kept answer is used even after the review service has refused the others. */
-  split(jobs: readonly PullJob[]): { reused: PullOutcome[]; toPull: PullJob[] } {
+  async split(jobs: readonly PullJob[]): Promise<{ reused: PullOutcome[]; toPull: PullJob[] }> {
     Trace.line(import.meta.url, "ReviewReuse.split", { jobs: jobs.length });
     const reused: PullOutcome[] = [];
     const toPull: PullJob[] = [];
     for (const job of jobs) {
       const { platform, listing, band } = job.label;
-      const kept = this.pulls.latest(platform, listing, band, this.since());
+      const kept = await this.pulls.latest(platform, listing, band, this.since());
       if (!kept) {
         toPull.push(this.keeping(job));
         continue;
@@ -39,7 +39,7 @@ export class ReviewReuse {
       fetch: async (signal?: AbortSignal): Promise<ReviewResult> => {
         Trace.line(import.meta.url, "ReviewReuse.keeping.fetch", { listing, band });
         const result = await job.fetch(signal);
-        if (!(result.excerpts.length === 0 && ReviewPuller.FAILED_RUNS.has(result.status))) this.pulls.save(platform, listing, band, result);
+        if (!(result.excerpts.length === 0 && ReviewPuller.FAILED_RUNS.has(result.status))) await this.pulls.save(platform, listing, band, result);
         return result;
       },
     };

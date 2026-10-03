@@ -40,9 +40,9 @@ export class ReviewAnalyst {
     this.handoff = new StageOneHandoff(store);
   }
 
-  read(runId: string): ReviewAnalysis | null {
+  async read(runId: string): Promise<ReviewAnalysis | null> {
     Trace.line(import.meta.url, "ReviewAnalyst.read", { runId });
-    const stored = this.store.getReviewAnalysis(runId);
+    const stored = await this.store.getReviewAnalysis(runId);
     if (stored && !Array.isArray(stored.slices)) {
       return { ...stored, status: "failed", error: "stored by an earlier version of the analysis — run it again" };
     }
@@ -50,18 +50,18 @@ export class ReviewAnalyst {
     return { ...stored, status: "failed", error: "interrupted: the server restarted while it ran" };
   }
 
-  start(run: ResearchRun): ReviewAnalysis {
+  async start(run: ResearchRun): Promise<ReviewAnalysis> {
     Trace.line(import.meta.url, "ReviewAnalyst.start", { runId: run.id });
     if (this.inFlight.has(run.id)) throw new RunError("this run's reviews are already being analysed");
-    const reviews = this.store.listRunReviews(run.id);
+    const reviews = await this.store.listRunReviews(run.id);
     if (reviews.length === 0) throw new RunError("this run stored no reviews to analyse");
     const resolved = ModelChain.resolve([this.settings.model, ...this.settings.backupModels], this.models, new ModelPricing(this.costs));
     if ("unknown" in resolved) throw new RunError(`unknown model ${JSON.stringify(resolved.unknown)} for provider openrouter`);
     const brief = Briefs.normalise(briefSchema.parse(run.brief));
-    const source = this.handoff.forRun(run);
+    const source = await this.handoff.forRun(run);
     const roster = source ? ReviewMiningRoster.of(source.packet) : [];
     const pending = ReviewAnalyst.pending(run.id, this.settings.model);
-    this.store.saveReviewAnalysis(pending);
+    await this.store.saveReviewAnalysis(pending);
     let usage: Usage = UsageTotals.empty();
     let calls = 0;
     const onUsage = (next: Usage) => {

@@ -46,7 +46,7 @@ export class MeteredActorRunner implements ActorRunner {
     Trace.line(import.meta.url, "MeteredActorRunner.run", { actorId, input, maxTotalChargeUsd });
     const result = await this.inner.run(actorId, input, maxTotalChargeUsd, signal);
     if (typeof result.usageUsd === "number" && Number.isFinite(result.usageUsd)) {
-      this.meter.charge({ service: "apify", item: actorId, units: 1, usd: result.usageUsd, basis: "billed" });
+      await this.meter.charge({ service: "apify", item: actorId, units: 1, usd: result.usageUsd, basis: "billed" });
     }
     return result;
   }

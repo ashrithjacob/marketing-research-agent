@@ -14,6 +14,7 @@ import type { LiveRuns } from "./live-runs.js";
 import type { ModelChain } from "./model-chain.js";
 import type { RetryPolicy } from "./retry.js";
 import type { BuiltAgent } from "./built-agent.js";
+import type { CallSequence } from "./llm-call-log.js";
 import { UsageTotals } from "./usage.js";
 
 /** One agent of a run and the agents whose end it waits for. */
@@ -58,10 +59,10 @@ export class AgentTeam {
     this.billed.onCall(call);
   };
 
-  readonly onChecked = (agentId: string, valid: boolean, problems: readonly string[]): void => {
+  readonly onChecked = async (agentId: string, valid: boolean, problems: readonly string[]): Promise<void> => {
     Trace.line(import.meta.url, "AgentTeam.onChecked", { agentId, valid, problems });
     if (valid) this.passed.add(agentId);
-    this.deps.store.addPacketCheck(this.runId, valid, problems);
+    await this.deps.store.addPacketCheck(this.runId, valid, problems);
     this.deps.runs.emit(this.runId, "packet.checked", { agent_id: agentId, valid, problems: [...problems] });
   };
 
@@ -70,7 +71,7 @@ export class AgentTeam {
     return this.usage;
   }
 
-  async run<Id extends string>(members: readonly TeamMember<Id>[], build: (id: Id) => BuiltAgent, roster: AgentRoster): Promise<AgentOutcome[]> {
+  async run<Id extends string>(members: readonly TeamMember<Id>[], build: (id: Id) => Promise<BuiltAgent>, roster: AgentRoster): Promise<AgentOutcome[]> {
     Trace.line(import.meta.url, "AgentTeam.run", { members });
     const driver = new AgentDriver(this.deps.store, this.deps.runs, this.deps.retry, this.runId, this.chain);
     const inPlan = new Set<string>(members.map((m) => m.id));
@@ -87,9 +88,17 @@ export class AgentTeam {
   }
 
   /** Each agent's own check, run again on the settled ledger: a part that never passed is not rescued by another agent's rows. */
-  partProblems(): CheckProblem[] {
+  async partProblems(): Promise<CheckProblem[]> {
     Trace.line(import.meta.url, "AgentTeam.partProblems", { agents: [...this.checks.keys()] });
-    return [...this.checks].flatMap(([id, check]) => check.problems().map((problem) => ({ ...problem, text: `${id}: ${problem.text}` })));
+    const each = await Promise.all([...this.checks].map(async ([id, check]) => (await check.problems()).map((problem) => ({ ...problem, text: `${id}: ${problem.text}` }))));
+    return each.flat();
+  }
+
+  /** Every LLM call record and billed cost written so far is stored. */
+  async written(sequence: CallSequence): Promise<void> {
+    Trace.line(import.meta.url, "AgentTeam.written");
+    await sequence.written();
+    await this.billed.written();
   }
 
   static output(outcomes: readonly AgentOutcome[]): string {
@@ -97,10 +106,10 @@ export class AgentTeam {
     return outcomes.filter((o) => o.text.trim()).map((o) => `[${o.agentId}]\n${o.text.trim()}`).join("\n\n");
   }
 
-  private async drive<Id extends string>(driver: AgentDriver, id: Id, build: (id: Id) => BuiltAgent, roster: AgentRoster): Promise<AgentOutcome[]> {
+  private async drive<Id extends string>(driver: AgentDriver, id: Id, build: (id: Id) => Promise<BuiltAgent>, roster: AgentRoster): Promise<AgentOutcome[]> {
     Trace.line(import.meta.url, "AgentTeam.drive", { id });
     if (this.stopped) return [];
-    const built = build(id);
+    const built = await build(id);
     this.checks.set(id, built.check);
     this.live.set(id, built.agent);
     try {
@@ -115,7 +124,7 @@ export class AgentTeam {
     Trace.line(import.meta.url, "AgentTeam.turnEnded");
     this.usage = UsageTotals.add(this.usage, message.usage);
     const responseId = message.responseId;
-    this.billing.track(responseId)?.then((generation) => {
+    void this.billing.track(responseId)?.then((generation) => {
       if (generation !== null && responseId) this.billed.attach(responseId, generation);
     });
   }

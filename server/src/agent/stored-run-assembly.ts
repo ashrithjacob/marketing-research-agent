@@ -33,13 +33,15 @@ export class StoredRunAssembly {
   }
 
   /** Each stage-1 agent that wrote rows, checked again on the ledger it left. */
-  private static partProblems(store: ResearchStore, runId: string, brief: Brief, nodes: readonly Node[]): CheckProblem[] {
+  private static async partProblems(store: ResearchStore, runId: string, brief: Brief, nodes: readonly Node[]): Promise<CheckProblem[]> {
     Trace.line(import.meta.url, "StoredRunAssembly.partProblems", { runId });
-    const wrote = new Set(store.findings.list(runId).map((row) => row.agent_id));
-    return STAGE_ONE_AGENTS.filter((id) => wrote.has(id)).flatMap((id) =>
-      RoleChecks.done(Roles.of(id), new RunFindings(store.findings, runId, id, [StageOnePlans.nodeOf(id, nodes)]), { brief, nodes, markets: Briefs.markets(brief) })
-        .problems()
-        .map((problem) => ({ ...problem, text: `${id}: ${problem.text}` })),
+    const wrote = new Set((await store.findings.list(runId)).map((row) => row.agent_id));
+    const each = await Promise.all(
+      STAGE_ONE_AGENTS.filter((id) => wrote.has(id)).map(async (id) => {
+        const check = RoleChecks.done(Roles.of(id), new RunFindings(store.findings, runId, id, [StageOnePlans.nodeOf(id, nodes)]), { brief, nodes, markets: Briefs.markets(brief) });
+        return (await check.problems()).map((problem) => ({ ...problem, text: `${id}: ${problem.text}` }));
+      }),
     );
+    return each.flat();
   }
 }

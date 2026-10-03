@@ -5,7 +5,7 @@ import { Trace } from "../trace/index.js";
 import type { RunFindings } from "./run-findings.js";
 
 export interface DoneCheck {
-  problems(): CheckProblem[];
+  problems(): Promise<CheckProblem[]>;
 }
 
 /** A stage-1 node agent's rows, with the champion's when it measures against it, pass the contract for its node: citations real, labels agreeing with forms, markets in the brief, "complete" only with saturation. */
@@ -15,10 +15,10 @@ export class NodeContract implements DoneCheck {
     private readonly run: { brief: Brief; node: Node; champion: string | null },
   ) {}
 
-  problems(): CheckProblem[] {
+  async problems(): Promise<CheckProblem[]> {
     Trace.line(import.meta.url, "NodeContract.problems", { agentId: this.findings.agentId, node: this.run.node });
     const { brief, node, champion } = this.run;
-    const rows = this.findings.live().filter((row) => row.agent_id === this.findings.agentId || row.agent_id === champion);
+    const rows = (await this.findings.live()).filter((row) => row.agent_id === this.findings.agentId || row.agent_id === champion);
     const draft = new PacketAssembly(rows).draft({ runId: this.findings.runId, brief, nodes: [node] });
     try {
       new PacketValidator().validate(draft, [node], brief);
@@ -37,9 +37,9 @@ export class ChampionContract implements DoneCheck {
     private readonly brief: Brief,
   ) {}
 
-  problems(): CheckProblem[] {
+  async problems(): Promise<CheckProblem[]> {
     Trace.line(import.meta.url, "ChampionContract.problems", { agentId: this.findings.agentId });
-    const rows: Finding[] = this.findings.own();
+    const rows: Finding[] = await this.findings.own();
     const draft = new PacketAssembly(rows).draft({ runId: this.findings.runId, brief: this.brief, nodes: ["competitors"] });
     const parsed = stagePacketSchema.safeParse(draft);
     if (!parsed.success) return ZodProblems.list(parsed.error).map(CheckProblems.of);
@@ -58,8 +58,8 @@ export class ChampionContract implements DoneCheck {
 export class TruthContract implements DoneCheck {
   constructor(private readonly findings: RunFindings) {}
 
-  problems(): CheckProblem[] {
+  async problems(): Promise<CheckProblem[]> {
     Trace.line(import.meta.url, "TruthContract.problems", { agentId: this.findings.agentId });
-    return TruthCitations.problems(this.findings.own(), this.findings.live());
+    return TruthCitations.problems(await this.findings.own(), await this.findings.live());
   }
 }

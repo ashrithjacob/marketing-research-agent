@@ -49,10 +49,10 @@ export class ReviewLedger {
     return this.reviews.length;
   }
 
-  saveTo(store: ResearchStore, runs: LiveRuns, runId: string): void {
+  async saveTo(store: ResearchStore, runs: LiveRuns, runId: string): Promise<void> {
     Trace.line(import.meta.url, "ReviewLedger.saveTo", { runId });
     try {
-      const saved = store.saveRunReviews(runId, this.snapshot());
+      const saved = await store.saveRunReviews(runId, this.snapshot());
       if (saved > 0) runs.emit(runId, "reviews.saved", { reviews: saved });
     } catch (error) {
       console.error(`research run ${runId}: saving the reviews failed`, error);

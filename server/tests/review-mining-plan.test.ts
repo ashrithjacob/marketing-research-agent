@@ -106,7 +106,7 @@ function rosterPacket(): Record<string, any> {
 }
 
 async function seedStageOne(briefProduct = "MagnaCalm 400mg", withProductTruth = true): Promise<string> {
-  const run = store.createRun({
+  const run = (await store.createRun({
     workspaceId: "admin",
     brief: { product: briefProduct, url: "", market: "UK", notes: "" },
     model: "faux-model",
@@ -114,9 +114,9 @@ async function seedStageOne(briefProduct = "MagnaCalm 400mg", withProductTruth =
     judgementIds: [],
     nodes: ["product_data", "competitors", "category_data"],
     stage: 1,
-  });
-  store.updateRun(run.id, { status: "completed", packet: rosterPacket() });
-  if (withProductTruth) completeProductTruth(store, run.id);
+  }));
+  await store.updateRun(run.id, { status: "completed", packet: rosterPacket() });
+  if (withProductTruth) await completeProductTruth(store, run.id);
   return run.id;
 }
 
@@ -232,7 +232,7 @@ describe("the review-mining gate", () => {
     expect(plan).toMatchObject({ ready: false });
     expect(plan.detail).toMatch(/Run product truth first/);
 
-    completeProductTruth(store, stageOne);
+    await completeProductTruth(store, stageOne);
     const allowed = await post("/api/research/runs", {
       brief: { product: "magna calm 400mg" },
       nodes: ["review_mining"],
@@ -242,12 +242,12 @@ describe("the review-mining gate", () => {
     expect(run.stage).toBe(3);
     await app.supervisor.waitFor(run.id);
 
-    expect(store.listLlmCalls(run.id)).toHaveLength(0);
-    expect(store.getRun(run.id)).toMatchObject({ status: "failed", error: "APIFY_TOKEN is not set, so no review can be pulled" });
+    expect((await store.listLlmCalls(run.id))).toHaveLength(0);
+    expect((await store.getRun(run.id))).toMatchObject({ status: "failed", error: "APIFY_TOKEN is not set, so no review can be pulled" });
   });
 
   it("stays shut for a stage-1 run whose packet is absent", async () => {
-    const run = store.createRun({
+    const run = (await store.createRun({
       workspaceId: "admin",
       brief: { product: "EmptyPacket", url: "", market: "", notes: "" },
       model: "faux-model",
@@ -255,8 +255,8 @@ describe("the review-mining gate", () => {
       judgementIds: [],
       nodes: ["product_data"],
       stage: 1,
-    });
-    store.updateRun(run.id, { status: "completed", packet: {} });
+    }));
+    await store.updateRun(run.id, { status: "completed", packet: {} });
     const blocked = await post("/api/research/runs", {
       brief: { product: "EmptyPacket" },
       nodes: ["review_mining"],
@@ -266,14 +266,14 @@ describe("the review-mining gate", () => {
 });
 
 describe("the hand-off", () => {
-  it("returns null for a subject stage 1 never ran", () => {
+  it("returns null for a subject stage 1 never ran", async () => {
     const handoff = new StageOneHandoff(store);
-    expect(handoff.forBrief({ product: "Nobody", url: "", market: "", notes: "" }, Scope.everything)).toBeNull();
+    expect((await handoff.forBrief({ product: "Nobody", url: "", market: "", notes: "" }, Scope.everything))).toBeNull();
   });
 
   it("hands over only a completed stage-1 run, never a newer invalid one that kept its packet", async () => {
     const completed = await seedStageOne();
-    const invalid = store.createRun({
+    const invalid = (await store.createRun({
       workspaceId: "admin",
       brief: { product: "MagnaCalm 400mg", url: "", market: "UK", notes: "" },
       model: "faux-model",
@@ -281,14 +281,14 @@ describe("the hand-off", () => {
       judgementIds: [],
       nodes: ["product_data", "competitors", "category_data"],
       stage: 1,
-    });
-    store.updateRun(invalid.id, { status: "invalid", packet: rosterPacket() });
+    }));
+    await store.updateRun(invalid.id, { status: "invalid", packet: rosterPacket() });
     const handoff = new StageOneHandoff(store);
-    expect(handoff.forBrief({ product: "MagnaCalm 400mg", url: "", market: "", notes: "" }, Scope.everything)?.run.id).toBe(completed);
+    expect((await handoff.forBrief({ product: "MagnaCalm 400mg", url: "", market: "", notes: "" }, Scope.everything))?.run.id).toBe(completed);
   });
 
   it("refuses a review-mining packet posing as stage 1", async () => {
-    const run = store.createRun({
+    const run = (await store.createRun({
       workspaceId: "admin",
       brief: { product: "WrongStage", url: "", market: "", notes: "" },
       model: "faux-model",
@@ -296,9 +296,9 @@ describe("the hand-off", () => {
       judgementIds: [],
       nodes: ["review_mining"],
       stage: 3,
-    });
-    store.updateRun(run.id, { status: "completed", packet: rosterPacket() });
+    }));
+    await store.updateRun(run.id, { status: "completed", packet: rosterPacket() });
     const handoff = new StageOneHandoff(store);
-    expect(handoff.forBrief({ product: "WrongStage", url: "", market: "", notes: "" }, Scope.everything)).toBeNull();
+    expect((await handoff.forBrief({ product: "WrongStage", url: "", market: "", notes: "" }, Scope.everything))).toBeNull();
   });
 });

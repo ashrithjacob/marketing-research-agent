@@ -133,8 +133,8 @@ describe("ReviewAnalyst", () => {
     store = new SqliteResearchStore(join(dir, "research.db"));
   });
 
-  afterEach(() => {
-    store.close();
+  afterEach(async () => {
+    await store.close();
     rmSync(dir, { recursive: true, force: true });
   });
 
@@ -142,30 +142,30 @@ describe("ReviewAnalyst", () => {
     fauxAssistantMessage(fauxToolCall("record_issue_catalogue", { issues: ISSUES }), { stopReason: "toolUse" });
   const spiral = () => fauxAssistantMessage("", { stopReason: "length" });
 
-  function setup(backups: string[] = []) {
+  async function setup(backups: string[] = []) {
     const faux = fauxProvider({ provider: "openrouter", models: [{ id: "faux-model" }, ...backups.map((id) => ({ id }))] });
     const models = createModels();
     models.setProvider(faux.provider);
     const settings = { ...Env.settings(), model: "faux-model", backupModels: backups };
     const supervisor = new RunSupervisor({ store, settings, models });
-    const run = store.createRun({ workspaceId: "admin", brief: { product: "Vitamin D" }, model: "faux-model", rejectKinds: [], judgementIds: [], nodes: ["review_mining"], stage: 3 });
+    const run = (await store.createRun({ workspaceId: "admin", brief: { product: "Vitamin D" }, model: "faux-model", rejectKinds: [], judgementIds: [], nodes: ["review_mining"], stage: 3 }));
     const review = (ref: string, star: number, text: string): LedgerReview => ({ ref, pull: "p", platform: "amazon", review_key: ref, listing: "", star, title: "", text, posted_at: "", verified: true, locator: "" });
-    store.saveRunReviews(run.id, {
+    await store.saveRunReviews(run.id, {
       pulls: [{ handle: "p", source_id: "s", target_id: "product", platform: "amazon", listing: "", band_requested: null, fetched_at: "", archived: false, total_reviews: null, total_ratings: null, gap: null }],
       reviews: [review("r1", 3, "The capsule is huge and hard to swallow"), review("r2", 1, "I got a bottle of fish oil instead"), review("r3", 5, "ok")],
     });
     const analyst = new ReviewAnalyst(store, settings, supervisor.models, supervisor.costs);
     const analyse = async () => {
-      analyst.start(store.getRun(run.id)!);
+      await analyst.start((await store.getRun(run.id))!);
       await analyst.waitFor(run.id);
       await supervisor.close();
-      return analyst.read(run.id)!;
+      return (await analyst.read(run.id))!;
     };
     return { faux, analyse };
   }
 
   it("catalogues, tags in bulk, drops off-product reviews, and stores the result", async () => {
-    const { faux, analyse } = setup();
+    const { faux, analyse } = (await setup());
     const tagged: string[] = [];
     faux.setResponses([
       catalogue(),
@@ -188,7 +188,7 @@ describe("ReviewAnalyst", () => {
   });
 
   it("retries a reply that ran out of tokens on the next model in the chain", async () => {
-    const { faux, analyse } = setup(["backup-model"]);
+    const { faux, analyse } = (await setup(["backup-model"]));
     const asked: string[] = [];
     faux.setResponses([
       catalogue(),
@@ -205,7 +205,7 @@ describe("ReviewAnalyst", () => {
   });
 
   it("counts a batch that fails every attempt as unread instead of failing the analysis", async () => {
-    const { faux, analyse } = setup();
+    const { faux, analyse } = (await setup());
     faux.setResponses([catalogue(), spiral(), spiral(), spiral()]);
     const result = await analyse();
     expect(result.status).toBe("done");
@@ -213,7 +213,7 @@ describe("ReviewAnalyst", () => {
   });
 
   it("keeps a point the catalogue missed: the tagger names it, one merge call makes it an issue", async () => {
-    const { faux, analyse } = setup();
+    const { faux, analyse } = (await setup());
     const merged: string[] = [];
     faux.setResponses([
       catalogue(),
@@ -242,7 +242,7 @@ describe("ReviewAnalyst", () => {
   });
 
   it("skips the merge call when every point fit the catalogue", async () => {
-    const { faux, analyse } = setup();
+    const { faux, analyse } = (await setup());
     faux.setResponses([
       catalogue(),
       fauxAssistantMessage(fauxToolCall("record_review_tags", { tags: [{ n: 0, issues: ["too_big"], severity: 2, off_product: false, new_label: "", new_kind: "complaint" }] }), { stopReason: "toolUse" }),

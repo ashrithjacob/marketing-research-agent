@@ -336,7 +336,7 @@ describe("MeteredActorRunner", () => {
   const charged = (usageUsd: number | null | undefined, items: Array<Record<string, unknown>> = []) => {
     const charges: ChargeDraft[] = [];
     const inner: ActorRunner = { run: async () => ({ status: "SUCCEEDED", items, usageUsd }) };
-    return { runner: new MeteredActorRunner(inner, { charge: (c) => charges.push(c) }), charges };
+    return { runner: new MeteredActorRunner(inner, { charge: async (c) => { charges.push(c); } }), charges };
   };
 
   it("reports the charge even when the tool then fails on an empty dataset", async () => {

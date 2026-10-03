@@ -21,7 +21,7 @@ CREATE INDEX IF NOT EXISTS research_review_pulls_listing ON research_review_pull
 
   constructor(private readonly db: Database.Database) {}
 
-  latest(platform: ReviewPlatform, listing: string, band: number | null, since: string): StoredPull | null {
+  async latest(platform: ReviewPlatform, listing: string, band: number | null, since: string): Promise<StoredPull | null> {
     Trace.line(import.meta.url, "ReviewPullTable.latest", { platform, listing, band, since });
     const row = this.db
       .prepare("SELECT pulled_at, result FROM research_review_pulls WHERE platform = ? AND listing = ? AND band IS ? AND pulled_at >= ? ORDER BY pulled_at DESC LIMIT 1")
@@ -29,7 +29,7 @@ CREATE INDEX IF NOT EXISTS research_review_pulls_listing ON research_review_pull
     return row ? { pulled_at: row.pulled_at, result: Rows.json(row.result, null) as ReviewResult } : null;
   }
 
-  save(platform: ReviewPlatform, listing: string, band: number | null, result: ReviewResult): void {
+  async save(platform: ReviewPlatform, listing: string, band: number | null, result: ReviewResult): Promise<void> {
     Trace.line(import.meta.url, "ReviewPullTable.save", { platform, listing, band, reviews: result.excerpts.length });
     this.db
       .prepare("INSERT INTO research_review_pulls (platform, listing, band, pulled_at, result) VALUES (?,?,?,?,?)")

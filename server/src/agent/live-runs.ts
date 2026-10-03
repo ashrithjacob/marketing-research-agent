@@ -21,6 +21,7 @@ export interface Live {
 /** The runs in flight in this process, and the browsers watching them. */
 export class LiveRuns {
   private readonly live = new Map<string, Live>();
+  private readonly writes = new Map<string, Promise<void>>();
 
   constructor(private readonly store: ResearchStore) {}
 
@@ -65,11 +66,11 @@ export class LiveRuns {
     await this.live.get(runId)?.done;
   }
 
-  controllable(runId: string): Live {
+  async controllable(runId: string): Promise<Live> {
     Trace.line(import.meta.url, "LiveRuns.controllable", { runId });
     const live = this.live.get(runId);
     if (!live) throw new RunError(`run ${runId} is not running here`);
-    const status = this.store.getRun(runId)?.status;
+    const status = (await this.store.getRun(runId))?.status;
     if (status && TERMINAL_STATUSES.has(status)) {
       throw new RunError(`run ${runId} has already finished (${status})`);
     }
@@ -84,22 +85,29 @@ export class LiveRuns {
     return () => live.subscribers.delete(subscriber);
   }
 
+  /** Records the event and then tells the run's watchers, in the order emitted; the caller does not wait, and `written` waits for every event emitted so far. */
   emit(runId: string, kind: string, payload: Record<string, unknown>): void {
     Trace.tick(import.meta.url, "LiveRuns.emit", { kind });
-    const event = this.store.addEvent(runId, kind, payload);
-    const live = this.live.get(runId);
-    if (!live) return;
-    const frame: EventFrame = {
-      id: event.id,
-      kind,
-      payload,
-      created_at: event.created_at,
-    };
-    this.deliver(live, frame);
+    const previous = this.writes.get(runId) ?? Promise.resolve();
+    const next = previous.then(async () => {
+      const event = await this.store.addEvent(runId, kind, payload);
+      const live = this.live.get(runId);
+      if (live) this.deliver(live, { id: event.id, kind, payload, created_at: event.created_at });
+    }).catch((error: unknown) => console.error(`research run ${runId}: recording event ${kind} failed`, error));
+    this.writes.set(runId, next);
   }
 
-  closeSubscribers(runId: string): void {
+  /** Every event emitted for the run so far is stored and delivered. */
+  async written(runId: string): Promise<void> {
+    Trace.line(import.meta.url, "LiveRuns.written", { runId });
+    await this.writes.get(runId);
+  }
+
+  /** Ends every watcher's stream once the run's last events have reached them. */
+  async closeSubscribers(runId: string): Promise<void> {
     Trace.line(import.meta.url, "LiveRuns.closeSubscribers", { runId });
+    await this.written(runId);
+    this.writes.delete(runId);
     const live = this.live.get(runId);
     if (live) this.deliver(live, null);
   }

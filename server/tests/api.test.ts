@@ -100,9 +100,9 @@ describe("runs", () => {
     const { id } = (await (await post("/api/research/runs", { brief: { product: "MagnaCalm" }, nodes: ["product_data"] })).json()) as { id: string };
     await app.supervisor.waitFor(id);
     const read = (await (await get(`/api/research/runs/${id}`)).json()) as any;
-    const events = app.store.listEvents(id);
+    const events = (await app.store.listEvents(id));
     expect(read.last_event_id).toBe(events.at(-1)!.id);
-    expect(app.store.listEvents(id, read.last_event_id)).toEqual([]);
+    expect((await app.store.listEvents(id, read.last_event_id))).toEqual([]);
   });
 
   it("refuses a run with neither a product nor a site", async () => {
@@ -169,7 +169,7 @@ describe("the corpus route", () => {
   };
 
   const runId = async () =>
-    store.createRun({ workspaceId: "admin", brief: {}, model: MODEL_ID, rejectKinds: [], judgementIds: [] }).id;
+    (await store.createRun({ workspaceId: "admin", brief: {}, model: MODEL_ID, rejectKinds: [], judgementIds: [] })).id;
 
   it("rejects anything that is not a bare hash", async () => {
     const id = await runId();
@@ -244,17 +244,17 @@ describe("judgements", () => {
   });
 
   it("409s a steer at a run that is not running here", async () => {
-    const id = store.createRun({
+    const id = (await store.createRun({
       workspaceId: "admin",
       brief: {},
       model: MODEL_ID,
       rejectKinds: [],
       judgementIds: [],
-    }).id;
+    })).id;
     const response = await post(`/api/research/runs/${id}/steer`, { text: "prefer UK" });
     expect(response.status).toBe(409);
     // Stored anyway: a correction is worth keeping even if its run has ended.
-    expect(store.listJudgements(Scope.everything)).toHaveLength(1);
+    expect((await store.listJudgements(Scope.everything))).toHaveLength(1);
   });
 });
 
@@ -377,7 +377,7 @@ describe("per-node runs and the LLM call log", () => {
     expect(((await early.json()) as any).detail).toMatch(/once product truth \(stage 2\) has completed/);
 
     // Review mining is stage 3: product truth on that same stage-1 run comes first.
-    completeProductTruth(store, stageOne.id);
+    await completeProductTruth(store, stageOne.id);
     faux.setResponses(recorded(reviewPacket()));
     const allowed = await post("/api/research/runs", {
       brief: { product: "magna calm" },

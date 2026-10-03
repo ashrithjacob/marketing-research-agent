@@ -176,10 +176,10 @@ export function genreRun(packet: Record<string, any> = productPacket()): Assista
 }
 
 /** A completed product-truth run on stage-1 run `sourceRunId`: review mining starts only after one (spec-stage-2-product-truth.md §4). */
-export function completeProductTruth(store: ResearchStore, sourceRunId: string): string {
-  const source = store.getRun(sourceRunId)!;
-  const run = store.createRun({ workspaceId: source.workspace_id, brief: source.brief, model: "m", rejectKinds: [], judgementIds: [], nodes: [...STAGE_NODES[2]], stage: 2 });
-  store.updateRun(run.id, { status: "completed", source_run_id: sourceRunId });
+export async function completeProductTruth(store: ResearchStore, sourceRunId: string): Promise<string> {
+  const source = (await store.getRun(sourceRunId))!;
+  const run = (await store.createRun({ workspaceId: source.workspace_id, brief: source.brief, model: "m", rejectKinds: [], judgementIds: [], nodes: [...STAGE_NODES[2]], stage: 2 }));
+  await store.updateRun(run.id, { status: "completed", source_run_id: sourceRunId });
   return run.id;
 }
 
@@ -191,14 +191,14 @@ export function services(settings: Settings, actors: ActorRunner | null = null, 
 
 /** A meter for a tool whose spend the test does not read. */
 export class NoCharges implements ChargeMeter {
-  charge(_draft: ChargeDraft): void {}
+  async charge(_draft: ChargeDraft): Promise<void> {}
 }
 
 /** The run ledger held in memory, for tests that need the port and not SQLite. */
 export class MemoryLedger implements FindingLedger {
   readonly rows: Finding[] = [];
 
-  append(draft: FindingDraft): Finding {
+  async append(draft: FindingDraft): Promise<Finding> {
     const seq = this.rows.filter((row) => row.run_id === draft.run_id).length + 1;
     const row: Finding = {
       ...draft,
@@ -212,7 +212,7 @@ export class MemoryLedger implements FindingLedger {
     return row;
   }
 
-  retract(runId: string, id: string, why: string): Finding | null {
+  async retract(runId: string, id: string, why: string): Promise<Finding | null> {
     const row = this.rows.find((r) => r.run_id === runId && r.id === id && r.retracted_at === "");
     if (!row) return null;
     row.retracted_at = "2026-09-29T00:00:01Z";
@@ -220,7 +220,7 @@ export class MemoryLedger implements FindingLedger {
     return row;
   }
 
-  list(runId: string): Finding[] {
+  async list(runId: string): Promise<Finding[]> {
     return this.rows.filter((row) => row.run_id === runId);
   }
 }

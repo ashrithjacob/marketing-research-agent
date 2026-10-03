@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS research_target_listings (
 
   constructor(private readonly db: Database.Database) {}
 
-  save(listing: TargetListing): void {
+  async save(listing: TargetListing): Promise<void> {
     Trace.line(import.meta.url, "TargetListingTable.save", { sourceRunId: listing.source_run_id, targetId: listing.target_id });
     this.db
       .prepare(
@@ -27,7 +27,7 @@ CREATE TABLE IF NOT EXISTS research_target_listings (
       .run(listing.source_run_id, listing.target_id, JSON.stringify(listing), listing.fetched_at);
   }
 
-  list(sourceRunId: string): TargetListing[] {
+  async list(sourceRunId: string): Promise<TargetListing[]> {
     Trace.line(import.meta.url, "TargetListingTable.list", { sourceRunId });
     const rows = this.db
       .prepare("SELECT body FROM research_target_listings WHERE source_run_id = ? ORDER BY target_id")

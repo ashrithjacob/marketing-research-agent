@@ -35,9 +35,7 @@ export class ReadLedgerTool {
       parameters: readLedgerParameters,
       async execute(_id, params) {
         Trace.line(import.meta.url, "ReadLedgerTool.tool.execute", { params });
-        const rows = findings
-          .live()
-          .filter((row) => (!params.agent || row.agent_id === params.agent) && (!params.kind || row.kind === params.kind));
+        const rows = (await findings.live()).filter((row) => (!params.agent || row.agent_id === params.agent) && (!params.kind || row.kind === params.kind));
         const text = rows.length > 0 ? LedgerRows.render(rows) : "No live rows match.";
         return { content: [{ type: "text", text }], details: { rows: rows.length } };
       },
@@ -75,7 +73,7 @@ export class WaitForTool {
   private async poll(agent: string, kind: string, signal?: AbortSignal): Promise<{ rows: Finding[]; polls: number; why: string }> {
     Trace.line(import.meta.url, "WaitForTool.poll", { agent, kind });
     for (let polls = 1; polls <= LEDGER_WAIT_POLLS; polls++) {
-      const rows = this.findings.live().filter((row) => row.agent_id === agent && row.kind === kind);
+      const rows = (await this.findings.live()).filter((row) => row.agent_id === agent && row.kind === kind);
       if (rows.length > 0) return { rows, polls, why: "" };
       if (this.roster.hasEnded(agent)) return { rows: [], polls, why: `${agent} has ended without recording ${kind}` };
       if (signal?.aborted) return { rows: [], polls, why: "the run is stopping" };

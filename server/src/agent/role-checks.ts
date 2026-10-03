@@ -22,7 +22,7 @@ export class RoleChecks {
   }
 
   /** The champion has no node of its own to gap and report, so its turn limit only stops it. */
-  static closer(role: RoleSpec, findings: RunFindings, repair: RowRepair, check: DoneCheck, run: CheckedRun): (() => LimitClosed) | null {
+  static closer(role: RoleSpec, findings: RunFindings, repair: RowRepair, check: DoneCheck, run: CheckedRun): (() => Promise<LimitClosed>) | null {
     Trace.line(import.meta.url, "RoleChecks.closer", { role: role.id });
     if (role.consistency === "champion") return null;
     const part = { node: Roles.node(role, run.nodes), limit: role.maxTurns, reports: RoleRecords.of(role).includes("node_status") };

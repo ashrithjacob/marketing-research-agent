@@ -10,8 +10,8 @@ export class JudgementRoutes {
 
   register(api: Hono<ApiEnv>): void {
     Trace.line(import.meta.url, "JudgementRoutes.register");
-    api.get("/judgements", (c) =>
-      c.json({ data: this.store.listJudgements(Scope.of(c.get("principal").workspaceId)) }),
+    api.get("/judgements", async (c) =>
+      c.json({ data: await this.store.listJudgements(Scope.of(c.get("principal").workspaceId)) }),
     );
 
     api.post("/judgements", async (c) => {
@@ -20,7 +20,7 @@ export class JudgementRoutes {
         return c.json({ detail: "judgement text is required" }, 400);
       }
       return c.json(
-        this.store.addJudgement(c.get("principal").workspaceId, {
+        await this.store.addJudgement(c.get("principal").workspaceId, {
           kind: parsed.data.kind,
           text: parsed.data.text.trim(),
           rejects_kinds: parsed.data.rejects_kinds,
@@ -28,9 +28,9 @@ export class JudgementRoutes {
       );
     });
 
-    api.delete("/judgements/:judgementId", (c) => {
+    api.delete("/judgements/:judgementId", async (c) => {
       const scope = Scope.of(c.get("principal").workspaceId);
-      if (!this.store.deleteJudgement(scope, c.req.param("judgementId"))) {
+      if (!(await this.store.deleteJudgement(scope, c.req.param("judgementId")))) {
         return c.json({ detail: "no such judgement" }, 404);
       }
       return c.json({ ok: true });

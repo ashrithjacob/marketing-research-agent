@@ -9,19 +9,19 @@ export class OperatorInputs {
 
   constructor(private readonly ledger: FindingLedger, private readonly runId: string) {}
 
-  record(inputs: ProductTruthInputs): void {
+  async record(inputs: ProductTruthInputs): Promise<void> {
     Trace.line(import.meta.url, "OperatorInputs.record", { inputs });
     const hand = new RunFindings(this.ledger, this.runId, OPERATOR_AGENT, STAGE_NODES[2]);
     const { prices, ...costs } = inputs;
-    hand.record("operator_input", { ...costs, currency: costs.currency.trim().toUpperCase() });
+    await hand.record("operator_input", { ...costs, currency: costs.currency.trim().toUpperCase() });
     const blank: Array<[keyof typeof costs, string]> = [
       ["landed_unit_cost", "landed_unit_cost: not entered when product truth started, so no margin is computed"],
       ["moq", "moq: not entered when product truth started"],
       ["lead_time_days", "lead_time_days: not entered when product truth started"],
     ];
     for (const [field, missing] of blank) {
-      if (costs[field] === null) hand.record("gap", { node: "cogs_refills", missing, would_need: "the operator's figure from the supplier" });
+      if (costs[field] === null) await hand.record("gap", { node: "cogs_refills", missing, would_need: "the operator's figure from the supplier" });
     }
-    for (const price of prices) hand.record("price_point", { ...price, market: "", source_id: OperatorInputs.SOURCE });
+    for (const price of prices) await hand.record("price_point", { ...price, market: "", source_id: OperatorInputs.SOURCE });
   }
 }

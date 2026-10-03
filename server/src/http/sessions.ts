@@ -22,7 +22,7 @@ export class Sessions {
 
   async login(username: string, password: string): Promise<{ token: string; principal: Principal } | null> {
     Trace.line(import.meta.url, "Sessions.login", { username, password });
-    const account = this.accounts.byUsername(username);
+    const account = await this.accounts.byUsername(username);
     const matches = await Passwords.verify(password, account?.password_hash ?? (await this.decoyHash));
     if (!account || account.disabled || !matches) return null;
     return {
@@ -36,14 +36,14 @@ export class Sessions {
     if (!token) return null;
     const claims = await this.tokens.verify(token);
     if (!claims) return null;
-    const account = this.accounts.get(claims.subject);
+    const account = await this.accounts.get(claims.subject);
     if (!account || account.disabled || account.token_version !== claims.version) return null;
     return Sessions.principal(account);
   }
 
-  revoke(principal: Principal): void {
+  async revoke(principal: Principal): Promise<void> {
     Trace.line(import.meta.url, "Sessions.revoke", { principal });
-    this.accounts.revokeSessions(principal.userId);
+    await this.accounts.revokeSessions(principal.userId);
   }
 
   static local(username: string): Principal {

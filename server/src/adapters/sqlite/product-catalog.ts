@@ -12,27 +12,27 @@ export class SqliteProductCatalog implements ProductCatalog {
     private readonly rows: PacketRowTable,
   ) {}
 
-  list(scope: Scope): Product[] {
+  async list(scope: Scope): Promise<Product[]> {
     Trace.line(import.meta.url, "SqliteProductCatalog.list", { scope });
     return this.table.list(scope);
   }
 
-  get(productId: string, scope: Scope): Product | null {
+  async get(productId: string, scope: Scope): Promise<Product | null> {
     Trace.line(import.meta.url, "SqliteProductCatalog.get", { productId, scope });
     return this.table.get(productId, scope);
   }
 
-  byKey(key: string): Product | null {
+  async byKey(key: string): Promise<Product | null> {
     Trace.line(import.meta.url, "SqliteProductCatalog.byKey", { key });
     return this.table.byKey(key, Scope.everything);
   }
 
-  runHeads(scope: Scope): RunHead[] {
+  async runHeads(scope: Scope): Promise<RunHead[]> {
     Trace.line(import.meta.url, "SqliteProductCatalog.runHeads", { scope });
     return this.runs.heads(scope);
   }
 
-  packetRows(productId: string, scope: Scope): StoredPacketRows {
+  async packetRows(productId: string, scope: Scope): Promise<StoredPacketRows> {
     Trace.line(import.meta.url, "SqliteProductCatalog.packetRows", { productId, scope });
     return this.rows.list(productId, scope);
   }

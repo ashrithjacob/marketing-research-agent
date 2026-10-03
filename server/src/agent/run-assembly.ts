@@ -11,5 +11,5 @@ export interface Assembled {
 export interface RunAssembly {
   readonly runId: string;
   readonly via: "ledger" | "pipeline";
-  assemble(): Assembled;
+  assemble(): Promise<Assembled>;
 }

@@ -14,6 +14,8 @@ export class AuthGate {
   private static readonly COOKIE = "mra_session";
   private readonly sessions: Sessions | null;
   private readonly throttle = new LoginThrottle();
+  /** The first admin, seeded from MRA_APP_* once the store answers; every auth route waits for it. */
+  private readonly seeded: Promise<void>;
 
   constructor(
     private readonly settings: Settings,
@@ -23,23 +25,29 @@ export class AuthGate {
     if (!settings.appPasswordHash) {
       console.warn("MRA_APP_PASSWORD_HASH is empty — authentication is DISABLED");
       this.sessions = null;
+      this.seeded = Promise.resolve();
       return;
     }
-    if (accounts.seedAdmin(settings.appUser, settings.appPasswordHash)) {
-      console.log(`seeded admin account ${JSON.stringify(settings.appUser)} from MRA_APP_*`);
-    }
+    this.seeded = accounts.seedAdmin(settings.appUser, settings.appPasswordHash).then((seeded) => {
+      if (seeded) console.log(`seeded admin account ${JSON.stringify(settings.appUser)} from MRA_APP_*`);
+    });
     this.sessions = new Sessions(accounts, settings);
   }
 
   register(app: Hono<ApiEnv>): void {
     Trace.line(import.meta.url, "AuthGate.register");
+    app.use("/api/*", async (_c, next) => {
+      await this.seeded;
+      await next();
+    });
+
     app.get("/api/auth/session", async (c) => {
       const principal = await this.principal(c);
       if (!principal) return c.json({ authenticated: false, user: null, auth_required: true });
       return c.json({
         authenticated: true,
         user: principal.username,
-        workspace: this.accounts.workspace(principal.workspaceId)?.name ?? principal.workspaceId,
+        workspace: (await this.accounts.workspace(principal.workspaceId))?.name ?? principal.workspaceId,
         is_admin: principal.isAdmin,
         auth_required: this.sessions !== null,
       });
@@ -49,7 +57,7 @@ export class AuthGate {
 
     app.post("/api/auth/logout", async (c) => {
       const principal = this.sessions ? await this.principal(c) : null;
-      if (principal) this.sessions?.revoke(principal);
+      if (principal) await this.sessions?.revoke(principal);
       deleteCookie(c, AuthGate.COOKIE, { path: "/" });
       return c.json({ ok: true });
     });

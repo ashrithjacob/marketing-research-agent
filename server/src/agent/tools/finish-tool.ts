@@ -15,7 +15,7 @@ export class FinishTool {
 
   constructor(
     private readonly check: DoneCheck,
-    private readonly onChecked: (valid: boolean, problems: readonly string[]) => void,
+    private readonly onChecked: (valid: boolean, problems: readonly string[]) => Promise<void>,
   ) {}
 
   tool(): AgentTool<typeof finishParameters> {
@@ -43,8 +43,8 @@ export class FinishTool {
           };
         }
         tool.spent += 1;
-        const problems = CheckProblems.texts(check.problems());
-        onChecked(problems.length === 0, problems);
+        const problems = CheckProblems.texts(await check.problems());
+        await onChecked(problems.length === 0, problems);
         if (problems.length === 0) {
           return {
             content: [{ type: "text", text: "FINISHED — your part of the ledger passes its check. Your work is done." }],

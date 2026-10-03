@@ -12,9 +12,9 @@ export class RunMeter implements ChargeMeter {
     private readonly agentId: string | null,
   ) {}
 
-  charge(draft: ChargeDraft): void {
+  async charge(draft: ChargeDraft): Promise<void> {
     Trace.line(import.meta.url, "RunMeter.charge", { agentId: this.agentId, service: draft.service, units: draft.units });
-    const charge = this.store.charges.add({ ...draft, run_id: this.runId, agent_id: this.agentId });
+    const charge = await this.store.charges.add({ ...draft, run_id: this.runId, agent_id: this.agentId });
     this.runs.emit(this.runId, "run.charged", { ...charge });
   }
 }

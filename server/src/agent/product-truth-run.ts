@@ -82,7 +82,7 @@ export class ProductTruthRun {
     let ending: RunEnding;
     let output = "";
     try {
-      new OperatorInputs(store.findings, runId).record(this.run.inputs);
+      await new OperatorInputs(store.findings, runId).record(this.run.inputs);
       const outcomes = await team.run(ProductTruthRun.members(), (id) => factory.build(Roles.of(id), context), context.roster);
       const errors = outcomes.filter((o) => o.error).map((o) => `${o.agentId}: ${o.error}`).join("; ");
       ending = { kind: "settled", errorMessage: errors || undefined };
@@ -92,10 +92,12 @@ export class ProductTruthRun {
       ending = { kind: "crashed", error: `agent failed: ${error instanceof Error ? error.message : String(error)}` };
     }
     try {
-      new RunEnd(store, runs).end(assembly, ending, { output, usage: UsageTotals.tokens(team.totals) });
+      await team.written(context.sequence);
+      await new RunEnd(store, runs).end(assembly, ending, { output, usage: UsageTotals.tokens(team.totals) });
     } finally {
       await new RunWrapUp(store, runs, runId).recordBilling(team.billing);
-      runs.closeSubscribers(runId);
+      await team.written(context.sequence);
+      await runs.closeSubscribers(runId);
       runs.remove(runId);
     }
   }

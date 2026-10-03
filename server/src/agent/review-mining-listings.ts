@@ -38,9 +38,10 @@ export class ReviewMiningListings {
   }
 
   /** The stored listings, each re-judged by today's matcher, so a verdict from an older rule is never shown or mined. */
-  judged(sourceRunId: string, targets: readonly MiningTarget[]): TargetListing[] {
+  async judged(sourceRunId: string, targets: readonly MiningTarget[]): Promise<TargetListing[]> {
     Trace.line(import.meta.url, "ReviewMiningListings.judged", { sourceRunId, targets: targets.length });
-    return this.listings.list(sourceRunId).map((row) => this.recheck(row, targets));
+    const rows = await this.listings.list(sourceRunId);
+    return Promise.all(rows.map((row) => this.recheck(row, targets)));
   }
 
   ensure(sourceRunId: string, targets: readonly MiningTarget[]): Promise<TargetListing[]> {
@@ -55,7 +56,8 @@ export class ReviewMiningListings {
   private async fill(sourceRunId: string, targets: readonly MiningTarget[]): Promise<TargetListing[]> {
     Trace.line(import.meta.url, "ReviewMiningListings.fill", { sourceRunId, targets: targets.length });
     const source = this.source;
-    const have = new Map(this.listings.list(sourceRunId).map((row) => [row.target_id, this.recheck(row, targets)]));
+    const rechecked = await Promise.all((await this.listings.list(sourceRunId)).map((row) => this.recheck(row, targets)));
+    const have = new Map(rechecked.map((row) => [row.target_id, row]));
     const missing = targets.filter((target) => {
       const row = have.get(target.id);
       return !row || (!row.matches && row.strategy !== ReviewMiningListings.strategy(target));
@@ -69,7 +71,7 @@ export class ReviewMiningListings {
         if (found === undefined) return;
         const matched = found.find((candidate) => ListingMatch.mismatch(target, candidate) === "");
         const listing = matched ?? found[0] ?? null;
-        this.listings.save({
+        await this.listings.save({
           source_run_id: sourceRunId,
           target_id: target.id,
           query,
@@ -91,10 +93,10 @@ export class ReviewMiningListings {
     Trace.line(import.meta.url, "ReviewMiningListings.fillTrustpilot", { sourceRunId });
     const profiles = this.profiles;
     if (!profiles) return;
-    const rows = new Map(this.listings.list(sourceRunId).map((row) => [row.target_id, row]));
+    const rows = new Map((await this.listings.list(sourceRunId)).map((row) => [row.target_id, row]));
     const unread = ReviewMiningOffer.of(targets, [...rows.values()]).filter((t) => t.trustpilot && rows.get(t.id) && !rows.get(t.id)!.trustpilot);
     await Http.pool(unread, this.concurrency, async (target) => {
-      this.listings.save({ ...rows.get(target.id)!, trustpilot: await profiles.read(target.trustpilot) });
+      await this.listings.save({ ...rows.get(target.id)!, trustpilot: await profiles.read(target.trustpilot) });
     });
   }
 
@@ -124,14 +126,14 @@ export class ReviewMiningListings {
     return branded.replace(/\s+/g, " ").trim();
   }
 
-  private recheck(row: TargetListing, targets: readonly MiningTarget[]): TargetListing {
+  private async recheck(row: TargetListing, targets: readonly MiningTarget[]): Promise<TargetListing> {
     Trace.line(import.meta.url, "ReviewMiningListings.recheck", { target: row.target_id });
     const target = targets.find((t) => t.id === row.target_id);
     if (!target || !row.listing) return row;
     const mismatch = ListingMatch.mismatch(target, row.listing);
     if (row.matches === (mismatch === "") && row.mismatch === mismatch) return row;
     const updated = { ...row, matches: mismatch === "", mismatch };
-    this.listings.save(updated);
+    await this.listings.save(updated);
     return updated;
   }
 }

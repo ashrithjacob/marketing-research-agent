@@ -33,22 +33,22 @@ CREATE TABLE IF NOT EXISTS research_accounts (
 
   constructor(private readonly db: Database.Database) {}
 
-  addWorkspace(name: string): Workspace {
+  async addWorkspace(name: string): Promise<Workspace> {
     Trace.line(import.meta.url, "AccountTable.addWorkspace", { name });
     return this.insertWorkspace(name, name);
   }
 
-  workspace(id: string): Workspace | null {
+  async workspace(id: string): Promise<Workspace | null> {
     Trace.line(import.meta.url, "AccountTable.workspace", { id });
     return (this.db.prepare("SELECT * FROM research_workspaces WHERE id = ?").get(id) as Workspace) ?? null;
   }
 
-  workspaceNamed(name: string): Workspace | null {
+  async workspaceNamed(name: string): Promise<Workspace | null> {
     Trace.line(import.meta.url, "AccountTable.workspaceNamed", { name });
     return (this.db.prepare("SELECT * FROM research_workspaces WHERE name = ?").get(name) as Workspace) ?? null;
   }
 
-  addAccount(input: { username: string; passwordHash: string; workspaceId: string; isAdmin: boolean }): Account {
+  async addAccount(input: { username: string; passwordHash: string; workspaceId: string; isAdmin: boolean }): Promise<Account> {
     Trace.line(import.meta.url, "AccountTable.addAccount", { input });
     const id = Ids.next();
     this.db
@@ -57,22 +57,22 @@ CREATE TABLE IF NOT EXISTS research_accounts (
           " VALUES (?,?,?,?,?,?)",
       )
       .run(id, input.username, input.passwordHash, input.workspaceId, input.isAdmin ? 1 : 0, Clock.nowIso());
-    return this.get(id)!;
+    return (await this.get(id))!;
   }
 
-  get(accountId: string): Account | null {
+  async get(accountId: string): Promise<Account | null> {
     Trace.line(import.meta.url, "AccountTable.get", { accountId });
     return AccountTable.account(this.db.prepare("SELECT * FROM research_accounts WHERE id = ?").get(accountId));
   }
 
-  byUsername(username: string): Account | null {
+  async byUsername(username: string): Promise<Account | null> {
     Trace.line(import.meta.url, "AccountTable.byUsername", { username });
     return AccountTable.account(
       this.db.prepare("SELECT * FROM research_accounts WHERE username = ?").get(username),
     );
   }
 
-  list(): AccountListing[] {
+  async list(): Promise<AccountListing[]> {
     Trace.line(import.meta.url, "AccountTable.list");
     const rows = this.db
       .prepare(
@@ -84,36 +84,36 @@ CREATE TABLE IF NOT EXISTS research_accounts (
     return rows.map((row) => ({ ...row, is_admin: Boolean(row.is_admin), disabled: Boolean(row.disabled) }) as AccountListing);
   }
 
-  setPassword(username: string, passwordHash: string): boolean {
+  async setPassword(username: string, passwordHash: string): Promise<boolean> {
     Trace.line(import.meta.url, "AccountTable.setPassword", { username, passwordHash });
     return this.change("password_hash = ?", passwordHash, username);
   }
 
-  setDisabled(username: string, disabled: boolean): boolean {
+  async setDisabled(username: string, disabled: boolean): Promise<boolean> {
     Trace.line(import.meta.url, "AccountTable.setDisabled", { username, disabled });
     return this.change("disabled = ?", disabled ? 1 : 0, username);
   }
 
-  revokeSessions(accountId: string): void {
+  async revokeSessions(accountId: string): Promise<void> {
     Trace.line(import.meta.url, "AccountTable.revokeSessions", { accountId });
     this.db.prepare("UPDATE research_accounts SET token_version = token_version + 1 WHERE id = ?").run(accountId);
   }
 
-  seedAdmin(username: string, passwordHash: string): boolean {
+  async seedAdmin(username: string, passwordHash: string): Promise<boolean> {
     Trace.line(import.meta.url, "AccountTable.seedAdmin", { username, passwordHash });
     const count = this.db.prepare("SELECT COUNT(*) AS n FROM research_accounts").get() as { n: number };
     if (count.n > 0 || !passwordHash) return false;
-    if (!this.workspace(ADMIN_WORKSPACE)) this.insertWorkspace(ADMIN_WORKSPACE, ADMIN_WORKSPACE);
-    this.addAccount({ username, passwordHash, workspaceId: ADMIN_WORKSPACE, isAdmin: true });
+    if (!(await this.workspace(ADMIN_WORKSPACE))) await this.insertWorkspace(ADMIN_WORKSPACE, ADMIN_WORKSPACE);
+    await this.addAccount({ username, passwordHash, workspaceId: ADMIN_WORKSPACE, isAdmin: true });
     return true;
   }
 
-  private insertWorkspace(id: string, name: string): Workspace {
+  private async insertWorkspace(id: string, name: string): Promise<Workspace> {
     Trace.line(import.meta.url, "AccountTable.insertWorkspace", { id, name });
     this.db
       .prepare("INSERT INTO research_workspaces (id, name, created_at) VALUES (?,?,?)")
       .run(id, name, Clock.nowIso());
-    return this.workspace(id)!;
+    return (await this.workspace(id))!;
   }
 
   private change(assignment: string, value: string | number, username: string): boolean {

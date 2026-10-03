@@ -50,8 +50,8 @@ async function build(): Promise<App> {
 }
 
 async function addUser(username: string, workspace: string): Promise<void> {
-  const id = store.accounts.workspaceNamed(workspace)?.id ?? store.accounts.addWorkspace(workspace).id;
-  store.accounts.addAccount({ username, passwordHash: await Passwords.hash(PASSWORD), workspaceId: id, isAdmin: false });
+  const id = (await store.accounts.workspaceNamed(workspace))?.id ?? (await store.accounts.addWorkspace(workspace)).id;
+  await store.accounts.addAccount({ username, passwordHash: await Passwords.hash(PASSWORD), workspaceId: id, isAdmin: false });
 }
 
 const call = (path: string, init: RequestInit & { cookie?: string; ip?: string } = {}) =>
@@ -104,7 +104,7 @@ describe("seeding", () => {
   it("creates the admin from MRA_APP_* once, and never again", async () => {
     await app.close();
     app = await build();
-    const admins = store.accounts.list().filter((a) => a.is_admin);
+    const admins = (await store.accounts.list()).filter((a) => a.is_admin);
     expect(admins.map((a) => [a.username, a.workspace])).toEqual([["ash", "admin"]]);
     expect((await login("ash")).status).toBe(200);
   });
@@ -137,7 +137,7 @@ describe("workspace isolation", () => {
 
   it("scopes products and their rows the same way", async () => {
     const runId = await startRun(await cookieFor("client"));
-    const productId = store.getRun(runId)!.product_id;
+    const productId = (await store.getRun(runId))!.product_id;
     const stranger = await cookieFor("stranger");
 
     expect(await ids(await call("/api/research/products", { cookie: stranger }))).toEqual([]);
@@ -150,9 +150,9 @@ describe("workspace isolation", () => {
   it("keeps two workspaces' runs of one product apart", async () => {
     const mine = await startRun(await cookieFor("client"));
     const theirs = await startRun(await cookieFor("stranger"));
-    const productId = store.getRun(mine)!.product_id;
-    expect(store.getRun(theirs)!.product_id).toBe(productId);
-    expect(store.products.packetRows(productId, Scope.everything).attributes).toHaveLength(2);
+    const productId = (await store.getRun(mine))!.product_id;
+    expect((await store.getRun(theirs))!.product_id).toBe(productId);
+    expect((await store.products.packetRows(productId, Scope.everything)).attributes).toHaveLength(2);
 
     const rows = (await (await call(`/api/research/products/${productId}/rows`, { cookie: await cookieFor("brother") })).json()) as any;
     expect(new Set(rows.attributes.map((r: { run_id: string }) => r.run_id))).toEqual(new Set([mine]));
@@ -160,7 +160,7 @@ describe("workspace isolation", () => {
 
   it("does not hand one workspace's stage-1 packet to another's stage 2", async () => {
     const runId = await startRun(await cookieFor("client"));
-    expect(store.getRun(runId)!.status).toBe("completed");
+    expect((await store.getRun(runId))!.status).toBe("completed");
     const plan = async (username: string) => {
       const response = await call("/api/research/review-mining/plan", {
         method: "POST",
@@ -173,7 +173,7 @@ describe("workspace isolation", () => {
     expect(await plan("stranger")).toMatchObject({ ready: false, detail: expect.stringMatching(/no stage-1 packet/) });
   });
 
-  it("gives runs from before workspaces to the admin only", () => {
+  it("gives runs from before workspaces to the admin only", async () => {
     const path = join(dir, "old.db");
     const old = new Database(path);
     old.exec(`CREATE TABLE research_runs (
@@ -185,11 +185,11 @@ describe("workspace isolation", () => {
     old.close();
     const migrated = new SqliteResearchStore(path);
     try {
-      expect(migrated.getRun("legacy")!.workspace_id).toBe("admin");
-      expect(migrated.listRuns(Scope.of("acme-id"))).toEqual([]);
-      expect(migrated.listRuns(Scope.everything).map((r) => r.id)).toEqual(["legacy"]);
+      expect((await migrated.getRun("legacy"))!.workspace_id).toBe("admin");
+      expect((await migrated.listRuns(Scope.of("acme-id")))).toEqual([]);
+      expect((await migrated.listRuns(Scope.everything)).map((r) => r.id)).toEqual(["legacy"]);
     } finally {
-      migrated.close();
+      await migrated.close();
     }
   });
 });
@@ -207,8 +207,8 @@ describe("judgements", () => {
     const stranger = await cookieFor("stranger");
     expect(await ids(await call("/api/research/judgements", { cookie: stranger }))).toEqual([]);
     expect((await call(`/api/research/judgements/${id}`, { method: "DELETE", cookie: stranger })).status).toBe(404);
-    expect(store.getRun(await startRun(stranger))!.judgement_ids).toEqual([]);
-    expect(store.getRun(await startRun(await cookieFor("brother")))!.judgement_ids).toEqual([id]);
+    expect((await store.getRun(await startRun(stranger)))!.judgement_ids).toEqual([]);
+    expect((await store.getRun(await startRun(await cookieFor("brother"))))!.judgement_ids).toEqual([id]);
   });
 });
 
@@ -219,8 +219,8 @@ describe("sessions", () => {
       async () => void store.accounts.setDisabled("client", true),
       async () => void store.accounts.setPassword("client", await Passwords.hash("another long password")),
     ]) {
-      store.accounts.setDisabled("client", false);
-      store.accounts.setPassword("client", await Passwords.hash(PASSWORD));
+      await store.accounts.setDisabled("client", false);
+      await store.accounts.setPassword("client", await Passwords.hash(PASSWORD));
       const cookie = await cookieFor("client");
       expect((await call("/api/research/runs", { cookie })).status).toBe(200);
       await revoke(cookie);

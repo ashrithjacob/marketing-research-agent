@@ -22,7 +22,7 @@ export interface Charge extends ChargeDraft {
 
 /** Where a paid call reports what it cost, bound to one run and one agent. */
 export interface ChargeMeter {
-  charge(draft: ChargeDraft): void;
+  charge(draft: ChargeDraft): Promise<void>;
 }
 
 /** What a service reported a call used, before it is priced. */

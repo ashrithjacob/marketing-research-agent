@@ -51,8 +51,8 @@ export class AgentDriver {
     } finally {
       unsubscribe();
     }
-    this.closeAtLimit(agentId, built, finished);
-    const status: AgentEnd = this.stopping() ? "cancelled" : finished() ? "complete" : error ? "failed" : "incomplete";
+    await this.closeAtLimit(agentId, built, finished);
+    const status: AgentEnd = (await this.stopping()) ? "cancelled" : finished() ? "complete" : error ? "failed" : "incomplete";
     runs.emit(runId, "agent.ended", { agent_id: agentId, status, ...(error ? { error } : {}) });
     return { agentId, status, text: recorder.text(), error };
   }
@@ -61,27 +61,27 @@ export class AgentDriver {
     Trace.line(import.meta.url, "AgentDriver.resumeDropped", { agentId });
     for (let attempt = 1; attempt <= this.retry.attempts; attempt++) {
       const dropped = agent.state.errorMessage ?? "";
-      if (!Retries.isRetryable(dropped) || this.stopping()) return;
+      if (!Retries.isRetryable(dropped) || (await this.stopping())) return;
       const delayMs = Retries.backoffMs(attempt, this.retry);
       const moved = this.chain.failover(agent);
       this.runs.emit(this.runId, "run.resumed", { agent_id: agentId, error: dropped, attempt, delay_ms: delayMs, ...moved });
       await Retries.sleep(delayMs);
-      if (this.stopping()) return;
+      if (await this.stopping()) return;
       await agent.prompt(AgentMessages.resume(dropped));
       await agent.waitForIdle();
     }
   }
 
   /** An agent its turn limit ended: rows that fail its check are retracted and whatever it left open is gapped, so the run shows what it found rather than a rejected part. */
-  private closeAtLimit(agentId: string, built: BuiltAgent, finished: () => boolean): void {
+  private async closeAtLimit(agentId: string, built: BuiltAgent, finished: () => boolean): Promise<void> {
     Trace.line(import.meta.url, "AgentDriver.closeAtLimit", { agentId, spent: built.budget.spent });
-    if (!built.budget.spent || finished() || this.stopping() || !built.closeOnLimit) return;
-    const { gapped, retracted } = built.closeOnLimit();
+    if (!built.budget.spent || finished() || (await this.stopping()) || !built.closeOnLimit) return;
+    const { gapped, retracted } = await built.closeOnLimit();
     this.runs.emit(this.runId, "agent.limit_reached", { agent_id: agentId, limit: built.budget.limit, gapped, retracted });
   }
 
-  private stopping(): boolean {
+  private async stopping(): Promise<boolean> {
     Trace.line(import.meta.url, "AgentDriver.stopping");
-    return this.store.getRun(this.runId)?.status === "stopping";
+    return (await this.store.getRun(this.runId))?.status === "stopping";
   }
 }

@@ -76,11 +76,13 @@ export class StageOneRun {
       ending = { kind: "crashed", error: `agent failed: ${error instanceof Error ? error.message : String(error)}` };
     }
     try {
-      new RunEnd(store, runs).end(assembly, ending, { output, usage: UsageTotals.tokens(team.totals) });
+      await team.written(context.sequence);
+      await new RunEnd(store, runs).end(assembly, ending, { output, usage: UsageTotals.tokens(team.totals) });
       await wrapUp.lookUpListings(nodes);
     } finally {
       await wrapUp.recordBilling(team.billing);
-      runs.closeSubscribers(runId);
+      await team.written(context.sequence);
+      await runs.closeSubscribers(runId);
       runs.remove(runId);
     }
   }

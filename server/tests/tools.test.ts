@@ -467,7 +467,7 @@ describe("the ledger tools", () => {
       findings,
       records: RoleRecords.of(Roles.of(agent)),
       check,
-      onChecked: (v, problems) => checked.push({ valid: v, problems }),
+      onChecked: async (v, problems) => { checked.push({ valid: v, problems }); },
       ...(options.roster ? { roster: options.roster } : {}),
       ...(options.pollMs !== undefined ? { pollMs: options.pollMs } : {}),
     }).build();

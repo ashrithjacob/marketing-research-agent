@@ -17,7 +17,7 @@ export interface LedgerOptions {
   findings: RunFindings;
   records: readonly FindingKind[];
   check: DoneCheck;
-  onChecked: (valid: boolean, problems: readonly string[]) => void;
+  onChecked: (valid: boolean, problems: readonly string[]) => Promise<void>;
   roster?: AgentRoster;
   pollMs?: number;
 }

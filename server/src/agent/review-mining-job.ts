@@ -44,22 +44,22 @@ export class ReviewMiningJob {
     const done = this.mine(runId, request, ledger, stop.signal).then(
       (result) => {
         mined = result;
-        this.end(assembly, { kind: "settled" });
+        return this.end(assembly, { kind: "settled" });
       },
       (error: unknown) => {
         const message = error instanceof Error ? error.message : String(error);
-        this.end(assembly, stop.signal.aborted ? { kind: "stopped", reason: message } : { kind: "crashed", error: message });
+        return this.end(assembly, stop.signal.aborted ? { kind: "stopped", reason: message } : { kind: "crashed", error: message });
       },
     );
     return { abort: () => stop.abort(new Error("stopped by the operator")), done };
   }
 
-  private end(assembly: ReviewMiningRunAssembly, ending: RunEnding): void {
+  private async end(assembly: ReviewMiningRunAssembly, ending: RunEnding): Promise<void> {
     Trace.line(import.meta.url, "ReviewMiningJob.end", { runId: assembly.runId, ending: ending.kind });
     try {
-      new RunEnd(this.store, this.runs).end(assembly, ending);
+      await new RunEnd(this.store, this.runs).end(assembly, ending);
     } finally {
-      this.runs.closeSubscribers(assembly.runId);
+      await this.runs.closeSubscribers(assembly.runId);
       this.runs.remove(assembly.runId);
     }
   }
@@ -73,12 +73,12 @@ export class ReviewMiningJob {
     Trace.line(import.meta.url, "ReviewMiningJob.mine", { runId });
     if (!this.actors) throw new Error("APIFY_TOKEN is not set, so no review can be pulled");
     const handoff = new StageOneHandoff(this.store);
-    const source = handoff.forBrief(request.brief, Scope.of(request.workspaceId));
+    const source = await handoff.forBrief(request.brief, Scope.of(request.workspaceId));
     if (!source) throw new Error("no completed stage-1 run for this brief names the targets to mine");
-    if (!handoff.hasCompleted(2, source.run.id, Scope.of(request.workspaceId))) {
+    if (!(await handoff.hasCompleted(2, source.run.id, Scope.of(request.workspaceId)))) {
       throw new Error(`product truth has not completed on stage-1 run ${source.run.id}, so review mining cannot start`);
     }
-    this.store.updateRun(runId, { source_run_id: source.run.id });
+    await this.store.updateRun(runId, { source_run_id: source.run.id });
     const runner = new MeteredActorRunner(this.actors, new RunMeter(this.store, this.runs, runId, null));
     const roster = ReviewMiningRoster.of(source.packet);
     const listings = await new ReviewMiningListings(this.store.listings, new AmazonListingLookup(runner), this.settings.apifyConcurrency)
@@ -97,7 +97,7 @@ export class ReviewMiningJob {
     const reuse = new ReviewReuse(this.store.pulls, this.settings.reviewReuseDays, (label, pulledAt) =>
       this.runs.emit(runId, "reviews.reused", { target_id: label.target_id, listing: label.listing, band: label.band, pulled_at: pulledAt }),
     );
-    const { reused, toPull } = reuse.split(this.jobs(targets, runner));
+    const { reused, toPull } = await reuse.split(this.jobs(targets, runner));
     const outcomes = [...reused, ...(await puller.pullAll(toPull, signal))];
     const filing = new ReviewFiling(new Corpus(this.settings.corpusPath), runId, ledger);
     const failures: PullFailure[] = [];

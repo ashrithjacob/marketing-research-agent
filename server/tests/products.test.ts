@@ -107,49 +107,50 @@ describe("the product store", () => {
     store = new SqliteResearchStore(path());
   });
 
-  afterEach(() => {
-    store.close();
+  afterEach(async () => {
+    await store.close();
     rmSync(dir, { recursive: true, force: true });
   });
 
-  it("files every spelling of a name under one stored product", () => {
-    const ids = ["Vitamin D", "vitamin_d", "VITAMIND"].map((name) => run(name).product_id);
+  it("files every spelling of a name under one stored product", async () => {
+    const ids: string[] = [];
+    for (const name of ["Vitamin D", "vitamin_d", "VITAMIND"]) ids.push((await run(name)).product_id);
     expect(new Set(ids).size).toBe(1);
-    expect(store.products.list(Scope.everything)).toHaveLength(1);
-    expect(store.products.get(ids[0]!, Scope.everything)?.label).toBe("VITAMIND");
+    expect((await store.products.list(Scope.everything))).toHaveLength(1);
+    expect((await store.products.get(ids[0]!, Scope.everything))?.label).toBe("VITAMIND");
   });
 
-  it("stores a packet's facts as rows tagged with run and product, replacing them on rewrite", () => {
-    const first = run("MagnaCalm");
-    store.updateRun(first.id, { packet: minimalPacket() });
-    store.updateRun(first.id, { packet: minimalPacket() });
-    const rows = store.products.packetRows(first.product_id, Scope.everything);
+  it("stores a packet's facts as rows tagged with run and product, replacing them on rewrite", async () => {
+    const first = (await run("MagnaCalm"));
+    await store.updateRun(first.id, { packet: minimalPacket() });
+    await store.updateRun(first.id, { packet: minimalPacket() });
+    const rows = (await store.products.packetRows(first.product_id, Scope.everything));
     expect(rows.attributes).toEqual([expect.objectContaining({ key: "dose_per_serving", value: "400 mg", run_id: first.id })]);
     expect(rows.sources).toHaveLength(1);
     expect(rows.gaps).toHaveLength(1);
   });
 
-  it("links each saved review to the run's product, counting a review two runs share once", () => {
+  it("links each saved review to the run's product, counting a review two runs share once", async () => {
     const pull = { handle: "p1", source_id: "s", target_id: "product", platform: "amazon" as const, listing: "L", band_requested: 3, fetched_at: "", archived: true, total_reviews: null, total_ratings: null, gap: null };
     const review = { ref: "r1", pull: "p1", platform: "amazon" as const, review_key: "R1", listing: "L", star: 3, title: "t", text: "works", posted_at: "", verified: true, locator: "" };
-    const [a, b] = [run("Vitamin D", 2), run("vitamin-d", 2)];
-    for (const r of [a!, b!]) store.saveRunReviews(r.id, { pulls: [pull], reviews: [review] });
-    expect(store.products.get(a!.product_id, Scope.everything)?.review_count).toBe(1);
+    const [a, b] = [await run("Vitamin D", 2), await run("vitamin-d", 2)];
+    for (const r of [a!, b!]) await store.saveRunReviews(r.id, { pulls: [pull], reviews: [review] });
+    expect((await store.products.get(a!.product_id, Scope.everything))?.review_count).toBe(1);
   });
 
-  it("gives runs from before products existed their product, rows and review links", () => {
-    const legacy = run("Vitamin D");
-    store.updateRun(legacy.id, { packet: minimalPacket() });
-    store.close();
+  it("gives runs from before products existed their product, rows and review links", async () => {
+    const legacy = (await run("Vitamin D"));
+    await store.updateRun(legacy.id, { packet: minimalPacket() });
+    await store.close();
     const db = new Database(path());
     db.exec("UPDATE research_runs SET product_id = ''; DELETE FROM research_products; DELETE FROM research_packet_attributes;");
     db.close();
 
     store = new SqliteResearchStore(path());
-    const again = store.getRun(legacy.id)!;
+    const again = (await store.getRun(legacy.id))!;
     expect(again.product_id).not.toBe("");
-    expect(store.products.get(again.product_id, Scope.everything)?.key).toBe("product:vitamind");
-    expect(store.products.packetRows(again.product_id, Scope.everything).attributes).toHaveLength(1);
+    expect((await store.products.get(again.product_id, Scope.everything))?.key).toBe("product:vitamind");
+    expect((await store.products.packetRows(again.product_id, Scope.everything)).attributes).toHaveLength(1);
   });
 });
 
@@ -170,24 +171,24 @@ describe("products cover every run, not the newest page", () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
-  function seed(newer: number): { id: string; product_id: string } {
+  async function seed(newer: number): Promise<{ id: string; product_id: string }> {
     const db = new Database(join(dir, "research.db"));
-    const make = (product: string, i: number) => {
-      const created = store.createRun({ workspaceId: "admin", brief: { product, url: "", market: "", notes: "" }, model: "m", rejectKinds: [], judgementIds: [], stage: 1 });
+    const make = async (product: string, i: number) => {
+      const created = (await store.createRun({ workspaceId: "admin", brief: { product, url: "", market: "", notes: "" }, model: "m", rejectKinds: [], judgementIds: [], stage: 1 }));
       const at = new Date(Date.UTC(2026, 0, 1) + i * 60_000).toISOString();
       db.prepare("UPDATE research_runs SET created_at = ? WHERE id = ?").run(at, created.id);
       return created;
     };
-    const oldest = make("Vitamin D", 0);
-    for (let i = 1; i <= newer; i++) make(`Filler ${i}`, i);
+    const oldest = (await make("Vitamin D", 0));
+    for (let i = 1; i <= newer; i++) await make(`Filler ${i}`, i);
     db.close();
     return oldest;
   }
 
-  const get = async (path: string) => (await app.fetch(new Request(`http://test${path}`))).json() as Promise<any>;
+  const get = async (path: string) => (await (await app.fetch(new Request(`http://test${path}`))).json()) as Promise<any>;
 
   it("lists a product whose only run is older than the newest 50", async () => {
-    const oldest = seed(60);
+    const oldest = await seed(60);
     const products = (await get("/api/research/products")).data;
     expect(products).toHaveLength(61);
     expect(products.at(-1)).toMatchObject({ id: oldest.product_id, label: "Vitamin D", default_run_id: oldest.id });
@@ -196,10 +197,10 @@ describe("products cover every run, not the newest page", () => {
     expect(await get(`/api/research/products/${oldest.product_id}`)).toMatchObject({ run_count: 1 });
   });
 
-  it("hands stage 2 a stage-1 run older than the newest 200", () => {
-    const oldest = seed(210);
-    store.updateRun(oldest.id, { status: "completed", packet: minimalPacket() });
-    const found = new StageOneHandoff(store).forBrief({ product: "VITAMIN-D", url: "", market: "", notes: "" }, Scope.everything);
+  it("hands stage 2 a stage-1 run older than the newest 200", async () => {
+    const oldest = await seed(210);
+    await store.updateRun(oldest.id, { status: "completed", packet: minimalPacket() });
+    const found = (await new StageOneHandoff(store).forBrief({ product: "VITAMIN-D", url: "", market: "", notes: "" }, Scope.everything));
     expect(found?.run.id).toBe(oldest.id);
   });
 });

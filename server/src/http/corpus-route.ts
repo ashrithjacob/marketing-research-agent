@@ -23,7 +23,7 @@ export class CorpusRoute {
     api.get("/runs/:runId/sources/:sha", async (c) => {
       const runId = c.req.param("runId");
       const sha = c.req.param("sha");
-      if (!this.store.getRun(runId)) return c.json({ detail: "no such run" }, 404);
+      if (!(await this.store.getRun(runId))) return c.json({ detail: "no such run" }, 404);
       if (!CorpusRoute.SHA_RE.test(sha)) return c.json({ detail: "not a source hash" }, 400);
 
       const root = resolve(join(this.settings.corpusPath, "runs", runId, "sources"));

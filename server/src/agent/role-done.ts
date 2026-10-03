@@ -13,9 +13,9 @@ export class RoleDone implements DoneCheck {
     private readonly consistency: DoneCheck,
   ) {}
 
-  problems(): CheckProblem[] {
+  async problems(): Promise<CheckProblem[]> {
     Trace.line(import.meta.url, "RoleDone.problems", { agentId: this.findings.agentId });
-    const open = this.deliverable.missing(this.findings.live()).map((missing) => ({ text: missing.text, row: missing.row ?? null }));
-    return [...open, ...this.consistency.problems()];
+    const open = this.deliverable.missing(await this.findings.live()).map((missing) => ({ text: missing.text, row: missing.row ?? null }));
+    return [...open, ...(await this.consistency.problems())];
   }
 }

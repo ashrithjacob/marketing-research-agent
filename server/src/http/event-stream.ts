@@ -16,9 +16,9 @@ export class EventStream {
 
   register(api: Hono<ApiEnv>): void {
     Trace.line(import.meta.url, "EventStream.register");
-    api.get("/runs/:runId/events", (c) => {
+    api.get("/runs/:runId/events", async (c) => {
       const runId = c.req.param("runId");
-      if (!this.store.getRun(runId)) return c.json({ detail: "no such run" }, 404);
+      if (!(await this.store.getRun(runId))) return c.json({ detail: "no such run" }, 404);
       const after = Number(c.req.query("after") ?? 0);
       const from = Number.isFinite(after) ? after : 0;
       return streamSSE(c, async (stream) => this.follow(stream, runId, from));
@@ -36,7 +36,7 @@ export class EventStream {
 
     let last = from;
     try {
-      for (const event of this.store.listEvents(runId, last)) {
+      for (const event of await this.store.listEvents(runId, last)) {
         last = event.id;
         await stream.writeSSE({
           event: "event",

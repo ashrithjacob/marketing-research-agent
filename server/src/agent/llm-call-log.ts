@@ -8,11 +8,24 @@ import { UsageTotals } from "./usage.js";
 /** Numbers a run's LLM calls across all of its agents. */
 export class CallSequence {
   private last = 0;
+  private readonly pending = new Set<Promise<void>>();
 
   next(): number {
     Trace.line(import.meta.url, "CallSequence.next", { last: this.last });
     this.last += 1;
     return this.last;
+  }
+
+  /** A call's record being written; the run waits for every one before it ends. */
+  track(write: Promise<void>): void {
+    Trace.line(import.meta.url, "CallSequence.track", { pending: this.pending.size });
+    this.pending.add(write);
+    void write.finally(() => this.pending.delete(write));
+  }
+
+  async written(): Promise<void> {
+    Trace.line(import.meta.url, "CallSequence.written", { pending: this.pending.size });
+    await Promise.all([...this.pending]);
   }
 }
 
@@ -66,11 +79,11 @@ export class LlmCallLog {
       const tools = toolsKey !== this.lastTools ? (JSON.parse(toolsKey) as unknown[]) : null;
       this.lastTools = toolsKey;
 
-      const record = (message: AssistantMessage | undefined, failure?: unknown) => {
+      const record = async (message: AssistantMessage | undefined, failure?: unknown): Promise<void> => {
         try {
           const ended = Date.now();
           const { usage, ...answer } = message ?? ({} as Partial<AssistantMessage>);
-          const call = this.options.store.addLlmCall({
+          const call = await this.options.store.addLlmCall({
             run_id: this.options.runId,
             seq: n,
             agent_id: this.options.agentId,
@@ -108,13 +121,13 @@ export class LlmCallLog {
       try {
         stream = await inner(model, context, streamOptions);
       } catch (error) {
-        record(undefined, error);
+        this.options.sequence.track(record(undefined, error));
         throw error;
       }
-      stream.result().then(
+      this.options.sequence.track(stream.result().then(
         (message) => record(message),
         (error) => record(undefined, error),
-      );
+      ));
       return stream;
     };
   }

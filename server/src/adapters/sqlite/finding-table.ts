@@ -34,7 +34,7 @@ CREATE TABLE IF NOT EXISTS research_findings (
 
   constructor(private readonly db: Database.Database) {}
 
-  append(draft: FindingDraft): Finding {
+  async append(draft: FindingDraft): Promise<Finding> {
     Trace.line(import.meta.url, "FindingTable.append", { runId: draft.run_id, kind: draft.kind });
     const insert = this.db.transaction((): Finding => {
       const { next } = this.db
@@ -60,7 +60,7 @@ CREATE TABLE IF NOT EXISTS research_findings (
     return insert();
   }
 
-  retract(runId: string, id: string, why: string): Finding | null {
+  async retract(runId: string, id: string, why: string): Promise<Finding | null> {
     Trace.line(import.meta.url, "FindingTable.retract", { runId, id, why });
     const changed = this.db
       .prepare(
@@ -69,10 +69,10 @@ CREATE TABLE IF NOT EXISTS research_findings (
       )
       .run(Clock.nowIso(), why, runId, id).changes;
     if (changed === 0) return null;
-    return this.list(runId).find((row) => row.id === id) ?? null;
+    return (await this.list(runId)).find((row) => row.id === id) ?? null;
   }
 
-  list(runId: string): Finding[] {
+  async list(runId: string): Promise<Finding[]> {
     Trace.line(import.meta.url, "FindingTable.list", { runId });
     const rows = this.db
       .prepare("SELECT * FROM research_findings WHERE run_id = ? ORDER BY seq")

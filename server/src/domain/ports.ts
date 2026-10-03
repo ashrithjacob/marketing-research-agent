@@ -23,26 +23,26 @@ import type { AdPage, AdQuery } from "./ad-library.js";
 
 /** Products and what their runs found, counted only over the runs a scope admits. */
 export interface ProductCatalog {
-  list(scope: Scope): Product[];
-  get(productId: string, scope: Scope): Product | null;
-  byKey(key: string): Product | null;
-  runHeads(scope: Scope): RunHead[];
-  packetRows(productId: string, scope: Scope): StoredPacketRows;
+  list(scope: Scope): Promise<Product[]>;
+  get(productId: string, scope: Scope): Promise<Product | null>;
+  byKey(key: string): Promise<Product | null>;
+  runHeads(scope: Scope): Promise<RunHead[]>;
+  packetRows(productId: string, scope: Scope): Promise<StoredPacketRows>;
 }
 
 /** Workspaces and the logins that belong to them. */
 export interface AccountDirectory {
-  addWorkspace(name: string): Workspace;
-  workspace(id: string): Workspace | null;
-  workspaceNamed(name: string): Workspace | null;
-  addAccount(input: { username: string; passwordHash: string; workspaceId: string; isAdmin: boolean }): Account;
-  get(accountId: string): Account | null;
-  byUsername(username: string): Account | null;
-  list(): AccountListing[];
-  setPassword(username: string, passwordHash: string): boolean;
-  setDisabled(username: string, disabled: boolean): boolean;
-  revokeSessions(accountId: string): void;
-  seedAdmin(username: string, passwordHash: string): boolean;
+  addWorkspace(name: string): Promise<Workspace>;
+  workspace(id: string): Promise<Workspace | null>;
+  workspaceNamed(name: string): Promise<Workspace | null>;
+  addAccount(input: { username: string; passwordHash: string; workspaceId: string; isAdmin: boolean }): Promise<Account>;
+  get(accountId: string): Promise<Account | null>;
+  byUsername(username: string): Promise<Account | null>;
+  list(): Promise<AccountListing[]>;
+  setPassword(username: string, passwordHash: string): Promise<boolean>;
+  setDisabled(username: string, disabled: boolean): Promise<boolean>;
+  revokeSessions(accountId: string): Promise<void>;
+  seedAdmin(username: string, passwordHash: string): Promise<boolean>;
 }
 
 /** The best-selling Amazon listings for a search phrase in one Amazon store, most popular first, with traction details. */
@@ -52,21 +52,21 @@ export interface AmazonListingSource {
 
 /** The Amazon listing looked up for each review-mining target, kept per stage-1 run so it is paid for once. */
 export interface TargetListings {
-  save(listing: TargetListing): void;
-  list(sourceRunId: string): TargetListing[];
+  save(listing: TargetListing): Promise<void>;
+  list(sourceRunId: string): Promise<TargetListing[]>;
 }
 
 /** Every charge a run made, appended as each call returns. */
 export interface ChargeLedger {
-  add(charge: Omit<Charge, "created_at">): Charge;
-  list(runId: string): Charge[];
+  add(charge: Omit<Charge, "created_at">): Promise<Charge>;
+  list(runId: string): Promise<Charge[]>;
 }
 
 /** What a run has found, one row per finding, written as it is found. Rows are retracted, never deleted. */
 export interface FindingLedger {
-  append(draft: FindingDraft): Finding;
-  retract(runId: string, id: string, why: string): Finding | null;
-  list(runId: string): Finding[];
+  append(draft: FindingDraft): Promise<Finding>;
+  retract(runId: string, id: string, why: string): Promise<Finding | null>;
+  list(runId: string): Promise<Finding[]>;
 }
 
 /** Reads one page as text. Throws rather than returning an empty body. */
@@ -104,28 +104,28 @@ export interface ResearchStore {
     judgementIds: string[];
     nodes?: string[];
     stage?: number;
-  }): ResearchRun;
-  getRun(runId: string): ResearchRun | null;
-  listRuns(scope: Scope, limit?: number): ResearchRun[];
-  updateRun(runId: string, fields: RunUpdate): void;
-  addEvent(runId: string, kind: string, payload: Record<string, unknown>): RunEvent;
-  listEvents(runId: string, afterId?: number): RunEvent[];
-  lastEventId(runId: string): number;
-  listJudgements(scope: Scope, activeOnly?: boolean): Judgement[];
-  addJudgement(workspaceId: string, input: { kind: string; text: string; rejects_kinds: SourceKind[] }): Judgement;
-  deleteJudgement(scope: Scope, judgementId: string): boolean;
-  bumpJudgement(judgementId: string, by?: number): void;
-  addPacketCheck(runId: string, valid: boolean, problems: readonly string[]): PacketCheck;
-  listPacketChecks(runId: string): PacketCheck[];
-  addLlmCall(call: LlmCallRecord): LlmCall;
-  setLlmCallGeneration(runId: string, responseId: string, generation: Generation): void;
-  listLlmCalls(runId: string): LlmCall[];
-  saveRunReviews(runId: string, ledger: ReviewLedgerSnapshot): number;
-  listRunReviews(runId: string): StoredRunReview[];
-  saveReviewAnalysis(analysis: ReviewAnalysis): void;
-  getReviewAnalysis(runId: string): ReviewAnalysis | null;
+  }): Promise<ResearchRun>;
+  getRun(runId: string): Promise<ResearchRun | null>;
+  listRuns(scope: Scope, limit?: number): Promise<ResearchRun[]>;
+  updateRun(runId: string, fields: RunUpdate): Promise<void>;
+  addEvent(runId: string, kind: string, payload: Record<string, unknown>): Promise<RunEvent>;
+  listEvents(runId: string, afterId?: number): Promise<RunEvent[]>;
+  lastEventId(runId: string): Promise<number>;
+  listJudgements(scope: Scope, activeOnly?: boolean): Promise<Judgement[]>;
+  addJudgement(workspaceId: string, input: { kind: string; text: string; rejects_kinds: SourceKind[] }): Promise<Judgement>;
+  deleteJudgement(scope: Scope, judgementId: string): Promise<boolean>;
+  bumpJudgement(judgementId: string, by?: number): Promise<void>;
+  addPacketCheck(runId: string, valid: boolean, problems: readonly string[]): Promise<PacketCheck>;
+  listPacketChecks(runId: string): Promise<PacketCheck[]>;
+  addLlmCall(call: LlmCallRecord): Promise<LlmCall>;
+  setLlmCallGeneration(runId: string, responseId: string, generation: Generation): Promise<void>;
+  listLlmCalls(runId: string): Promise<LlmCall[]>;
+  saveRunReviews(runId: string, ledger: ReviewLedgerSnapshot): Promise<number>;
+  listRunReviews(runId: string): Promise<StoredRunReview[]>;
+  saveReviewAnalysis(analysis: ReviewAnalysis): Promise<void>;
+  getReviewAnalysis(runId: string): Promise<ReviewAnalysis | null>;
 
-  close(): void;
+  close(): Promise<void>;
 }
 
 export interface GateVerdict {
@@ -142,6 +142,6 @@ export interface FetchGate {
 
 /** Earlier pulls of a listing's star band, from any run in any workspace: reviews are public pages, so one paid pull serves everyone until it is too old. */
 export interface ReviewPullStore {
-  latest(platform: ReviewPlatform, listing: string, band: number | null, since: string): StoredPull | null;
-  save(platform: ReviewPlatform, listing: string, band: number | null, result: ReviewResult): void;
+  latest(platform: ReviewPlatform, listing: string, band: number | null, since: string): Promise<StoredPull | null>;
+  save(platform: ReviewPlatform, listing: string, band: number | null, result: ReviewResult): Promise<void>;
 }

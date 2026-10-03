@@ -28,43 +28,45 @@ export class ProductTruthRunAssembly implements RunAssembly {
     private readonly run: { sourceRunId: string; brief: Brief; markets: readonly string[] },
   ) {}
 
-  assemble(): Assembled {
+  async assemble(): Promise<Assembled> {
     Trace.line(import.meta.url, "ProductTruthRunAssembly.assemble", { runId: this.runId });
-    const agentRows = Findings.live(this.ledger.list(this.runId)).filter((row) => (PRODUCT_TRUTH_AGENTS as readonly string[]).includes(row.agent_id));
-    if (agentRows.length === 0) return { packet: null, problems: this.problems().map((p) => p.text), retracted: [] };
-    const all = () => [...this.problems(), ...this.parse().problems];
-    const retracted = new RowRepair(this.ledger, this.runId, STAGE_NODES[2]).repair(all, "when the run settled");
-    const { packet, problems } = this.parse();
-    return { packet, problems: [...this.problems(), ...problems].map((p) => p.text), retracted };
+    const agentRows = Findings.live(await this.ledger.list(this.runId)).filter((row) => (PRODUCT_TRUTH_AGENTS as readonly string[]).includes(row.agent_id));
+    if (agentRows.length === 0) return { packet: null, problems: (await this.problems()).map((p) => p.text), retracted: [] };
+    const all = async () => [...(await this.problems()), ...(await this.parse()).problems];
+    const retracted = await new RowRepair(this.ledger, this.runId, STAGE_NODES[2]).repair(all, "when the run settled");
+    const { packet, problems } = await this.parse();
+    return { packet, problems: [...(await this.problems()), ...problems].map((p) => p.text), retracted };
   }
 
-  private parse(): { packet: ProductTruthPacket | null; problems: CheckProblem[] } {
+  private async parse(): Promise<{ packet: ProductTruthPacket | null; problems: CheckProblem[] }> {
     Trace.line(import.meta.url, "ProductTruthRunAssembly.parse", { runId: this.runId });
-    const rows = this.ledger.list(this.runId);
-    const draft = new ProductTruthAssembly(rows).draft({ ...this.run, runId: this.runId, nodes: this.nodes() });
+    const rows = await this.ledger.list(this.runId);
+    const draft = new ProductTruthAssembly(rows).draft({ ...this.run, runId: this.runId, nodes: await this.nodes() });
     const parsed = productTruthPacketSchema.safeParse(draft);
     if (parsed.success) return { packet: parsed.data, problems: [] };
     const blamed = new RowBlame(Findings.live(rows), ProductTruthAssembly.SECTIONS).problems(parsed.error);
     return { packet: null, problems: blamed.map((p) => ({ ...p, text: `the packet does not parse: ${p.text}` })) };
   }
 
-  private problems(): CheckProblem[] {
+  private async problems(): Promise<CheckProblem[]> {
     Trace.line(import.meta.url, "ProductTruthRunAssembly.problems");
-    return PRODUCT_TRUTH_AGENTS.flatMap((id) => this.check(id).map((p) => ({ ...p, text: `${id}: ${p.text}` })));
+    const each = await Promise.all(PRODUCT_TRUTH_AGENTS.map(async (id) => (await this.check(id)).map((p) => ({ ...p, text: `${id}: ${p.text}` }))));
+    return each.flat();
   }
 
-  private check(id: ProductTruthAgent): CheckProblem[] {
+  private check(id: ProductTruthAgent): Promise<CheckProblem[]> {
     Trace.line(import.meta.url, "ProductTruthRunAssembly.check", { id });
     const findings = new RunFindings(this.ledger, this.runId, id, STAGE_NODES[2], this.run.markets);
     return RoleChecks.done(Roles.of(id), findings, { brief: this.run.brief, nodes: STAGE_NODES[2], markets: this.run.markets }).problems();
   }
 
-  private nodes(): NodeReport[] {
+  private nodes(): Promise<NodeReport[]> {
     Trace.line(import.meta.url, "ProductTruthRunAssembly.nodes");
-    return STAGE_NODES[2].map((node) => {
-      const open = PRODUCT_TRUTH_AGENTS.filter((id) => Roles.of(id).deliverable.node === node).flatMap((id) => this.check(id));
+    return Promise.all(STAGE_NODES[2].map(async (node): Promise<NodeReport> => {
+      const owners = PRODUCT_TRUTH_AGENTS.filter((id) => Roles.of(id).deliverable.node === node);
+      const open = (await Promise.all(owners.map((id) => this.check(id)))).flat();
       const done = open.length === 0;
       return { node, status: done ? "complete" : "incomplete", done_criterion_met: done, why: done ? "every item recorded or gapped" : open.map((p) => p.text).join("; ") };
-    });
+    }));
   }
 }

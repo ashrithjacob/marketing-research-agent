@@ -16,8 +16,8 @@ new WireTap().attach();
 traces.prune();
 const app = new App({ settings, traces });
 
-app.supervisor.recoverRunsKilledByRestart();
-const resettled = app.supervisor.resettleInvalidRuns();
+await app.supervisor.recoverRunsKilledByRestart();
+const resettled = await app.supervisor.resettleInvalidRuns();
 if (resettled.length > 0) console.log(`re-settled ${resettled.length} invalid run(s) from their ledgers: ${resettled.join(", ")}`);
 app.supervisor.costs.start();
 

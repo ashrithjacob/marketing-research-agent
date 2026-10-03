@@ -76,6 +76,6 @@ export class App {
   async close(): Promise<void> {
     Trace.line(import.meta.url, "App.close");
     await this.supervisor.close();
-    this.store.close();
+    await this.store.close();
   }
 }

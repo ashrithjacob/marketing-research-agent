@@ -75,39 +75,39 @@ export class RunSupervisor {
     return this.runs.waitFor(runId);
   };
 
-  start(request: RunRequest, workspaceId: string): string {
+  start(request: RunRequest, workspaceId: string): Promise<string> {
     Trace.line(import.meta.url, "RunSupervisor.start", { request, workspaceId });
     return this.launcher.launch(request, workspaceId);
   }
 
   /** Every run a restart left unfinished ends from its ledger, so what its agents found is shown; no model or paid tool is called. */
-  recoverRunsKilledByRestart(): void {
+  async recoverRunsKilledByRestart(): Promise<void> {
     Trace.line(import.meta.url, "RunSupervisor.recoverRunsKilledByRestart");
     const end = new RunEnd(this.store, this.runs);
-    for (const run of this.store.listRuns(Scope.everything, 200)) {
+    for (const run of await this.store.listRuns(Scope.everything, 200)) {
       if (TERMINAL_STATUSES.has(run.status)) continue;
-      end.end(StoredRunAssembly.of(this.store, this.runs, run), { kind: "restarted" });
+      await end.end(StoredRunAssembly.of(this.store, this.runs, run), { kind: "restarted" });
     }
   }
 
   /** Settles again the invalid runs from before rows were repaired, so a refresh shows what they found. */
-  resettleInvalidRuns(): string[] {
+  resettleInvalidRuns(): Promise<string[]> {
     Trace.line(import.meta.url, "RunSupervisor.resettleInvalidRuns");
     return new InvalidRunResettle(this.store, this.runs).resettleAll();
   }
 
-  steer(runId: string, judgement: Judgement): void {
+  async steer(runId: string, judgement: Judgement): Promise<void> {
     Trace.line(import.meta.url, "RunSupervisor.steer", { runId, judgement });
-    const live = this.runs.controllable(runId);
+    const live = await this.runs.controllable(runId);
     if (!live.control.steer) throw new RunError(`run ${runId} is the review-mining pipeline: there is no agent to steer`);
     live.control.steer(AgentMessages.steer(judgement));
     this.runs.emit(runId, "run.steered", { judgement_id: judgement.id, text: judgement.text });
   }
 
-  stop(runId: string): void {
+  async stop(runId: string): Promise<void> {
     Trace.line(import.meta.url, "RunSupervisor.stop", { runId });
-    const live = this.runs.controllable(runId);
-    this.store.updateRun(runId, { status: "stopping" });
+    const live = await this.runs.controllable(runId);
+    await this.store.updateRun(runId, { status: "stopping" });
     this.runs.emit(runId, "run.stopping", {});
     live.control.abort();
   }

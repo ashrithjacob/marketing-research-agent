@@ -40,10 +40,10 @@ const listing = (brand: string, title = "Creatine Monohydrate Powder"): AmazonLi
 
 class MemoryListings implements TargetListings {
   readonly rows = new Map<string, TargetListing>();
-  save(row: TargetListing): void {
+  async save(row: TargetListing): Promise<void> {
     this.rows.set(`${row.source_run_id}/${row.target_id}`, row);
   }
-  list(sourceRunId: string): TargetListing[] {
+  async list(sourceRunId: string): Promise<TargetListing[]> {
     return [...this.rows.values()].filter((row) => row.source_run_id === sourceRunId);
   }
 }
@@ -80,14 +80,14 @@ describe("ReviewMiningListings", () => {
     expect(ListingMatch.formMatches(bulk, "Creatine Powder or Capsules")).toBe(true);
   });
 
-  it("re-judges a stored verdict on every read, so an older rule's match is neither shown nor mined (c16, run 99002ee8)", () => {
+  it("re-judges a stored verdict on every read, so an older rule's match is neither shown nor mined (c16, run 99002ee8)", async () => {
     const store = new MemoryListings();
     const spray = { ...target("c16", "A.Vogel Mullein & Marshmallow Spray", "A.Vogel"), form: "spray" as const, actives: ["mullein"] };
     const sinuforce = listing("A.Vogel", "A.Vogel Sinuforce Nasal Spray + Menthol");
-    store.save({ source_run_id: "r", target_id: "c16", query: "", strategy: "", listing: sinuforce, matches: true, mismatch: "", error: "", fetched_at: "" });
-    const [row] = new ReviewMiningListings(store, null, 1).judged("r", [spray]);
+    await store.save({ source_run_id: "r", target_id: "c16", query: "", strategy: "", listing: sinuforce, matches: true, mismatch: "", error: "", fetched_at: "" });
+    const [row] = (await new ReviewMiningListings(store, null, 1).judged("r", [spray]));
     expect([row!.matches, row!.mismatch]).toEqual([false, "active"]);
-    expect(store.list("r")[0]!.matches).toBe(false);
+    expect((await store.list("r"))[0]!.matches).toBe(false);
   });
 
   it("re-checks a saved listing against the rule without searching again", async () => {
@@ -96,7 +96,7 @@ describe("ReviewMiningListings", () => {
     const source: AmazonListingSource = { lookup: async (q) => (asked.push(q), []) };
     const bulk = { ...target("c2", "Creatine Monohydrate Powder", "Bulk"), url: "https://www.bulk.com/uk/p" };
     const listings = new ReviewMiningListings(store, source, 2);
-    store.save({ source_run_id: "r", target_id: "c2", query: "", strategy: ReviewMiningListings.strategy(bulk), listing: listing("Bulk", "Bulk Creatine Monohydrate Tablets"), matches: true, mismatch: "", fetched_at: "", error: "" });
+    await store.save({ source_run_id: "r", target_id: "c2", query: "", strategy: ReviewMiningListings.strategy(bulk), listing: listing("Bulk", "Bulk Creatine Monohydrate Tablets"), matches: true, mismatch: "", fetched_at: "", error: "" });
     const [row] = await listings.ensure("r", [bulk]);
     expect([row!.matches, row!.mismatch]).toEqual([false, "form"]);
     expect(asked).toEqual([]);
@@ -140,13 +140,13 @@ describe("ReviewMiningListings", () => {
     };
     const store = new MemoryListings();
     const switchTarget = { ...target("c5", "Creatine Monohydrate", "Switch Nutrition"), url: "https://switchnutrition.com.au/p" };
-    store.save({ source_run_id: "r", target_id: "c5", query: "", strategy: "", listing: listing("Optimum Nutrition"), matches: false, mismatch: "brand", error: "", fetched_at: "" });
+    await store.save({ source_run_id: "r", target_id: "c5", query: "", strategy: "", listing: listing("Optimum Nutrition"), matches: false, mismatch: "brand", error: "", fetched_at: "" });
     const [row] = await new ReviewMiningListings(store, source, 2).ensure("r", [switchTarget]);
     expect(row!.matches).toBe(true);
     expect(row!.listing!.title).toBe("Switch Creatine Powder");
     await new ReviewMiningListings(store, source, 2).ensure("r", [switchTarget]);
     expect(asked).toEqual(["www.amazon.com.au 5"]);
-    store.save({ source_run_id: "r", target_id: "c3", query: "", strategy: "", listing: listing("Thorne"), matches: true, mismatch: "", error: "", fetched_at: "" });
+    await store.save({ source_run_id: "r", target_id: "c3", query: "", strategy: "", listing: listing("Thorne"), matches: true, mismatch: "", error: "", fetched_at: "" });
     await new ReviewMiningListings(store, source, 2).ensure("r", [{ ...target("c3", "Creatine", "Thorne"), url: "https://thorne.com/p" }]);
     expect(asked).toHaveLength(1);
   });

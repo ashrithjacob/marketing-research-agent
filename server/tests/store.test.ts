@@ -22,8 +22,8 @@ beforeEach(() => {
   store = new SqliteResearchStore(join(dir, "research.db"));
 });
 
-afterEach(() => {
-  store.close();
+afterEach(async () => {
+  await store.close();
   rmSync(dir, { recursive: true, force: true });
 });
 
@@ -31,26 +31,26 @@ const newRun = () =>
   store.createRun({ workspaceId: "admin", brief: { product: "x" }, model: "m", rejectKinds: [], judgementIds: [] });
 
 describe("runs", () => {
-  it("moves through its lifecycle", () => {
-    const run = newRun();
+  it("moves through its lifecycle", async () => {
+    const run = await newRun();
     expect(run.status).toBe("queued");
-    store.updateRun(run.id, { status: "running" });
-    expect(store.getRun(run.id)?.status).toBe("running");
+    await store.updateRun(run.id, { status: "running" });
+    expect((await store.getRun(run.id))?.status).toBe("running");
   });
 
-  it("refuses to write a column that does not exist", () => {
-    const run = newRun();
-    expect(() => store.updateRun(run.id, { nonsense: 1 } as any)).toThrow(/not run columns/);
+  it("refuses to write a column that does not exist", async () => {
+    const run = (await newRun());
+    await expect(store.updateRun(run.id, { nonsense: 1 } as any)).rejects.toThrow(/not run columns/);
   });
 
-  it("stores the packet as JSON", () => {
-    const run = newRun();
-    store.updateRun(run.id, { packet: minimalPacket() });
-    expect((store.getRun(run.id)?.packet as any).brief.product).toBe("MagnaCalm 400mg");
+  it("stores the packet as JSON", async () => {
+    const run = (await newRun());
+    await store.updateRun(run.id, { packet: minimalPacket() });
+    expect(((await store.getRun(run.id))?.packet as any).brief.product).toBe("MagnaCalm 400mg");
   });
 
-  it("counts admitted and rejected sources separately", () => {
-    const run = newRun();
+  it("counts admitted and rejected sources separately", async () => {
+    const run = (await newRun());
     const packet = minimalPacket();
     packet.sources.push({
       id: "sha256:ddd",
@@ -59,40 +59,40 @@ describe("runs", () => {
       admitted: false,
       node: "competitors",
     });
-    store.updateRun(run.id, { packet });
-    const counts = Runs.summary(store.getRun(run.id)!).counts;
+    await store.updateRun(run.id, { packet });
+    const counts = Runs.summary((await store.getRun(run.id))!).counts;
     expect(counts.sources).toBe(1);
     expect(counts.rejected).toBe(1);
   });
 });
 
 describe("events", () => {
-  it("replays in order and honours `after`", () => {
-    const run = newRun();
-    const first = store.addEvent(run.id, "run.started", {});
-    store.addEvent(run.id, "tool.started", { tool: "web_search" });
-    const all = store.listEvents(run.id);
+  it("replays in order and honours `after`", async () => {
+    const run = (await newRun());
+    const first = (await store.addEvent(run.id, "run.started", {}));
+    await store.addEvent(run.id, "tool.started", { tool: "web_search" });
+    const all = (await store.listEvents(run.id));
     expect(all.map((e) => e.kind)).toEqual(["run.started", "tool.started"]);
-    expect(store.listEvents(run.id, first.id).map((e) => e.kind)).toEqual(["tool.started"]);
+    expect((await store.listEvents(run.id, first.id)).map((e) => e.kind)).toEqual(["tool.started"]);
   });
 });
 
 describe("judgements", () => {
-  it("counts applications rather than claiming them", () => {
-    const judgement = store.addJudgement("admin", { kind: "source_rule", text: "no listicles", rejects_kinds: [] });
+  it("counts applications rather than claiming them", async () => {
+    const judgement = (await store.addJudgement("admin", { kind: "source_rule", text: "no listicles", rejects_kinds: [] }));
     expect(judgement.applied_count).toBe(0);
-    store.bumpJudgement(judgement.id, 3);
-    expect(store.listJudgements(Scope.everything)[0]!.applied_count).toBe(3);
+    await store.bumpJudgement(judgement.id, 3);
+    expect((await store.listJudgements(Scope.everything))[0]!.applied_count).toBe(3);
   });
 
-  it("lists only active judgements when asked", () => {
-    store.addJudgement("admin", { kind: "custom", text: "one", rejects_kinds: [] });
-    expect(store.listJudgements(Scope.everything, true)).toHaveLength(1);
+  it("lists only active judgements when asked", async () => {
+    await store.addJudgement("admin", { kind: "custom", text: "one", rejects_kinds: [] });
+    expect((await store.listJudgements(Scope.everything, true))).toHaveLength(1);
   });
 });
 
 describe("migration", () => {
-  it("adds columns to a database an older version created", () => {
+  it("adds columns to a database an older version created", async () => {
     // `CREATE TABLE IF NOT EXISTS` is a no-op against an existing table, so a
     // column added later has to arrive through the migration or the first
     // INSERT fails — at INSERT, not at startup, which is the trap.
@@ -113,30 +113,30 @@ describe("migration", () => {
 
     const migrated = new SqliteResearchStore(path);
     try {
-      const run = migrated.createRun({
+      const run = (await migrated.createRun({
         workspaceId: "admin",
         brief: { product: "x" },
         model: "m",
         rejectKinds: [],
         judgementIds: ["j1"],
         nodes: ["product_data"],
-      });
-      migrated.updateRun(run.id, { output: "text", usage: { totalTokens: 1 }, agent_run_id: "a" });
-      const back = migrated.getRun(run.id)!;
+      }));
+      await migrated.updateRun(run.id, { output: "text", usage: { totalTokens: 1 }, agent_run_id: "a" });
+      const back = (await migrated.getRun(run.id))!;
       expect(back.output).toBe("text");
       expect(back.judgement_ids).toEqual(["j1"]);
       expect(back.agent_run_id).toBe("a");
       expect(back.nodes).toEqual(["product_data"]);
     } finally {
-      migrated.close();
+      await migrated.close();
     }
   });
 
-  it("reads a run from before per-node runs as covering the whole stage", () => {
+  it("reads a run from before per-node runs as covering the whole stage", async () => {
     // Its `nodes` column arrives as `[]`, and every such run did all four.
-    const run = newRun();
-    expect(store.getRun(run.id)!.nodes).toEqual([]);
-    expect(Runs.summary(store.getRun(run.id)!).nodes).toEqual([
+    const run = (await newRun());
+    expect((await store.getRun(run.id))!.nodes).toEqual([]);
+    expect(Runs.summary((await store.getRun(run.id))!).nodes).toEqual([
       "product_data",
       "competitors",
       "category_data",
@@ -145,19 +145,19 @@ describe("migration", () => {
 });
 
 describe("stage-2 runs and their stage-1 run", () => {
-  it("backfills each old stage-2 run with the stage-1 run it mined, never a later one", () => {
+  it("backfills each old stage-2 run with the stage-1 run it mined, never a later one", async () => {
     const path = join(dir, "before-source-run.db");
     const first = new SqliteResearchStore(path);
     const brief = { product: "", url: "https://mullevia.com/p" };
-    const run = (stage: number, at: string) => {
-      const r = first.createRun({ workspaceId: "admin", brief, model: "m", rejectKinds: [], judgementIds: [], stage });
-      first.updateRun(r.id, { status: "completed" });
+    const run = async (stage: number, at: string) => {
+      const r = (await first.createRun({ workspaceId: "admin", brief, model: "m", rejectKinds: [], judgementIds: [], stage }));
+      await first.updateRun(r.id, { status: "completed" });
       return { id: r.id, at };
     };
-    const older = run(1, "2026-09-29T10:00:00.000Z");
-    const mining = run(2, "2026-09-29T11:00:00.000Z");
-    const newer = run(1, "2026-09-30T10:00:00.000Z");
-    first.close();
+    const older = (await run(1, "2026-09-29T10:00:00.000Z"));
+    const mining = (await run(2, "2026-09-29T11:00:00.000Z"));
+    const newer = (await run(1, "2026-09-30T10:00:00.000Z"));
+    await first.close();
     const raw = new Database(path);
     for (const r of [older, mining, newer]) raw.prepare("UPDATE research_runs SET created_at = ? WHERE id = ?").run(r.at, r.id);
     raw.exec("ALTER TABLE research_runs DROP COLUMN source_run_id");
@@ -165,39 +165,39 @@ describe("stage-2 runs and their stage-1 run", () => {
 
     const migrated = new SqliteResearchStore(path);
     try {
-      expect(migrated.getRun(mining.id)!.source_run_id).toBe(older.id);
-      expect(migrated.getRun(newer.id)!.source_run_id).toBe("");
+      expect((await migrated.getRun(mining.id))!.source_run_id).toBe(older.id);
+      expect((await migrated.getRun(newer.id))!.source_run_id).toBe("");
     } finally {
-      migrated.close();
+      await migrated.close();
     }
   });
 });
 
 describe("review mining moving to stage 3", () => {
-  it("renumbers every stored review-mining run and its packet once, and never a stage-2 run made after", () => {
+  it("renumbers every stored review-mining run and its packet once, and never a stage-2 run made after", async () => {
     const path = join(dir, "before-stage-3.db");
     const first = new SqliteResearchStore(path);
     const brief = { product: "", url: "https://mullevia.com/p" };
-    const mining = first.createRun({ workspaceId: "admin", brief, model: "", rejectKinds: [], judgementIds: [], nodes: ["review_mining"], stage: 2 });
-    first.updateRun(mining.id, { status: "completed", packet: { stage: 2, run_id: mining.id } });
-    const unpacked = first.createRun({ workspaceId: "admin", brief, model: "", rejectKinds: [], judgementIds: [], nodes: ["review_mining"], stage: 2 });
-    first.close();
+    const mining = (await first.createRun({ workspaceId: "admin", brief, model: "", rejectKinds: [], judgementIds: [], nodes: ["review_mining"], stage: 2 }));
+    await first.updateRun(mining.id, { status: "completed", packet: { stage: 2, run_id: mining.id } });
+    const unpacked = (await first.createRun({ workspaceId: "admin", brief, model: "", rejectKinds: [], judgementIds: [], nodes: ["review_mining"], stage: 2 }));
+    await first.close();
     const raw = new Database(path);
     raw.exec("DELETE FROM research_migrations");
     raw.close();
 
     const migrated = new SqliteResearchStore(path);
-    const later = migrated.createRun({ workspaceId: "admin", brief, model: "", rejectKinds: [], judgementIds: [], stage: 2 });
-    migrated.close();
+    const later = (await migrated.createRun({ workspaceId: "admin", brief, model: "", rejectKinds: [], judgementIds: [], stage: 2 }));
+    await migrated.close();
     const reopened = new SqliteResearchStore(path);
     try {
-      expect(reopened.getRun(mining.id)!.stage).toBe(3);
-      expect(reopened.getRun(mining.id)!.packet!.stage).toBe(3);
-      expect(reopened.getRun(unpacked.id)!.stage).toBe(3);
-      expect(reopened.getRun(unpacked.id)!.packet).toBeNull();
-      expect(reopened.getRun(later.id)!.stage).toBe(2);
+      expect((await reopened.getRun(mining.id))!.stage).toBe(3);
+      expect((await reopened.getRun(mining.id))!.packet!.stage).toBe(3);
+      expect((await reopened.getRun(unpacked.id))!.stage).toBe(3);
+      expect((await reopened.getRun(unpacked.id))!.packet).toBeNull();
+      expect((await reopened.getRun(later.id))!.stage).toBe(2);
     } finally {
-      reopened.close();
+      await reopened.close();
     }
   });
 });
@@ -223,7 +223,7 @@ describe("llm calls", () => {
     response_id: responseId,
   });
 
-  it("adds the generation and agent_id columns to a call log that predates them", () => {
+  it("adds the generation and agent_id columns to a call log that predates them", async () => {
     const path = join(dir, "calls-before-generation.db");
     const old = new Database(path);
     old.exec(`
@@ -241,16 +241,16 @@ describe("llm calls", () => {
 
     const migrated = new SqliteResearchStore(path);
     try {
-      const run = migrated.createRun({
+      const run = (await migrated.createRun({
         workspaceId: "admin",
         brief: { product: "x" },
         model: "m",
         rejectKinds: [],
         judgementIds: [],
         nodes: ["product_data"],
-      });
-      migrated.addLlmCall(call(run.id, 1, "gen-1"));
-      migrated.setLlmCallGeneration(run.id, "gen-1", {
+      }));
+      await migrated.addLlmCall(call(run.id, 1, "gen-1"));
+      await migrated.setLlmCallGeneration(run.id, "gen-1", {
         model: "z-ai/glm-5.3-flash",
         cost: 0.01,
         latency_ms: 949,
@@ -258,18 +258,18 @@ describe("llm calls", () => {
         reasoning_tokens: 2015,
         provider: "Parasail",
       });
-      expect(migrated.listLlmCalls(run.id)[0]!.generation?.latency_ms).toBe(949);
-      expect(migrated.listLlmCalls(run.id)[0]!.agent_id).toBe("champion");
+      expect((await migrated.listLlmCalls(run.id))[0]!.generation?.latency_ms).toBe(949);
+      expect((await migrated.listLlmCalls(run.id))[0]!.agent_id).toBe("champion");
     } finally {
-      migrated.close();
+      await migrated.close();
     }
   });
 
-  it("round-trips in order, keeping null where the prompt did not change", () => {
-    const run = newRun();
-    store.addLlmCall(call(run.id, 2, "gen-2"));
-    store.addLlmCall(call(run.id, 1, "gen-1"));
-    const calls = store.listLlmCalls(run.id);
+  it("round-trips in order, keeping null where the prompt did not change", async () => {
+    const run = (await newRun());
+    await store.addLlmCall(call(run.id, 2, "gen-2"));
+    await store.addLlmCall(call(run.id, 1, "gen-1"));
+    const calls = (await store.listLlmCalls(run.id));
     expect(calls.map((c) => c.seq)).toEqual([1, 2]);
     expect(calls.map((c) => c.agent_id)).toEqual(["champion", "product"]);
     expect(calls[0]!.system_prompt).toBe("you are the researcher");
@@ -280,10 +280,10 @@ describe("llm calls", () => {
     expect(calls[0]!.billed_cost).toBeNull();
   });
 
-  it("attaches a generation record, and its billed cost, to the call it belongs to", () => {
-    const run = newRun();
-    store.addLlmCall(call(run.id, 1, "gen-1"));
-    store.addLlmCall(call(run.id, 2, "gen-2"));
+  it("attaches a generation record, and its billed cost, to the call it belongs to", async () => {
+    const run = (await newRun());
+    await store.addLlmCall(call(run.id, 1, "gen-1"));
+    await store.addLlmCall(call(run.id, 2, "gen-2"));
     const generation = {
       model: "z-ai/glm-5.3-flash",
       cost: 0.0042,
@@ -292,8 +292,8 @@ describe("llm calls", () => {
       reasoning_tokens: 2015,
       provider: "Parasail",
     };
-    store.setLlmCallGeneration(run.id, "gen-2", generation);
-    const [first, second] = store.listLlmCalls(run.id);
+    await store.setLlmCallGeneration(run.id, "gen-2", generation);
+    const [first, second] = (await store.listLlmCalls(run.id));
     expect(first!.billed_cost).toBeNull();
     expect(first!.generation).toBeNull();
     expect(second!.billed_cost).toBeCloseTo(0.0042, 10);
@@ -335,11 +335,11 @@ describe("the review corpus", () => {
     ],
   });
 
-  it("keeps a review once however many runs fetch it, and links it to each run", () => {
-    const first = newRun();
-    const second = newRun();
-    store.saveRunReviews(first.id, snapshot("works"));
-    store.saveRunReviews(second.id, snapshot("works"));
+  it("keeps a review once however many runs fetch it, and links it to each run", async () => {
+    const first = (await newRun());
+    const second = (await newRun());
+    await store.saveRunReviews(first.id, snapshot("works"));
+    await store.saveRunReviews(second.id, snapshot("works"));
 
     const db = new Database(join(dir, "research.db"));
     const count = (db.prepare("SELECT COUNT(*) AS n FROM research_reviews").get() as { n: number }).n;
@@ -347,7 +347,7 @@ describe("the review corpus", () => {
     expect(count).toBe(1);
 
     for (const run of [first, second]) {
-      expect(store.listRunReviews(run.id)[0]).toMatchObject({
+      expect((await store.listRunReviews(run.id))[0]).toMatchObject({
         ref: "r1.1",
         source_id: "sha256:abc",
         target_id: "product",
@@ -365,28 +365,28 @@ describe("the run ledger", () => {
     run_id: runId, kind, entity: "product", agent_id: "parent", source_id: "", payload,
   });
 
-  it("numbers rows per run and names each by its kind", () => {
-    const a = newRun();
-    const b = newRun();
-    expect(store.findings.append(draft(a.id, "gap", { missing: "x" })).id).toBe("gap1");
-    expect(store.findings.append(draft(a.id, "source", { id: "sha256:a" })).id).toBe("src2");
-    expect(store.findings.append(draft(b.id, "gap", { missing: "y" })).id).toBe("gap1");
-    expect(store.findings.list(a.id).map((row) => row.seq)).toEqual([1, 2]);
+  it("numbers rows per run and names each by its kind", async () => {
+    const a = (await newRun());
+    const b = (await newRun());
+    expect((await store.findings.append(draft(a.id, "gap", { missing: "x" }))).id).toBe("gap1");
+    expect((await store.findings.append(draft(a.id, "source", { id: "sha256:a" }))).id).toBe("src2");
+    expect((await store.findings.append(draft(b.id, "gap", { missing: "y" }))).id).toBe("gap1");
+    expect((await store.findings.list(a.id)).map((row) => row.seq)).toEqual([1, 2]);
   });
 
-  it("retracts a row once, keeping it with its reason", () => {
-    const run = newRun();
-    store.findings.append(draft(run.id, "gap", { missing: "x" }));
-    expect(store.findings.retract(run.id, "gap1", "found it")?.retracted_why).toBe("found it");
-    expect(store.findings.retract(run.id, "gap1", "again")).toBeNull();
-    expect(store.findings.list(run.id)).toHaveLength(1);
+  it("retracts a row once, keeping it with its reason", async () => {
+    const run = (await newRun());
+    await store.findings.append(draft(run.id, "gap", { missing: "x" }));
+    expect((await store.findings.retract(run.id, "gap1", "found it"))?.retracted_why).toBe("found it");
+    expect((await store.findings.retract(run.id, "gap1", "again"))).toBeNull();
+    expect((await store.findings.list(run.id))).toHaveLength(1);
   });
 
-  it("keeps what was found through a restart, because each row is written as it is found", () => {
-    const run = newRun();
-    store.findings.append(draft(run.id, "gap", { missing: "no COA" }));
-    store.close();
+  it("keeps what was found through a restart, because each row is written as it is found", async () => {
+    const run = (await newRun());
+    await store.findings.append(draft(run.id, "gap", { missing: "no COA" }));
+    await store.close();
     store = new SqliteResearchStore(join(dir, "research.db"));
-    expect(store.findings.list(run.id).map((row) => row.payload)).toEqual([{ missing: "no COA" }]);
+    expect((await store.findings.list(run.id)).map((row) => row.payload)).toEqual([{ missing: "no COA" }]);
   });
 });
