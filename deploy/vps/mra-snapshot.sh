@@ -28,12 +28,14 @@ mkdir -p "$OUT"
 # in .env, and research.db is the frozen pre-cutover file. pg_dump runs in a
 # throwaway postgres image matching Neon's major version (18), so the box needs
 # no client installed; the URL reaches it through the environment, never argv.
-DATABASE_URL="$(grep -m1 '^DATABASE_URL=' "$(dirname "$0")/.env" 2>/dev/null | cut -d= -f2- || true)"
+# libpq's verify-full wants a root certificate file; sslrootcert=system points it
+# at the image's CA bundle. Only here: node pg would read "system" as a file path.
+DATABASE_URL="$(grep -m1 '^DATABASE_URL=' "$(dirname "$0")/.env" 2>/dev/null | cut -d= -f2- | sed -e 's/^["'\'']//' -e 's/["'\'']$//' || true)"
 export DATABASE_URL
 
 if [ -n "$DATABASE_URL" ]; then
   docker run --rm -e DATABASE_URL postgres:18-alpine \
-    sh -c 'pg_dump --format=custom --no-owner --no-privileges "$DATABASE_URL"' > "$OUT/mra-pg-${STAMP}.dump"
+    sh -c 'pg_dump --format=custom --no-owner --no-privileges "${DATABASE_URL}&sslrootcert=system"' > "$OUT/mra-pg-${STAMP}.dump"
   TABLES=$(docker run --rm -i postgres:18-alpine pg_restore --list < "$OUT/mra-pg-${STAMP}.dump" | grep -c 'TABLE DATA')
   echo "mra-pg-${STAMP}.dump: ${TABLES} tables"
   # owui-snapshot.sh's retention sweep matches only *.tar.gz; these are swept here, on its 14 days.

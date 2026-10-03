@@ -19,7 +19,7 @@ set -euo pipefail
 if [ "${1:-}" != remote ]; then
   cd "$(dirname "$0")/../.."
   REMOTE="${REMOTE:-owui}"
-  URL="$(grep -m1 '^DATABASE_URL=' .env | cut -d= -f2- | sed 's/sslmode=require/sslmode=verify-full/')"
+  URL="$(grep -m1 '^DATABASE_URL=' .env | cut -d= -f2- | sed -e 's/^["'\'']//' -e 's/["'\'']$//' -e 's/sslmode=require/sslmode=verify-full/')"
   [ -n "$URL" ] || { echo "!! no DATABASE_URL in .env" >&2; exit 1; }
   case "$URL" in *'$'*) echo "!! DATABASE_URL holds a \$, which docker compose would mangle" >&2; exit 1 ;; esac
   rsync -az deploy/vps/mra-to-neon.sh "$REMOTE:mra-compose/"
