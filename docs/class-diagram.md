@@ -824,6 +824,9 @@ classDiagram
       save()
       get()
     }
+    class ReviewPullBackfill {
+      apply()
+    }
     class ReviewPullTable {
       latest()
       save()
@@ -1458,6 +1461,7 @@ classDiagram
   SqlProductCatalog --> PacketRowTable
   ProductTable --> SqlDatabase
   ReviewAnalysisTable --> SqlDatabase
+  ReviewPullBackfill --> SqlDatabase
   ReviewPullTable --> SqlDatabase
   ReviewTable --> SqlDatabase
   RunTable --> SqlDatabase
@@ -1663,6 +1667,7 @@ classDiagram
 | `adapters` | `adapters/store/product-catalog.ts` | SqlProductCatalog |
 | `adapters` | `adapters/store/product-table.ts` | ProductTable |
 | `adapters` | `adapters/store/review-analysis-table.ts` | ReviewAnalysisTable |
+| `adapters` | `adapters/store/review-pull-backfill.ts` | ReviewPullBackfill |
 | `adapters` | `adapters/store/review-pull-table.ts` | ReviewPullTable |
 | `adapters` | `adapters/store/review-table.ts` | ReviewTable |
 | `adapters` | `adapters/store/rows.ts` | Rows |

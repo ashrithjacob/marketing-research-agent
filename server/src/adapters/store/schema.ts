@@ -7,6 +7,7 @@ import { StoreMigrations } from "./migrations.js";
 import { PacketRowTable } from "./packet-row-table.js";
 import { ReviewPullTable } from "./review-pull-table.js";
 import { ReviewAnalysisTable } from "./review-analysis-table.js";
+import { ReviewPullBackfill } from "./review-pull-backfill.js";
 import { TargetListingTable } from "./target-listing-table.js";
 import type { SqlDatabase } from "./sql-database.js";
 import { Trace } from "../../trace/index.js";
@@ -22,6 +23,7 @@ export class StoreSchema {
     await db.exec(StoreSchema.INDEXES);
     for (const ddl of [PacketRowTable.DDL, ReviewAnalysisTable.DDL, TargetListingTable.DDL, FindingTable.DDL, ChargeTable.DDL, ReviewPullTable.DDL]) await db.exec(ddl);
     await StoreMigrations.once(db, CompetitorKinds.NAME, (tx) => new CompetitorKinds(tx).apply());
+    await StoreMigrations.once(db, ReviewPullBackfill.NAME, async (tx) => { await new ReviewPullBackfill(tx).apply(); });
   }
 
   static readonly INDEXES = `
