@@ -21,19 +21,20 @@ import { App, Passwords } from "../src/http/index.js";
 import { RunSupervisor } from "../src/agent/index.js";
 import { Env, type Settings } from "../src/config/index.js";
 
-import { SqliteResearchStore } from "../src/adapters/index.js";
+import { SqlResearchStore } from "../src/adapters/index.js";
 import { genreRun, minimalPacket, recordCalls, recorded, reviewPacket, productPacket, completeProductTruth } from "./fixtures.js";
+import { SqliteStores } from "./sqlite-stores.js";
 
 const MODEL_ID = "faux-model";
 
 let dir: string;
 let app: App;
-let store: SqliteResearchStore;
+let store: SqlResearchStore;
 let settings: Settings;
 let faux: ReturnType<typeof fauxProvider>;
 let models: MutableModels;
 
-function build(settingsOverrides: Partial<Settings> = {}): App {
+async function build(settingsOverrides: Partial<Settings> = {}): Promise<App> {
   settings = {
     ...Env.settings(),
     model: MODEL_ID,
@@ -42,7 +43,7 @@ function build(settingsOverrides: Partial<Settings> = {}): App {
     appPasswordHash: "",
     ...settingsOverrides,
   };
-  store = new SqliteResearchStore(join(dir, "research.db"));
+  store = await SqliteStores.open(join(dir, "research.db"));
   faux = fauxProvider({ provider: "openrouter", models: [{ id: MODEL_ID }] });
   models = createModels();
   models.setProvider(faux.provider);
@@ -57,9 +58,9 @@ function build(settingsOverrides: Partial<Settings> = {}): App {
   return new App({ settings, store, supervisor });
 }
 
-beforeEach(() => {
+beforeEach(async () => {
   dir = mkdtempSync(join(tmpdir(), "mra-api-"));
-  app = build();
+  app = await build();
 });
 
 afterEach(async () => {
@@ -266,7 +267,7 @@ describe("auth", () => {
 
   it("guards the research routes when a hash is set", async () => {
     await app.close();
-    app = build({ appPasswordHash: await Passwords.hash("hunter2"), jwtSecret: "s".repeat(32) });
+    app = await build({ appPasswordHash: await Passwords.hash("hunter2"), jwtSecret: "s".repeat(32) });
 
     expect((await get("/api/research/runs")).status).toBe(401);
 
@@ -317,12 +318,12 @@ describe("review mining config", () => {
     // without a token, `review_mining` cannot complete and the run form should
     // say so before the button rather than after the run.
     await app.close();
-    app = build({ apifyToken: "apify_api_test", apifyMaxReviews: 10 });
+    app = await build({ apifyToken: "apify_api_test", apifyMaxReviews: 10 });
     const body = (await (await get("/api/research/config")).json()) as any;
     expect(body.review_mining).toEqual({ configured: true, max_reviews: 10 });
 
     await app.close();
-    app = build({ apifyToken: "" });
+    app = await build({ apifyToken: "" });
     const offBody = (await (await get("/api/research/config")).json()) as any;
     expect(offBody.review_mining.configured).toBe(false);
   });

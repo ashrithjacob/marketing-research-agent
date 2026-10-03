@@ -2,6 +2,7 @@ import { setDefaultAutoSelectFamilyAttemptTimeout } from "node:net";
 
 import { serve } from "@hono/node-server";
 
+import { SqlResearchStore, StoreDatabase } from "./adapters/index.js";
 import { Env } from "./config/index.js";
 import { App } from "./http/index.js";
 import { Trace, WireTap } from "./trace/index.js";
@@ -14,7 +15,8 @@ const traces = App.traceFile(settings);
 Trace.install(traces);
 new WireTap().attach();
 traces.prune();
-const app = new App({ settings, traces });
+const store = await SqlResearchStore.open(StoreDatabase.forSettings(settings));
+const app = new App({ settings, traces, store });
 
 await app.supervisor.recoverRunsKilledByRestart();
 const resettled = await app.supervisor.resettleInvalidRuns();

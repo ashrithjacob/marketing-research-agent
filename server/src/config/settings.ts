@@ -128,6 +128,8 @@ export class Env {
       corpusPath: Env.text("MRA_CORPUS_PATH", "/corpus"),
 
       databasePath: Env.text("MRA_DATABASE_PATH", "/data/research.db"),
+      databaseUrl: Env.text("DATABASE_URL", ""),
+      databaseConnections: Env.number("MRA_DATABASE_CONNECTIONS", 5),
       traceDir: Env.text("MRA_TRACE_DIR", "/data/traces"),
       traceKeepDays: Env.number("MRA_TRACE_KEEP_DAYS", 30),
       traceMaxMb: Env.number("MRA_TRACE_MAX_MB", 20),

@@ -29,24 +29,25 @@ import {
   type RunRequest,
   runRequestSchema,
 } from "../src/domain/index.js";
-import { SqliteResearchStore } from "../src/adapters/index.js";
+import { SqlResearchStore } from "../src/adapters/index.js";
 import { Env, type Settings } from "../src/config/index.js";
 import { minimalPacket, recordCalls, recorded, reviewPacket, services, productPacket } from "./fixtures.js";
 import { HUEL_PAGE } from "./trustpilot-pages.js";
+import { SqliteStores } from "./sqlite-stores.js";
 
 const MODEL_ID = "faux-model";
 const FAST_RETRY = { attempts: 3, baseMs: 0, capMs: 0 };
 
 let dir: string;
-let store: SqliteResearchStore;
+let store: SqlResearchStore;
 let settings: Settings;
 let models: MutableModels;
 let faux: ReturnType<typeof fauxProvider>;
 let supervisor: RunSupervisor;
 
-beforeEach(() => {
+beforeEach(async () => {
   dir = mkdtempSync(join(tmpdir(), "mra-runner-"));
-  store = new SqliteResearchStore(join(dir, "research.db"));
+  store = await SqliteStores.open(join(dir, "research.db"));
   settings = { ...Env.settings(), model: MODEL_ID, corpusPath: join(dir, "corpus") };
   faux = fauxProvider({ provider: "openrouter", models: [{ id: MODEL_ID }] });
   models = createModels();

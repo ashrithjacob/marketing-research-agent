@@ -18,18 +18,19 @@ import { Env, type Settings } from "../src/config/index.js";
 import { ReviewMiningRoster } from "../src/extract/index.js";
 import { StageOneHandoff, ReviewMiningPlanner } from "../src/agent/index.js";
 import type { StagePacket } from "../src/domain/index.js";
-import { SqliteResearchStore } from "../src/adapters/index.js";
+import { SqlResearchStore } from "../src/adapters/index.js";
 
 import { minimalPacket, completeProductTruth } from "./fixtures.js";
+import { SqliteStores } from "./sqlite-stores.js";
 
 let dir: string;
 let app: App;
-let store: SqliteResearchStore;
+let store: SqlResearchStore;
 let settings: Settings;
 let faux: ReturnType<typeof fauxProvider>;
 let models: MutableModels;
 
-function build(): App {
+async function build(): Promise<App> {
   settings = {
     ...Env.settings(),
     model: "faux-model",
@@ -37,7 +38,7 @@ function build(): App {
     staticDir: join(dir, "static"),
     appPasswordHash: "",
   };
-  store = new SqliteResearchStore(join(dir, "research.db"));
+  store = await SqliteStores.open(join(dir, "research.db"));
   faux = fauxProvider({ provider: "openrouter", models: [{ id: "faux-model" }] });
   models = createModels();
   models.setProvider(faux.provider);
@@ -50,9 +51,9 @@ function build(): App {
   return new App({ settings, store, supervisor });
 }
 
-beforeEach(() => {
+beforeEach(async () => {
   dir = mkdtempSync(join(tmpdir(), "mra-review-mining-"));
-  app = build();
+  app = await build();
 });
 
 afterEach(async () => {

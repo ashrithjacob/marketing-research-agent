@@ -1,8 +1,3 @@
-import { mkdirSync } from "node:fs";
-import { dirname } from "node:path";
-
-import Database from "better-sqlite3";
-
 import type { AccountDirectory, ChargeLedger, FindingLedger, ProductCatalog, ReviewPullStore } from "../../domain/index.js";
 import { Trace } from "../../trace/index.js";
 
@@ -15,17 +10,18 @@ import { FindingTable } from "./finding-table.js";
 import { JudgementTable } from "./judgement-table.js";
 import { PacketRowTable } from "./packet-row-table.js";
 import { ProductBackfill } from "./product-backfill.js";
-import { SqliteProductCatalog } from "./product-catalog.js";
+import { SqlProductCatalog } from "./product-catalog.js";
 import { ProductTable } from "./product-table.js";
 import { ReviewPullTable } from "./review-pull-table.js";
 import { ReviewAnalysisTable } from "./review-analysis-table.js";
 import { ReviewTable } from "./review-table.js";
 import { RunTable } from "./run-table.js";
+import { StoreSchema } from "./schema.js";
+import type { SqlDatabase } from "./sql-database.js";
 import { TargetListingTable } from "./target-listing-table.js";
-import { SqliteSchema } from "./schema.js";
 
-/** Opens the database, applies the schema, and holds one object per table. */
-export class SqliteTables {
+/** One object per table, on a database whose schema is applied. */
+export class StoreTables {
   readonly runs: RunTable;
   readonly events: EventLog;
   readonly judgements: JudgementTable;
@@ -42,8 +38,8 @@ export class SqliteTables {
   readonly charges: ChargeLedger;
   readonly pulls: ReviewPullStore;
 
-  constructor(readonly db: Database.Database) {
-    Trace.line(import.meta.url, "SqliteTables.constructor");
+  private constructor(readonly db: SqlDatabase) {
+    Trace.line(import.meta.url, "StoreTables.constructor");
     this.runs = new RunTable(db);
     this.events = new EventLog(db);
     this.judgements = new JudgementTable(db);
@@ -58,18 +54,15 @@ export class SqliteTables {
     this.findings = new FindingTable(db);
     this.charges = new ChargeTable(db);
     this.pulls = new ReviewPullTable(db);
-    this.catalog = new SqliteProductCatalog(this.products, this.runs, this.packetRows);
-    new ProductBackfill(db, this.products, this.packetRows).apply();
+    this.catalog = new SqlProductCatalog(this.products, this.runs, this.packetRows);
   }
 
-  static open(path: string): SqliteTables {
-    Trace.line(import.meta.url, "SqliteTables.open", { path });
-    if (path !== ":memory:") mkdirSync(dirname(path), { recursive: true });
-    const db = new Database(path, { timeout: 15000 });
-    db.pragma("journal_mode = WAL");
-    db.pragma("busy_timeout = 15000");
-    db.pragma("foreign_keys = ON");
-    SqliteSchema.apply(db);
-    return new SqliteTables(db);
+  /** Applies the schema and its migrations, then backfills runs from before products existed. */
+  static async open(db: SqlDatabase): Promise<StoreTables> {
+    Trace.line(import.meta.url, "StoreTables.open");
+    await StoreSchema.apply(db);
+    const tables = new StoreTables(db);
+    await new ProductBackfill(db, tables.products, tables.packetRows).apply();
+    return tables;
   }
 }

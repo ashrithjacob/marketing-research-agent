@@ -14,7 +14,7 @@ import { createModels } from "@earendil-works/pi-ai";
 import { fauxProvider } from "@earendil-works/pi-ai/providers/faux";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { SqliteResearchStore } from "../src/adapters/index.js";
+import { SqlResearchStore } from "../src/adapters/index.js";
 import {
   AMAZON_REVIEWS_ACTOR,
   ApifyCreditError,
@@ -28,16 +28,17 @@ import { runRequestSchema, stagePacketSchema, type AmazonListing, type MiningTar
 import { ReviewMiningOffer, ReviewMiningRoster, TrustpilotDomain } from "../src/extract/index.js";
 
 import { minimalPacket, services, completeProductTruth } from "./fixtures.js";
+import { SqliteStores } from "./sqlite-stores.js";
 
 const BANDS = ["oneStar", "twoStar", "threeStar", "fourStar", "fiveStar"];
 
 let dir: string;
-let store: SqliteResearchStore;
+let store: SqlResearchStore;
 let settings: Settings;
 
-beforeEach(() => {
+beforeEach(async () => {
   dir = mkdtempSync(join(tmpdir(), "mra-mining-"));
-  store = new SqliteResearchStore(join(dir, "research.db"));
+  store = await SqliteStores.open(join(dir, "research.db"));
   settings = { ...Env.settings(), model: "faux-model", corpusPath: join(dir, "corpus"), apifyMaxReviews: 7, apifyConcurrency: 1, apifyPullRetries: 1 };
 });
 

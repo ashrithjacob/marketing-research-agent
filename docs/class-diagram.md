@@ -772,7 +772,7 @@ classDiagram
       delete()
       bump()
     }
-    class SqliteMigrations {
+    class StoreMigrations {
       apply()
       once()
     }
@@ -780,10 +780,34 @@ classDiagram
       replace()
       list()
     }
+    class PostgresStatements {
+      all()
+      get()
+      run()
+      exec()
+      columns()
+      transaction()
+      close()
+    }
+    class PostgresDatabase {
+      connect()
+      all()
+      get()
+      run()
+      exec()
+      columns()
+      transaction()
+      close()
+    }
+    class PostgresDialect {
+      statement()
+      script()
+      parser()
+    }
     class ProductBackfill {
       apply()
     }
-    class SqliteProductCatalog {
+    class SqlProductCatalog {
       list()
       get()
       byKey()
@@ -813,6 +837,9 @@ classDiagram
       head()
       run()
     }
+    class RunLock {
+      claim()
+    }
     class RunTable {
       create()
       get()
@@ -820,14 +847,47 @@ classDiagram
       heads()
       update()
     }
-    class SqliteSchema {
+    class StoreSchema {
       apply()
     }
     class ScopeFilter {
       sql()
       args()
     }
-    class SqliteResearchStore {
+    class SqlDatabase {
+      <<interface>>
+      all()
+      get()
+      run()
+      exec()
+      columns()
+      transaction()
+      close()
+    }
+    class SqliteStatements {
+      all()
+      get()
+      run()
+      exec()
+      columns()
+      transaction()
+      close()
+    }
+    class SqliteDatabase {
+      open()
+      all()
+      get()
+      run()
+      exec()
+      columns()
+      transaction()
+      close()
+    }
+    class StoreDatabase {
+      forSettings()
+    }
+    class SqlResearchStore {
+      open()
       createRun()
       getRun()
       listRuns()
@@ -835,9 +895,8 @@ classDiagram
       addEvent()
       lastEventId()
       listEvents()
-      listJudgements()
     }
-    class SqliteTables {
+    class StoreTables {
       open()
     }
     class TargetListingTable {
@@ -884,9 +943,11 @@ classDiagram
     class AgentTeam {
       run()
       partProblems()
+      written()
       output()
     }
     class BilledCosts {
+      written()
     }
     class BuiltAgent {
       <<interface>>
@@ -954,6 +1015,8 @@ classDiagram
     }
     class CallSequence {
       next()
+      track()
+      written()
     }
     class LlmCallLog {
       wrap()
@@ -1371,11 +1434,29 @@ classDiagram
   ServiceClients --> EvidenceServices
   ServiceClients --> CompetitorDiscovery
   ServiceClients --> AdLibrary
+  AccountTable --> SqlDatabase
+  CallLog --> SqlDatabase
+  ChargeTable --> SqlDatabase
+  PacketCheckLog --> SqlDatabase
+  CompetitorKinds --> SqlDatabase
+  EventLog --> SqlDatabase
+  FindingTable --> SqlDatabase
+  JudgementTable --> SqlDatabase
+  PacketRowTable --> SqlDatabase
+  ProductBackfill --> SqlDatabase
   ProductBackfill --> ProductTable
   ProductBackfill --> PacketRowTable
-  SqliteProductCatalog --> ProductTable
-  SqliteProductCatalog --> RunTable
-  SqliteProductCatalog --> PacketRowTable
+  SqlProductCatalog --> ProductTable
+  SqlProductCatalog --> RunTable
+  SqlProductCatalog --> PacketRowTable
+  ProductTable --> SqlDatabase
+  ReviewAnalysisTable --> SqlDatabase
+  ReviewPullTable --> SqlDatabase
+  ReviewTable --> SqlDatabase
+  RunTable --> SqlDatabase
+  SqlResearchStore --> StoreTables
+  StoreTables --> SqlDatabase
+  TargetListingTable --> SqlDatabase
   ThrottledPageFetcher --> PageFetcher
   ThrottledPageFetcher --> ServiceQueue
   ThrottledWebSearch --> WebSearch
@@ -1558,29 +1639,35 @@ classDiagram
 | `adapters` | `adapters/run-billing.ts` | RunBilling |
 | `adapters` | `adapters/service-clients.ts` | EvidenceServices, ServiceClients |
 | `adapters` | `adapters/service-queue.ts` | Waiter, ServiceQueue |
-| `adapters` | `adapters/sqlite/account-table.ts` | AccountTable |
-| `adapters` | `adapters/sqlite/call-log.ts` | CallLog |
-| `adapters` | `adapters/sqlite/charge-table.ts` | ChargeTable |
-| `adapters` | `adapters/sqlite/check-log.ts` | PacketCheckLog |
-| `adapters` | `adapters/sqlite/competitor-kinds.ts` | CompetitorKinds |
-| `adapters` | `adapters/sqlite/event-log.ts` | EventLog |
-| `adapters` | `adapters/sqlite/finding-table.ts` | FindingTable |
-| `adapters` | `adapters/sqlite/judgement-table.ts` | JudgementTable |
-| `adapters` | `adapters/sqlite/migrations.ts` | SqliteMigrations |
-| `adapters` | `adapters/sqlite/packet-row-table.ts` | PacketRowTable |
-| `adapters` | `adapters/sqlite/product-backfill.ts` | ProductBackfill |
-| `adapters` | `adapters/sqlite/product-catalog.ts` | SqliteProductCatalog |
-| `adapters` | `adapters/sqlite/product-table.ts` | ProductTable |
-| `adapters` | `adapters/sqlite/review-analysis-table.ts` | ReviewAnalysisTable |
-| `adapters` | `adapters/sqlite/review-pull-table.ts` | ReviewPullTable |
-| `adapters` | `adapters/sqlite/review-table.ts` | ReviewTable |
-| `adapters` | `adapters/sqlite/rows.ts` | Rows |
-| `adapters` | `adapters/sqlite/run-table.ts` | RunTable |
-| `adapters` | `adapters/sqlite/schema.ts` | SqliteSchema |
-| `adapters` | `adapters/sqlite/scope-filter.ts` | ScopeFilter |
-| `adapters` | `adapters/sqlite/store.ts` | SqliteResearchStore |
-| `adapters` | `adapters/sqlite/tables.ts` | SqliteTables |
-| `adapters` | `adapters/sqlite/target-listing-table.ts` | TargetListingTable |
+| `adapters` | `adapters/store/account-table.ts` | AccountTable |
+| `adapters` | `adapters/store/call-log.ts` | CallLog |
+| `adapters` | `adapters/store/charge-table.ts` | ChargeTable |
+| `adapters` | `adapters/store/check-log.ts` | PacketCheckLog |
+| `adapters` | `adapters/store/competitor-kinds.ts` | CompetitorKinds |
+| `adapters` | `adapters/store/event-log.ts` | EventLog |
+| `adapters` | `adapters/store/finding-table.ts` | FindingTable |
+| `adapters` | `adapters/store/judgement-table.ts` | JudgementTable |
+| `adapters` | `adapters/store/migrations.ts` | StoreMigrations |
+| `adapters` | `adapters/store/packet-row-table.ts` | PacketRowTable |
+| `adapters` | `adapters/store/postgres-database.ts` | PostgresStatements, PostgresDatabase |
+| `adapters` | `adapters/store/postgres-dialect.ts` | PostgresDialect |
+| `adapters` | `adapters/store/product-backfill.ts` | ProductBackfill |
+| `adapters` | `adapters/store/product-catalog.ts` | SqlProductCatalog |
+| `adapters` | `adapters/store/product-table.ts` | ProductTable |
+| `adapters` | `adapters/store/review-analysis-table.ts` | ReviewAnalysisTable |
+| `adapters` | `adapters/store/review-pull-table.ts` | ReviewPullTable |
+| `adapters` | `adapters/store/review-table.ts` | ReviewTable |
+| `adapters` | `adapters/store/rows.ts` | Rows |
+| `adapters` | `adapters/store/run-lock.ts` | RunLock |
+| `adapters` | `adapters/store/run-table.ts` | RunTable |
+| `adapters` | `adapters/store/schema.ts` | StoreSchema |
+| `adapters` | `adapters/store/scope-filter.ts` | ScopeFilter |
+| `adapters` | `adapters/store/sql-database.ts` | SqlDatabase |
+| `adapters` | `adapters/store/sqlite-database.ts` | SqliteStatements, SqliteDatabase |
+| `adapters` | `adapters/store/store-database.ts` | StoreDatabase |
+| `adapters` | `adapters/store/store.ts` | SqlResearchStore |
+| `adapters` | `adapters/store/tables.ts` | StoreTables |
+| `adapters` | `adapters/store/target-listing-table.ts` | TargetListingTable |
 | `adapters` | `adapters/throttled.ts` | ThrottledPageFetcher, ThrottledWebSearch, ThrottledActorRunner, ThrottledAdLibrary |
 | `adapters` | `adapters/trendtrack-ads.ts` | TrendtrackAd, TrendtrackAds |
 | `adapters` | `adapters/trustpilot-profiles.ts` | TrustpilotProfiles |

@@ -1,28 +1,27 @@
-import type Database from "better-sqlite3";
-
 import { AccountTable } from "./account-table.js";
 import { CallLog } from "./call-log.js";
 import { ChargeTable } from "./charge-table.js";
 import { CompetitorKinds } from "./competitor-kinds.js";
 import { FindingTable } from "./finding-table.js";
-import { SqliteMigrations } from "./migrations.js";
+import { StoreMigrations } from "./migrations.js";
 import { PacketRowTable } from "./packet-row-table.js";
 import { ReviewPullTable } from "./review-pull-table.js";
 import { ReviewAnalysisTable } from "./review-analysis-table.js";
 import { TargetListingTable } from "./target-listing-table.js";
+import type { SqlDatabase } from "./sql-database.js";
 import { Trace } from "../../trace/index.js";
 
 /** The tables, then their migrations, then the indexes that need the migrated columns, then the row migrations that need every table. */
-export class SqliteSchema {
-  static apply(db: Database.Database): void {
-    Trace.line(import.meta.url, "SqliteSchema.apply", { db });
-    db.exec(SqliteSchema.DDL);
-    db.exec(AccountTable.DDL);
-    db.exec(CallLog.DDL);
-    SqliteMigrations.apply(db);
-    db.exec(SqliteSchema.INDEXES);
-    for (const ddl of [PacketRowTable.DDL, ReviewAnalysisTable.DDL, TargetListingTable.DDL, FindingTable.DDL, ChargeTable.DDL, ReviewPullTable.DDL]) db.exec(ddl);
-    SqliteMigrations.once(db, CompetitorKinds.NAME, () => new CompetitorKinds(db).apply());
+export class StoreSchema {
+  static async apply(db: SqlDatabase): Promise<void> {
+    Trace.line(import.meta.url, "StoreSchema.apply");
+    await db.exec(StoreSchema.DDL);
+    await db.exec(AccountTable.DDL);
+    await db.exec(CallLog.DDL);
+    await StoreMigrations.apply(db);
+    await db.exec(StoreSchema.INDEXES);
+    for (const ddl of [PacketRowTable.DDL, ReviewAnalysisTable.DDL, TargetListingTable.DDL, FindingTable.DDL, ChargeTable.DDL, ReviewPullTable.DDL]) await db.exec(ddl);
+    await StoreMigrations.once(db, CompetitorKinds.NAME, (tx) => new CompetitorKinds(tx).apply());
   }
 
   static readonly INDEXES = `
@@ -98,6 +97,7 @@ CREATE TABLE IF NOT EXISTS research_reviews (
 CREATE TABLE IF NOT EXISTS research_run_reviews (
     run_id         TEXT NOT NULL REFERENCES research_runs(id) ON DELETE CASCADE,
     review_id      INTEGER NOT NULL REFERENCES research_reviews(id),
+    seq            INTEGER NOT NULL DEFAULT 0,
     ref            TEXT NOT NULL,
     target_id      TEXT NOT NULL DEFAULT '',
     source_id      TEXT NOT NULL DEFAULT '',

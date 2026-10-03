@@ -1,6 +1,7 @@
-import type Database from "better-sqlite3";
-
 import { Trace } from "../../trace/index.js";
+
+import { Rows } from "./rows.js";
+import type { SqlDatabase } from "./sql-database.js";
 
 const MIGRATIONS: ReadonlyArray<readonly [string, string, string]> = [
   ["research_runs", "output", "ALTER TABLE research_runs ADD COLUMN output TEXT NOT NULL DEFAULT ''"],
@@ -11,6 +12,7 @@ const MIGRATIONS: ReadonlyArray<readonly [string, string, string]> = [
   ["research_runs", "packet_source", "ALTER TABLE research_runs ADD COLUMN packet_source TEXT NOT NULL DEFAULT ''"],
   ["research_runs", "product_id", "ALTER TABLE research_runs ADD COLUMN product_id TEXT NOT NULL DEFAULT ''"],
   ["research_run_reviews", "product_id", "ALTER TABLE research_run_reviews ADD COLUMN product_id TEXT NOT NULL DEFAULT ''"],
+  ["research_run_reviews", "seq", "ALTER TABLE research_run_reviews ADD COLUMN seq INTEGER NOT NULL DEFAULT 0; UPDATE research_run_reviews SET seq = rowid"],
   ["research_runs", "workspace_id", "ALTER TABLE research_runs ADD COLUMN workspace_id TEXT NOT NULL DEFAULT 'admin'"],
   ["research_judgements", "workspace_id", "ALTER TABLE research_judgements ADD COLUMN workspace_id TEXT NOT NULL DEFAULT 'admin'"],
   ["research_llm_calls", "generation", "ALTER TABLE research_llm_calls ADD COLUMN generation TEXT"],
@@ -26,38 +28,34 @@ const MIGRATIONS: ReadonlyArray<readonly [string, string, string]> = [
   ],
 ];
 
-const DATA_MIGRATIONS: ReadonlyArray<readonly [string, string]> = [
-  [
-    "review-mining-is-stage-3",
-    "UPDATE research_runs SET stage = 3, packet = CASE WHEN json_valid(packet)" +
-      " THEN json_set(packet, '$.stage', 3) ELSE packet END WHERE stage = 2",
-  ],
-];
-
 /** CREATE TABLE IF NOT EXISTS never alters an existing table, so columns migrate here; a change to rows already stored runs once, by name. */
-export class SqliteMigrations {
-  static apply(db: Database.Database): void {
-    Trace.line(import.meta.url, "SqliteMigrations.apply");
+export class StoreMigrations {
+  static async apply(db: SqlDatabase): Promise<void> {
+    Trace.line(import.meta.url, "StoreMigrations.apply");
     for (const [table, column, ddl] of MIGRATIONS) {
-      const have = (db.pragma(`table_info(${table})`) as Array<{ name: string }>).map((row) => row.name);
-      if (!have.includes(column)) db.exec(ddl);
+      if (!(await db.columns(table)).includes(column)) await db.exec(ddl);
     }
-    SqliteMigrations.data(db);
-  }
-
-  private static data(db: Database.Database): void {
-    Trace.line(import.meta.url, "SqliteMigrations.data");
-    for (const [name, sql] of DATA_MIGRATIONS) SqliteMigrations.once(db, name, () => db.exec(sql));
+    await StoreMigrations.once(db, "review-mining-is-stage-3", StoreMigrations.reviewMiningIsStageThree);
   }
 
   /** Runs `change` and records it under `name`, in one transaction, unless a migration of that name has run. */
-  static once(db: Database.Database, name: string, change: () => void): void {
-    Trace.line(import.meta.url, "SqliteMigrations.once", { name });
-    db.exec("CREATE TABLE IF NOT EXISTS research_migrations (name TEXT PRIMARY KEY, applied_at TEXT NOT NULL)");
-    if (db.prepare("SELECT 1 FROM research_migrations WHERE name = ?").get(name)) return;
-    db.transaction(() => {
-      change();
-      db.prepare("INSERT INTO research_migrations (name, applied_at) VALUES (?, ?)").run(name, new Date().toISOString());
-    })();
+  static async once(db: SqlDatabase, name: string, change: (tx: SqlDatabase) => Promise<void>): Promise<void> {
+    Trace.line(import.meta.url, "StoreMigrations.once", { name });
+    await db.exec("CREATE TABLE IF NOT EXISTS research_migrations (name TEXT PRIMARY KEY, applied_at TEXT NOT NULL)");
+    if (await db.get("SELECT 1 AS done FROM research_migrations WHERE name = ?", [name])) return;
+    await db.transaction(async (tx) => {
+      await change(tx);
+      await tx.run("INSERT INTO research_migrations (name, applied_at) VALUES (?, ?)", [name, new Date().toISOString()]);
+    });
+  }
+
+  private static async reviewMiningIsStageThree(tx: SqlDatabase): Promise<void> {
+    Trace.line(import.meta.url, "StoreMigrations.reviewMiningIsStageThree");
+    const runs = await tx.all<{ id: string; packet: string }>("SELECT id, packet FROM research_runs WHERE stage = 2");
+    for (const run of runs) {
+      const packet = Rows.json(run.packet, null) as Record<string, unknown> | null;
+      const rewritten = packet && typeof packet === "object" ? JSON.stringify({ ...packet, stage: 3 }) : run.packet;
+      await tx.run("UPDATE research_runs SET stage = 3, packet = ? WHERE id = ?", [rewritten, run.id]);
+    }
   }
 }

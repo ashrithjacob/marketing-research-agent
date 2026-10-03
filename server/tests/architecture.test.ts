@@ -41,6 +41,7 @@ const TRACE_LAYER = "trace";
 const PACKAGE_OWNERS: Record<string, string> = {
   "apify-client": "adapters",
   "better-sqlite3": "adapters",
+  pg: "adapters",
   hono: "http",
   "@hono/node-server": "http",
   "@earendil-works/pi-agent-core": "agent",

@@ -1,7 +1,7 @@
 import { Hono, type Context, type Next } from "hono";
 
 import { RunSupervisor } from "../agent/index.js";
-import { ServiceClients, SqliteResearchStore } from "../adapters/index.js";
+import { ServiceClients } from "../adapters/index.js";
 import { AmazonListingLookup } from "../adapters/apify/index.js";
 import { Env, type Settings } from "../config/index.js";
 import type { AmazonListingSource, ResearchStore } from "../domain/index.js";
@@ -20,20 +20,20 @@ export class App {
   readonly settings: Settings;
   readonly traces: TraceFile;
 
-  constructor(overrides?: {
+  constructor(overrides: {
     settings?: Settings;
     traces?: TraceFile;
-    store?: ResearchStore;
+    store: ResearchStore;
     supervisor?: RunSupervisor;
     listingSource?: AmazonListingSource | null;
   }) {
     Trace.line(import.meta.url, "App.constructor");
-    this.settings = overrides?.settings ?? Env.settings();
-    this.traces = overrides?.traces ?? App.traceFile(this.settings);
-    this.store = overrides?.store ?? new SqliteResearchStore(this.settings.databasePath);
+    this.settings = overrides.settings ?? Env.settings();
+    this.traces = overrides.traces ?? App.traceFile(this.settings);
+    this.store = overrides.store;
     const services = ServiceClients.forSettings(this.settings);
     this.supervisor =
-      overrides?.supervisor ?? new RunSupervisor({ store: this.store, settings: this.settings, services });
+      overrides.supervisor ?? new RunSupervisor({ store: this.store, settings: this.settings, services });
 
     const hono = new Hono<ApiEnv>();
     hono.use("*", (c, next) => this.request(c, next));
@@ -46,7 +46,7 @@ export class App {
         supervisor: this.supervisor,
         settings: this.settings,
         traces: this.traces,
-        listingSource: overrides?.listingSource !== undefined ? overrides.listingSource : App.listingSource(services),
+        listingSource: overrides.listingSource !== undefined ? overrides.listingSource : App.listingSource(services),
         pages: services.pages,
       }).router(),
     );

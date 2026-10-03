@@ -1,8 +1,8 @@
-import type Database from "better-sqlite3";
 
 import { Clock, Ids, type ResearchRun, type RunHead, type RunUpdate, type Scope } from "../../domain/index.js";
 
 import { Rows } from "./rows.js";
+import type { SqlDatabase } from "./sql-database.js";
 import { ScopeFilter } from "./scope-filter.js";
 import { Trace } from "../../trace/index.js";
 
@@ -27,9 +27,9 @@ const COLUMNS = new Set([
 const JSON_COLUMNS = new Set(["brief", "reject_kinds", "judgement_ids", "packet", "usage"]);
 
 export class RunTable {
-  constructor(private readonly db: Database.Database) {}
+  constructor(private readonly db: SqlDatabase) {}
 
-  create(input: {
+  async create(input: {
     workspaceId: string;
     brief: Record<string, unknown>;
     model: string;
@@ -38,16 +38,14 @@ export class RunTable {
     nodes?: string[];
     stage?: number;
     productId: string;
-  }): ResearchRun {
+  }): Promise<ResearchRun> {
     Trace.line(import.meta.url, "RunTable.create", { input });
     const now = Clock.nowIso();
     const runId = Ids.next();
-    this.db
-      .prepare(
-        "INSERT INTO research_runs (id, workspace_id, product_id, status, stage, model, brief, reject_kinds," +
-          " judgement_ids, nodes, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
-      )
-      .run(
+    await this.db.run(
+      "INSERT INTO research_runs (id, workspace_id, product_id, status, stage, model, brief, reject_kinds," +
+        " judgement_ids, nodes, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+      [
         runId,
         input.workspaceId,
         input.productId,
@@ -60,40 +58,39 @@ export class RunTable {
         JSON.stringify(input.nodes ?? []),
         now,
         now,
-      );
-    const run = this.get(runId);
+      ],
+    );
+    const run = await this.get(runId);
     if (!run) throw new Error("run vanished immediately after insert");
     return run;
   }
 
-  get(runId: string): ResearchRun | null {
+  async get(runId: string): Promise<ResearchRun | null> {
     Trace.line(import.meta.url, "RunTable.get", { runId });
-    const row = this.db.prepare("SELECT * FROM research_runs WHERE id = ?").get(runId);
-    return row ? Rows.run(row as Record<string, any>) : null;
+    const row = await this.db.get("SELECT * FROM research_runs WHERE id = ?", [runId]);
+    return row ? Rows.run(row) : null;
   }
 
-  list(scope: Scope, limit = 50): ResearchRun[] {
+  async list(scope: Scope, limit = 50): Promise<ResearchRun[]> {
     Trace.line(import.meta.url, "RunTable.list", { scope, limit });
-    const rows = this.db
-      .prepare(
-        `SELECT * FROM research_runs WHERE ${ScopeFilter.sql("workspace_id")} ORDER BY created_at DESC LIMIT ?`,
-      )
-      .all(...ScopeFilter.args(scope), limit) as Array<Record<string, any>>;
+    const rows = await this.db.all(
+      `SELECT * FROM research_runs WHERE ${ScopeFilter.sql("workspace_id")} ORDER BY created_at DESC LIMIT ?`,
+      [...ScopeFilter.args(scope), limit],
+    );
     return rows.map(Rows.run);
   }
 
-  heads(scope: Scope): RunHead[] {
+  async heads(scope: Scope): Promise<RunHead[]> {
     Trace.line(import.meta.url, "RunTable.heads", { scope });
-    const rows = this.db
-      .prepare(
-        "SELECT id, product_id, stage, status, created_at FROM research_runs" +
-          ` WHERE ${ScopeFilter.sql("workspace_id")} ORDER BY created_at DESC`,
-      )
-      .all(...ScopeFilter.args(scope)) as Array<Record<string, any>>;
+    const rows = await this.db.all(
+      "SELECT id, product_id, stage, status, created_at FROM research_runs" +
+        ` WHERE ${ScopeFilter.sql("workspace_id")} ORDER BY created_at DESC`,
+      ScopeFilter.args(scope),
+    );
     return rows.map(Rows.head);
   }
 
-  update(runId: string, fields: RunUpdate): void {
+  async update(runId: string, fields: RunUpdate): Promise<void> {
     Trace.line(import.meta.url, "RunTable.update", { runId, fields });
     const keys = Object.keys(fields) as Array<keyof RunUpdate>;
     const unknown = keys.filter((key) => !COLUMNS.has(key as string));
@@ -109,8 +106,6 @@ export class RunTable {
       return value as string | number;
     });
     const assignments = keys.map((key) => `${key} = ?`).join(", ");
-    this.db
-      .prepare(`UPDATE research_runs SET ${assignments}, updated_at = ? WHERE id = ?`)
-      .run(...values, Clock.nowIso(), runId);
+    await this.db.run(`UPDATE research_runs SET ${assignments}, updated_at = ? WHERE id = ?`, [...values, Clock.nowIso(), runId]);
   }
 }

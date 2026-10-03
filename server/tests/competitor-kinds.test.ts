@@ -10,8 +10,9 @@ import { join } from "node:path";
 import Database from "better-sqlite3";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { SqliteResearchStore } from "../src/adapters/index.js";
-import { CompetitorKinds } from "../src/adapters/sqlite/competitor-kinds.js";
+import { SqlResearchStore } from "../src/adapters/index.js";
+import { CompetitorKinds } from "../src/adapters/store/competitor-kinds.js";
+import { SqliteStores } from "./sqlite-stores.js";
 
 let dir: string;
 let path: string;
@@ -29,7 +30,7 @@ const competitor = (id: string, relation: string, form: string, shared: string[]
 
 describe("the competitor-kinds migration", () => {
   it("relabels old packets, their packet rows and the ledger, and marks an old indirect curve for what it was", async () => {
-    const store = new SqliteResearchStore(path);
+    const store = await SqliteStores.open(path);
     const runId = (await store.createRun({ workspaceId: "admin", brief: { product: "Mullevia" }, model: "m", rejectKinds: [], judgementIds: [] })).id;
     await store.close();
     const db = new Database(path);
@@ -51,7 +52,7 @@ describe("the competitor-kinds migration", () => {
     db.prepare("DELETE FROM research_migrations WHERE name = ?").run(CompetitorKinds.NAME);
     db.close();
 
-    const reopened = new SqliteResearchStore(path);
+    const reopened = await SqliteStores.open(path);
     const stored = (await reopened.getRun(runId))!.packet as any;
     expect(stored.competitors.map((c: any) => c.relation)).toEqual(["direct", "indirect_form", "indirect_active", "indirect_active"]);
     expect(stored.saturation[0]).toMatchObject({ class: "indirect_form", stopped_because: expect.stringMatching(/^\(an `indirect` curve from before 2026-10-03, counting brands of both indirect kinds\) three quiet sources/) });
@@ -65,7 +66,7 @@ describe("the competitor-kinds migration", () => {
   });
 
   it("runs once: a store opened again leaves a relabelled run alone", async () => {
-    await new SqliteResearchStore(path).close();
+    await (await SqliteStores.open(path)).close();
     const db = new Database(path);
     expect(db.prepare("SELECT COUNT(*) AS n FROM research_migrations WHERE name = ?").get(CompetitorKinds.NAME)).toEqual({ n: 1 });
     db.close();

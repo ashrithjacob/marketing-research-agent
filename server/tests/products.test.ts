@@ -12,9 +12,10 @@ import { App } from "../src/http/index.js";
 import { RunSupervisor, StageOneHandoff } from "../src/agent/index.js";
 import { Env } from "../src/config/index.js";
 import { Briefs, ProductFolders, type Product, type RunHead } from "../src/domain/index.js";
-import { SqliteResearchStore } from "../src/adapters/index.js";
+import { SqlResearchStore } from "../src/adapters/index.js";
 
 import { minimalPacket } from "./fixtures.js";
+import { SqliteStores } from "./sqlite-stores.js";
 
 describe("Briefs.key", () => {
   it("treats spellings of one typed name as one product", () => {
@@ -97,14 +98,14 @@ describe("ProductFolders.summaries", () => {
 
 describe("the product store", () => {
   let dir: string;
-  let store: SqliteResearchStore;
+  let store: SqlResearchStore;
   const path = () => join(dir, "research.db");
   const run = (product: string, stage = 1) =>
     store.createRun({ workspaceId: "admin", brief: { product, url: "", market: "", notes: "" }, model: "m", rejectKinds: [], judgementIds: [], stage });
 
-  beforeEach(() => {
+  beforeEach(async () => {
     dir = mkdtempSync(join(tmpdir(), "mra-products-"));
-    store = new SqliteResearchStore(path());
+    store = await SqliteStores.open(path());
   });
 
   afterEach(async () => {
@@ -146,7 +147,7 @@ describe("the product store", () => {
     db.exec("UPDATE research_runs SET product_id = ''; DELETE FROM research_products; DELETE FROM research_packet_attributes;");
     db.close();
 
-    store = new SqliteResearchStore(path());
+    store = await SqliteStores.open(path());
     const again = (await store.getRun(legacy.id))!;
     expect(again.product_id).not.toBe("");
     expect((await store.products.get(again.product_id, Scope.everything))?.key).toBe("product:vitamind");
@@ -156,13 +157,13 @@ describe("the product store", () => {
 
 describe("products cover every run, not the newest page", () => {
   let dir: string;
-  let store: SqliteResearchStore;
+  let store: SqlResearchStore;
   let app: App;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     dir = mkdtempSync(join(tmpdir(), "mra-products-api-"));
     const settings = { ...Env.settings(), corpusPath: join(dir, "corpus"), staticDir: join(dir, "static"), appPasswordHash: "" };
-    store = new SqliteResearchStore(join(dir, "research.db"));
+    store = await SqliteStores.open(join(dir, "research.db"));
     app = new App({ settings, store, supervisor: new RunSupervisor({ store, settings }) });
   });
 

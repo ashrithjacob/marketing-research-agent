@@ -12,13 +12,14 @@ import { fauxAssistantMessage, fauxProvider } from "@earendil-works/pi-ai/provid
 import ts from "typescript";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { SqliteResearchStore } from "../src/adapters/index.js";
+import { SqlResearchStore } from "../src/adapters/index.js";
 import { RunSupervisor } from "../src/agent/index.js";
 import { Env } from "../src/config/index.js";
 import { App } from "../src/http/index.js";
 import { Trace, TraceFile, TraceFormat, WireTap, type TraceStep } from "../src/trace/index.js";
 import { minimalPacket, recorded } from "./fixtures.js";
 import { TraceCoverage } from "./trace-coverage.js";
+import { SqliteStores } from "./sqlite-stores.js";
 
 let dir: string;
 let traces: TraceFile;
@@ -184,7 +185,7 @@ describe("the wire", () => {
 describe("the download", () => {
   it("serves a finished run's trace as an attachment, with the agent's own lines in it", async () => {
     const settings = { ...Env.settings(), model: "faux-model", corpusPath: join(dir, "corpus"), staticDir: join(dir, "static"), appPasswordHash: "", traceDir: dir };
-    const store = new SqliteResearchStore(join(dir, "research.db"));
+    const store = await SqliteStores.open(join(dir, "research.db"));
     const faux = fauxProvider({ provider: "openrouter", models: [{ id: "faux-model" }] });
     const models = createModels();
     models.setProvider(faux.provider);

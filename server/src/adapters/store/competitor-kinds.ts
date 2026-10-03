@@ -1,10 +1,9 @@
-import type Database from "better-sqlite3";
-
 import { Relations, type CompetitorRelation } from "../../domain/index.js";
 import { Trace } from "../../trace/index.js";
 
 import { PacketRowTable } from "./packet-row-table.js";
 import { Rows } from "./rows.js";
+import type { SqlDatabase } from "./sql-database.js";
 
 type Row = Record<string, unknown>;
 
@@ -12,18 +11,20 @@ type Row = Record<string, unknown>;
 export class CompetitorKinds {
   static readonly NAME = "competitor-kinds-split";
 
-  constructor(private readonly db: Database.Database) {}
+  constructor(private readonly db: SqlDatabase) {}
 
-  apply(): void {
+  async apply(): Promise<void> {
     Trace.line(import.meta.url, "CompetitorKinds.apply");
-    this.packets();
-    this.ledger();
+    await this.packets();
+    await this.ledger();
   }
 
-  private packets(): void {
+  private async packets(): Promise<void> {
     Trace.line(import.meta.url, "CompetitorKinds.packets");
     const rows = new PacketRowTable(this.db);
-    const runs = this.db.prepare("SELECT id, product_id, packet FROM research_runs WHERE packet LIKE '%\"relation\"%' OR packet LIKE '%\"indirect\"%'").all() as Array<{ id: string; product_id: string; packet: string }>;
+    const runs = await this.db.all<{ id: string; product_id: string; packet: string }>(
+      "SELECT id, product_id, packet FROM research_runs WHERE packet LIKE '%\"relation\"%' OR packet LIKE '%\"indirect\"%'",
+    );
     for (const run of runs) {
       const packet = Rows.json(run.packet, null) as Row | null;
       if (!packet) continue;
@@ -31,21 +32,23 @@ export class CompetitorKinds {
       packet.competitors = ((packet.competitors as Row[] | undefined) ?? []).map((row) => ({ ...row, relation: CompetitorKinds.kind(row, reference) }));
       packet.saturation = ((packet.saturation as Row[] | undefined) ?? []).map(CompetitorKinds.curve);
       const json = JSON.stringify(packet);
-      this.db.prepare("UPDATE research_runs SET packet = ? WHERE id = ?").run(json, run.id);
-      rows.replace(run.id, run.product_id, packet);
+      await this.db.run("UPDATE research_runs SET packet = ? WHERE id = ?", [json, run.id]);
+      await rows.replace(run.id, run.product_id, packet);
     }
   }
 
-  private ledger(): void {
+  private async ledger(): Promise<void> {
     Trace.line(import.meta.url, "CompetitorKinds.ledger");
-    const rows = this.db.prepare("SELECT run_id, seq, kind, payload FROM research_findings WHERE kind IN ('competitor', 'saturation', 'competitor_reference') ORDER BY run_id, seq").all() as Array<{ run_id: string; seq: number; kind: string; payload: string }>;
+    const rows = await this.db.all<{ run_id: string; seq: number; kind: string; payload: string }>(
+      "SELECT run_id, seq, kind, payload FROM research_findings WHERE kind IN ('competitor', 'saturation', 'competitor_reference') ORDER BY run_id, seq",
+    );
     const references = new Map<string, Row>();
     for (const row of rows) if (row.kind === "competitor_reference") references.set(row.run_id, Rows.json(row.payload, {}) as Row);
-    const update = this.db.prepare("UPDATE research_findings SET payload = ? WHERE run_id = ? AND seq = ?");
+    const update = "UPDATE research_findings SET payload = ? WHERE run_id = ? AND seq = ?";
     for (const row of rows) {
       const payload = Rows.json(row.payload, {}) as Row;
-      if (row.kind === "competitor") update.run(JSON.stringify({ ...payload, relation: CompetitorKinds.kind(payload, references.get(row.run_id) ?? null) }), row.run_id, row.seq);
-      if (row.kind === "saturation" && payload.class === "indirect") update.run(JSON.stringify(CompetitorKinds.curve(payload)), row.run_id, row.seq);
+      if (row.kind === "competitor") await this.db.run(update, [JSON.stringify({ ...payload, relation: CompetitorKinds.kind(payload, references.get(row.run_id) ?? null) }), row.run_id, row.seq]);
+      if (row.kind === "saturation" && payload.class === "indirect") await this.db.run(update, [JSON.stringify(CompetitorKinds.curve(payload)), row.run_id, row.seq]);
     }
   }
 

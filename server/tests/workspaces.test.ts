@@ -14,19 +14,20 @@ import { createModels } from "@earendil-works/pi-ai";
 import { fauxAssistantMessage, fauxProvider } from "@earendil-works/pi-ai/providers/faux";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { SqliteResearchStore } from "../src/adapters/index.js";
+import { SqlResearchStore } from "../src/adapters/index.js";
 import { RunSupervisor } from "../src/agent/index.js";
 import { Env, type Settings } from "../src/config/index.js";
 import { Scope } from "../src/domain/index.js";
 import { AccountCommands, App, LoginThrottle, Passwords } from "../src/http/index.js";
 import { genreRun, minimalPacket, recorded, productPacket } from "./fixtures.js";
+import { SqliteStores } from "./sqlite-stores.js";
 
 const MODEL_ID = "faux-model";
 const PASSWORD = "correct horse battery";
 
 let dir: string;
 let app: App;
-let store: SqliteResearchStore;
+let store: SqlResearchStore;
 let faux: ReturnType<typeof fauxProvider>;
 
 async function build(): Promise<App> {
@@ -41,7 +42,7 @@ async function build(): Promise<App> {
     databasePath: join(dir, "research.db"),
     traceDir: join(dir, "traces"),
   };
-  store = new SqliteResearchStore(settings.databasePath);
+  store = await SqliteStores.open(settings.databasePath);
   faux = fauxProvider({ provider: "openrouter", models: [{ id: MODEL_ID }] });
   const models = createModels();
   models.setProvider(faux.provider);
@@ -183,7 +184,7 @@ describe("workspace isolation", () => {
       created_at TEXT NOT NULL, updated_at TEXT NOT NULL, ended_at TEXT NOT NULL DEFAULT '');
       INSERT INTO research_runs (id, status, created_at, updated_at) VALUES ('legacy', 'completed', 't', 't');`);
     old.close();
-    const migrated = new SqliteResearchStore(path);
+    const migrated = await SqliteStores.open(path);
     try {
       expect((await migrated.getRun("legacy"))!.workspace_id).toBe("admin");
       expect((await migrated.listRuns(Scope.of("acme-id")))).toEqual([]);

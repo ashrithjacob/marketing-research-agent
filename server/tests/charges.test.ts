@@ -9,7 +9,7 @@ import { join } from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { MeteredAdLibrary, MeteredDiscovery, MeteredPageFetcher, MeteredWebSearch, ServiceClients, SqliteResearchStore } from "../src/adapters/index.js";
+import { MeteredAdLibrary, MeteredDiscovery, MeteredPageFetcher, MeteredWebSearch, ServiceClients, SqlResearchStore } from "../src/adapters/index.js";
 import { ParallelApi } from "../src/adapters/parallel-api.js";
 import { ParallelSearch } from "../src/adapters/parallel-search.js";
 import { TrendtrackAds } from "../src/adapters/trendtrack-ads.js";
@@ -18,6 +18,7 @@ import { ToolRegistry } from "../src/agent/tools/index.js";
 import { Env, type ServicePrices, type Settings } from "../src/config/index.js";
 import type { ChargeDraft, LlmCall } from "../src/domain/index.js";
 import { CostReports } from "../src/extract/index.js";
+import { SqliteStores } from "./sqlite-stores.js";
 
 const prices: ServicePrices = {
   parallelSearchUsd: 0.005,
@@ -84,10 +85,10 @@ describe("what the services report", () => {
 
 describe("a charge's agent", () => {
   let dir: string;
-  let store: SqliteResearchStore;
-  beforeEach(() => {
+  let store: SqlResearchStore;
+  beforeEach(async () => {
     dir = mkdtempSync(join(tmpdir(), "mra-charges-"));
-    store = new SqliteResearchStore(join(dir, "research.db"));
+    store = await SqliteStores.open(join(dir, "research.db"));
   });
   afterEach(async () => {
     await store.close();

@@ -14,26 +14,27 @@ import { createModels, type AssistantMessage } from "@earendil-works/pi-ai";
 import { fauxAssistantMessage, fauxProvider, fauxToolCall } from "@earendil-works/pi-ai/providers/faux";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { SqliteResearchStore } from "../src/adapters/index.js";
+import { SqlResearchStore } from "../src/adapters/index.js";
 import { RunSupervisor } from "../src/agent/index.js";
 import { Env, type Settings } from "../src/config/index.js";
 import { productTruthPacketSchema, type ProductTruthAgent } from "../src/domain/index.js";
 import { App } from "../src/http/index.js";
 
 import { minimalPacket } from "./fixtures.js";
+import { SqliteStores } from "./sqlite-stores.js";
 
 let dir: string;
-let store: SqliteResearchStore;
+let store: SqlResearchStore;
 let app: App;
 let faux: ReturnType<typeof fauxProvider>;
 
 const BRIEF = { product: "", url: "https://mullevia.com/products/mullevia-mullein-drops", market: "US, UK", notes: "" };
 const MULLEVIA = ["Wildcrafted Mullein leaf", "Ginger", "Bromelain", "Cordyceps", "Lemon Peel"];
 
-beforeEach(() => {
+beforeEach(async () => {
   dir = mkdtempSync(join(tmpdir(), "mra-truth-"));
   const settings: Settings = { ...Env.settings(), model: "faux-model", corpusPath: join(dir, "corpus"), staticDir: join(dir, "static"), appPasswordHash: "", parallelApiKey: "" };
-  store = new SqliteResearchStore(join(dir, "research.db"));
+  store = await SqliteStores.open(join(dir, "research.db"));
   faux = fauxProvider({ provider: "openrouter", models: [{ id: "faux-model" }] });
   const models = createModels();
   models.setProvider(faux.provider);

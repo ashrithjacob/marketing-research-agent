@@ -51,6 +51,8 @@ export interface Settings {
   corpusPath: string;
 
   databasePath: string;
+  databaseUrl: string;
+  databaseConnections: number;
   traceDir: string;
   traceKeepDays: number;
   traceMaxMb: number;

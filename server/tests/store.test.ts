@@ -11,15 +11,16 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   Runs,
 } from "../src/domain/index.js";
-import { SqliteResearchStore } from "../src/adapters/index.js";
+import { SqlResearchStore } from "../src/adapters/index.js";
 import { minimalPacket } from "./fixtures.js";
+import { SqliteStores } from "./sqlite-stores.js";
 
 let dir: string;
-let store: SqliteResearchStore;
+let store: SqlResearchStore;
 
-beforeEach(() => {
+beforeEach(async () => {
   dir = mkdtempSync(join(tmpdir(), "mra-store-"));
-  store = new SqliteResearchStore(join(dir, "research.db"));
+  store = await SqliteStores.open(join(dir, "research.db"));
 });
 
 afterEach(async () => {
@@ -111,7 +112,7 @@ describe("migration", () => {
     `);
     old.close();
 
-    const migrated = new SqliteResearchStore(path);
+    const migrated = await SqliteStores.open(path);
     try {
       const run = (await migrated.createRun({
         workspaceId: "admin",
@@ -147,7 +148,7 @@ describe("migration", () => {
 describe("stage-2 runs and their stage-1 run", () => {
   it("backfills each old stage-2 run with the stage-1 run it mined, never a later one", async () => {
     const path = join(dir, "before-source-run.db");
-    const first = new SqliteResearchStore(path);
+    const first = await SqliteStores.open(path);
     const brief = { product: "", url: "https://mullevia.com/p" };
     const run = async (stage: number, at: string) => {
       const r = (await first.createRun({ workspaceId: "admin", brief, model: "m", rejectKinds: [], judgementIds: [], stage }));
@@ -163,7 +164,7 @@ describe("stage-2 runs and their stage-1 run", () => {
     raw.exec("ALTER TABLE research_runs DROP COLUMN source_run_id");
     raw.close();
 
-    const migrated = new SqliteResearchStore(path);
+    const migrated = await SqliteStores.open(path);
     try {
       expect((await migrated.getRun(mining.id))!.source_run_id).toBe(older.id);
       expect((await migrated.getRun(newer.id))!.source_run_id).toBe("");
@@ -176,7 +177,7 @@ describe("stage-2 runs and their stage-1 run", () => {
 describe("review mining moving to stage 3", () => {
   it("renumbers every stored review-mining run and its packet once, and never a stage-2 run made after", async () => {
     const path = join(dir, "before-stage-3.db");
-    const first = new SqliteResearchStore(path);
+    const first = await SqliteStores.open(path);
     const brief = { product: "", url: "https://mullevia.com/p" };
     const mining = (await first.createRun({ workspaceId: "admin", brief, model: "", rejectKinds: [], judgementIds: [], nodes: ["review_mining"], stage: 2 }));
     await first.updateRun(mining.id, { status: "completed", packet: { stage: 2, run_id: mining.id } });
@@ -186,10 +187,10 @@ describe("review mining moving to stage 3", () => {
     raw.exec("DELETE FROM research_migrations");
     raw.close();
 
-    const migrated = new SqliteResearchStore(path);
+    const migrated = await SqliteStores.open(path);
     const later = (await migrated.createRun({ workspaceId: "admin", brief, model: "", rejectKinds: [], judgementIds: [], stage: 2 }));
     await migrated.close();
-    const reopened = new SqliteResearchStore(path);
+    const reopened = await SqliteStores.open(path);
     try {
       expect((await reopened.getRun(mining.id))!.stage).toBe(3);
       expect((await reopened.getRun(mining.id))!.packet!.stage).toBe(3);
@@ -239,7 +240,7 @@ describe("llm calls", () => {
     `);
     old.close();
 
-    const migrated = new SqliteResearchStore(path);
+    const migrated = await SqliteStores.open(path);
     try {
       const run = (await migrated.createRun({
         workspaceId: "admin",
@@ -358,6 +359,24 @@ describe("the review corpus", () => {
   });
 });
 
+describe("run-review links from before they were numbered", () => {
+  it("keep the order they were written in, which once came from SQLite's rowid", async () => {
+    const run = await newRun();
+    await store.close();
+    const db = new Database(join(dir, "research.db"));
+    db.exec("DROP TABLE research_run_reviews; CREATE TABLE research_run_reviews (run_id TEXT NOT NULL, review_id INTEGER NOT NULL, ref TEXT NOT NULL," +
+      " target_id TEXT NOT NULL DEFAULT '', source_id TEXT NOT NULL DEFAULT '', band_requested INTEGER, product_id TEXT NOT NULL DEFAULT '', PRIMARY KEY (run_id, review_id))");
+    const review = db.prepare("INSERT INTO research_reviews (platform, review_key, text, first_seen_at, last_seen_at) VALUES ('amazon', ?, 't', '', '') RETURNING id");
+    const link = db.prepare("INSERT INTO research_run_reviews (run_id, review_id, ref) VALUES (?, ?, ?)");
+    const ids = new Map(["r5", "r1", "r9"].map((ref) => [ref, (review.get(`K-${ref}`) as { id: number }).id]));
+    for (const ref of ["r9", "r1", "r5"]) link.run(run.id, ids.get(ref)!, ref);
+    db.close();
+
+    store = await SqliteStores.open(join(dir, "research.db"));
+    expect((await store.listRunReviews(run.id)).map((r) => r.ref)).toEqual(["r9", "r1", "r5"]);
+  });
+});
+
 describe("the run ledger", () => {
   const newRun = () =>
     store.createRun({ workspaceId: "admin", brief: { product: "x" }, model: "m", rejectKinds: [], judgementIds: [] });
@@ -386,7 +405,7 @@ describe("the run ledger", () => {
     const run = (await newRun());
     await store.findings.append(draft(run.id, "gap", { missing: "no COA" }));
     await store.close();
-    store = new SqliteResearchStore(join(dir, "research.db"));
+    store = await SqliteStores.open(join(dir, "research.db"));
     expect((await store.findings.list(run.id)).map((row) => row.payload)).toEqual([{ missing: "no COA" }]);
   });
 });

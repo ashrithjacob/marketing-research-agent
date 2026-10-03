@@ -1,9 +1,9 @@
-import type Database from "better-sqlite3";
 
 import { PacketRows, type PacketRowSet, type Scope, type StoredPacketRows } from "../../domain/index.js";
 
 import { Rows } from "./rows.js";
 import { ScopeFilter } from "./scope-filter.js";
+import type { SqlDatabase } from "./sql-database.js";
 import { Trace } from "../../trace/index.js";
 
 type Value = string | number | null;
@@ -101,45 +101,43 @@ ${own}
 CREATE INDEX IF NOT EXISTS ${table}_product ON ${table}(product_id);`;
   }).join("\n");
 
-  constructor(private readonly db: Database.Database) {}
+  constructor(private readonly db: SqlDatabase) {}
 
-  replace(runId: string, productId: string, packet: unknown): void {
+  async replace(runId: string, productId: string, packet: unknown): Promise<void> {
     Trace.line(import.meta.url, "PacketRowTable.replace", { runId, productId, packet });
     const rows = PacketRows.of(typeof packet === "string" ? Rows.json(packet, null) : packet);
-    this.db.transaction(() => {
-      for (const kind of KINDS) this.write(kind, runId, productId, rows[kind]);
-    })();
+    await this.db.transaction(async (tx) => {
+      for (const kind of KINDS) await PacketRowTable.write(tx, kind, runId, productId, rows[kind]);
+    });
   }
 
-  list(productId: string, scope: Scope): StoredPacketRows {
+  async list(productId: string, scope: Scope): Promise<StoredPacketRows> {
     Trace.line(import.meta.url, "PacketRowTable.list", { productId, scope });
-    const read = (kind: keyof PacketRowSet) =>
-      (
-        this.db
-          .prepare(
-            `SELECT t.run_id, t.data FROM ${SPECS[kind].table} t JOIN research_runs r ON r.id = t.run_id` +
-              ` WHERE t.product_id = ? AND ${ScopeFilter.sql("r.workspace_id")} ORDER BY t.rowid`,
-          )
-          .all(productId, ...ScopeFilter.args(scope)) as Array<{ run_id: string; data: string }>
-      ).map((row) => ({ ...(Rows.json(row.data, {}) as object), run_id: row.run_id }));
-    return Object.fromEntries(KINDS.map((kind) => [kind, read(kind)])) as StoredPacketRows;
+    const read = async (kind: keyof PacketRowSet) => {
+      const rows = await this.db.all<{ run_id: string; data: string }>(
+        `SELECT t.run_id, t.data FROM ${SPECS[kind].table} t JOIN research_runs r ON r.id = t.run_id` +
+          ` WHERE t.product_id = ? AND ${ScopeFilter.sql("r.workspace_id")} ORDER BY r.created_at, t.run_id, t.seq`,
+        [productId, ...ScopeFilter.args(scope)],
+      );
+      return [kind, rows.map((row) => ({ ...(Rows.json(row.data, {}) as object), run_id: row.run_id }))] as const;
+    };
+    return Object.fromEntries(await Promise.all(KINDS.map(read))) as StoredPacketRows;
   }
 
-  private write<K extends keyof PacketRowSet>(
+  private static async write<K extends keyof PacketRowSet>(
+    tx: SqlDatabase,
     kind: K,
     runId: string,
     productId: string,
     rows: PacketRowSet[K],
-  ): void {
+  ): Promise<void> {
     Trace.line(import.meta.url, "PacketRowTable.write", { kind, runId, productId, rows });
     const { table, columns } = SPECS[kind] as Spec<K>;
-    this.db.prepare(`DELETE FROM ${table} WHERE run_id = ?`).run(runId);
+    await tx.run(`DELETE FROM ${table} WHERE run_id = ?`, [runId]);
     const names = ["run_id", "product_id", "seq", ...columns.map(([name]) => name), "data"];
-    const insert = this.db.prepare(
-      `INSERT INTO ${table} (${names.join(", ")}) VALUES (${names.map(() => "?").join(",")})`,
-    );
-    rows.forEach((row, seq) => {
-      insert.run(runId, productId, seq, ...columns.map(([, , read]) => read(row)), JSON.stringify(row));
-    });
+    const insert = `INSERT INTO ${table} (${names.join(", ")}) VALUES (${names.map(() => "?").join(",")})`;
+    for (const [seq, row] of rows.entries()) {
+      await tx.run(insert, [runId, productId, seq, ...columns.map(([, , read]) => read(row)), JSON.stringify(row)]);
+    }
   }
 }

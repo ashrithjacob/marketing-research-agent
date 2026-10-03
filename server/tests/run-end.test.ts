@@ -10,26 +10,27 @@ import { createModels, type MutableModels } from "@earendil-works/pi-ai";
 import { fauxAssistantMessage, fauxProvider } from "@earendil-works/pi-ai/providers/faux";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { SqliteResearchStore } from "../src/adapters/index.js";
+import { SqlResearchStore } from "../src/adapters/index.js";
 import { LiveRuns, RunEnd, RunSupervisor, RunWrapUp, StageOneRunAssembly, type RunAssembly } from "../src/agent/index.js";
 import { RunFindings } from "../src/agent/run-findings.js";
 import { Env, type Settings } from "../src/config/index.js";
 import { Findings, runRequestSchema, type Brief } from "../src/domain/index.js";
 import { productPacket, recordCalls } from "./fixtures.js";
+import { SqliteStores } from "./sqlite-stores.js";
 
 const MODEL_ID = "faux-model";
 const brief: Brief = { product: "MagnaCalm 400mg", url: "https://magnacalm.example/products/glycinate-400", market: "UK", notes: "" };
 
 let dir: string;
-let store: SqliteResearchStore;
+let store: SqlResearchStore;
 let settings: Settings;
 let models: MutableModels;
 let faux: ReturnType<typeof fauxProvider>;
 let supervisor: RunSupervisor;
 
-beforeEach(() => {
+beforeEach(async () => {
   dir = mkdtempSync(join(tmpdir(), "mra-run-end-"));
-  store = new SqliteResearchStore(join(dir, "research.db"));
+  store = await SqliteStores.open(join(dir, "research.db"));
   settings = { ...Env.settings(), model: MODEL_ID, corpusPath: join(dir, "corpus") };
   faux = fauxProvider({ provider: "openrouter", models: [{ id: MODEL_ID }] });
   models = createModels();

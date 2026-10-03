@@ -6,10 +6,11 @@ import { createModels } from "@earendil-works/pi-ai";
 import { fauxAssistantMessage, fauxProvider, fauxToolCall } from "@earendil-works/pi-ai/providers/faux";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { SqliteResearchStore } from "../src/adapters/index.js";
+import { SqlResearchStore } from "../src/adapters/index.js";
 import { IssueSlices, IssueTally, ReviewAnalyst, ReviewCleaner, RunSupervisor } from "../src/agent/index.js";
 import { Env } from "../src/config/index.js";
 import type { AnalysedReview, Issue, LedgerReview, MiningTarget, ReviewAnalysis, ReviewTag, StoredRunReview } from "../src/domain/index.js";
+import { SqliteStores } from "./sqlite-stores.js";
 
 const stored = (ref: string, star: number, text: string, target_id = "product"): StoredRunReview => ({
   run_id: "r",
@@ -126,11 +127,11 @@ describe("IssueSlices", () => {
 
 describe("ReviewAnalyst", () => {
   let dir: string;
-  let store: SqliteResearchStore;
+  let store: SqlResearchStore;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     dir = mkdtempSync(join(tmpdir(), "mra-analysis-"));
-    store = new SqliteResearchStore(join(dir, "research.db"));
+    store = await SqliteStores.open(join(dir, "research.db"));
   });
 
   afterEach(async () => {

@@ -5,7 +5,7 @@ import type { ProductTable } from "./product-table.js";
 import type { RunTable } from "./run-table.js";
 import { Trace } from "../../trace/index.js";
 
-export class SqliteProductCatalog implements ProductCatalog {
+export class SqlProductCatalog implements ProductCatalog {
   constructor(
     private readonly table: ProductTable,
     private readonly runs: RunTable,
@@ -13,27 +13,27 @@ export class SqliteProductCatalog implements ProductCatalog {
   ) {}
 
   async list(scope: Scope): Promise<Product[]> {
-    Trace.line(import.meta.url, "SqliteProductCatalog.list", { scope });
+    Trace.line(import.meta.url, "SqlProductCatalog.list", { scope });
     return this.table.list(scope);
   }
 
   async get(productId: string, scope: Scope): Promise<Product | null> {
-    Trace.line(import.meta.url, "SqliteProductCatalog.get", { productId, scope });
+    Trace.line(import.meta.url, "SqlProductCatalog.get", { productId, scope });
     return this.table.get(productId, scope);
   }
 
   async byKey(key: string): Promise<Product | null> {
-    Trace.line(import.meta.url, "SqliteProductCatalog.byKey", { key });
+    Trace.line(import.meta.url, "SqlProductCatalog.byKey", { key });
     return this.table.byKey(key, Scope.everything);
   }
 
   async runHeads(scope: Scope): Promise<RunHead[]> {
-    Trace.line(import.meta.url, "SqliteProductCatalog.runHeads", { scope });
+    Trace.line(import.meta.url, "SqlProductCatalog.runHeads", { scope });
     return this.runs.heads(scope);
   }
 
   async packetRows(productId: string, scope: Scope): Promise<StoredPacketRows> {
-    Trace.line(import.meta.url, "SqliteProductCatalog.packetRows", { productId, scope });
+    Trace.line(import.meta.url, "SqlProductCatalog.packetRows", { productId, scope });
     return this.rows.list(productId, scope);
   }
 }
