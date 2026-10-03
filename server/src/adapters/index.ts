@@ -9,6 +9,7 @@ export * from "./store/sqlite-database.js";
 export * from "./store/postgres-database.js";
 export type * from "./store/sql-database.js";
 export * from "./store/postgres-dialect.js";
+export * from "./store/store-copy.js";
 export * from "./service-queue.js";
 export * from "./throttled.js";
 export * from "./service-clients.js";

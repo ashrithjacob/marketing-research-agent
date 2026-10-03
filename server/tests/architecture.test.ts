@@ -59,7 +59,7 @@ const PACKAGE_OWNERS: Record<string, string> = {
 const TEXT_MODULE = /(^|[\\/])text[\\/]/;
 
 /** Entry points, which exist to wire concrete things together. */
-const WIRING = new Set(["main.ts", "hashpw.ts", "accounts.ts"]);
+const WIRING = new Set(["main.ts", "hashpw.ts", "accounts.ts", "copy-store.ts"]);
 
 /**
  * Modules written before the conversion were exempt while it was staged. The

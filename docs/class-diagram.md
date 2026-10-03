@@ -883,6 +883,13 @@ classDiagram
       transaction()
       close()
     }
+    class CopiedTable {
+      <<interface>>
+    }
+    class StoreCopy {
+      leftBehind()
+      copy()
+    }
     class StoreDatabase {
       forSettings()
     }
@@ -1454,6 +1461,7 @@ classDiagram
   ReviewPullTable --> SqlDatabase
   ReviewTable --> SqlDatabase
   RunTable --> SqlDatabase
+  StoreCopy --> SqlDatabase
   SqlResearchStore --> StoreTables
   StoreTables --> SqlDatabase
   TargetListingTable --> SqlDatabase
@@ -1664,6 +1672,7 @@ classDiagram
 | `adapters` | `adapters/store/scope-filter.ts` | ScopeFilter |
 | `adapters` | `adapters/store/sql-database.ts` | SqlDatabase |
 | `adapters` | `adapters/store/sqlite-database.ts` | SqliteStatements, SqliteDatabase |
+| `adapters` | `adapters/store/store-copy.ts` | CopiedTable, StoreCopy |
 | `adapters` | `adapters/store/store-database.ts` | StoreDatabase |
 | `adapters` | `adapters/store/store.ts` | SqlResearchStore |
 | `adapters` | `adapters/store/tables.ts` | StoreTables |

@@ -15,6 +15,7 @@
     "test": "vitest run",
     "hashpw": "tsx src/hashpw.ts",
     "accounts": "tsx src/accounts.ts",
+    "copy-store": "tsx src/copy-store.ts",
     "conventions": "node scripts/check-conventions.mjs"
   },
   "dependencies": {
