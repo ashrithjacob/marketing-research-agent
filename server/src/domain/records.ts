@@ -63,7 +63,7 @@ export interface RunSummary {
     measurements: number;
     attributes: number;
     gaps: number;
-    competitors: { direct: number; indirect: number };
+    competitors: { direct: number; indirect_form: number; indirect_active: number };
   };
 }
 
@@ -97,7 +97,8 @@ export class Runs {
         gaps: (packet.gaps ?? []).length,
         competitors: {
           direct: (packet.competitors ?? []).filter((c: any) => c.relation === "direct").length,
-          indirect: (packet.competitors ?? []).filter((c: any) => c.relation === "indirect").length,
+          indirect_form: (packet.competitors ?? []).filter((c: any) => c.relation === "indirect_form").length,
+          indirect_active: (packet.competitors ?? []).filter((c: any) => c.relation === "indirect_active").length,
         },
       },
     };

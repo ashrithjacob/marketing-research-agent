@@ -1,5 +1,6 @@
 export * from "./nodes.js";
 export * from "./vocabulary.js";
+export * from "./relations.js";
 export * from "./brief.js";
 export * from "./evidence.js";
 export * from "./packet.js";

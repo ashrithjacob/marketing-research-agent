@@ -86,6 +86,14 @@ export type SourceScope = (typeof SOURCE_SCOPES)[number];
 export const GROUP_SCOPES = ["product", "direct", "indirect"] as const;
 export type GroupScope = (typeof GROUP_SCOPES)[number];
 
+/** The voice of customer groups a target's reviews by: both kinds of indirect competitor are one group. */
+export const RELATION_GROUP: Readonly<Record<string, GroupScope>> = {
+  product: "product",
+  direct: "direct",
+  indirect_form: "indirect",
+  indirect_active: "indirect",
+};
+
 export interface ProductIssue {
   issue_id: string;
   mentions: number;

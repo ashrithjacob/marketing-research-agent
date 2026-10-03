@@ -60,7 +60,8 @@ export const FORMS = [
 export type Form = (typeof FORMS)[number];
 export const formSchema = z.enum(FORMS);
 
-export const COMPETITOR_RELATIONS = ["direct", "indirect"] as const;
+/** For the champion's own customer: `direct` shares an active in the same form; `indirect_form` shares an active in another form; `indirect_active` shares none. */
+export const COMPETITOR_RELATIONS = ["direct", "indirect_form", "indirect_active"] as const;
 export type CompetitorRelation = (typeof COMPETITOR_RELATIONS)[number];
 export const relationSchema = z.enum(COMPETITOR_RELATIONS);
 

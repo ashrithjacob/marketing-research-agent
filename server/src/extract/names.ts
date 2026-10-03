@@ -1,4 +1,3 @@
-import type { CompetitorRelation } from "../domain/index.js";
 import { Trace } from "../trace/index.js";
 
 const NON_BRAND = new Set(["www", "co", "com", "net", "org", "gov", "edu", "ac", "shop", "store"]);
@@ -49,14 +48,5 @@ export class BrandLabels {
     if (parts.length < 2) return null;
     const labels = parts.slice(0, -1).filter((label) => label.length > 1 && !NON_BRAND.has(label));
     return labels.length > 0 ? labels : null;
-  }
-}
-
-/** Same form is direct, different form is indirect; two `other`s cannot be told apart. */
-export class Relations {
-  static expected(competitorForm: string, referenceForm: string): CompetitorRelation | null {
-    Trace.line(import.meta.url, "Relations.expected", { competitorForm, referenceForm });
-    if (competitorForm === "other" && referenceForm === "other") return null;
-    return competitorForm === referenceForm ? "direct" : "indirect";
   }
 }

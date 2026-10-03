@@ -41,8 +41,8 @@ export default function ProductRuns({
             </div>
             <div className="runrow-sub">
               {r.counts.competitors &&
-                r.counts.competitors.direct + r.counts.competitors.indirect > 0 &&
-                `${r.counts.competitors.direct} direct · ${r.counts.competitors.indirect} indirect · `}
+                r.counts.competitors.direct + r.counts.competitors.indirect_form + r.counts.competitors.indirect_active > 0 &&
+                `${r.counts.competitors.direct} direct · ${r.counts.competitors.indirect_form + r.counts.competitors.indirect_active} indirect · `}
               {r.counts.sources} sources · {r.counts.excerpts} excerpts · {r.counts.gaps} gaps
             </div>
           </Link>

@@ -48,10 +48,11 @@ export const RECORD_TOOLS = [
     kind: "competitor",
     description:
       "Record one competitor, read off its own page. `id` is yours: c1, c2, …; " + REPLACES +
-      " A competitor sells to the champion's icp, whatever its actives; a product with the same active sold to " +
+      " A competitor sells to the champion's icp; a product with the same active sold to " +
       "another audience or for another problem is not a competitor — do not record it. icp_as_printed is who its own page says it " +
-      "is for. relation is checked against the champion's form. shared_actives are picked from the champion's " +
-      "actives and copied word for word, [] when it shares none; the competitor's own actives keep its page's wording. Example: " +
+      "is for. shared_actives are picked from the champion's actives and copied word for word, [] when it shares none; the " +
+      "competitor's own actives keep its page's wording. relation is checked against them and the champion's form: \"direct\" " +
+      "shares an active in the same form, \"indirect_form\" shares one in another form, \"indirect_active\" shares none. Example: " +
       '{"id":"c1","name":"CalmWell Magnesium Glycinate","brand":"CalmWell",' +
       '"url":"https://calmwell.example/mg","relation":"direct","form":"capsule",' +
       '"form_as_printed":"60 capsules","active_ingredients":[{"name_as_printed":"Magnesium ' +
@@ -66,7 +67,7 @@ export const RECORD_TOOLS = [
     kind: "saturation",
     description:
       "Record a node's saturation curve, the whole curve each time: one per node, and for " +
-      "competitors one per class (\"direct\", \"indirect\"); every other node's class is null. " +
+      "competitors one per class (\"direct\", \"indirect_form\", \"indirect_active\"); every other node's class is null. " +
       REPLACES + ' Example: {"node":"category_data","class":null,"curve":[{"source_id":' +
       '"sha256:9c04…","new_themes":2,"cumulative_themes":2}],"stopped_because":' +
       '"three consecutive sources added no new theme"}',

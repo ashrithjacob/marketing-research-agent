@@ -1,12 +1,12 @@
 import { z } from "zod";
 
-import { formSchema, relationSchema } from "./vocabulary.js";
+import { COMPETITOR_RELATIONS, formSchema, relationSchema } from "./vocabulary.js";
 
 export const miningTargetSchema = z
   .object({
     id: z.string(),
     name: z.string(),
-    relation: z.enum(["product", "direct", "indirect"]),
+    relation: z.enum(["product", ...COMPETITOR_RELATIONS]),
     form: formSchema,
     actives: z.array(z.string()).min(1),
     url: z.string().default(""),

@@ -1,12 +1,11 @@
-import { COMPETITORS_DELIVERABLE, CheckProblems, type CheckProblem, type Competitor, type CompetitorReference, type StagePacket } from "../domain/index.js";
+import { COMPETITORS_DELIVERABLE, CheckProblems, Relations, type CheckProblem, type Competitor, type CompetitorReference, type StagePacket } from "../domain/index.js";
 
 import type { PacketCheck, PacketContext } from "./check.js";
-import { Relations } from "./names.js";
 import { ListCheck } from "./list-check.js";
 import { SharedActives } from "./shared-actives.js";
 import { Trace } from "../trace/index.js";
 
-/** A competitor sells to the product's own customer; direct and indirect are told apart by the product's form. */
+/** A competitor sells to the product's own customer; its kind follows from the actives it shares with the product and its form. */
 export class CompetitorCheck implements PacketCheck {
   problems(packet: StagePacket, { sourceIds }: PacketContext): CheckProblem[] {
     Trace.line(import.meta.url, "CompetitorCheck.problems", { packet });
@@ -69,7 +68,7 @@ export class CompetitorCheck implements PacketCheck {
     reference: CompetitorReference,
   ): string[] {
     Trace.line(import.meta.url, "CompetitorCheck.relationProblems", { row, label, reference });
-    const expected = Relations.expected(row.form, reference.form);
+    const expected = Relations.expected(row.form, reference.form, row.shared_actives);
     if (expected === null) {
       const missing = !row.form_as_printed.trim()
         ? "the competitor"
@@ -83,10 +82,7 @@ export class CompetitorCheck implements PacketCheck {
       ];
     }
     if (row.relation === expected) return [];
-    return [
-      `${label} is labelled ${row.relation}, but its form (${row.form}) ` +
-        `${expected === "direct" ? "matches" : "differs from"} the reference's ` +
-        `(${reference.form}), which makes it ${expected}`,
-    ];
+    const shares = row.shared_actives.length === 0 ? "shares none of the champion's actives" : `shares ${row.shared_actives.join(", ")}`;
+    return [`${label} is labelled ${row.relation}, but it ${shares} and its form (${row.form}) is ${row.form === reference.form ? "the" : "not the"} champion's (${reference.form}), which makes it ${expected}`];
   }
 }

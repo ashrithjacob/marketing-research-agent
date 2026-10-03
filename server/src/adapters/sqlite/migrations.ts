@@ -47,14 +47,17 @@ export class SqliteMigrations {
 
   private static data(db: Database.Database): void {
     Trace.line(import.meta.url, "SqliteMigrations.data");
+    for (const [name, sql] of DATA_MIGRATIONS) SqliteMigrations.once(db, name, () => db.exec(sql));
+  }
+
+  /** Runs `change` and records it under `name`, in one transaction, unless a migration of that name has run. */
+  static once(db: Database.Database, name: string, change: () => void): void {
+    Trace.line(import.meta.url, "SqliteMigrations.once", { name });
     db.exec("CREATE TABLE IF NOT EXISTS research_migrations (name TEXT PRIMARY KEY, applied_at TEXT NOT NULL)");
-    const applied = new Set((db.prepare("SELECT name FROM research_migrations").all() as Array<{ name: string }>).map((row) => row.name));
-    for (const [name, sql] of DATA_MIGRATIONS) {
-      if (applied.has(name)) continue;
-      db.transaction(() => {
-        db.exec(sql);
-        db.prepare("INSERT INTO research_migrations (name, applied_at) VALUES (?, ?)").run(name, new Date().toISOString());
-      })();
-    }
+    if (db.prepare("SELECT 1 FROM research_migrations WHERE name = ?").get(name)) return;
+    db.transaction(() => {
+      change();
+      db.prepare("INSERT INTO research_migrations (name, applied_at) VALUES (?, ?)").run(name, new Date().toISOString());
+    })();
   }
 }

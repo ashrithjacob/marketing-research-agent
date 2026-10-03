@@ -467,8 +467,8 @@ last agent has ended:
    - an admitted `ad_library` source with no `first_seen` needs a `competitors` gap;
    - `review_mining` marked complete needs at least one 3★ excerpt;
    - `gaps` must not be empty;
-   - `competitors` marked complete needs two saturation curves, one with
-     `class: "direct"` and one with `class: "indirect"` (§2c). `product_data` and
+   - `competitors` marked complete needs a saturation curve per kind:
+     `direct`, `indirect_form`, `indirect_active` (§2c). `product_data` and
      `category_data` are checklists and need none (since 2026-09-30);
    - competitor rows obey the §2.2 test (§2c): `relation` is recomputed from the
      forms — **except where both are `other`**, the escape hatch for anything the
@@ -629,12 +629,26 @@ token counts, cost). It follows the event stream and fetches only calls it has n
 got (`?after=<seq>`), then refetches everything once `run.billed` lands, because the
 billed costs arrive on calls it already has.
 
-### §2c — competitors: direct and indirect
+### §2c — competitors: direct, indirect by form, indirect by active
 
-`spec-stage-1.md` §2.2, since 2026-10-01: a competitor is any product sold to the
-champion's customer — its `icp`, the people and the problem its own page names —
-in the brief's markets, whatever its actives. A **direct** one has the champion's
-form; an **indirect** one has another. A baby diaper cream with zinc oxide is not a
+Since 2026-10-03 (operator): a competitor is any product sold to the champion's
+customer — its `icp`, the people and the problem its own page names — in the
+brief's markets, and it is one of three kinds, which code derives
+(`Relations.expected`, `domain/relations.ts`):
+
+- **`direct`** — shares an active with the champion, in the champion's form;
+- **`indirect_form`** — shares an active, in another form;
+- **`indirect_active`** — shares none, in any form.
+
+Each kind has its own saturation curve: `direct` is done after 3 sources in a
+row add no new brand of it, each indirect kind after 2
+(`COMPETITORS_DELIVERABLE.stop`). The voice-of-customer analysis still groups
+both indirect kinds as "indirect" (`RELATION_GROUP`). Stored runs were relabelled
+once by the same rule (`adapters/sqlite/competitor-kinds.ts`); an old `indirect`
+curve, which counted both indirect kinds, became `indirect_form` and its
+`stopped_because` says so. *Superseded 2026-10-03:* from 2026-10-01 there were two
+kinds by form alone — **direct** the champion's form, **indirect** another,
+whatever the actives. A baby diaper cream with zinc oxide is not a
 competitor of an adult skin-fold cream with zinc oxide; a skin-fold soap with no
 ingredient in common is. Before that day a competitor had to share an active, and
 a brand with a different one was gapped as "same problem, different active".
@@ -661,10 +675,11 @@ The packet carries this as two things (`domain/packet.ts`):
 `liquid`, `spray`, `tea`, `topical`, `other` — because the test is only mechanical
 if "veg caps" and "capsules" are the same word; `form_as_printed` keeps the label's
 own wording. The validator then **recomputes** each row's relation from the two
-forms and rejects a label that disagrees, rejects a "shared" active that is not in
-both the row's and the reference's actives, and requires two saturation curves
-(`class: "direct"`, `class: "indirect"`) before the node may call itself complete —
-one combined count would let a long direct list end the indirect search.
+forms and its shared actives and rejects a label that disagrees, rejects a
+"shared" active that is not in both the row's and the reference's actives, and
+requires a saturation curve per kind (`direct`, `indirect_form`,
+`indirect_active`) before the node may call itself complete — one combined count
+would let a long direct list end the indirect search.
 
 The agent finds competitors with `web_search` across forms ("<active> capsules",
 "… spray", "… gummies", "… tea"), `amazon_find_product` where offered, and then

@@ -200,7 +200,8 @@ describe("settling a run", () => {
       gaps: [
         { node: "competitors", missing: "no competitor researched", would_need: "time" },
         { node: "competitors", missing: "saturation: direct: no competitor researched", would_need: "time" },
-        { node: "competitors", missing: "saturation: indirect: no competitor researched", would_need: "time" },
+        { node: "competitors", missing: "saturation: indirect_form: no competitor researched", would_need: "time" },
+        { node: "competitors", missing: "saturation: indirect_active: no competitor researched", would_need: "time" },
       ],
       nodes: [{ node: "competitors", status: "incomplete", done_criterion_met: false, why: "test" }],
     });
@@ -1105,7 +1106,7 @@ describe("the two steps of a stage-1 run", () => {
   });
 
   it("at the turn limit, also retracts a `complete` status that a retracted row was holding up", async () => {
-    const statusRow = { node: "competitors", status: "complete", done_criterion_met: true, why: "both classes saturated" };
+    const statusRow = { node: "competitors", status: "complete", done_criterion_met: true, why: "every kind saturated" };
     const curve = (cls: string) => ({
       node: "competitors",
       class: cls,
@@ -1114,11 +1115,12 @@ describe("the two steps of a stage-1 run", () => {
     const runId = store.createRun({ workspaceId: "admin", brief: genre, model: "m", rejectKinds: [], judgementIds: [] }).id;
     const findings = new RunFindings(store.findings, runId, "competitors", ["competitors"]);
     findings.record("saturation", curve("direct"));
-    findings.record("saturation", curve("indirect"));
+    findings.record("saturation", curve("indirect_form"));
+    findings.record("saturation", curve("indirect_active"));
     findings.record("node_status", statusRow);
     const check = RoleChecks.done(Roles.of("competitors"), findings, { brief: genre, nodes: ["competitors"], markets: [] });
     const closed = new LimitClose(findings, new RowRepair(store.findings, runId, ["competitors"]), check, DeliverableChecks.of(COMPETITORS_DELIVERABLE, []), { node: "competitors", limit: 20, reports: true }).close();
-    expect(closed.retracted.map((id) => id.replace(/\d+$/, ""))).toEqual(["sat", "sat", "ns"]);
+    expect(closed.retracted.map((id) => id.replace(/\d+$/, ""))).toEqual(["sat", "sat", "sat", "ns"]);
     expect(findings.own().find((row) => row.kind === "node_status")!.payload).toMatchObject({ status: "incomplete" });
     expect(CheckProblems.texts(check.problems()).filter((p) => /saturation|complete with no/.test(p))).toEqual([]);
   });
@@ -1196,7 +1198,8 @@ describe("the Amazon listings of a completed stage-1 run", () => {
       gaps: [
         { node: "competitors", missing: "no ad library entries" },
         { node: "competitors", missing: "saturation: direct: one competitor only" },
-        { node: "competitors", missing: "saturation: indirect: one competitor only" },
+        { node: "competitors", missing: "saturation: indirect_form: one competitor only" },
+        { node: "competitors", missing: "saturation: indirect_active: one competitor only" },
       ],
     });
   const searches: string[] = [];

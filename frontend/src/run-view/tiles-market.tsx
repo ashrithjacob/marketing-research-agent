@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type {
   Competitor,
+  CompetitorRelation,
   Excerpt,
   Gap,
   Measurement,
@@ -13,7 +14,13 @@ import { BarList } from './charts';
 import { Chip, Tile, TileGaps } from './tile';
 import { SourceRow } from './packet-sections';
 
-type Focus = 'direct' | 'indirect' | 'sources' | 'gaps' | null;
+type Focus = CompetitorRelation | 'sources' | 'gaps' | null;
+
+const KINDS: { relation: CompetitorRelation; label: string; tone: 'accent' | 'infer' }[] = [
+  { relation: 'direct', label: 'direct', tone: 'accent' },
+  { relation: 'indirect_form', label: 'indirect by form', tone: 'infer' },
+  { relation: 'indirect_active', label: 'indirect by active', tone: 'infer' },
+];
 
 function CompetitorRow({ competitor: c, listing }: { competitor: Competitor; listing: TargetListing | undefined }) {
   const ads = c.ad_source_ids?.length ?? 0;
@@ -91,12 +98,14 @@ export function CompetitorsTile({
   const reference = packet.competitor_reference ?? null;
   const rows = packet.competitors ?? [];
   const curves = packet.saturation.filter((s) => s.node === 'competitors');
-  const direct = rows.filter((c) => c.relation === 'direct').length;
-  const indirect = rows.filter((c) => c.relation === 'indirect').length;
+  const listing = focus === null || KINDS.some((k) => k.relation === focus);
   const chips = (
     <>
-      <Chip tone="accent" onClick={() => pick('direct')} active={focus === 'direct'}>{direct} direct</Chip>
-      <Chip tone="infer" onClick={() => pick('indirect')} active={focus === 'indirect'}>{indirect} indirect</Chip>
+      {KINDS.map((k) => (
+        <Chip key={k.relation} tone={k.tone} onClick={() => pick(k.relation)} active={focus === k.relation}>
+          {rows.filter((c) => c.relation === k.relation).length} {k.label}
+        </Chip>
+      ))}
       <Chip onClick={() => pick('sources')} active={focus === 'sources'}>
         {sources.length} {sources.length === 1 ? 'source' : 'sources'}
       </Chip>
@@ -121,7 +130,7 @@ export function CompetitorsTile({
   return (
     <Tile
       label="Competitors"
-      sub="direct = same form, indirect = different form"
+      sub="direct = shares an active, same form · indirect by form = shares an active, other form · indirect by active = shares none"
       open={focus !== null ? true : undefined}
       onToggle={focus !== null ? () => setFocus(null) : undefined}
       chips={chips}
@@ -138,7 +147,7 @@ export function CompetitorsTile({
         </div>
       }
     >
-      {(focus === null || focus === 'direct' || focus === 'indirect') && head}
+      {listing && head}
       {focus === 'sources' && (
         <div className="src-list">
           {sources.map((source) => (
@@ -147,18 +156,18 @@ export function CompetitorsTile({
         </div>
       )}
       {focus === 'gaps' && <TileGaps gaps={gaps} force />}
-      {(focus === null || focus === 'direct' || focus === 'indirect') && (
+      {listing && (
         <>
           {focus === null && <SocialProof measurements={measurements} />}
-          {(['direct', 'indirect'] as const)
-            .filter((relation) => focus === null || focus === relation)
-            .map((relation) => {
+          {KINDS
+            .filter((k) => focus === null || focus === k.relation)
+            .map(({ relation, label }) => {
               const group = rows.filter((c) => c.relation === relation);
               const curve = curves.find((s) => s.class === relation);
               return (
                 <div key={relation} className="comp-group">
                   <div className="comp-head">
-                    <span className={`comp-tag ${relation}`}>{relation}</span>
+                    <span className={`comp-tag ${relation}`}>{label}</span>
                     <span>
                       {group.length} found
                       {curve?.stopped_because ? ` · ${curve.stopped_because}` : ''}

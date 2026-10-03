@@ -54,7 +54,7 @@ export const COMPETITORS_DELIVERABLE: ListDeliverable = {
   shape: "list",
   node: "competitors",
   item: "competitor",
-  classes: ["direct", "indirect"],
+  classes: ["direct", "indirect_form", "indirect_active"],
   parts: [
     { key: "icp_as_printed", required: true, describe: "who its own page says it is for and what it treats, word for word" },
     { key: "form_as_printed", required: true, describe: "what the product physically is, as printed" },
@@ -62,7 +62,7 @@ export const COMPETITORS_DELIVERABLE: ListDeliverable = {
     { key: "positioning_copy", required: false, describe: "its headline, word for word" },
     { key: "ad_source_ids", required: false, describe: "its Meta ads, as ad_library sources" },
   ],
-  stop: { kind: "saturation", quietRun: 3 },
+  stop: { kind: "saturation", quietRun: { direct: 3, indirect_form: 2, indirect_active: 2 } },
 };
 
 export const FORMULA_DELIVERABLE: FieldsDeliverable = {

@@ -1047,3 +1047,12 @@ product_data,category_data`) — its rail cost table, its logs tabs' rows, the
 product and category tables in its first prompt; then Stop pressed halfway on a
 second one, its packet shown. Competitors (phase 4) and the champion spend Apify:
 ask first.
+
+**After phase 5: three kinds of competitor (2026-10-03, operator).** `direct`
+(shares an active, same form), `indirect_form` (shares an active, other form),
+`indirect_active` (shares none). The kind is derived by code from
+`shared_actives` and the forms; the list deliverable's `stop.quietRun` became per
+class: 3 for direct, 2 for each indirect kind. Stored packets, packet rows and
+ledger rows were relabelled once (`competitor-kinds-split`); on the local database
+296 competitors became 166 direct, 117 indirect by form and 13 indirect by active,
+in 101 ms.

@@ -73,7 +73,8 @@ export interface Gap {
   blocking?: boolean;
 }
 
-export type CompetitorRelation = 'direct' | 'indirect';
+/** `direct` shares an active in the champion's form; `indirect_form` shares one in another form; `indirect_active` shares none. */
+export type CompetitorRelation = 'direct' | 'indirect_form' | 'indirect_active';
 
 export interface ActiveIngredient {
   name_as_printed: string;

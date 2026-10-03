@@ -103,7 +103,7 @@ describe("IssueSlices", () => {
     const tag = (issues: string[]): ReviewTag => ({ n: 0, issues, severity: 2, off_product: false, new_label: "", new_kind: "complaint" });
     const roster: MiningTarget[] = [
       { id: "c1", name: "Direct", relation: "direct", form: "tablet", actives: ["d3"], url: "", brand: "", amazon_url: "", trustpilot: "", note: "" },
-      { id: "c2", name: "Indirect", relation: "indirect", form: "gummy", actives: ["d3"], url: "", brand: "", amazon_url: "", trustpilot: "", note: "" },
+      { id: "c2", name: "Indirect", relation: "indirect_form", form: "gummy", actives: ["d3"], url: "", brand: "", amazon_url: "", trustpilot: "", note: "" },
     ];
     const tags = new Map([["a", tag(["too_big"])], ["b", tag(["no_effect"])], ["c", tag(["too_big"])]]);
     const built = new IssueSlices(new IssueTally(ISSUES, tags), roster).build([

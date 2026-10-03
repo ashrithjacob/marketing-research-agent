@@ -86,31 +86,37 @@ describe("ListCheck", () => {
   const competitors = new ListCheck(COMPETITORS_DELIVERABLE);
   const point = (n: number, added: number) => ({ source_id: `sha256:s${n}`, new_themes: added, cumulative_themes: 0 });
   const curve = (cls: string, added: number[]) => row("saturation", { node: "competitors", class: cls, curve: added.map((a, i) => point(i, a)) });
-  const saturated = curve("indirect", [2, 0, 0, 0]);
+  const saturated = [curve("indirect_form", [2, 0, 0]), curve("indirect_active", [1, 0, 0])];
 
   it("refuses a class whose curve ends on two quiet sources, as run f7b10adb's did and passed", () => {
     // Mullevia, 2026-10-02: the direct curve ended 1, 0, 0 and the node was
     // reported complete; the rule is three sources in a row adding nothing.
-    const open = competitors.missing([curve("direct", [3, 1, 0, 0]), saturated]);
+    const open = competitors.missing([curve("direct", [3, 1, 0, 0]), ...saturated]);
     expect(open.map((m) => m.key)).toEqual(["saturation: direct"]);
     expect(open[0]!.text).toMatch(/ends in 2 sources in a row adding nothing; it is saturated after 3/);
   });
 
+  it("stops an indirect kind after two quiet sources, and direct only after three", () => {
+    expect(competitors.missing([curve("direct", [3, 0, 0, 0]), curve("indirect_form", [2, 1, 0]), curve("indirect_active", [1, 0, 0])]).map((m) => m.key)).toEqual(["saturation: indirect_form"]);
+    expect(competitors.missing([curve("direct", [3, 0, 0]), ...saturated]).map((m) => m.key)).toEqual(["saturation: direct"]);
+  });
+
   it("accepts three quiet sources in a row, or a gap naming the class", () => {
-    expect(competitors.missing([curve("direct", [3, 0, 0, 0]), saturated])).toEqual([]);
-    expect(competitors.missing([row("gap", { node: "competitors", missing: "saturation: direct: only two brands sell this" }), saturated])).toEqual([]);
+    expect(competitors.missing([curve("direct", [3, 0, 0, 0]), ...saturated])).toEqual([]);
+    expect(competitors.missing([row("gap", { node: "competitors", missing: "saturation: direct: only two brands sell this" }), ...saturated])).toEqual([]);
   });
 
   it("asks for a curve per class when none is recorded", () => {
     expect(competitors.missing([]).map((m) => m.text)).toEqual([
       expect.stringMatching(/^no direct saturation curve is recorded/),
-      expect.stringMatching(/^no indirect saturation curve is recorded/),
+      expect.stringMatching(/^no indirect_form saturation curve is recorded/),
+      expect.stringMatching(/^no indirect_active saturation curve is recorded/),
     ]);
   });
 
   it("names a competitor missing a required part, tied to its row; an optional part may be empty", () => {
     const item = row("competitor", { node: "competitors", id: "c4", name: "Herbify", form_as_printed: "drops", icp_as_printed: "", price: "" });
-    const open = competitors.missing([item, curve("direct", [0, 0, 0]), saturated]);
+    const open = competitors.missing([item, curve("direct", [0, 0, 0]), ...saturated]);
     expect(open).toEqual([{ key: "competitor c4", text: "competitor 'Herbify' has no icp_as_printed — record who its own page says it is for and what it treats, word for word", row: { kind: "competitor", key: "c4" } }]);
   });
 });

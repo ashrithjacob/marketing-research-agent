@@ -36,11 +36,12 @@ export class ListCheck implements DeliverableCheck {
       if (FieldsCheck.gapped(key, rows)) return [];
       const curve = (curves.find((c) => c.class === cls)?.curve as Array<{ new_themes?: number }> | undefined) ?? [];
       const quiet = ListCheck.quietRun(curve);
-      if (quiet >= stop.quietRun) return [];
+      const needed = stop.quietRun[cls] ?? 0;
+      if (quiet >= needed) return [];
       const gap = `record_gap with missing "${key}: <why>"`;
       const text = curve.length === 0
         ? `no ${cls} saturation curve is recorded — record_saturation for class "${cls}", or ${gap}`
-        : `the ${cls} curve ends in ${quiet} source${quiet === 1 ? "" : "s"} in a row adding nothing; it is saturated after ${stop.quietRun} — keep looking, or ${gap}`;
+        : `the ${cls} curve ends in ${quiet} source${quiet === 1 ? "" : "s"} in a row adding nothing; it is saturated after ${needed} — keep looking, or ${gap}`;
       return [{ key, text }];
     });
   }

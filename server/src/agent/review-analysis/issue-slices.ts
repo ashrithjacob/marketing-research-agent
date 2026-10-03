@@ -1,5 +1,6 @@
 import {
   GROUP_SCOPES,
+  RELATION_GROUP,
   SOURCE_SCOPES,
   type AnalysedReview,
   type IssueQuote,
@@ -21,7 +22,7 @@ export class IssueSlices {
 
   build(reviews: readonly AnalysedReview[]): { slices: IssueSlice[]; products: ProductVoice[]; quotes: Record<string, IssueQuote> } {
     Trace.line(import.meta.url, "IssueSlices.build", { reviews: reviews.length });
-    const relation = new Map<string, string>([["product", "product"], ...this.roster.map((target): [string, string] => [target.id, target.relation])]);
+    const relation = new Map<string, string>([["product", "product"], ...this.roster.map((target): [string, string] => [target.id, RELATION_GROUP[target.relation] ?? target.relation])]);
     const slices: IssueSlice[] = [];
     const products: ProductVoice[] = [];
     for (const source of SOURCE_SCOPES) {

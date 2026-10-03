@@ -1,9 +1,11 @@
+import type { CompetitorRelation } from './packet';
+
 /** The review-mining plan: what stage 1 found, and what mining it costs. Mirrors the server's `/review-mining/plan`. */
 
 export interface MiningTarget {
   id: string;
   name: string;
-  relation: 'product' | 'direct' | 'indirect';
+  relation: 'product' | CompetitorRelation;
   form: string;
   actives: string[];
   url: string;
@@ -92,5 +94,6 @@ export interface ReviewMiningPlanResponse {
 export const RELATION_LABEL: Record<MiningTarget['relation'], string> = {
   product: 'champion product',
   direct: 'direct',
-  indirect: 'indirect',
+  indirect_form: 'indirect, by form',
+  indirect_active: 'indirect, by active',
 };

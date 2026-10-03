@@ -3,6 +3,7 @@ import type Database from "better-sqlite3";
 import { AccountTable } from "./account-table.js";
 import { CallLog } from "./call-log.js";
 import { ChargeTable } from "./charge-table.js";
+import { CompetitorKinds } from "./competitor-kinds.js";
 import { FindingTable } from "./finding-table.js";
 import { SqliteMigrations } from "./migrations.js";
 import { PacketRowTable } from "./packet-row-table.js";
@@ -10,7 +11,7 @@ import { ReviewAnalysisTable } from "./review-analysis-table.js";
 import { TargetListingTable } from "./target-listing-table.js";
 import { Trace } from "../../trace/index.js";
 
-/** The tables, then their migrations, then the indexes that need the migrated columns. */
+/** The tables, then their migrations, then the indexes that need the migrated columns, then the row migrations that need every table. */
 export class SqliteSchema {
   static apply(db: Database.Database): void {
     Trace.line(import.meta.url, "SqliteSchema.apply", { db });
@@ -20,6 +21,7 @@ export class SqliteSchema {
     SqliteMigrations.apply(db);
     db.exec(SqliteSchema.INDEXES);
     for (const ddl of [PacketRowTable.DDL, ReviewAnalysisTable.DDL, TargetListingTable.DDL, FindingTable.DDL, ChargeTable.DDL]) db.exec(ddl);
+    SqliteMigrations.once(db, CompetitorKinds.NAME, () => new CompetitorKinds(db).apply());
   }
 
   static readonly INDEXES = `

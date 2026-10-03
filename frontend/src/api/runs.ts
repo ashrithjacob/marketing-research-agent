@@ -48,7 +48,7 @@ export interface RunCounts {
   measurements: number;
   attributes: number;
   gaps: number;
-  competitors?: { direct: number; indirect: number };
+  competitors?: { direct: number; indirect_form: number; indirect_active: number };
 }
 
 export interface Billed {

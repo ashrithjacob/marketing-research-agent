@@ -369,7 +369,7 @@ describe("runNodes", () => {
 });
 
 describe("validation: competitors, direct and indirect", () => {
-  /** A capsule product with one direct (capsule) and one indirect (spray) competitor. */
+  /** A capsule product with one direct (capsule) and one indirect-by-form (spray) competitor, both sharing its active. */
   const withCompetitors = (): Record<string, any> => {
     const data = minimalPacket();
     data.saturation = [];
@@ -390,22 +390,22 @@ describe("validation: competitors, direct and indirect", () => {
     };
     data.competitors = [
       { id: "c1", name: "CalmWell 400", url: "https://calmwell.example/p", relation: "direct", form: "capsule", active_ingredients: [active], shared_actives: ["magnesium glycinate"], form_as_printed: "as printed", icp_as_printed: "for restless nights", positioning_copy: "Sleep through.", source_id: "sha256:cw", ad_source_ids: ["sha256:ad"] },
-      { id: "c2", name: "SleepMist spray", url: "https://sleepmist.example/p", relation: "indirect", form: "spray", active_ingredients: [active], shared_actives: ["Magnesium Glycinate"], form_as_printed: "spray", icp_as_printed: "for restless nights", source_id: "sha256:sm" },
+      { id: "c2", name: "SleepMist spray", url: "https://sleepmist.example/p", relation: "indirect_form", form: "spray", active_ingredients: [active], shared_actives: ["Magnesium Glycinate"], form_as_printed: "spray", icp_as_printed: "for restless nights", source_id: "sha256:sm" },
     ];
     return data;
   };
 
   it("accepts rows whose relation agrees with the forms", () => {
     const packet = packets.validate(withCompetitors());
-    expect(packet.competitors.map((c) => c.relation)).toEqual(["direct", "indirect"]);
+    expect(packet.competitors.map((c) => c.relation)).toEqual(["direct", "indirect_form"]);
   });
 
   it("rejects a label the forms contradict, and names the test", () => {
-    // A spray against a capsule is indirect by §2.2, whatever the agent thinks.
+    // A spray against a capsule is indirect by form, whatever the agent thinks.
     const data = withCompetitors();
     data.competitors[1].relation = "direct";
     expect(() => packets.validate(data)).toThrow(
-      /'SleepMist spray' is labelled direct, but its form \(spray\) differs from the reference's \(capsule\), which makes it indirect/,
+      /'SleepMist spray' is labelled direct, but it shares Magnesium Glycinate and its form \(spray\) is not the champion's \(capsule\), which makes it indirect_form/,
     );
   });
 
@@ -424,12 +424,12 @@ describe("validation: competitors, direct and indirect", () => {
     data.competitors[0].relation = "direct";
     data.competitors[1].form = "other";
     data.competitors[1].form_as_printed = "electric brush heads, Sonicare-compatible";
-    data.competitors[1].relation = "indirect";
+    data.competitors[1].relation = "indirect_form";
     expect(() => packets.validate(data)).not.toThrow();
 
     // And the opposite call on the same rows is accepted too: with no vocabulary
     // to appeal to, the packet records the judgement and the evidence for it.
-    data.competitors[0].relation = "indirect";
+    data.competitors[0].relation = "indirect_form";
     expect(() => packets.validate(data)).not.toThrow();
   });
 
@@ -449,7 +449,7 @@ describe("validation: competitors, direct and indirect", () => {
     const data = withCompetitors();
     data.competitors[0].form = "other";
     data.competitors[0].form_as_printed = "toothbrush";
-    expect(() => packets.validate(data)).toThrow(/its form \(other\) differs from the reference's \(capsule\)/);
+    expect(() => packets.validate(data)).toThrow(/its form \(other\) is not the champion's \(capsule\)/);
   });
 
   it("rejects a shared active the reference product does not have", () => {
@@ -466,7 +466,17 @@ describe("validation: competitors, direct and indirect", () => {
     const data = withCompetitors();
     data.competitors[0].active_ingredients = [{ name_as_printed: "Melatonin", name_normalised: "melatonin" }];
     data.competitors[0].shared_actives = [];
+    data.competitors[0].relation = "indirect_active";
     expect(packets.validate(data).competitors[0]!.shared_actives).toEqual([]);
+  });
+
+  it("makes a competitor that shares none of the champion's actives indirect by active, in any form", () => {
+    const data = withCompetitors();
+    data.competitors[0].active_ingredients = [{ name_as_printed: "Melatonin", name_normalised: "melatonin" }];
+    data.competitors[0].shared_actives = [];
+    expect(() => packets.validate(data)).toThrow(
+      /'CalmWell 400' is labelled direct, but it shares none of the champion's actives and its form \(capsule\) is the champion's \(capsule\), which makes it indirect_active/,
+    );
   });
 
   it("needs each side to say who its customer is", () => {
@@ -520,9 +530,11 @@ describe("validation: competitors, direct and indirect", () => {
     const data = withCompetitors();
     data.nodes.push({ node: "competitors", status: "complete", done_criterion_met: true, why: "saturated" });
     data.saturation.push({ node: "competitors", class: "direct", curve: [{ source_id: "sha256:cw", new_themes: 1, cumulative_themes: 1 }] });
-    expect(() => packets.validate(data)).toThrow(/competitors is complete with no indirect saturation curve/);
+    expect(() => packets.validate(data)).toThrow(/competitors is complete with no indirect_form saturation curve/);
 
-    data.saturation.push({ node: "competitors", class: "indirect", curve: [{ source_id: "sha256:sm", new_themes: 1, cumulative_themes: 1 }] });
+    data.saturation.push({ node: "competitors", class: "indirect_form", curve: [{ source_id: "sha256:sm", new_themes: 1, cumulative_themes: 1 }] });
+    expect(() => packets.validate(data)).toThrow(/competitors is complete with no indirect_active saturation curve/);
+    data.saturation.push({ node: "competitors", class: "indirect_active", curve: [{ source_id: "sha256:sm", new_themes: 0, cumulative_themes: 0 }] });
     expect(() => packets.validate(data)).not.toThrow();
   });
 

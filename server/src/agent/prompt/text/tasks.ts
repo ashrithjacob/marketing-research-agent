@@ -109,18 +109,20 @@ required.`;
 
 export const COMPETITORS_TASK = `## Your task: the competitors
 
-List every brand that sells to the champion's customer: its \`icp\` below — the
-same people, with the same problem — in the brief's markets. That is the whole
-test of a competitor. A product for other people or another problem is not one,
-even when it shares an active (a baby diaper cream is not a competitor of an
-adult skin-fold cream): do not list it. A product for the same people and
-problem is one, whatever its actives.
+List every product sold to the champion's customer — its \`icp\` below, the
+same people with the same problem — in the brief's markets. A product for other
+people or another problem is not a competitor, even when it shares an active (a
+baby diaper cream is not a competitor of an adult skin-fold cream): do not list it.
 
-Two classes, decided by a mechanical test on form:
+Every competitor is one of three kinds, decided by code from what you record:
 
-- **direct** — the champion's customer, **same** form;
-- **indirect** — the champion's customer, **different** form (a spray, gummy
-  or tea where the champion is a liquid). Research these as fully as direct ones.
+- **direct** — shares an active with the champion, in the **same** form;
+- **indirect_form** — shares an active with the champion, in a **different**
+  form (a spray, gummy or tea where the champion is a liquid);
+- **indirect_active** — shares **none** of the champion's actives, in any form:
+  another substance for the same people and the same problem.
+
+Research all three kinds as fully as each other.
 
 **Shares an active** means it contains the same substance as one of the
 champion's actives, whatever its page calls it — a Latin name, another part or
@@ -130,10 +132,11 @@ compound (another salt of a mineral, another plant) is a different active.
 How to work:
 1. Find candidates. If you have \`discover_competitors\`, call it first, once: it
    names brands from a research pass over the whole web, including ones sold
-   only direct or through ads. Then widen by the customer's problem, not only
-   the champion's actives: \`web_search\` "<problem> <form>" for every form
-   (cream, powder, spray, capsules, drops, gummies…), "best <problem> <market>"
-   and "<active> <problem>", and \`amazon_find_product\` "<problem>". If you have
+   only direct or through ads. Then widen for each kind: for direct and
+   indirect_form, \`web_search\` "<active> <form>" for every form (cream,
+   powder, spray, capsules, drops, gummies…) and "<active> <problem>"; for
+   indirect_active, "<problem> <form>" and "best <problem> <market>";
+   \`amazon_find_product\` "<active>" and "<problem>". If you have
    \`ad_library_search\`, search the problem in ad copy too (\`countries\` the
    brief's markets as ISO codes): brands that sell only through Meta ads appear
    there and nowhere else. An ad's landing domain names the brand behind a
@@ -147,9 +150,11 @@ How to work:
    \`form\` (one of {forms}) and \`form_as_printed\`; its actives as its own
    page names them, with dose; \`shared_actives\` — which of the champion's
    actives it contains, **copied word for word from the champion's list below**
-   (a pick from that list, never its own wording), or [] when it shares none;
+   (a pick from that list, never its own wording), or [] when it shares none,
+   which makes it indirect_active;
    \`icp_as_printed\` — who its own page says it is for and what it treats, word
-   for word; \`relation\` (checked against the forms); \`dose_per_serving\`, \`price\`, \`price_per_dose\`;
+   for word; \`relation\` — its kind above, checked against \`shared_actives\`
+   and the forms; \`dose_per_serving\`, \`price\`, \`price_per_dose\`;
    \`positioning_copy\` — its headline, word for word; \`market\` exactly as the
    brief's Markets line names it. A brand sold only outside those markets is
    out of scope. Where both forms are \`other\`, your \`relation\` stands, and
@@ -157,12 +162,12 @@ How to work:
 3. Ads: a competitor's ad is an \`ad_library\` source with \`first_seen\` (null
    plus a gap when undated), linked from the competitor's \`ad_source_ids\`.
    \`ad_library_search\` by its domain (\`search_in\` "domain") finds them.
-4. Stop per class: a class is done when three sources in a row surface no new
-   brand of that class. \`record_saturation\` twice, \`class\` "direct" and
-   "indirect", each point a source with \`new_themes\` = new brands it added.
-   A class you cannot saturate is a \`record_gap\` with missing
-   "saturation: <class>: <why>".
-5. \`record_node_status\` (\`complete\` only if both classes saturated), gaps,
+4. Stop per kind: a kind is done when this many sources in a row surface no new
+   brand of that kind — {stop}. \`record_saturation\` once per kind, \`class\`
+   "direct", "indirect_form" and "indirect_active", each point a source with
+   \`new_themes\` = new brands of that kind it added. A kind you cannot
+   saturate is a \`record_gap\` with missing "saturation: <kind>: <why>".
+5. \`record_node_status\` (\`complete\` only if every kind is saturated), gaps,
    then \`finish\`.
 
 Every row you record carries \`node: "competitors"\`. At least one gap is

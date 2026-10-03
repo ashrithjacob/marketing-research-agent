@@ -50,7 +50,8 @@ export interface ListDeliverable {
   item: FindingKind;
   classes: readonly string[];
   parts: readonly ItemPart[];
-  stop: { kind: "saturation"; quietRun: number };
+  /** Per class, how many sources in a row adding no new brand end its search. */
+  stop: { kind: "saturation"; quietRun: Readonly<Record<string, number>> };
 }
 
 /** Across all items: at least one row of `record` has `field` equal to `value` (one active the product's story rests on). */

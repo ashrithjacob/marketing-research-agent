@@ -67,7 +67,7 @@ const post = (path: string, body: unknown) =>
     body: JSON.stringify(body),
   }));
 
-/** A stage-1 packet the way a real run leaves it: reference plus a direct and an indirect. */
+/** A stage-1 packet the way a real run leaves it: reference plus a direct and an indirect by form. */
 function rosterPacket(): Record<string, any> {
   const active = {
     name_as_printed: "Magnesium Glycinate",
@@ -95,7 +95,7 @@ function rosterPacket(): Record<string, any> {
         id: "c2",
         name: "SleepMist spray",
         url: "https://sleepmist.example/p",
-        relation: "indirect",
+        relation: "indirect_form",
         form: "spray",
         active_ingredients: [active],
         shared_actives: ["Magnesium Glycinate"], icp_as_printed: "for restless nights",
@@ -126,7 +126,7 @@ describe("the review-mining roster", () => {
     const targets = ReviewMiningRoster.of(rosterPacket() as unknown as StagePacket);
     expect(targets.map((t) => t.id)).toEqual(["product", "c1", "c2"]);
     expect(targets[0]).toMatchObject({ relation: "product", form: "capsule" });
-    expect(targets[2]).toMatchObject({ relation: "indirect", form: "spray" });
+    expect(targets[2]).toMatchObject({ relation: "indirect_form", form: "spray" });
   });
 
   it("selects the approved subset", () => {

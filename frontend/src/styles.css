@@ -740,7 +740,7 @@ details.tl-tool.lane[open] > summary { border-bottom: 1px solid var(--line); }
   border-radius: 999px; border: 1px solid var(--line); font-family: var(--font-mono);
 }
 .comp-tag.direct { color: var(--accent); border-color: rgba(0, 82, 255, 0.4); background: var(--accent-soft); }
-.comp-tag.indirect { color: var(--infer); border-color: rgba(124, 58, 237, 0.35); background: rgba(124, 58, 237, 0.05); }
+.comp-tag.indirect_form, .comp-tag.indirect_active { color: var(--infer); border-color: rgba(124, 58, 237, 0.35); background: rgba(124, 58, 237, 0.05); }
 .comp {
   background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
   padding: 9px 12px; margin-bottom: 6px; font-size: 12.5px;

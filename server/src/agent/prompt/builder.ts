@@ -60,7 +60,12 @@ export class PromptBuilder {
     const text = agent === "champion" ? (brief.url.trim() ? CHAMPION_URL_TASK : CHAMPION_GENRE_TASK) : TASKS[agent];
     const deliverable = Roles.of(agent).deliverable;
     const table = deliverable.shape === "fields" ? DeliverableTable.render(deliverable) : "";
-    return text.replaceAll("{node}", StageOnePlans.nodeOf(agent, nodes)).replaceAll("{forms}", PromptBlocks.code(FORMS)).replace("{deliverable}", table);
+    const stop = deliverable.shape === "list" ? DeliverableTable.stop(deliverable) : "";
+    return text
+      .replaceAll("{node}", StageOnePlans.nodeOf(agent, nodes))
+      .replaceAll("{forms}", PromptBlocks.code(FORMS))
+      .replace("{deliverable}", table)
+      .replace("{stop}", stop);
   }
 
   private static limit(agent: StageOneAgent): string {

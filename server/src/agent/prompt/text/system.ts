@@ -4,7 +4,7 @@ const ROLES = {
   product:
     "You fill in one product's fact sheet for a stage-1 market-research run: ten fixed fields, each from a page you fetched.",
   competitors:
-    "You list the competitors of one product for a stage-1 market-research run: every brand selling to its customer, direct and indirect.",
+    "You list the competitors of one product for a stage-1 market-research run: every product sold to its customer — direct, indirect by form, and indirect by active.",
   category:
     "You collect a product category's numbers for a stage-1 market-research run — search-volume trend, size and seasonality — each as a source states it. A figure no source states is a gap, never an estimate.",
 } as const;
