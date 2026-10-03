@@ -8,6 +8,8 @@
 #
 # Two archives, both landing beside agentchat's so pull-backups.sh brings them
 # down to the laptop with no change:
+#   mra-pg-<stamp>.dump         the store, from Neon (pg_dump custom format), when
+#                               DATABASE_URL is set; otherwise
 #   mra-<stamp>.tar.gz          research.db — runs, events, packets, judgements
 #   mra-corpus-<stamp>.tar.gz   raw fetched bodies, content-addressed
 #
@@ -22,7 +24,21 @@ OUT="${1:-/var/backups/openwebui}"
 STAMP="${2:-$(date +%F-%H%M)}"
 mkdir -p "$OUT"
 
-if docker ps --format '{{.Names}}' | grep -qx mra; then
+# Since 2026-10-03 the store lives in Postgres on Neon when DATABASE_URL is set
+# in .env, and research.db is the frozen pre-cutover file. pg_dump runs in a
+# throwaway postgres image matching Neon's major version (18), so the box needs
+# no client installed; the URL reaches it through the environment, never argv.
+DATABASE_URL="$(grep -m1 '^DATABASE_URL=' "$(dirname "$0")/.env" 2>/dev/null | cut -d= -f2- || true)"
+export DATABASE_URL
+
+if [ -n "$DATABASE_URL" ]; then
+  docker run --rm -e DATABASE_URL postgres:18-alpine \
+    sh -c 'pg_dump --format=custom --no-owner --no-privileges "$DATABASE_URL"' > "$OUT/mra-pg-${STAMP}.dump"
+  TABLES=$(docker run --rm -i postgres:18-alpine pg_restore --list < "$OUT/mra-pg-${STAMP}.dump" | grep -c 'TABLE DATA')
+  echo "mra-pg-${STAMP}.dump: ${TABLES} tables"
+  # owui-snapshot.sh's retention sweep matches only *.tar.gz; these are swept here, on its 14 days.
+  find "$OUT" -name 'mra-pg-*.dump' -mtime +14 -delete
+elif docker ps --format '{{.Names}}' | grep -qx mra; then
   docker exec mra sh -c 'rm -rf /data/.snapshot && mkdir /data/.snapshot'
   # Bound parameter rather than a quoted literal: VACUUM INTO takes any string
   # expression, and it spares three layers of shell quoting.
@@ -46,4 +62,4 @@ if docker volume inspect mra_corpus >/dev/null 2>&1; then
     tar czf "/out/mra-corpus-${STAMP}.tar.gz" -C /corpus .
 fi
 
-ls -lh "$OUT"/mra-*"${STAMP}".tar.gz 2>/dev/null || true
+ls -lh "$OUT"/mra-*"${STAMP}".* 2>/dev/null || true

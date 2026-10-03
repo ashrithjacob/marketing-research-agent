@@ -210,7 +210,7 @@ Where the build differs from §1–§8, and why. File paths are under `server/sr
 7. **Product truth always runs whole.** Any stage-2 node in a request expands to
    all four (`Stages.expand`), because each node needs what another found.
 8. **The renumbering migration is a named data migration**
-   (`adapters/sqlite/migrations.ts`, `research_migrations`), since the existing
+   (`adapters/store/migrations.ts`, `research_migrations`), since the existing
    migrations only add columns.
 9. **Margins are per unit**: (price ÷ units in the price − landed cost) ÷ (price
    ÷ units). A price in another currency than the landed cost gets no margin,

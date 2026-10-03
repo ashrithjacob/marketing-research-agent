@@ -517,7 +517,7 @@ export class ResearchAgentFactory {
 ### 7.1 How the ledger works
 
 The ledger is one SQLite table, `research_findings`
-(`adapters/sqlite/finding-table.ts`): one row per finding — source, attribute,
+(`adapters/store/finding-table.ts`): one row per finding — source, attribute,
 measurement, competitor, gap — with the run, a sequence number, the row id
 (`src3`, `co12`), its kind, the agent that wrote it, the source it cites, the
 finding as JSON, and when it was written or retracted.
@@ -936,7 +936,7 @@ roles is byte-identical to the previous commit's, rendered from both trees; and
   `consistency` (`RoleChecks`) until phases 3–5 split presence from consistency.
 
 **Phase 2 (2026-10-03).** `Charge` and `ChargeMeter` (`domain/charges.ts`),
-`research_charges` (`adapters/sqlite/charge-table.ts`), the wrappers
+`research_charges` (`adapters/store/charge-table.ts`), the wrappers
 (`adapters/metered.ts`: `MeteredWebSearch`, `MeteredPageFetcher`,
 `MeteredAdLibrary`, `MeteredDiscovery`; `MeteredActorRunner` now takes a meter),
 `RunMeter` (agent layer: writes the charge, emits `run.charged`), `CostReports`

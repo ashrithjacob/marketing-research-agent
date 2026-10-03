@@ -78,7 +78,7 @@ server/src/
                   + the three Apify review tools
   apify.ts        the Apify boundary: Amazon + Trustpilot reviews, and costs
   http.ts         fetch-with-deadline and a bounded concurrency pool
-  store.ts        ResearchStore interface + SqliteResearchStore
+  store/          SqlResearchStore on SQLite or Postgres (DATABASE_URL)
   runner.ts       RunSupervisor — one pi Agent per run, owns its event stream
   api.ts          /api/research/*
   app.ts          auth + routes + the built SPA
@@ -92,7 +92,8 @@ deploy/           Caddy snippet for marketing.vanis.ai; vps/ holds the
 
 The engine is `@earendil-works/pi-agent-core`, embedded in this process rather
 than called over HTTP. `runner.ts` builds one `Agent` per run, subscribes to its
-events, and writes every one to SQLite before fanning it out — so a browser
+events, and writes every one to the store (SQLite, or Postgres when
+`DATABASE_URL` is set) before fanning it out — so a browser
 refresh replays the run instead of losing it.
 
 ## Run it

@@ -12,6 +12,9 @@ deploy steps are about **agentchat**, a different app. Use the ones below.
 - Container `mra` (app and agent in one process), compose stack
   `~/mra-compose`, on its own `edge` network. Search is Parallel's cloud API.
 - The agent runs in-process through `pi-agent-core`. No hermes.
+- The store is SQLite (`research.db`) unless `DATABASE_URL` is set, then Postgres
+  on Neon (Frankfurt). One set of tables, two drivers (`adapters/store/`); the
+  move and the way back are in `../setup.md` §5a "The store".
 - Ops: `../setup.md` §5a. How a run works, end to end: `workings.md`. Why
   stage 1 is four agents (champion, then product/competitors/category side by
   side): `workings_stage1.md`.
@@ -102,12 +105,12 @@ every rule in that file at once.
 | `domain` | Types, zod schemas, `interface` ports. No I/O. | `trace` (owns `zod`) |
 | `config` | `Settings`, the only reader of `process.env` | `trace` |
 | `extract` | Packet parsing and validation. Pure. | `trace`, `domain` |
-| `adapters` | Apify, Firecrawl, Parallel, OpenRouter prices, SQLite, corpus | `trace`, `domain`, `config` |
+| `adapters` | Apify, Firecrawl, Parallel, OpenRouter prices, the SQL store (SQLite or Postgres), corpus | `trace`, `domain`, `config` |
 | `agent` | Prompt building, tools, the run loop | `trace`, `domain`, `config`, `extract`, `adapters` |
 | `http` | Routes, auth, app wiring | everything above |
 | `main.ts` | Entry point. Wiring only. | everything |
 
-Package ownership, enforced: `apify-client` and `better-sqlite3` belong to
+Package ownership, enforced: `apify-client`, `better-sqlite3` and `pg` belong to
 `adapters`, `hono` to `http`, `pi-agent-core` and `pi-ai` to `agent`.
 
 The class diagram lives in `docs/class-diagram.md`. Regenerate it with

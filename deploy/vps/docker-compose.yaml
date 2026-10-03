@@ -37,6 +37,10 @@ services:
       - MRA_JWT_SECRET=${MRA_JWT_SECRET:?MRA_JWT_SECRET is not set}
       - MRA_COOKIE_SECURE=true
       - MRA_DATABASE_PATH=/data/research.db
+      # The store. Set, it lives in Postgres on Neon (Frankfurt, project
+      # silent-band-48662060); blank, in the SQLite file above, as before
+      # 2026-10-03. setup.md 5a has the cutover and the way back.
+      - DATABASE_URL=${DATABASE_URL:-}
       - MRA_CORPUS_PATH=/corpus
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:?OPENROUTER_API_KEY is not set}
       - MRA_MODEL=${MRA_MODEL:?MRA_MODEL must be set in .env - the model id lives only there}

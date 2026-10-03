@@ -31,7 +31,8 @@ mra container — one Node process (server/src, layered — see CLAUDE.md)
    │                tools/    the only things the agent can do (below)
    ├─ adapters/     OpenRouterPrices: live prices, billed cost read back per turn
    │                apify/     Amazon / Trustpilot through Apify actors
-   │                sqlite/    SQLite at /data/research.db  (volume mra_data)
+   │                store/     the store: Postgres on Neon when DATABASE_URL is set,
+   │                           else SQLite at /data/research.db (volume mra_data)
    ├─ extract/      pull the JSON packet out of the output and validate it
    ├─ domain/       the packet schema, the vocabulary, the ports
    └─ config/       Settings — the only reader of process.env
@@ -61,7 +62,7 @@ customer truth · synthesis. *Superseded 2026-10-01:* review mining was stage 2
 (from 2026-09-21) and product truth an empty slot after it; it moved behind
 product truth because the operator wants the product assessed before its
 reviews are bought, and the stored rows were renumbered by a one-time data
-migration (`adapters/sqlite/migrations.ts`). The `StageTwo*` classes were
+migration (`adapters/store/migrations.ts`). The `StageTwo*` classes were
 renamed `ReviewMining*` at the same time — numbers in names are what made the
 rename necessary.
 
@@ -650,7 +651,7 @@ Each kind has its own saturation curve: `direct` is done after 3 sources in a
 row add no new brand of it, each indirect kind after 2
 (`COMPETITORS_DELIVERABLE.stop`). The voice-of-customer analysis still groups
 both indirect kinds as "indirect" (`RELATION_GROUP`). Stored runs were relabelled
-once by the same rule (`adapters/sqlite/competitor-kinds.ts`); an old `indirect`
+once by the same rule (`adapters/store/competitor-kinds.ts`); an old `indirect`
 curve, which counted both indirect kinds, became `indirect_form` and its
 `stopped_because` says so. *Superseded 2026-10-03:* from 2026-10-01 there were two
 kinds by form alone — **direct** the champion's form, **indirect** another,
