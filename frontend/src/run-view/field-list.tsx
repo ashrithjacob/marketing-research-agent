@@ -1,5 +1,5 @@
 import type { AttributeRecord, Measurement, Source } from '../api';
-import { Cite } from './cite';
+import { FactRow } from './fact-value';
 
 function fieldOf(name: string): string {
   return name.split(':')[0].trim();
@@ -14,12 +14,7 @@ function AttributeRows({ attributes, runId, sources }: { attributes: AttributeRe
   return (
     <>
       {attributes.map((attribute) => (
-        <div key={attribute.id} className="kv-row">
-          <span className="k">{attribute.key.replace(/_/g, ' ')}</span>
-          <span className="v">
-            {attribute.value} <Cite runId={runId} id={attribute.source_id} sources={sources} />
-          </span>
-        </div>
+        <FactRow key={attribute.id} label={attribute.key.replace(/_/g, ' ')} value={attribute.value} sourceId={attribute.source_id} runId={runId} sources={sources} />
       ))}
     </>
   );
@@ -29,13 +24,15 @@ function MeasurementRows({ measurements, runId, sources }: { measurements: Measu
   return (
     <>
       {measurements.map((m) => (
-        <div key={m.id} className="kv-row">
-          <span className="k">{m.metric.replace(/_/g, ' ')}</span>
-          <span className="v">
-            {m.value} {m.unit}
-            {m.period ? ` · ${m.period}` : ''} <Cite runId={runId} id={m.source_id} sources={sources} />
-          </span>
-        </div>
+        <FactRow
+          key={m.id}
+          label={m.metric.replace(/_/g, ' ')}
+          value={m.value}
+          suffix={`${m.unit ?? ''}${m.period ? ` · ${m.period}` : ''}`.trim()}
+          sourceId={m.source_id}
+          runId={runId}
+          sources={sources}
+        />
       ))}
     </>
   );

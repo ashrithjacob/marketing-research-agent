@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react';
-import type { Gap } from '../api';
+import { factText, type Gap } from '../api';
 
 /** A dashboard tile: headline figures visible, full values behind one click. */
 export function Tile({
@@ -89,10 +89,10 @@ export function TileGaps({ gaps, force }: { gaps: Gap[]; force?: boolean }) {
         Data gaps <span>{gaps.length}</span>
       </div>
       {gaps.map((gap, index) => (
-        <div key={index} className="tile-gap">
-          <div className="tile-gap-missing">{gap.missing}</div>
-          {gap.would_need && <div className="tile-gap-need">To close it: {gap.would_need}</div>}
-        </div>
+        <details key={index} className="tile-gap">
+          <summary className="tile-gap-missing">{factText(gap.missing).preview}</summary>
+          {gap.would_need && <div className="tile-gap-need">To close it: {factText(gap.would_need).preview}</div>}
+        </details>
       ))}
     </div>
   );

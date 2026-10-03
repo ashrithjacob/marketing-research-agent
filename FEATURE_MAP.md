@@ -222,6 +222,7 @@ Source also carries a `node`, so source counts are per tile.
 | Panel | Field | Source |
 |---|---|---|
 | runmeta | tokens | `usage.totalTokens` |
+| fact rows | every product and category field, each competitor and each data gap is a closed row: name and a one-line preview; opened, the whole value — a bulleted list when the agent separated three or more items with " \| " — and the page it was read off. A source id the agent pasted into its text (`sha256:…`) is never shown: it becomes a numbered link [n] to that source's archived copy (`api/fact-text.ts`, `run-view/fact-value.tsx`) | the same packet fields |
 | citations | every fact in a stage-1 tile (each field row, each competitor, its ads, the champion line) and stage 2 links the page it was read off, and **read** opens the archived copy the agent actually read; an ad-library search, which is not a web page, links its archived copy only (`run-view/cite.tsx`) | `packet.sources` by `source_id`; `GET /runs/:id/sources/:sourceId` for the archived copy |
 | cost list (rail) | one block per agent and a `run` block: its total, then LLM, Apify, Parallel, Trendtrack and pages, each for the services its tools can spend in (`run-view/CostTable.tsx`) | `GET /api/research/runs/:id/costs`, read every 5s while live (`run-view/use-costs.ts`) |
 | logs page, agent tab | that agent's row of the cost table | the same `/costs` |

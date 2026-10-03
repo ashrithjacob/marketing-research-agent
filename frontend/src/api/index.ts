@@ -2,6 +2,7 @@ export * from './runs';
 export * from './packet';
 export * from './calls';
 export * from './costs';
+export * from './fact-text';
 export * from './judgements';
 export * from './config';
 export * from './client';

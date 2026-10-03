@@ -35,6 +35,20 @@ export function Cite({ runId, id, sources }: { runId: string; id: string; source
   );
 }
 
+/** A source named inside a fact's own text, as a numbered link to the copy that was read, so a run of them stays short. */
+export function InlineCite({ runId, id, sources, n }: { runId: string; id: string; sources: Source[]; n: number }) {
+  const source = sources.find((s) => s.id === id);
+  if (!source) return <sup className="cite-n muted">[{n}]</sup>;
+  const href = source.archived ? api.sourceUrl(runId, source.id) : /^https?:\/\//.test(source.url) ? source.url : undefined;
+  return (
+    <sup className="cite-n">
+      <a href={href} target="_blank" rel="noreferrer" title={`${label(source)} — ${source.title || source.url}`}>
+        [{n}]
+      </a>
+    </sup>
+  );
+}
+
 /** Each of several sources, side by side. */
 export function Cites({ runId, ids, sources }: { runId: string; ids: readonly string[]; sources: Source[] }) {
   return (

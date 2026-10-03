@@ -881,3 +881,39 @@ details.tl-tool.lane[open] > summary { border-bottom: 1px solid var(--line); }
 .cite a:hover { text-decoration: underline; }
 .cite .archived { color: var(--faint); }
 .comp-source { font-size: 11.5px; color: var(--faint); margin-top: 4px; }
+
+/* ---------- collapsible fact rows ---------- */
+details.kv-row.fact, details.comp, details.tile-gap { cursor: default; min-width: 0; }
+.tile-body, .kv { min-width: 0; overflow-wrap: anywhere; }
+details.kv-row.fact > summary { display: block; min-width: 0; }
+details.kv-row.fact > summary, details.comp > summary, details.tile-gap > summary {
+  list-style: none; cursor: pointer; position: relative; padding-right: 22px;
+}
+details.kv-row.fact > summary::-webkit-details-marker,
+details.comp > summary::-webkit-details-marker,
+details.tile-gap > summary::-webkit-details-marker { display: none; }
+details.kv-row.fact > summary::after, details.comp > summary::after, details.tile-gap > summary::after {
+  content: '▸'; position: absolute; right: 2px; top: 1px; color: var(--faint); font-size: 12px;
+  transition: transform 0.15s ease-out;
+}
+details[open].kv-row.fact > summary::after, details[open].comp > summary::after, details[open].tile-gap > summary::after { transform: rotate(90deg); }
+details.kv-row.fact > summary:hover::after, details.comp > summary:hover::after { color: var(--accent); }
+.fact-preview {
+  display: block; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+details[open].kv-row.fact .fact-preview { display: none; }
+details.kv-row.fact > .v { margin-top: 4px; line-height: 1.55; }
+.fact-items { margin: 2px 0 0; padding-left: 18px; display: grid; gap: 5px; }
+.fact-items li { padding-left: 2px; }
+.fact-source { font-size: 11.5px; color: var(--faint); margin-top: 6px; }
+.fact-source .cite { margin-left: 2px; }
+details.comp > summary { display: flex; flex-direction: column; gap: 1px; }
+details.comp .comp-name { font-weight: 600; }
+.comp-glance { color: var(--faint); font-size: 11.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.comp-body { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--line); display: grid; gap: 6px; }
+.comp-page { font-size: 11.5px; color: var(--accent); text-decoration: none; }
+.comp-copy { line-height: 1.5; }
+details.tile-gap > summary.tile-gap-missing { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+details[open].tile-gap > summary.tile-gap-missing { white-space: normal; }
+.cite-n { font-size: 10px; margin: 0 1px; }
+.cite-n a { color: var(--accent); text-decoration: none; }

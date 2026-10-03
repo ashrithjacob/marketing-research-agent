@@ -9,10 +9,12 @@ import type {
   StagePacket,
   TargetListing,
 } from '../api';
+import { factText } from '../api';
 import { AmazonLink } from './amazon-link';
 import { BarList } from './charts';
 import { Chip, Tile, TileGaps } from './tile';
 import { Cite, Cites } from './cite';
+import { FactValue } from './fact-value';
 import { SourceRow } from './packet-sections';
 
 type Focus = CompetitorRelation | 'sources' | 'gaps' | null;
@@ -23,34 +25,36 @@ const KINDS: { relation: CompetitorRelation; label: string; tone: 'accent' | 'in
   { relation: 'indirect_active', label: 'indirect by active', tone: 'infer', means: "shares none of the champion's actives" },
 ];
 
+/** One competitor as a closed row — its name, brand, market and price — opened for the rest, each part tied to the page it was read off. */
 function CompetitorRow({ competitor: c, listing, runId, sources }: { competitor: Competitor; listing: TargetListing | undefined; runId: string; sources: Source[] }) {
   const ads = c.ad_source_ids?.length ?? 0;
+  const glance = factText([c.brand, c.market, c.price].filter(Boolean).join(' · ')).preview;
   return (
-    <div className="comp">
-      <a href={c.url} target="_blank" rel="noreferrer" className="comp-name">
-        {c.name} <span className="comp-open">↗</span>
-      </a>{' '}
-      <AmazonLink row={listing} />
-      <div className="comp-facts">
-        <span className="comp-form">
-          {c.form}
-          {c.form_as_printed ? ` · ${c.form_as_printed}` : ''}
-        </span>
-        {c.market && <span>{c.market}</span>}
-        {c.shared_actives.length > 0 && <span>shares {c.shared_actives.join(', ')}</span>}
-        {c.dose_per_serving && <span>{c.dose_per_serving}</span>}
-        {c.price && (
-          <span>
-            {c.price}
-            {c.price_per_dose ? ` (${c.price_per_dose})` : ''}
+    <details className="comp">
+      <summary>
+        <span className="comp-name">{c.name}</span>
+        {glance && <span className="comp-glance">{glance}</span>}
+      </summary>
+      <div className="comp-body">
+        <a href={c.url} target="_blank" rel="noreferrer" className="comp-page">
+          product page ↗
+        </a>{' '}
+        <AmazonLink row={listing} />
+        <div className="comp-facts">
+          <span className="comp-form">
+            {c.form}
+            {c.form_as_printed ? ` · ${c.form_as_printed}` : ''}
           </span>
-        )}
-        {ads > 0 && <span>{ads} ad{ads === 1 ? '' : 's'}: <Cites runId={runId} ids={c.ad_source_ids ?? []} sources={sources} /></span>}
+          {c.shared_actives.length > 0 && <span>shares {c.shared_actives.join(', ')}</span>}
+          {c.dose_per_serving && <span>{c.dose_per_serving}</span>}
+          {c.price_per_dose && <span>price per dose: {c.price_per_dose}</span>}
+          {ads > 0 && <span>{ads} ad{ads === 1 ? '' : 's'}: <Cites runId={runId} ids={c.ad_source_ids ?? []} sources={sources} /></span>}
+        </div>
+        {c.icp_as_printed && <div className="comp-copy">For: <FactValue value={c.icp_as_printed} runId={runId} sources={sources} /></div>}
+        {c.positioning_copy && <div className="comp-copy">“<FactValue value={c.positioning_copy} runId={runId} sources={sources} />”</div>}
+        <div className="comp-source">Read off <Cite runId={runId} id={c.source_id} sources={sources} /></div>
       </div>
-      <div className="comp-source">read off <Cite runId={runId} id={c.source_id} sources={sources} /></div>
-      {c.icp_as_printed && <div className="comp-copy">for: {c.icp_as_printed}</div>}
-      {c.positioning_copy && <div className="comp-copy">“{c.positioning_copy}”</div>}
-    </div>
+    </details>
   );
 }
 
@@ -180,7 +184,11 @@ export function CompetitorsTile({
                     <span className={`comp-tag ${relation}`}>{label}</span>
                     <span>{group.length} found</span>
                   </div>
-                  {curve?.stopped_because && <p className="comp-stopped">Stopped: {curve.stopped_because}</p>}
+                  {curve?.stopped_because && (
+                    <p className="comp-stopped">
+                      Stopped: <FactValue value={curve.stopped_because} runId={runId} sources={packet.sources} />
+                    </p>
+                  )}
                   {group.length === 0 && <p className="muted">None recorded.</p>}
                   {group.map((c) => (
                     <CompetitorRow key={c.id} competitor={c} listing={listings.find((l) => l.target_id === c.id)} runId={runId} sources={packet.sources} />
