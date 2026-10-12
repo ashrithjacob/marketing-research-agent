@@ -15,6 +15,8 @@ import {
   DISCOVER_LINE,
   EVIDENCE_FETCH_LINE,
   EVIDENCE_SEARCH_LINE,
+  LIBRARY_INDEX_LINE,
+  LIBRARY_READ_LINE,
   WEB_FETCH_LINE,
   WEB_SEARCH_LINE,
 } from "../prompt/text/tool-lines.js";
@@ -23,6 +25,7 @@ import { DiscoverCompetitorsTool } from "./discover-competitors-tool.js";
 import { EvidenceSearchTool } from "./evidence-search-tool.js";
 import { FindProductTool } from "./find-product-tool.js";
 import type { FetchRecord } from "./lanes.js";
+import type { LibraryTools } from "./library-tools.js";
 import { WebFetchTool } from "./web-fetch-tool.js";
 import { WebSearchTool } from "./web-search-tool.js";
 
@@ -40,9 +43,10 @@ export interface ToolContext {
   discovery: DiscoveryQuestion | null;
   meter: ChargeMeter;
   onFetch?: (record: FetchRecord) => void;
+  library?: LibraryTools | null;
 }
 
-/** Builds the research tools a role names, in its order, each charging what it spends to the agent's meter; a tool whose service is not configured, or whose input the run lacks, is left out, not stubbed. `wait_for` is a ledger tool and is built with the ledger's. */
+/** Builds the research tools a role names, in its order, each charging what it spends to the agent's meter; a tool whose service is not configured, or whose input the run lacks (the library tools, with nothing in the library), is left out, not stubbed. `wait_for` is a ledger tool and is built with the ledger's. */
 export class ToolRegistry {
   constructor(
     private readonly services: ServiceClients,
@@ -61,7 +65,7 @@ export class ToolRegistry {
     Trace.line(import.meta.url, "ToolRegistry.one", { name });
     const { services, settings } = this;
     const { prices } = settings;
-    const { meter } = run;
+    const { meter, library } = run;
     const corpus = new Corpus(settings.corpusPath);
     switch (name) {
       case "web_search":
@@ -85,6 +89,10 @@ export class ToolRegistry {
         return services.ads ? { tool: new AdLibraryTool(new MeteredAdLibrary(services.ads, prices, meter), corpus, run.runId).tool(), line: AD_LIBRARY_LINE } : null;
       case "amazon_find_product":
         return services.actors ? { tool: new FindProductTool(new AmazonProducts(new MeteredActorRunner(services.actors, meter))).tool(), line: AMAZON_SEARCH_LINE } : null;
+      case "library_index":
+        return library ? { tool: library.index(), line: LIBRARY_INDEX_LINE } : null;
+      case "library_read":
+        return library ? { tool: library.read(), line: LIBRARY_READ_LINE } : null;
       case "wait_for":
         return null;
     }

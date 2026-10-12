@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 
-import { ReviewAnalyst, RunSupervisor, StageOneHandoff, ReviewMiningListings } from "../agent/index.js";
+import { ReviewAnalyst, RunSupervisor, StageOneHandoff, ReviewMiningListings, type LibraryIntake } from "../agent/index.js";
 import { TrustpilotProfiles } from "../adapters/index.js";
 import type { Settings } from "../config/index.js";
 import type { AmazonListingSource, PageFetcher, ResearchStore } from "../domain/index.js";
@@ -12,6 +12,7 @@ import { CorpusRoute } from "./corpus-route.js";
 import { CostRoute } from "./cost-route.js";
 import { EventStream } from "./event-stream.js";
 import { JudgementRoutes } from "./judgement-routes.js";
+import { LibraryRoutes } from "./library-routes.js";
 import { ReviewAnalysisRoutes } from "./review-analysis-routes.js";
 import { RunRoutes } from "./run-routes.js";
 import { ReviewMiningRoutes } from "./review-mining-routes.js";
@@ -25,6 +26,7 @@ export class ResearchApi {
     private readonly options: {
       store: ResearchStore;
       supervisor: RunSupervisor;
+      intake: LibraryIntake;
       settings: Settings;
       traces: TraceFile;
       listingSource: AmazonListingSource | null;
@@ -35,7 +37,7 @@ export class ResearchApi {
   router(): Hono<ApiEnv> {
     Trace.line(import.meta.url, "ResearchApi.router");
     const api = new Hono<ApiEnv>();
-    const { store, supervisor, settings, traces, listingSource, pages } = this.options;
+    const { store, supervisor, intake, settings, traces, listingSource, pages } = this.options;
     const handoff = new StageOneHandoff(store);
     new ScopeGuard(store).register(api);
     const listings = new ReviewMiningListings(store.listings, listingSource, settings.apifyConcurrency, new TrustpilotProfiles(pages));
@@ -47,6 +49,7 @@ export class ResearchApi {
     new EventStream(store, supervisor).register(api);
     new CorpusRoute(store, settings).register(api);
     new JudgementRoutes(store).register(api);
+    new LibraryRoutes(store.library, intake, settings.libraryMaxMb * 1024 * 1024).register(api);
     new ConfigRoute(settings).register(api);
     new TraceRoute(traces).register(api);
     return api;

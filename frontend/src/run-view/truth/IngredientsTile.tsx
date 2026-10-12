@@ -1,6 +1,7 @@
 import type { Gap, ProductTruthPacket } from '../../api';
 import { Chip, Tile, TileGaps } from '../tile';
 import { Cite } from '../cite';
+import { Fold, FoldCard } from '../fold';
 
 function effect(time: ProductTruthPacket['mechanisms'][number]['time_to_effect']): string {
   return time ? `${time.value} ${time.unit}` : 'not stated by any source';
@@ -25,35 +26,35 @@ export function IngredientsTile({ runId, packet, gaps }: { runId: string; packet
       <div className="pt-cards">
         {packet.actives.map((active) => {
           const m = packet.mechanisms.find((x) => x.active.toLowerCase() === active.name.toLowerCase());
+          const label = active.amount === null ? 'no amount stated' : `${active.amount} ${active.unit} per serving`;
           return (
-            <div key={active.name} className="pt-card">
-              <div className="pt-card-head">
-                <b>{active.name}</b>
-                {m?.story_weight === 'carrier' && <span className="tile-chip accent">carrier</span>}
-                {active.in_blend && <span className="tile-chip warn">in a blend</span>}
-              </div>
-              <div className="kv">
-                <div className="kv-row">
-                  <span className="k">on the label</span>
-                  <span className="v">
-                    {active.amount === null ? 'no amount stated' : `${active.amount} ${active.unit} per serving`}
-                    {active.form ? ` · ${active.form}` : ''} <Cite runId={runId} id={active.source_id} sources={packet.sources} />
-                  </span>
-                </div>
-                {m ? (
-                  <>
-                    <div className="kv-row"><span className="k">pathway</span><span className="v">{m.pathway}</span></div>
-                    <div className="kv-row"><span className="k">time to effect</span><span className="v">{effect(m.time_to_effect)}</span></div>
-                    <div className="kv-row">
-                      <span className="k">magnitude</span>
-                      <span className="v">{m.magnitude} <Cite runId={runId} id={m.source_id} sources={packet.sources} /></span>
-                    </div>
-                  </>
-                ) : (
-                  <div className="kv-row"><span className="k">mechanism</span><span className="v muted">not recorded — see the gaps</span></div>
-                )}
-              </div>
-            </div>
+            <FoldCard
+              key={active.name}
+              title={active.name}
+              glance={label}
+              chips={
+                <>
+                  {m?.story_weight === 'carrier' && <span className="tile-chip accent">carrier</span>}
+                  {active.in_blend && <span className="tile-chip warn">in a blend</span>}
+                </>
+              }
+            >
+              <Fold label="on the label" preview={`${label}${active.form ? ` · ${active.form}` : ''}`}>
+                {label}
+                {active.form ? ` · ${active.form}` : ''} <Cite runId={runId} id={active.source_id} sources={packet.sources} />
+              </Fold>
+              {m ? (
+                <>
+                  <Fold label="pathway" preview={m.pathway} />
+                  <Fold label="time to effect" preview={effect(m.time_to_effect)} />
+                  <Fold label="magnitude" preview={m.magnitude}>
+                    {m.magnitude} <Cite runId={runId} id={m.source_id} sources={packet.sources} />
+                  </Fold>
+                </>
+              ) : (
+                <Fold label="mechanism" preview="not recorded — see the gaps" tone="muted" />
+              )}
+            </FoldCard>
           );
         })}
       </div>

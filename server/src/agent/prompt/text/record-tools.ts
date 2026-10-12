@@ -35,7 +35,7 @@ export const RECORD_TOOLS = [
       "Record the champion product every competitor is measured against. There is one; " +
       "recording it again replaces it. With a url brief the champion is that site's product and " +
       "there is no ranking: runner_up_name and runner_up_reviews are null. icp is who the product is for and the " +
-      "problem it solves, as its page says; every competitor must share it. amazon_url is the " +
+      "problem it solves, as its page says or implies; every competitor must share it. amazon_url is the " +
       "champion's Amazon listing, or \"\" when it has none. Example: " +
       '{"name":"MagnaCalm Glycinate 400mg","form":"capsule","form_as_printed":"90 vegan capsules",' +
       '"actives":["magnesium glycinate"],"icp":"adults who struggle to fall asleep",' +
@@ -50,7 +50,7 @@ export const RECORD_TOOLS = [
       "Record one competitor, read off its own page. `id` is yours: c1, c2, …; " + REPLACES +
       " A competitor sells to the champion's icp; a product with the same active sold to " +
       "another audience or for another problem is not a competitor — do not record it. icp_as_printed is who its own page says it " +
-      "is for. shared_actives are picked from the champion's actives and copied word for word, [] when it shares none; the " +
+      "is for, or \"\" when it never says. shared_actives are picked from the champion's actives and copied word for word, [] when it shares none; the " +
       "competitor's own actives keep its page's wording. relation is checked against them and the champion's form: \"direct\" " +
       "shares an active in the same form, \"indirect_form\" shares one in another form, \"indirect_active\" shares none. Example: " +
       '{"id":"c1","name":"CalmWell Magnesium Glycinate","brand":"CalmWell",' +

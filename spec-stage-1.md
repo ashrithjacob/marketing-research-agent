@@ -120,8 +120,10 @@ customer in the brief's markets, **whatever its actives**, and records
 | **Indirect** | the champion's customer, **different** form |
 
 `shared_actives` is still recorded, and is `[]` when a competitor shares none.
-Code checks that both sides wrote down their customer (`extract/competitor-icp.ts`,
-at write time and at `finish`) and that `relation` agrees with the forms; whether
+~~Code checks that both sides wrote down their customer (`extract/competitor-icp.ts`,
+at write time and at `finish`)~~ Superseded 2026-10-04: a page often never states
+who it is for, so the customer is inferred, and an empty `icp` or `icp_as_printed`
+is no longer refused or gapped (`workings_stage1.md` decision 19). Code checks that `relation` agrees with the forms; whether
 the two customers are the same is the agent's judgement, with both quotes on the
 row for a human to audit.
 
@@ -206,10 +208,13 @@ form · dose_per_serving · positioning_copy (verbatim) · price · price_per_do
 ad_library_entries`.
 
 Each ad-library entry **must carry `first_seen`**. `spec.md` §7 is blunt about why:
-longevity is the only outside performance signal there is. An ad with no first-seen
-date is captured, marked `first_seen: null`, and **counted as a gap** — not silently
-dropped, because a competitor whose ad dates we couldn't get is a hole in the
-sophistication read that stage 3 depends on.
+longevity is the only outside performance signal there is. ~~An ad with no first-seen
+date is captured, marked `first_seen: null`, and **counted as a gap**.~~ Superseded
+2026-10-04: an undated ad is kept with `first_seen: null` and no gap, and the
+cockpit marks it "* first seen not found" on the competitor's row. The rule made
+run `33c8b754` `invalid`: the category agent cited a whole ad *search*, which has
+no date, and could only write gaps under its own node (`workings_stage1.md`
+decision 20).
 
 Saturation applies to competitor *discovery*, **per class**: three consecutive
 searches surfacing no new direct brand, and three surfacing no new indirect one. One
@@ -508,7 +513,7 @@ them would hide the shape of what was searched.
 | `review_platform` | admit | Trustpilot and similar |
 | `forum` | admit | Reddit, niche boards |
 | `video_comments` | admit | YouTube, TikTok comments |
-| `ad_library` | admit | `first_seen` required or gapped |
+| `ad_library` | admit | `first_seen` when dated, else null (no gap since 2026-10-04) |
 | `trial` | admit | needs dose, form and population — not the abstract |
 | `reference` | admit | Examine and similar secondary compendia |
 | `keyword_data` | admit | search-volume tooling |
@@ -647,7 +652,7 @@ The packet is rejected — the run marked `invalid`, not `completed` — when:
    agent that writes `"finding": "…"` gets a hard failure, not a warning. Strict
    rejection over silent stripping, because stripping teaches nothing.
 2. An excerpt's `source_id` does not resolve to a source in the packet.
-3. An admitted `ad_library` source has `first_seen: null` and no matching gap.
+3. ~~An admitted `ad_library` source has `first_seen: null` and no matching gap.~~ Removed 2026-10-04 (§2.2).
 4. The `review_mining` node is `complete` with zero 3★ excerpts.
 5. **`gaps` is empty.** `spec.md` §4.3: *if the gap list is empty, treat the run as
    failed*. Real research always has holes; a run claiming none is a run that stopped

@@ -9,6 +9,7 @@ import {
   type Session,
 } from './api';
 import Login from './Login';
+import LibraryPage from './LibraryPage';
 import LogsPage from './LogsPage';
 import ProductRuns from './ProductRuns';
 import ProductsPage from './ProductsPage';
@@ -105,6 +106,9 @@ export default function App() {
         <Link to={paths.products()} className="brand">
           research cockpit
         </Link>
+        <Link to={paths.library()} className="chip">
+          Library
+        </Link>
         <div className="subject">
           {activeRun && (
             <>
@@ -158,6 +162,7 @@ export default function App() {
       )}
 
       {route.page === 'products' && <ProductsPage products={products} />}
+      {route.page === 'library' && <LibraryPage onError={setError} />}
       {(route.page === 'missing' || missing) && (
         <div className="empty">
           No page here. <Link to={paths.products()}>All products</Link>

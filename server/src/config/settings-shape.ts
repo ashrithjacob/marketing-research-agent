@@ -49,6 +49,7 @@ export interface Settings {
   reviewReuseDays: number;
 
   corpusPath: string;
+  libraryMaxMb: number;
 
   databasePath: string;
   databaseUrl: string;

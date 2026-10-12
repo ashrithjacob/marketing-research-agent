@@ -1,9 +1,10 @@
-import type { AccountDirectory, ChargeLedger, FindingLedger, ProductCatalog, ReviewPullStore } from "../../domain/index.js";
+import type { AccountDirectory, ChargeLedger, DocumentLibrary, FindingLedger, ProductCatalog, ReviewPullStore } from "../../domain/index.js";
 import { Trace } from "../../trace/index.js";
 
 import { AccountTable } from "./account-table.js";
 import { CallLog } from "./call-log.js";
 import { ChargeTable } from "./charge-table.js";
+import { DocumentTable } from "./document-table.js";
 import { PacketCheckLog } from "./check-log.js";
 import { EventLog } from "./event-log.js";
 import { FindingTable } from "./finding-table.js";
@@ -37,6 +38,7 @@ export class StoreTables {
   readonly findings: FindingLedger;
   readonly charges: ChargeLedger;
   readonly pulls: ReviewPullStore;
+  readonly library: DocumentLibrary;
 
   private constructor(readonly db: SqlDatabase) {
     Trace.line(import.meta.url, "StoreTables.constructor");
@@ -54,6 +56,7 @@ export class StoreTables {
     this.findings = new FindingTable(db);
     this.charges = new ChargeTable(db);
     this.pulls = new ReviewPullTable(db);
+    this.library = new DocumentTable(db);
     this.catalog = new SqlProductCatalog(this.products, this.runs, this.packetRows);
   }
 

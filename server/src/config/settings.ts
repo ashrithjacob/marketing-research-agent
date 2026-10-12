@@ -126,6 +126,7 @@ export class Env {
       reviewReuseDays: Env.number("MRA_REVIEW_REUSE_DAYS", 183),
 
       corpusPath: Env.text("MRA_CORPUS_PATH", "/corpus"),
+      libraryMaxMb: Env.number("MRA_LIBRARY_MAX_MB", 25),
 
       databasePath: Env.text("MRA_DATABASE_PATH", "/data/research.db"),
       databaseUrl: Env.text("DATABASE_URL", ""),

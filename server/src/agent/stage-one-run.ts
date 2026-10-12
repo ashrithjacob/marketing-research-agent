@@ -63,7 +63,7 @@ export class StageOneRun {
       onChecked: team.onChecked,
     };
     const wrapUp = new RunWrapUp(store, runs, runId, this.deps.listings);
-    const assembly = new StageOneRunAssembly(store.findings, runId, { brief, nodes }, () => team.partProblems());
+    const assembly = new StageOneRunAssembly(store.findings, runId, { brief, nodes });
     let ending: RunEnding;
     let output = "";
     try {

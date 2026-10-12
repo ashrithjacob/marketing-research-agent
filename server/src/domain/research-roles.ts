@@ -23,6 +23,8 @@ export const TOOL_NAMES = [
   "discover_competitors",
   "ad_library_search",
   "amazon_find_product",
+  "library_index",
+  "library_read",
   "wait_for",
 ] as const;
 export type ToolName = (typeof TOOL_NAMES)[number];
@@ -43,8 +45,8 @@ export interface RoleSpec {
   waitsFor: readonly RoleId[];
 }
 
-const STAGE_ONE_WEB: readonly ToolName[] = ["web_search", "web_fetch"];
-const EVIDENCE: readonly ToolName[] = ["evidence_search", "evidence_fetch"];
+const STAGE_ONE_WEB: readonly ToolName[] = ["web_search", "web_fetch", "library_index", "library_read"];
+const EVIDENCE: readonly ToolName[] = ["evidence_search", "evidence_fetch", "library_index", "library_read"];
 
 export const ROLES: readonly RoleSpec[] = [
   { id: "champion", stage: 1, tools: [...STAGE_ONE_WEB, "amazon_find_product"], deliverable: CHAMPION_DELIVERABLE, consistency: "champion", maxTurns: 10, waitsFor: [] },

@@ -2,13 +2,12 @@ import type { Agent } from "@earendil-works/pi-agent-core";
 import type { Usage } from "@earendil-works/pi-ai";
 
 import { RunBilling, type OpenRouterPrices } from "../adapters/index.js";
-import type { CheckProblem, LlmCall, ResearchStore } from "../domain/index.js";
+import type { LlmCall, ResearchStore } from "../domain/index.js";
 import { Trace } from "../trace/index.js";
 
 import { AgentDriver, type AgentOutcome } from "./agent-driver.js";
 import type { AgentRoster } from "./agent-roster.js";
 import { BilledCosts } from "./billed-costs.js";
-import type { DoneCheck } from "./done-check.js";
 import type { TurnEnd } from "./event-recorder.js";
 import type { LiveRuns } from "./live-runs.js";
 import type { ModelChain } from "./model-chain.js";
@@ -27,7 +26,6 @@ export interface TeamMember<Id extends string> {
 export class AgentTeam {
   private readonly live = new Map<string, Agent>();
   private readonly passed = new Set<string>();
-  private readonly checks = new Map<string, DoneCheck>();
   private stopped = false;
   private usage = UsageTotals.empty();
   readonly billing: RunBilling;
@@ -87,13 +85,6 @@ export class AgentTeam {
     return (await Promise.all(members.map(start))).flat();
   }
 
-  /** Each agent's own check, run again on the settled ledger: a part that never passed is not rescued by another agent's rows. */
-  async partProblems(): Promise<CheckProblem[]> {
-    Trace.line(import.meta.url, "AgentTeam.partProblems", { agents: [...this.checks.keys()] });
-    const each = await Promise.all([...this.checks].map(async ([id, check]) => (await check.problems()).map((problem) => ({ ...problem, text: `${id}: ${problem.text}` }))));
-    return each.flat();
-  }
-
   /** Every LLM call record and billed cost written so far is stored. */
   async written(sequence: CallSequence): Promise<void> {
     Trace.line(import.meta.url, "AgentTeam.written");
@@ -110,7 +101,6 @@ export class AgentTeam {
     Trace.line(import.meta.url, "AgentTeam.drive", { id });
     if (this.stopped) return [];
     const built = await build(id);
-    this.checks.set(id, built.check);
     this.live.set(id, built.agent);
     try {
       return [await driver.drive(id, built, () => this.passed.has(id), (message) => this.turnEnded(message))];

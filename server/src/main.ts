@@ -19,6 +19,8 @@ const store = await SqlResearchStore.open(StoreDatabase.forSettings(settings));
 const app = new App({ settings, traces, store });
 
 await app.supervisor.recoverRunsKilledByRestart();
+const abandoned = await app.intake.recover();
+if (abandoned > 0) console.log(`${abandoned} document conversion(s) were cut off by the restart and marked failed`);
 const resettled = await app.supervisor.resettleInvalidRuns();
 if (resettled.length > 0) console.log(`re-settled ${resettled.length} invalid run(s) from their ledgers: ${resettled.join(", ")}`);
 app.supervisor.costs.start();

@@ -2,6 +2,7 @@ import { AccountTable } from "./account-table.js";
 import { CallLog } from "./call-log.js";
 import { ChargeTable } from "./charge-table.js";
 import { CompetitorKinds } from "./competitor-kinds.js";
+import { DocumentTable } from "./document-table.js";
 import { FindingTable } from "./finding-table.js";
 import { StoreMigrations } from "./migrations.js";
 import { PacketRowTable } from "./packet-row-table.js";
@@ -21,7 +22,7 @@ export class StoreSchema {
     await db.exec(CallLog.DDL);
     await StoreMigrations.apply(db);
     await db.exec(StoreSchema.INDEXES);
-    for (const ddl of [PacketRowTable.DDL, ReviewAnalysisTable.DDL, TargetListingTable.DDL, FindingTable.DDL, ChargeTable.DDL, ReviewPullTable.DDL]) await db.exec(ddl);
+    for (const ddl of [PacketRowTable.DDL, ReviewAnalysisTable.DDL, TargetListingTable.DDL, FindingTable.DDL, ChargeTable.DDL, ReviewPullTable.DDL, DocumentTable.DDL]) await db.exec(ddl);
     await StoreMigrations.once(db, CompetitorKinds.NAME, (tx) => new CompetitorKinds(tx).apply());
     await StoreMigrations.once(db, ReviewPullBackfill.NAME, async (tx) => { await new ReviewPullBackfill(tx).apply(); });
   }

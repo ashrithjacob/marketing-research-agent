@@ -3,6 +3,7 @@ import type { DeliverableCheck } from "../extract/index.js";
 import { Trace } from "../trace/index.js";
 
 import type { DoneCheck } from "./done-check.js";
+import { PartClose } from "./part-close.js";
 import type { RowRepair } from "./row-repair.js";
 import type { RunFindings } from "./run-findings.js";
 
@@ -24,22 +25,11 @@ export class LimitClose {
   async close(): Promise<LimitClosed> {
     Trace.line(import.meta.url, "LimitClose.close", { node: this.part.node, limit: this.part.limit });
     const retracted = await this.repair.repair(() => this.check.problems(), `at the ${this.part.limit}-turn limit`, this.findings.agentId);
-    return { gapped: await this.gapOpen(), retracted };
-  }
-
-  private async gapOpen(): Promise<string[]> {
-    Trace.line(import.meta.url, "LimitClose.gapOpen", { node: this.part.node });
-    const { findings } = this;
     const { node, limit, reports } = this.part;
-    const why = `not found within the ${limit}-turn limit`;
-    const open = this.deliverable.missing(await findings.live()).filter((missing) => !missing.row).map((missing) => missing.key);
-    for (const key of open) await findings.record("gap", { node, missing: `${key}: ${why}`, would_need: "a longer search" });
-    if (!reports) return open;
-    const own = await findings.own();
-    if (!own.some((row) => row.kind === "gap")) await findings.record("gap", { node, missing: `research stopped: ${why}`, would_need: "a longer search" });
-    if (!own.some((row) => row.kind === "node_status")) {
-      await findings.record("node_status", { node, status: "incomplete", done_criterion_met: false, why: `the ${limit}-turn limit was reached` });
-    }
-    return open;
+    const gapped = await new PartClose(this.findings, this.deliverable, { node, reports }).close({
+      gap: `not found within the ${limit}-turn limit`,
+      status: `the ${limit}-turn limit was reached`,
+    });
+    return { gapped, retracted };
   }
 }

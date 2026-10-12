@@ -368,7 +368,9 @@ function checkComposeEnvStrings() {
 // It has been called research.vanis.ai and was once going to be a tab on
 // chat.vanis.ai. Both names are still in the specs, correctly, as superseded
 // decisions. What is not allowed is naming one of them *as this app's address*
-// — so an old name is fine on a line that also names the current one.
+// — so an old name is fine on a line that also names the current one. And
+// chat.vanis.ai is agentchat's real address: in a paragraph that names
+// agentchat, it is used correctly.
 function checkAppDomain() {
   const files = (git("ls-files") || "")
     .split("\n")
@@ -377,9 +379,16 @@ function checkAppDomain() {
   for (const rel of files) {
     const text = read(rel);
     if (!text) continue;
-    text.split("\n").forEach((line, i) => {
+    const lines = text.split("\n");
+    lines.forEach((line, i) => {
       if (!/\b(chat|research)\.vanis\.ai\b/.test(line)) return;
       if (line.includes("marketing.vanis.ai")) return; // contrast or correction
+      let start = i;
+      while (start > 0 && lines[start - 1].trim()) start -= 1;
+      let end = i;
+      while (end < lines.length - 1 && lines[end + 1].trim()) end += 1;
+      const aboutAgentchat = lines.slice(start, end + 1).some((l) => /agentchat/i.test(l));
+      if (aboutAgentchat && !/\bresearch\.vanis\.ai\b/.test(line)) return;
       fail(
         rel, i + 1, "app-domain",
         "names chat.vanis.ai / research.vanis.ai without naming " +

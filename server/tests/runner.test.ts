@@ -118,22 +118,23 @@ describe("settling a run", () => {
     expect((await store.listEvents(runId)).map((e) => e.kind)).toContain("packet.ready");
   });
 
-  it("marks a run whose ledger breaks the contract `invalid`, not `failed`", async () => {
-    // The agent finished and produced something, and what it produced broke the
-    // contract. That is the most informative failure there is.
+  it("closes a part its agent left with no gap, and completes: an empty gap list is not grave", async () => {
+    // Until 2026-10-04 this run ended invalid, hiding a valid part over a missing gap.
     const runId = await runWith([...recorded(productPacket({ gaps: [] })), fauxAssistantMessage("Done.")]);
     const run = (await store.getRun(runId))!;
-    expect(run.status).toBe("invalid");
-    expect(run.error).toMatch(/gap list is empty/);
-    expect((await store.listEvents(runId)).map((e) => e.kind)).toContain("packet.invalid");
+    expect(run.status).toBe("completed");
+    expect((run.packet as any).attributes.map((a: any) => a.key)).toEqual(["dose_per_serving"]);
+    const gaps = (run.packet as any).gaps.map((g: any) => g.missing);
+    expect(gaps).toHaveLength(9);
+    expect(gaps.every((g: string) => g.endsWith(": the agent ended without finishing"))).toBe(true);
   });
 
-  it("keeps and shows the packet of an `invalid` run, so what passed is not lost to what did not", async () => {
-    const runId = await runWith([...recorded(productPacket({ gaps: [] })), fauxAssistantMessage("Done.")]);
+  it("closes a part its agent left with no status, as incomplete", async () => {
+    const { nodes: _nodes, ...unreported } = productPacket();
+    const runId = await runWith([...recorded(unreported), fauxAssistantMessage("Done.")]);
     const run = (await store.getRun(runId))!;
-    expect(run.status).toBe("invalid");
-    expect((run.packet as any).attributes.map((a: any) => a.key)).toEqual(["dose_per_serving"]);
-    expect(run.packet_source).toBe("ledger");
+    expect(run.status).toBe("completed");
+    expect((run.packet as any).nodes).toEqual([{ node: "product_data", status: "incomplete", done_criterion_met: false, why: "the agent ended without reporting its status" }]);
   });
 
   it("at settlement, retracts a row that breaks the contract into a gap and completes with the rest", async () => {
@@ -338,9 +339,8 @@ describe("finish", () => {
     expect(answers[4]).toMatch(/Checks used: 5 of 5\.$/);
     expect((await store.listLlmCalls(runId))).toHaveLength(7);
     const run = (await store.getRun(runId))!;
-    expect(run.status).toBe("invalid");
-    expect(run.error).toMatch(/gap list is empty/);
-    expect((await store.listPacketChecks(runId)).map((c) => c.valid)).toEqual([false, false, false, false, false, false]);
+    expect(run.status).toBe("completed");
+    expect((await store.listPacketChecks(runId)).map((c) => c.valid)).toEqual([false, false, false, false, false]);
   });
 
   it("leaves a retracted row out of the packet", async () => {
@@ -1057,7 +1057,7 @@ describe("the two steps of a stage-1 run", () => {
     expect(StageOnePlans.of(genre, ["product_data", "competitors", "category_data"]).parallel).toEqual(["product", "competitors", "category"]);
   });
 
-  it("settles invalid when one agent's part breaks the contract, and names which", async () => {
+  it("closes the part of the one agent that left it open, under that agent's node", async () => {
     const runId = await runWith(
       byAgent({
         champion: recorded(championPart()),
@@ -1066,8 +1066,10 @@ describe("the two steps of a stage-1 run", () => {
       }),
       request({ brief: genre, nodes: ["product_data", "category_data"] }),
     );
-    expect((await store.getRun(runId))!.status).toBe("invalid");
-    expect((await store.getRun(runId))!.error).toMatch(/gap list is empty/);
+    expect((await store.getRun(runId))!.status).toBe("completed");
+    const closing = ((await store.getRun(runId))!.packet as any).gaps.filter((g: any) => g.missing.endsWith("the agent ended without finishing"));
+    expect(closing.length).toBeGreaterThan(0);
+    expect(new Set(closing.map((g: any) => g.node))).toEqual(new Set(["category_data"]));
     const ended = (await store.listEvents(runId)).filter((e) => e.kind === "agent.ended").map((e) => [e.payload.agent_id, e.payload.status]);
     expect(ended).toEqual(expect.arrayContaining([["product", "complete"], ["category", "incomplete"]]));
   });
@@ -1156,6 +1158,29 @@ describe("the two steps of a stage-1 run", () => {
     expect(run.status).toBe("completed");
     expect((run.packet as any).attributes.map((a: any) => a.key)).toEqual(["dose_per_serving"]);
     expect((await supervisor.resettleInvalidRuns())).toEqual([]);
+  });
+
+  it("re-settles an invalid run that kept a packet, once a relaxed rule no longer breaks it (run 33c8b754)", async () => {
+    const runId = (await store.createRun({ workspaceId: "admin", brief: { product: "MagnaCalm 400mg", url: "https://x", market: "UK", notes: "" }, model: "m", rejectKinds: [], judgementIds: [], nodes: ["product_data"] })).id;
+    const product = new RunFindings(store.findings, runId, "product", ["product_data"]);
+    const packet = productPacket();
+    for (const kind of ["source", "attribute", "node_status", "gap"] as const) {
+      for (const item of packet[{ source: "sources", attribute: "attributes", node_status: "nodes", gap: "gaps" }[kind]]) await product.record(kind, item);
+    }
+    await store.updateRun(runId, { status: "invalid", error: "category: ad-library source has no first_seen", packet: packet as any });
+    expect((await supervisor.resettleInvalidRuns())).toEqual([runId]);
+    expect((await store.getRun(runId))!.status).toBe("completed");
+  });
+
+  it("records a genre champion left unranked as a ranking that could not be had, and completes", async () => {
+    const { gaps: _ranked, ...unranked } = championPart();
+    const runId = await runWith(
+      byAgent({ champion: [...recorded(unranked), fauxAssistantMessage("Done.")], product: recorded(productPacket()) }),
+      request({ brief: genre, nodes: ["product_data"] }),
+    );
+    const run = (await store.getRun(runId))!;
+    expect(run.status).toBe("completed");
+    expect((run.packet as any).gaps.map((g: any) => g.missing)).toContainEqual(expect.stringMatching(/^champion ranking unavailable: champion product 'MagnaCalm Glycinate' carries no popularity evidence/));
   });
 
   it("stops every agent at once, and starts no step-2 agent after a stop", async () => {
@@ -1253,9 +1278,15 @@ describe("the Amazon listings of a completed stage-1 run", () => {
     expect(rows.find((r) => r.target_id === "c1")!.trustpilot).toBeUndefined();
   });
 
-  it("looks nothing up for a run that ended invalid", async () => {
-    const runId = await competitorsRun([...championThen({ ...packet(), gaps: [] }), fauxAssistantMessage("Done.")]);
-    expect((await store.getRun(runId))!.status).toBe("invalid");
+  it("ends invalid, not failed, when competitors are listed with no champion, keeps the packet, and looks nothing up", async () => {
+    // Grave: with no champion there is nothing to tell direct from indirect by.
+    const { sources, competitor_reference: _reference, ...rest } = packet();
+    const runId = await competitorsRun(byAgent({ champion: [...recorded({ sources }), fauxAssistantMessage("Done.")], competitors: [...recorded({ ...rest, sources: [] }), fauxAssistantMessage("Done.")] }));
+    const run = (await store.getRun(runId))!;
+    expect(run.status).toBe("invalid");
+    expect(run.error).toMatch(/competitor_reference is missing/);
+    expect((run.packet as any).competitors.length).toBeGreaterThan(0);
+    expect((await store.listEvents(runId)).map((e) => e.kind)).toContain("packet.invalid");
     expect(searches).toHaveLength(0);
   });
 

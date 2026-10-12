@@ -177,6 +177,25 @@ cmd_calls() {
     | jq '{totals, calls: [.calls[] | {seq, node, model, stopReason, tokens: .usage.totalTokens}]}'
 }
 
+cmd_library() {
+  need curl "mra library"; need jq "mra library"
+  local file="${1:-}" url="${BASE:-$LOCAL_URL}"
+  if [ -z "$file" ]; then
+    api GET "/api/research/library" | jq -r '.data[] | "\(.id)  \(.status)  \(.pages)p  \(.chars)c  \(.title)"'
+    return
+  fi
+  [ -f "$file" ] || die "no such file: $file"
+  local doc id
+  doc=$(curl -s -b "$JAR" -c "$JAR" -X POST "$url/api/research/library" -F "file=@$file;type=application/pdf")
+  id=$(jq -r '.id // empty' <<<"$doc")
+  [ -n "$id" ] || die "upload refused: $doc"
+  note "accepted $id ($(jq -r .status <<<"$doc")); following the conversion"
+  curl -s -N -b "$JAR" "$url/api/research/library/$id/events" | grep --line-buffered '^data: ' | sed -u 's/^data: //' \
+    | jq -rc 'if .kind == "page" then "page \(.page)/\(.pages)" else "\(.kind): \(.document.pages) pages, \(.document.chars) chars \(.document.error)" end'
+  note "sections, as library_read numbers them"
+  api GET "/api/research/library/$id" | jq -r .markdown | grep -E '^#{1,3} ' | head -40
+}
+
 # --- the deploy ------------------------------------------------------------
 cmd_trace() {
   need curl "mra trace"
@@ -230,6 +249,8 @@ mra — drive and inspect the research cockpit
   calls [runId]            the LLM call log, one line per turn
   trace [runId] [file]     download the run's trace: one line per function
                            and per HTTP request, each tagged with its file
+  library [file.pdf]       upload a PDF to the library, stream its conversion,
+                           print its headings; with no file, list the library
 
   deployed                 what is actually live, and what is not yet shipped
 
@@ -248,6 +269,7 @@ case "${1:-help}" in
   watch)    shift; cmd_watch "$@" ;;
   calls)    shift; cmd_calls "$@" ;;
   trace)    shift; cmd_trace "$@" ;;
+  library)  shift; cmd_library "$@" ;;
   deployed) shift; cmd_deployed "$@" ;;
   help|-h|--help) cmd_help ;;
   *) die "unknown command '$1'. Try: mra help" ;;

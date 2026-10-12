@@ -4,10 +4,12 @@ export type Route =
   | { page: 'products' }
   | { page: 'product'; productId: string; runId: string | null }
   | { page: 'logs'; runId: string }
+  | { page: 'library' }
   | { page: 'missing' };
 
 export const paths = {
   products: () => '/',
+  library: () => '/library',
   product: (productId: string) => `/products/${productId}`,
   run: (productId: string, runId: string) => `/products/${productId}/runs/${runId}`,
 };
@@ -17,6 +19,7 @@ const NAVIGATED = 'mra:navigated';
 export function parseRoute(pathname: string): Route {
   const path = pathname.replace(/\/+$/, '') || '/';
   if (path === '/') return { page: 'products' };
+  if (path === '/library') return { page: 'library' };
   const logs = path.match(/^\/runs\/([0-9a-f]+)\/logs$/);
   if (logs) return { page: 'logs', runId: logs[1] };
   const product = path.match(/^\/products\/([0-9a-f]+)(?:\/runs\/([0-9a-f]+))?$/);

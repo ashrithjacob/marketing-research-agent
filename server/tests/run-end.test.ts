@@ -57,7 +57,7 @@ async function runWithRows(status: string): Promise<string> {
 }
 
 function assembly(runId: string): StageOneRunAssembly {
-  return new StageOneRunAssembly(store.findings, runId, { brief, nodes: ["product_data"] }, async () => []);
+  return new StageOneRunAssembly(store.findings, runId, { brief, nodes: ["product_data"] });
 }
 
 describe("a run killed by a restart", () => {

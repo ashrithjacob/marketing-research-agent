@@ -56,7 +56,7 @@ export const COMPETITORS_DELIVERABLE: ListDeliverable = {
   item: "competitor",
   classes: ["direct", "indirect_form", "indirect_active"],
   parts: [
-    { key: "icp_as_printed", required: true, describe: "who its own page says it is for and what it treats, word for word" },
+    { key: "icp_as_printed", required: false, describe: "who its own page says it is for and what it treats, word for word, where the page says so" },
     { key: "form_as_printed", required: true, describe: "what the product physically is, as printed" },
     { key: "price", required: false, describe: "price and currency" },
     { key: "positioning_copy", required: false, describe: "its headline, word for word" },

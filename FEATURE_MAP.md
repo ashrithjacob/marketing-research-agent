@@ -41,13 +41,14 @@ every URL survives a reload, a bookmark and the back button.
 | `/products/:productId` | That product's dashboard, on its default run |
 | `/products/:productId/runs/:runId` | That product's dashboard, on that run |
 | `/runs/:runId/logs` | The activity log (below) |
+| `/library` | The document library (below) |
 
 Anything else renders *No page here*; an unknown product id renders the same,
 under a `no such product` banner.
 
 ## The cockpit shell (`App.tsx`)
 
-**Header.** `research cockpit` (a link to `/`), then the active run's brief as a chip and a
+**Header.** `research cockpit` (a link to `/`), a **Library** chip (a link to `/library`), then the active run's brief as a chip and a
 clock chip, then the buttons: **Step in** (ghost), **Stop** (ghost, only while a
 run is live), **Start run** (primary), a `user · workspace` chip (only when login
 is on), **Sign out** (ghost). Signed in as the admin, each run row in a product
@@ -204,7 +205,7 @@ generic gaps table:
 | Tile | Shows | Where its data comes from |
 |---|---|---|
 | Product data (open by default) | attributes, SVG bars for numeric measurements, excerpts, gaps | packet rows with `node: 'product_data'` |
-| Competitors | direct / indirect by form / indirect by active groups, one chip each, each competitor's page it was read off and its ads as citations (`run-view/cite.tsx`), each competitor's site link, the champion's actives it shares (none shown when it shares none), **for:** who its own page says it is for (`icp_as_printed`), and its Amazon listing or "not on Amazon — <why>" (`run-view/amazon-link.tsx`, also on the champion line), social-proof review-count chart, excerpts, gaps | `packet.competitors`, `measurements`, `listings` on `GET /runs/:id` (re-judged by today's matcher on each read) |
+| Competitors | direct / indirect by form / indirect by active groups, one chip each, each competitor's page it was read off and its ads as citations with the date each was first seen, or "* first seen not found" (`AdCites`, `run-view/cite.tsx`), each competitor's site link, the champion's actives it shares (none shown when it shares none), **for:** who its own page says it is for (`icp_as_printed`), and its Amazon listing or "not on Amazon — <why>" (`run-view/amazon-link.tsx`, also on the champion line), social-proof review-count chart, excerpts, gaps | `packet.competitors`, `measurements`, `listings` on `GET /runs/:id` (re-judged by today's matcher on each read) |
 | Category data | market-size/CAGR bar charts, every figure with its period, gaps | `measurements` with `node: 'category_data'` |
 | Ingredients (stage 2, `run-view/truth/IngredientsTile.tsx`) | one card per active: amount on the label (or "no amount stated"), pathway, time to effect, magnitude, a `carrier` badge on the actives the story rests on | `packet.actives`, `packet.mechanisms` |
 | Dose vs study (stage 2) | active · ours per day · studied per day · ratio · class · form match · study; an unassessable row says why | `packet.doses`, computed by `extract/dose-bands.ts` |
@@ -271,6 +272,23 @@ Same button, two endpoints. A correction that "did not take" is usually this:
 it was saved as a standing judgement because the run had already settled.
 
 ---
+
+## `/library` — the document library (`LibraryPage.tsx`, `use-library.ts`)
+
+Strategy PDFs every research agent can read. A drop zone and **Choose files**
+(PDF only, several at once), then one row per document, newest first. Design:
+`spec-always-on.md` §9.
+
+| Control | Calls | Broken looks like |
+|---|---|---|
+| (on open) | `GET /api/research/library` | `Loading library…` that never ends |
+| Drop / Choose files | `POST /api/research/library` (multipart `file`), answers `202` | red banner `<file>: only PDF files…` (415) or `…over 25 MB` (413) |
+| progress bar on a `converting` row | `GET /api/research/library/:id/events` (SSE: `page`, then `ready`/`failed`) | bar stays at 0 and the row stays `converting`: the stream is not reaching the browser |
+| Read | `GET /api/research/library/:id` | nothing opens; the markdown appears below the list in a monospace box |
+| Remove | `DELETE /api/research/library/:id` | row stays |
+
+A `failed` row shows its reason in red: `the PDF has no text layer…` (a scan),
+or `the server restarted while this was converting…`.
 
 ## `/runs/:runId/logs` — the activity log (`LogsPage.tsx`)
 

@@ -1,30 +1,22 @@
-import { CheckProblems, Briefs, type CheckProblem, type StagePacket } from "../domain/index.js";
+import { CheckProblems, Briefs, type CheckProblem, type CompetitorReference, type StagePacket } from "../domain/index.js";
 
 import type { PacketCheck, PacketContext } from "./check.js";
 import { Trace } from "../trace/index.js";
 
-/** The champion must say who its customer is, since every competitor is measured against that; and on a genre brief it must be the most-bought listing, with the ranking that proves it. */
+/** On a genre brief the champion must be the most-bought listing, with the ranking that proves it. */
 export class ChampionCheck implements PacketCheck {
   private static readonly RANKING_GAP = /champion ranking unavailable/i;
 
   problems(packet: StagePacket, context: PacketContext): CheckProblem[] {
     Trace.line(import.meta.url, "ChampionCheck.problems", { packet });
-    const reference = packet.competitor_reference;
-    const customer = reference && !reference.icp.trim()
-      ? [CheckProblems.at("competitor_reference", reference, `the champion '${reference.name}' records no icp — who its page says the product is for and the problem it solves, in its own words; every competitor is measured against it`)]
-      : [];
-    return [...customer, ...this.texts(packet, context).map(CheckProblems.of)];
+    return ChampionCheck.ranking(packet.competitor_reference, packet.gaps, context.brief).map(CheckProblems.of);
   }
 
-  private texts(packet: StagePacket, { brief }: PacketContext): string[] {
-    Trace.line(import.meta.url, "ChampionCheck.texts", { packet });
-    const reference = packet.competitor_reference;
+  /** What the champion's ranking lacks on a genre brief, unless a gap says it could not be had. */
+  static ranking(reference: CompetitorReference | null, gaps: readonly { missing: string }[], brief: PacketContext["brief"]): string[] {
+    Trace.line(import.meta.url, "ChampionCheck.ranking", { reference });
     if (!reference || !ChampionCheck.isGenreBrief(brief)) return [];
-    if (
-      packet.gaps.some((gap) => ChampionCheck.RANKING_GAP.test(gap.missing))
-    ) {
-      return [];
-    }
+    if (gaps.some((gap) => ChampionCheck.RANKING_GAP.test(gap.missing))) return [];
     const problems: string[] = [];
     if (reference.reviews_count <= 0) {
       problems.push(

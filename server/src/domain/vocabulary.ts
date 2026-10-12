@@ -30,7 +30,7 @@ export const SOURCE_KIND_NOTES: ReadonlyArray<readonly [SourceKind, string]> = [
   ["review_platform", "Trustpilot and similar"],
   ["forum", "Reddit, niche boards, Q&A sites"],
   ["video_comments", "YouTube or TikTok comments"],
-  ["ad_library", "Meta/TikTok/Google ad libraries — `first_seen` required"],
+  ["ad_library", "Meta/TikTok/Google ad libraries — `first_seen` when the ad is dated, null otherwise"],
   ["trial", "a study or trial; needs dose, form and population"],
   ["reference", "Examine, NIH fact sheets, secondary compendia"],
   ["keyword_data", "search volume and trend tooling; also market-size reports"],

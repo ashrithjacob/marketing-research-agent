@@ -1,7 +1,7 @@
 import { Hono, type Context, type Next } from "hono";
 
-import { RunSupervisor } from "../agent/index.js";
-import { ServiceClients } from "../adapters/index.js";
+import { LibraryIntake, RunSupervisor } from "../agent/index.js";
+import { MarkdownLayout, PdfMarkdown, ServiceClients } from "../adapters/index.js";
 import { AmazonListingLookup } from "../adapters/apify/index.js";
 import { Env, type Settings } from "../config/index.js";
 import type { AmazonListingSource, ResearchStore } from "../domain/index.js";
@@ -16,6 +16,7 @@ import { ResearchApi } from "./research-api.js";
 export class App {
   readonly fetch: Hono["fetch"];
   readonly supervisor: RunSupervisor;
+  readonly intake: LibraryIntake;
   readonly store: ResearchStore;
   readonly settings: Settings;
   readonly traces: TraceFile;
@@ -35,6 +36,8 @@ export class App {
     this.supervisor =
       overrides.supervisor ?? new RunSupervisor({ store: this.store, settings: this.settings, services });
 
+    this.intake = new LibraryIntake(this.store.library, new PdfMarkdown(new MarkdownLayout()));
+
     const hono = new Hono<ApiEnv>();
     hono.use("*", (c, next) => this.request(c, next));
     new AuthGate(this.settings, this.store.accounts).register(hono);
@@ -44,6 +47,7 @@ export class App {
       new ResearchApi({
         store: this.store,
         supervisor: this.supervisor,
+        intake: this.intake,
         settings: this.settings,
         traces: this.traces,
         listingSource: overrides.listingSource !== undefined ? overrides.listingSource : App.listingSource(services),
@@ -76,6 +80,7 @@ export class App {
   async close(): Promise<void> {
     Trace.line(import.meta.url, "App.close");
     await this.supervisor.close();
+    await this.intake.drain();
     await this.store.close();
   }
 }

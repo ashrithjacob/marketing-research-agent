@@ -4,8 +4,9 @@ import { Trace } from "../trace/index.js";
 
 import type { Assembled, RunAssembly } from "./run-assembly.js";
 import { RowRepair } from "./row-repair.js";
+import { StageOneParts } from "./stage-one-parts.js";
 
-/** The stage-1 packet, built from every agent's rows and checked against the run's scope; a row that breaks a check or the schema is retracted into a gap, and the rest is kept. */
+/** The stage-1 packet, built from every agent's rows and checked against the run's scope: a row that breaks a check or the schema is retracted into a gap, a part its agent left open is closed with gaps, and the rest is kept. */
 export class StageOneRunAssembly implements RunAssembly {
   readonly via = "ledger";
 
@@ -13,13 +14,16 @@ export class StageOneRunAssembly implements RunAssembly {
     private readonly ledger: FindingLedger,
     readonly runId: string,
     private readonly run: { brief: Brief; nodes: readonly Node[] },
-    private readonly partProblems: () => Promise<readonly CheckProblem[]>,
   ) {}
 
   async assemble(): Promise<Assembled> {
     Trace.line(import.meta.url, "StageOneRunAssembly.assemble", { runId: this.runId });
-    const all = async () => [...(await this.partProblems()), ...(await this.inspect()).problems];
-    const retracted = await new RowRepair(this.ledger, this.runId, this.run.nodes).repair(all, "when the run settled");
+    const parts = new StageOneParts(this.ledger, this.runId, this.run);
+    const all = async () => [...(await parts.problems()), ...(await this.inspect()).problems];
+    const repair = new RowRepair(this.ledger, this.runId, this.run.nodes);
+    const retracted = await repair.repair(all, "when the run settled");
+    await parts.close();
+    retracted.push(...(await repair.repair(all, "when the run settled")));
     const empty = Findings.live(await this.ledger.list(this.runId)).length === 0;
     return { packet: empty ? null : (await this.inspect()).packet, problems: CheckProblems.texts(await all()), retracted };
   }

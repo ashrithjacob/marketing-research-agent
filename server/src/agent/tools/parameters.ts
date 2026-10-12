@@ -62,3 +62,10 @@ export const adSearchParameters = Type.Object({
   ),
   max_results: Type.Optional(Type.Number({ description: "How many ads to return (default 10, max 20). Each costs one credit." })),
 });
+
+export const libraryIndexParameters = Type.Object({});
+
+export const libraryReadParameters = Type.Object({
+  document_id: Type.String({ description: "The document's id, from library_index." }),
+  section: Type.Number({ description: "The section's number, from library_index." }),
+});

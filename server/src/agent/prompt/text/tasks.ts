@@ -10,8 +10,8 @@ most-bought product on Amazon. The other agents all measure against it.
 3. \`record_source\` the page you read. Then \`record_reference\`: name, \`form\` (one of {forms}),
    actives (\`name_normalised\` lowercase, one accepted synonym), \`icp\`,
    \`source_id\` of that page, \`reviews_count\`, \`runner_up_name\`,
-   \`runner_up_reviews\`, \`amazon_url\`. \`icp\` is the customer: who the page
-   says the product is for and the problem it solves, in its own words.
+   \`runner_up_reviews\`, \`amazon_url\`. \`icp\` is the customer: who the product is for and the problem it
+   solves, in the page's words where it says so, otherwise as the page implies.
 4. If \`amazon_find_product\` is missing or fails: \`record_gap\` with missing
    "champion ranking unavailable: <why>", and pick the champion from the best
    evidence you can fetch.
@@ -26,8 +26,8 @@ all measure against it.
 
 1. \`web_fetch\` the brief's url and \`record_source\` it. Read off the product's
    name as the page writes it, its \`form\` (one of {forms}), its actives, and its
-   \`icp\`: who the page says the product is for and the problem it solves, in
-   its own words.
+   \`icp\`: who the product is for and the problem it solves, in the page's
+   words where it says so, otherwise as the page implies.
 2. \`amazon_find_product\` with the brand and product name. A listing that is the
    same product (same brand, same form) gives \`amazon_url\` and \`reviews_count\`.
    If none is, \`amazon_url\` is "" and \`reviews_count\` is 0.
@@ -153,14 +153,14 @@ How to work:
    (a pick from that list, never its own wording), or [] when it shares none,
    which makes it indirect_active;
    \`icp_as_printed\` — who its own page says it is for and what it treats, word
-   for word; \`relation\` — its kind above, checked against \`shared_actives\`
+   for word, or "" when the page never says; \`relation\` — its kind above, checked against \`shared_actives\`
    and the forms; \`dose_per_serving\`, \`price\`, \`price_per_dose\`;
    \`positioning_copy\` — its headline, word for word; \`market\` exactly as the
    brief's Markets line names it. A brand sold only outside those markets is
    out of scope. Where both forms are \`other\`, your \`relation\` stands, and
    \`form_as_printed\` must say specifically what each product is.
 3. Ads: a competitor's ad is an \`ad_library\` source with \`first_seen\` (null
-   plus a gap when undated), linked from the competitor's \`ad_source_ids\`.
+   when undated), linked from the competitor's \`ad_source_ids\`.
    \`ad_library_search\` by its domain (\`search_in\` "domain") finds them.
 4. Stop per kind: a kind is done when this many sources in a row surface no new
    brand of that kind — {stop}. \`record_saturation\` once per kind, \`class\`

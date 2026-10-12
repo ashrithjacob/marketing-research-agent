@@ -169,6 +169,33 @@ classDiagram
       name()
       live()
     }
+    class LibraryDocument {
+      <<interface>>
+    }
+    class ConvertedDocument {
+      <<interface>>
+    }
+    class DocumentSection {
+      <<interface>>
+    }
+    class DocumentLibrary {
+      <<interface>>
+      add()
+      finish()
+      fail()
+      failConverting()
+      list()
+      get()
+      markdown()
+      delete()
+    }
+    class DocumentConverter {
+      <<interface>>
+      convert()
+    }
+    class DocumentSections {
+      of()
+    }
     class RunEvent {
       <<interface>>
     }
@@ -437,6 +464,7 @@ classDiagram
     }
     class ChampionCheck {
       problems()
+      ranking()
     }
     class PacketContext {
       <<interface>>
@@ -642,6 +670,12 @@ classDiagram
       withTimeout()
       pool()
     }
+    class PrintedLine {
+      <<interface>>
+    }
+    class MarkdownLayout {
+      render()
+    }
     class MeteredWebSearch {
       find()
     }
@@ -694,6 +728,12 @@ classDiagram
     }
     class ParallelTask {
       run()
+    }
+    class TextPiece {
+      <<interface>>
+    }
+    class PdfMarkdown {
+      convert()
     }
     class RateLimitWait {
       askedMs()
@@ -755,6 +795,16 @@ classDiagram
     }
     class CompetitorKinds {
       apply()
+    }
+    class DocumentTable {
+      add()
+      finish()
+      fail()
+      failConverting()
+      list()
+      get()
+      markdown()
+      delete()
     }
     class EventLog {
       add()
@@ -952,7 +1002,6 @@ classDiagram
     }
     class AgentTeam {
       run()
-      partProblems()
       written()
       output()
     }
@@ -994,6 +1043,16 @@ classDiagram
     }
     class InvalidRunResettle {
       resettleAll()
+    }
+    class LiveConversion {
+      <<interface>>
+    }
+    class LibraryIntake {
+      accept()
+      subscribe()
+      settled()
+      recover()
+      drain()
     }
     class LimitClosed {
       <<interface>>
@@ -1039,6 +1098,12 @@ classDiagram
     }
     class OperatorInputs {
       record()
+    }
+    class CloseReason {
+      <<interface>>
+    }
+    class PartClose {
+      close()
     }
     class ModelPricing {
       apply()
@@ -1258,6 +1323,10 @@ classDiagram
     class StageOneListings {
       lookUp()
     }
+    class StageOneParts {
+      problems()
+      close()
+    }
     class StageOneRunAssembly {
       assemble()
     }
@@ -1309,6 +1378,11 @@ classDiagram
     }
     class LedgerToolset {
       build()
+    }
+    class LibraryTools {
+      index()
+      read()
+      forWorkspace()
     }
     class BuiltTool {
       <<interface>>
@@ -1367,6 +1441,9 @@ classDiagram
       mount()
     }
     class JudgementRoutes {
+      register()
+    }
+    class LibraryRoutes {
       register()
     }
     class LoginThrottle {
@@ -1441,6 +1518,7 @@ classDiagram
   ParallelExtract --> ParallelApi
   ParallelSearch --> ParallelApi
   ParallelTask --> ParallelApi
+  PdfMarkdown --> MarkdownLayout
   RunBilling --> OpenRouterPrices
   ServiceClients --> PageFetcher
   ServiceClients --> WebSearch
@@ -1453,6 +1531,7 @@ classDiagram
   ChargeTable --> SqlDatabase
   PacketCheckLog --> SqlDatabase
   CompetitorKinds --> SqlDatabase
+  DocumentTable --> SqlDatabase
   EventLog --> SqlDatabase
   FindingTable --> SqlDatabase
   JudgementTable --> SqlDatabase
@@ -1498,12 +1577,16 @@ classDiagram
   AgentEventRecorder --> ToolSteps
   InvalidRunResettle --> ResearchStore
   InvalidRunResettle --> LiveRuns
+  LibraryIntake --> DocumentLibrary
+  LibraryIntake --> DocumentConverter
   LimitClose --> RunFindings
   LimitClose --> RowRepair
   LimitClose --> DoneCheck
   LimitClose --> DeliverableCheck
   LiveRuns --> ResearchStore
   OperatorInputs --> FindingLedger
+  PartClose --> RunFindings
+  PartClose --> DeliverableCheck
   ModelPricing --> OpenRouterPrices
   ProductTruthRunAssembly --> FindingLedger
   ProductTruthRun --> ResearchAgentFactory
@@ -1558,8 +1641,8 @@ classDiagram
   StageOneListings --> TargetListings
   StageOneListings --> ActorRunner
   StageOneListings --> PageFetcher
+  StageOneParts --> FindingLedger
   StageOneRunAssembly --> FindingLedger
-  StageOneRunAssembly --> CheckProblem
   AdLibraryTool --> AdLibrary
   AdLibraryTool --> Corpus
   DiscoverCompetitorsTool --> CompetitorDiscovery
@@ -1575,6 +1658,7 @@ classDiagram
   RecordTool --> RunFindings
   RetractTool --> RunFindings
   LedgerToolset --> LedgerOptions
+  LibraryTools --> DocumentLibrary
   ToolRegistry --> ServiceClients
   ToolRegistry --> Settings
   WebFetchTool --> Settings
@@ -1604,6 +1688,8 @@ classDiagram
   EventStream --> ResearchStore
   EventStream --> RunSupervisor
   JudgementRoutes --> ResearchStore
+  LibraryRoutes --> DocumentLibrary
+  LibraryRoutes --> LibraryIntake
   ProductRoutes --> ResearchStore
   ResearchApi --> AmazonListingSource
   ReviewAnalysisRoutes --> ResearchStore
@@ -1642,6 +1728,7 @@ classDiagram
 | `adapters` | `adapters/fetch-gate.ts` | OpenRouterGate |
 | `adapters` | `adapters/firecrawl.ts` | FirecrawlPayload, Firecrawl |
 | `adapters` | `adapters/http.ts` | Http |
+| `adapters` | `adapters/markdown-layout.ts` | PrintedLine, MarkdownLayout |
 | `adapters` | `adapters/metered.ts` | MeteredWebSearch, MeteredPageFetcher, MeteredAdLibrary, MeteredDiscovery |
 | `adapters` | `adapters/openrouter-generation.ts` | OpenRouterGeneration |
 | `adapters` | `adapters/openrouter-prices.ts` | OpenRouterPrices |
@@ -1650,6 +1737,7 @@ classDiagram
 | `adapters` | `adapters/parallel-extract.ts` | ExtractResult, ExtractError, ParallelExtract |
 | `adapters` | `adapters/parallel-search.ts` | ParallelUsage, ParallelResult, ParallelSearch |
 | `adapters` | `adapters/parallel-task.ts` | ParallelTask |
+| `adapters` | `adapters/pdf-markdown.ts` | TextPiece, PdfMarkdown |
 | `adapters` | `adapters/rate-limit-wait.ts` | RateLimitWait |
 | `adapters` | `adapters/rates.ts` | Rates, Pricing, Billed, Money |
 | `adapters` | `adapters/run-billing.ts` | RunBilling |
@@ -1660,6 +1748,7 @@ classDiagram
 | `adapters` | `adapters/store/charge-table.ts` | ChargeTable |
 | `adapters` | `adapters/store/check-log.ts` | PacketCheckLog |
 | `adapters` | `adapters/store/competitor-kinds.ts` | CompetitorKinds |
+| `adapters` | `adapters/store/document-table.ts` | DocumentTable |
 | `adapters` | `adapters/store/event-log.ts` | EventLog |
 | `adapters` | `adapters/store/finding-table.ts` | FindingTable |
 | `adapters` | `adapters/store/judgement-table.ts` | JudgementTable |
@@ -1699,12 +1788,14 @@ classDiagram
 | `agent` | `agent/event-recorder.ts` | TurnEnd, AgentEventRecorder |
 | `agent` | `agent/frames.ts` | EventFrame, Frames |
 | `agent` | `agent/invalid-run-resettle.ts` | InvalidRunResettle |
+| `agent` | `agent/library/library-intake.ts` | LiveConversion, LibraryIntake |
 | `agent` | `agent/limit-close.ts` | LimitClosed, LimitClose |
 | `agent` | `agent/listing-match.ts` | ListingMatch |
 | `agent` | `agent/live-runs.ts` | RunControl, Live, LiveRuns |
 | `agent` | `agent/llm-call-log.ts` | CallSequence, LlmCallLog |
 | `agent` | `agent/model-chain.ts` | ModelChain |
 | `agent` | `agent/operator-inputs.ts` | OperatorInputs |
+| `agent` | `agent/part-close.ts` | CloseReason, PartClose |
 | `agent` | `agent/pricing.ts` | ModelPricing |
 | `agent` | `agent/product-truth-run-assembly.ts` | ProductTruthRunAssembly |
 | `agent` | `agent/product-truth-run.ts` | ProductTruthBrief, ProductTruthRun |
@@ -1746,6 +1837,7 @@ classDiagram
 | `agent` | `agent/run-wrap-up.ts` | RunWrapUp |
 | `agent` | `agent/stage-one-handoff.ts` | StageOneHandoff |
 | `agent` | `agent/stage-one-listings.ts` | StageOneListings |
+| `agent` | `agent/stage-one-parts.ts` | StageOneParts |
 | `agent` | `agent/stage-one-run-assembly.ts` | StageOneRunAssembly |
 | `agent` | `agent/stage-one-run.ts` | StageOneRun |
 | `agent` | `agent/stored-run-assembly.ts` | StoredRunAssembly |
@@ -1759,6 +1851,7 @@ classDiagram
 | `agent` | `agent/tools/ledger-read-tools.ts` | LedgerRows, ReadLedgerTool, WaitForTool |
 | `agent` | `agent/tools/ledger-tools.ts` | RecordTool, RetractTool |
 | `agent` | `agent/tools/ledger-toolset.ts` | LedgerOptions, LedgerToolset |
+| `agent` | `agent/tools/library-tools.ts` | LibraryTools |
 | `agent` | `agent/tools/registry.ts` | BuiltTool, ToolContext, ToolRegistry |
 | `agent` | `agent/tools/traced-tool.ts` | TracedTool |
 | `agent` | `agent/tools/web-fetch-tool.ts` | WebFetchTool |
@@ -1776,6 +1869,7 @@ classDiagram
 | `domain` | `domain/cost-report.ts` | CostCell, CostRow, CostReport |
 | `domain` | `domain/deliverable.ts` | FieldSpec, ItemPart, ItemNeed, FieldsDeliverable, ListDeliverable, OneMarked, PerItemDeliverable, Deliverables |
 | `domain` | `domain/findings.ts` | FindingDraft, Finding, Findings |
+| `domain` | `domain/library.ts` | LibraryDocument, ConvertedDocument, DocumentSection, DocumentLibrary, DocumentConverter, DocumentSections |
 | `domain` | `domain/logs.ts` | RunEvent, Judgement, PacketCheck, RunUpdate, LlmCallRecord, Generation, LlmCall |
 | `domain` | `domain/nodes.ts` | Stages |
 | `domain` | `domain/packet-rows.ts` | PacketRowSet, PacketRows |
@@ -1833,6 +1927,7 @@ classDiagram
 | `http` | `http/event-stream.ts` | EventStream |
 | `http` | `http/frontend.ts` | Frontend |
 | `http` | `http/judgement-routes.ts` | JudgementRoutes |
+| `http` | `http/library-routes.ts` | LibraryRoutes |
 | `http` | `http/login-throttle.ts` | LoginThrottle |
 | `http` | `http/passwords.ts` | Passwords |
 | `http` | `http/product-routes.ts` | ProductRoutes |

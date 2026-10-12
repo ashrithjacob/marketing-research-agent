@@ -32,3 +32,4 @@ export * from "./deliverable.js";
 export * from "./role-deliverables.js";
 export * from "./research-roles.js";
 export * from "./role-records.js";
+export * from "./library.js";

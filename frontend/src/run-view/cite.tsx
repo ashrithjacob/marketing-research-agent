@@ -59,3 +59,22 @@ export function Cites({ runId, ids, sources }: { runId: string; ids: readonly st
     </>
   );
 }
+
+/** A competitor's ads, each with the date it was first seen, or an asterisk where the ad library gave none. */
+export function AdCites({ runId, ids, sources }: { runId: string; ids: readonly string[]; sources: Source[] }) {
+  const undated = ids.some((id) => !sources.find((s) => s.id === id)?.first_seen);
+  return (
+    <>
+      {ids.map((id) => {
+        const firstSeen = sources.find((s) => s.id === id)?.first_seen;
+        return (
+          <span key={id} className="ad-cite">
+            <Cite runId={runId} id={id} sources={sources} />
+            {firstSeen ? <span className="muted"> since {firstSeen}</span> : <span className="muted" title="first seen not found">*</span>}
+          </span>
+        );
+      })}
+      {undated && <span className="muted ad-note">* first seen not found</span>}
+    </>
+  );
+}

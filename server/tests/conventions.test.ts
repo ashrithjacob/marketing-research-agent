@@ -328,6 +328,26 @@ describe("app-domain", () => {
     git("-c", "user.email=t@t", "-c", "user.name=t", "commit", "-m", "x");
     expect(rules()).not.toContain("app-domain");
   });
+
+  it("allows chat.vanis.ai in a paragraph that says it is agentchat, and only there", () => {
+    // spec-platform-move.md: "It keeps serving agentchat (`chat.vanis.ai`)", and a DNS
+    // cutover step whose list names chat.vanis.ai around "agentchat and its Caddy TLS are untouched".
+    write("README.md", "It keeps serving agentchat (`chat.vanis.ai`)\n\nwith `chat.vanis.ai` DNS-only\nagentchat is untouched\nconfirm with dig chat.vanis.ai\n");
+    git("add", "-A");
+    git("-c", "user.email=t@t", "-c", "user.name=t", "commit", "-m", "x");
+    expect(rules()).not.toContain("app-domain");
+    write("README.md", "agentchat runs on the VPS\n\nLive at https://chat.vanis.ai\n");
+    git("add", "-A");
+    git("-c", "user.email=t@t", "-c", "user.name=t", "commit", "-m", "x");
+    expect(rules()).toContain("app-domain");
+  });
+
+  it("still catches research.vanis.ai beside agentchat: that name was never agentchat's", () => {
+    write("README.md", "agentchat runs beside it\nThis app lives at research.vanis.ai\n");
+    git("add", "-A");
+    git("-c", "user.email=t@t", "-c", "user.name=t", "commit", "-m", "x");
+    expect(rules()).toContain("app-domain");
+  });
 });
 
 describe("no-secrets", () => {

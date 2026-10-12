@@ -12,3 +12,4 @@ export * from "./ledger-toolset.js";
 export * from "./traced-tool.js";
 export * from "./evidence-search-tool.js";
 export * from "./ledger-read-tools.js";
+export * from "./library-tools.js";

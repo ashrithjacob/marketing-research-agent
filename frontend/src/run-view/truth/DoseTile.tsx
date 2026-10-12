@@ -1,6 +1,7 @@
 import type { DoseClass, Gap, ProductTruthPacket } from '../../api';
 import { Chip, Tile, TileGaps } from '../tile';
 import { Cite } from '../cite';
+import { Fold, FoldCard } from '../fold';
 
 const CLASS_LABEL: Record<DoseClass, string> = {
   at_dose: 'at dose',
@@ -10,6 +11,10 @@ const CLASS_LABEL: Record<DoseClass, string> = {
 };
 
 const CLASS_TONE: Record<DoseClass, string> = { at_dose: 'accent', partial: 'warn', under_dose: 'warn', unassessable: 'dim' };
+
+function amount(value: number | null, unit: string): string {
+  return value === null ? '—' : `${value} ${unit}`;
+}
 
 /** Our daily dose against the studied daily dose, per active, with the class code computed from the ratio. */
 export function DoseTile({ runId, packet, gaps }: { runId: string; packet: ProductTruthPacket; gaps: Gap[] }) {
@@ -23,32 +28,29 @@ export function DoseTile({ runId, packet, gaps }: { runId: string; packet: Produ
       defaultOpen
     >
       {regimen && (
-        <p className="muted small">
-          Daily dose = amount per serving × {regimen.servings_per_day ?? '?'} servings a day
-          {regimen.directions_as_printed ? ` (“${regimen.directions_as_printed}”)` : ''}.
-        </p>
+        <div className="kv">
+          <Fold label="how the daily dose is computed" preview={`amount per serving × ${regimen.servings_per_day ?? '?'} servings a day`}>
+            Amount per serving × {regimen.servings_per_day ?? '?'} servings a day.
+            {regimen.directions_as_printed && <div className="muted small">“{regimen.directions_as_printed}”</div>}
+          </Fold>
+        </div>
       )}
-      <table className="pt-table">
-        <thead>
-          <tr><th>Active</th><th>Ours / day</th><th>Studied / day</th><th>Ratio</th><th>Class</th><th>Form match</th><th>Study</th></tr>
-        </thead>
-        <tbody>
-          {packet.doses.map((d) => (
-            <tr key={d.active}>
-              <td>{d.active}</td>
-              <td>{d.our_daily_dose === null ? '—' : `${d.our_daily_dose} ${d.unit}`}</td>
-              <td>{d.studied_daily_dose === null ? '—' : `${d.studied_daily_dose} ${d.unit}`}</td>
-              <td>{d.ratio ?? '—'}</td>
-              <td>
-                <span className={`tile-chip ${CLASS_TONE[d.class]}`}>{CLASS_LABEL[d.class]}</span>
-                {d.class === 'unassessable' && <div className="small muted">{d.why}</div>}
-              </td>
-              <td className="small">{d.form_match || '—'}{d.studied_form ? ` (${d.studied_form})` : ''}</td>
-              <td className="small">{d.study ? <>{d.study} <Cite runId={runId} id={d.source_id} sources={packet.sources} /></> : '—'}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <div className="pt-cards">
+        {packet.doses.map((d) => (
+          <FoldCard
+            key={d.active}
+            title={d.active}
+            chips={<span className={`tile-chip ${CLASS_TONE[d.class]}`}>{CLASS_LABEL[d.class]}</span>}
+            glance={`ours ${amount(d.our_daily_dose, d.unit)} / day · studied ${amount(d.studied_daily_dose, d.unit)} / day · ratio ${d.ratio ?? '—'}`}
+          >
+            {d.class === 'unassessable' && <Fold label="why unassessable" preview={d.why} />}
+            <Fold label="form match" preview={`${d.form_match || '—'}${d.studied_form ? ` (${d.studied_form})` : ''}`} />
+            <Fold label="study" preview={d.study || 'no study found'}>
+              {d.study ? <>{d.study} <Cite runId={runId} id={d.source_id} sources={packet.sources} /></> : 'no study found'}
+            </Fold>
+          </FoldCard>
+        ))}
+      </div>
       <TileGaps gaps={gaps} />
     </Tile>
   );

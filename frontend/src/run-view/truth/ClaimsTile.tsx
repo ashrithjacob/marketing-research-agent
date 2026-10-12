@@ -1,6 +1,7 @@
 import type { Gap, ProductTruthPacket } from '../../api';
 import { Chip, Tile, TileGaps } from '../tile';
 import { Cite } from '../cite';
+import { Fold, FoldCard, Lines } from '../fold';
 
 const PLATFORM: Record<string, string> = { meta: 'Meta', google_ads: 'Google Ads' };
 
@@ -14,26 +15,29 @@ export function ClaimsTile({ runId, packet, gaps }: { runId: string; packet: Pro
       defaultOpen
     >
       <p className="warn small">{packet.guard}</p>
-      {packet.claim_limits.map((c) => (
-        <div key={`${c.market}-${c.platform}`} className="pt-claims">
-          <h3>
-            {c.market} · {PLATFORM[c.platform] ?? c.platform}
-          </h3>
-          <div className="small">Sources: {c.source_ids.map((id) => <Cite key={id} runId={runId} id={id} sources={packet.sources} />)}</div>
-          {c.disclaimers.length > 0 && <div className="small muted">Disclaimers: {c.disclaimers.join(' · ')}</div>}
-          <div className="small muted">Evidence standard: {c.evidence_standard}</div>
-          <div className="pt-columns">
-            <div>
-              <div className="pt-col-head ok">Permitted</div>
-              <ul>{c.permitted.map((line) => <li key={line}>{line}</li>)}</ul>
-            </div>
-            <div>
-              <div className="pt-col-head bad">Forbidden</div>
-              <ul>{c.forbidden.map((line) => <li key={line}>{line}</li>)}</ul>
-            </div>
-          </div>
-        </div>
-      ))}
+      <div className="pt-cards">
+        {packet.claim_limits.map((c) => (
+          <FoldCard
+            key={`${c.market}-${c.platform}`}
+            title={`${c.market} · ${PLATFORM[c.platform] ?? c.platform}`}
+            glance={`${c.permitted.length} permitted · ${c.forbidden.length} forbidden · ${c.source_ids.length} sources`}
+          >
+            <Fold label="permitted" preview={c.permitted.join(' · ') || 'none recorded'} tone="ok">
+              <Lines lines={c.permitted} />
+            </Fold>
+            <Fold label="forbidden" preview={c.forbidden.join(' · ') || 'none recorded'} tone="bad">
+              <Lines lines={c.forbidden} />
+            </Fold>
+            <Fold label="disclaimers" preview={c.disclaimers.join(' · ') || 'none recorded'}>
+              <Lines lines={c.disclaimers} />
+            </Fold>
+            <Fold label="evidence standard" preview={c.evidence_standard} />
+            <Fold label="sources" preview={`${c.source_ids.length} pages`}>
+              {c.source_ids.map((id) => <Cite key={id} runId={runId} id={id} sources={packet.sources} />)}
+            </Fold>
+          </FoldCard>
+        ))}
+      </div>
       <TileGaps gaps={gaps} />
     </Tile>
   );

@@ -115,9 +115,14 @@ describe("ListCheck", () => {
   });
 
   it("names a competitor missing a required part, tied to its row; an optional part may be empty", () => {
-    const item = row("competitor", { node: "competitors", id: "c4", name: "Herbify", form_as_printed: "drops", icp_as_printed: "", price: "" });
+    const item = row("competitor", { node: "competitors", id: "c4", name: "Herbify", form_as_printed: "", icp_as_printed: "", price: "" });
     const open = competitors.missing([item, curve("direct", [0, 0, 0]), ...saturated]);
-    expect(open).toEqual([{ key: "competitor c4", text: "competitor 'Herbify' has no icp_as_printed — record who its own page says it is for and what it treats, word for word", row: { kind: "competitor", key: "c4" } }]);
+    expect(open).toEqual([{ key: "competitor c4", text: "competitor 'Herbify' has no form_as_printed — record what the product physically is, as printed", row: { kind: "competitor", key: "c4" } }]);
+  });
+
+  it("leaves icp_as_printed empty when the competitor's page never says who it is for", () => {
+    const item = row("competitor", { node: "competitors", id: "c4", name: "Herbify", form_as_printed: "drops", icp_as_printed: "" });
+    expect(competitors.missing([item, curve("direct", [0, 0, 0]), ...saturated])).toEqual([]);
   });
 });
 

@@ -230,9 +230,9 @@ the rejected kinds), standing judgements, the brief, and for step 2 the champion
 
 | Agent | Records | Task | Done when |
 |---|---|---|---|
-| `champion` | source, reference, gap | genre brief: `amazon_find_product` with the genre, the most-reviewed listing is the champion and the next is the runner-up; read its page, `record_reference` with the ranking and `amazon_url`. Url brief: fetch the site, then `amazon_find_product` for its Amazon listing | `RoleDone`: a reference recorded (or gapped — its deliverable), then `ChampionContract`: citing a source it recorded, with an `icp`, and for a genre brief the ranking `ChampionCheck` demands (or a "champion ranking unavailable" gap) |
+| `champion` | source, reference, gap | genre brief: `amazon_find_product` with the genre, the most-reviewed listing is the champion and the next is the runner-up; read its page, `record_reference` with the ranking and `amazon_url`. Url brief: fetch the site, then `amazon_find_product` for its Amazon listing | `RoleDone`: a reference recorded (or gapped — its deliverable), then `ChampionContract`: citing a source it recorded, and for a genre brief the ranking `ChampionCheck` demands (or a "champion ranking unavailable" gap) |
 | `product` | source, attribute, node status, gap | the ten required fields of `PRODUCT_DELIVERABLE` (`domain/role-deliverables.ts`), one attribute each, from the product page, its Shopify `.json`, FAQ and policy pages; other facts may follow as attributes with their own key, never instead of the ten | `RoleDone`: every one of the ten recorded or gapped as "<key>: <why>" (`FieldsCheck`), and its rows pass the contract for `product_data` (`NodeContract`) |
-| `competitors` | source, competitor, saturation, node status, gap | the direct/indirect search of §2c, measured against the champion row | `RoleDone`; `NodeContract` over its own rows **plus the champion's**; each competitor with `icp_as_printed` and `form_as_printed` (refused at write time without them), and each class's curve ending in three sources in a row adding nothing, or a gap "saturation: <class>: <why>" (`ListCheck`, `extract/list-check.ts`, from `COMPETITORS_DELIVERABLE`) |
+| `competitors` | source, competitor, saturation, node status, gap | the direct/indirect search of §2c, measured against the champion row | `RoleDone`; `NodeContract` over its own rows **plus the champion's**; each competitor with `form_as_printed` (refused at write time without it; `icp_as_printed` may be empty since 2026-10-04), and each class's curve ending in three sources in a row adding nothing, or a gap "saturation: <class>: <why>" (`ListCheck`, `extract/list-check.ts`, from `COMPETITORS_DELIVERABLE`) |
 | `category` | source, measurement, attribute, node status, gap | `search_volume` (rows for three or more years), `category_size: <segment>`, `seasonality`; two failed routes to a field and it is gapped; other category facts may follow, never instead of the three | `RoleDone`: all three recorded or gapped, the trend three distinct years (`FieldsCheck`), then `NodeContract` |
 
 **The required fields are enforced, not only asked for.** They are declared once,
@@ -471,7 +471,6 @@ last agent has ended:
      the packet may not itself be a url: the name is what the run was for;
    - every `source_id` cited by an excerpt, measurement, attribute or saturation
      point exists in `sources`;
-   - an admitted `ad_library` source with no `first_seen` needs a `competitors` gap;
    - `review_mining` marked complete needs at least one 3★ excerpt;
    - `gaps` must not be empty;
    - `competitors` marked complete needs a saturation curve per kind:
@@ -660,9 +659,7 @@ competitor of an adult skin-fold cream with zinc oxide; a skin-fold soap with no
 ingredient in common is. Before that day a competitor had to share an active, and
 a brand with a different one was gapped as "same problem, different active".
 
-Code checks what it can: the champion's `icp` and each competitor's
-`icp_as_printed` are non-empty (`CompetitorIcp`, refused at `record_competitor`
-and again at `finish`), `shared_actives` are picks from the champion's list
+Code checks what it can: `shared_actives` are picks from the champion's list
 (possibly none), and `relation` agrees with the forms. Whether the two customers
 match is the agent's call, with both quotes on the row.
 
@@ -1261,6 +1258,42 @@ What the start modal needs to warn you before you pay for a run.
 
 - **In:** the id.
 - **Out:** `{"ok": true}` — a hard delete, and also `ok` for an id that did not exist.
+
+### Library — `http/library-routes.ts`, behind the session check
+
+Scoped like runs: the caller's workspace, or every workspace for the admin.
+Design and conversion details: `spec-always-on.md` §9.
+
+#### `GET /api/research/library`
+
+- **Out:** `{"data": [LibraryDocument, ...]}`, newest first, where a `LibraryDocument` is
+  `{"id", "workspace_id", "title", "filename", "status": "converting"|"ready"|"failed", "pages", "chars", "error", "created_at", "updated_at"}`.
+  No markdown.
+
+#### `POST /api/research/library`
+
+- **In:** multipart, the PDF as field `file`.
+- **Out:** `202` and the `LibraryDocument`, `status: "converting"`. The conversion
+  runs in the background (`LibraryIntake`).
+- **Errors:** `400` no `file` field; `413` over `MRA_LIBRARY_MAX_MB`; `415` the
+  bytes do not start with `%PDF-`.
+
+#### `GET /api/research/library/:documentId`
+
+- **Out:** the `LibraryDocument` plus `"markdown"` (empty until `ready`). `404` outside the workspace.
+
+#### `GET /api/research/library/:documentId/events` — Server-Sent Events
+
+- While converting: the page reached so far (`event: page`,
+  `{"kind":"page","page":3,"pages":18}`), then one per page, then
+  `event: ready` or `event: failed` with `{"kind", "document"}`, and the stream ends.
+  A follower that connects late gets the latest page first, so it never waits on
+  pages already read.
+- Already settled: one `ready` or `failed` frame, and the stream ends.
+
+#### `DELETE /api/research/library/:documentId`
+
+- **Out:** `{"ok": true}`; `404` for an id not in the workspace.
 
 ### Everything else — `http/frontend.ts`'s `Frontend`
 

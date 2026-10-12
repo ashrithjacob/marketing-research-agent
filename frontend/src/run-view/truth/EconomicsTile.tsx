@@ -1,6 +1,7 @@
 import type { Gap, ProductTruthPacket } from '../../api';
 import { Chip, Tile, TileGaps } from '../tile';
 import { Cite } from '../cite';
+import { Fold, FoldCard } from '../fold';
 
 function percent(value: number | null): string {
   return value === null ? '—' : `${(value * 100).toFixed(1)}%`;
@@ -11,6 +12,7 @@ export function EconomicsTile({ runId, packet, gaps }: { runId: string; packet: 
   const { economics } = packet;
   const op = economics.operator;
   const churn = economics.churn;
+  const churnFlag = churn.mismatch === null ? 'not assessable' : churn.mismatch ? 'yes' : 'no';
   return (
     <Tile
       label="Economics"
@@ -25,40 +27,31 @@ export function EconomicsTile({ runId, packet, gaps }: { runId: string; packet: 
       defaultOpen
     >
       <div className="kv">
-        <div className="kv-row"><span className="k">days of supply</span><span className="v">{economics.days_of_supply ?? '—'} · {economics.days_why}</span></div>
-        {churn.carriers.map((c) => (
-          <div key={c.active} className="kv-row">
-            <span className="k">{c.active} works in</span>
-            <span className={`v ${c.runs_out_first ? 'churn-bad' : ''}`}>
-              {c.time_to_effect_days === null ? 'no time to effect stated' : `${c.time_to_effect_days} days`}
-              {c.runs_out_first ? ' — the container runs out first' : ''}
-            </span>
-          </div>
-        ))}
-        <div className="kv-row">
-          <span className="k">churn flag</span>
-          <span className={`v ${churn.mismatch ? 'churn-bad' : ''}`}>{churn.mismatch === null ? 'not assessable' : churn.mismatch ? 'yes' : 'no'} — {churn.why}</span>
-        </div>
-        <div className="kv-row">
-          <span className="k">landed unit cost</span>
-          <span className="v">{op?.landed_unit_cost != null ? `${op.landed_unit_cost} ${op.currency}` : 'not entered'} · MOQ {op?.moq ?? 'not entered'} · lead time {op?.lead_time_days != null ? `${op.lead_time_days} days` : 'not entered'}</span>
-        </div>
+        <Fold label="days of supply" preview={`${economics.days_of_supply ?? '—'} · ${economics.days_why}`} />
+        {churn.carriers.map((c) => {
+          const works = `${c.time_to_effect_days === null ? 'no time to effect stated' : `${c.time_to_effect_days} days`}${c.runs_out_first ? ' — the container runs out first' : ''}`;
+          return <Fold key={c.active} label={`${c.active} works in`} preview={works} tone={c.runs_out_first ? 'churn-bad' : undefined} />;
+        })}
+        <Fold label="churn flag" preview={`${churnFlag} — ${churn.why}`} tone={churn.mismatch ? 'churn-bad' : undefined} />
+        <Fold
+          label="operator costs"
+          preview={`landed unit cost ${op?.landed_unit_cost != null ? `${op.landed_unit_cost} ${op.currency}` : 'not entered'} · MOQ ${op?.moq ?? 'not entered'} · lead time ${op?.lead_time_days != null ? `${op.lead_time_days} days` : 'not entered'}`}
+        />
       </div>
       <h3>Margin at each price</h3>
-      <table className="pt-table">
-        <thead><tr><th>Price</th><th>Per unit</th><th>Gross margin</th><th>How</th><th>Source</th></tr></thead>
-        <tbody>
-          {economics.margins.map((m) => (
-            <tr key={m.label}>
-              <td>{m.label}{m.subscription ? ' (subscription)' : ''}</td>
-              <td>{m.unit_price} {m.currency}</td>
-              <td>{percent(m.margin)}</td>
-              <td className="small muted">{m.why}</td>
-              <td className="small"><Cite runId={runId} id={m.source_id} sources={packet.sources} /></td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <div className="pt-cards">
+        {economics.margins.map((m) => (
+          <FoldCard
+            key={m.label}
+            title={`${m.label}${m.subscription ? ' (subscription)' : ''}`}
+            glance={`${m.unit_price} ${m.currency} per unit · gross margin ${percent(m.margin)}`}
+          >
+            <Fold label="how" preview={m.why}>
+              {m.why} <Cite runId={runId} id={m.source_id} sources={packet.sources} />
+            </Fold>
+          </FoldCard>
+        ))}
+      </div>
       <TileGaps gaps={gaps} />
     </Tile>
   );

@@ -24,7 +24,7 @@ import { RoleChecks } from "./role-checks.js";
 import { RowRepair } from "./row-repair.js";
 import { RunFindings } from "./run-findings.js";
 import { ToolSteps } from "./tool-steps.js";
-import { LedgerToolset, TracedTool, type ToolRegistry } from "./tools/index.js";
+import { LedgerToolset, LibraryTools, TracedTool, type ToolRegistry } from "./tools/index.js";
 import { TurnBudget } from "./turn-budget.js";
 
 /** What every role's agent needs from the run it belongs to, whichever stage. */
@@ -60,8 +60,10 @@ export class ResearchAgentFactory {
     const budget = new TurnBudget(role.maxTurns);
     const steps = new ToolSteps();
     const rows = await findings.rows();
+    const workspaceId = (await this.store.getRun(run.runId))?.workspace_id ?? "";
     const research = this.tools.build(role.tools, {
       runId: run.runId,
+      library: await LibraryTools.forWorkspace(this.store.library, workspaceId),
       subject: run.brief.product || run.brief.url,
       market: run.brief.market,
       discovery: DiscoveryQuestions.of(rows, run.brief),

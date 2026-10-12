@@ -1,21 +1,8 @@
-import {
-  Briefs,
-  Roles,
-  STAGE_ONE_AGENTS,
-  StageOnePlans,
-  briefSchema,
-  type Brief,
-  type CheckProblem,
-  type Node,
-  type ResearchRun,
-  type ResearchStore,
-} from "../domain/index.js";
+import { Briefs, briefSchema, type Node, type ResearchRun, type ResearchStore } from "../domain/index.js";
 import { Trace } from "../trace/index.js";
 
-import { RoleChecks } from "./role-checks.js";
 import type { LiveRuns } from "./live-runs.js";
 import { ProductTruthRunAssembly } from "./product-truth-run-assembly.js";
-import { RunFindings } from "./run-findings.js";
 import { ReviewLedger } from "./review-ledger.js";
 import { ReviewMiningRunAssembly } from "./review-mining-run-assembly.js";
 import type { RunAssembly } from "./run-assembly.js";
@@ -29,19 +16,6 @@ export class StoredRunAssembly {
     if (run.stage === 2) return new ProductTruthRunAssembly(store.findings, run.id, { sourceRunId: run.source_run_id, brief, markets: Briefs.markets(brief) });
     if (run.stage === 3) return new ReviewMiningRunAssembly(store, runs, run.id, brief, new ReviewLedger(), () => ({ targets: [], failures: [] }));
     const nodes = run.nodes as Node[];
-    return new StageOneRunAssembly(store.findings, run.id, { brief, nodes }, () => StoredRunAssembly.partProblems(store, run.id, brief, nodes));
-  }
-
-  /** Each stage-1 agent that wrote rows, checked again on the ledger it left. */
-  private static async partProblems(store: ResearchStore, runId: string, brief: Brief, nodes: readonly Node[]): Promise<CheckProblem[]> {
-    Trace.line(import.meta.url, "StoredRunAssembly.partProblems", { runId });
-    const wrote = new Set((await store.findings.list(runId)).map((row) => row.agent_id));
-    const each = await Promise.all(
-      STAGE_ONE_AGENTS.filter((id) => wrote.has(id)).map(async (id) => {
-        const check = RoleChecks.done(Roles.of(id), new RunFindings(store.findings, runId, id, [StageOnePlans.nodeOf(id, nodes)]), { brief, nodes, markets: Briefs.markets(brief) });
-        return (await check.problems()).map((problem) => ({ ...problem, text: `${id}: ${problem.text}` }));
-      }),
-    );
-    return each.flat();
+    return new StageOneRunAssembly(store.findings, run.id, { brief, nodes });
   }
 }

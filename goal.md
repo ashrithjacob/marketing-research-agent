@@ -1,0 +1,69 @@
+# Goal
+
+Read this before any change. If a change does not move one of the outcomes below,
+or makes one of the principles false, it is the wrong change.
+
+## The north star
+
+**An e-commerce or Shopify owner gets the understanding a good marketing agency
+and a GTM engineer would give them — of their product, their market and their
+customer — and high-converting ads built on it, with deeper analysis than a
+human-only process can afford to do.**
+
+The system does the work an agency bills for: research, synthesis, angle
+finding, ad writing, testing and reporting. The owner makes the judgement calls.
+
+## What "better than a human process" means here
+
+A human team samples. It reads a few dozen reviews, a handful of competitor ads,
+one or two category reports, and concludes. This system can read all of it,
+keep every source, and show which source each conclusion came from. The
+advantage is **coverage and traceability**, not speed alone:
+
+- every claim on the screen links to the page, review or ad it came from;
+- a conclusion says how much evidence it rests on, and where the evidence ran out;
+- the work is repeatable: the same brief run next month shows what changed.
+
+## The outcomes, in order
+
+1. **Product truth** — what the product is, what it can legally claim, what it
+   costs to make. (Stage 2.)
+2. **Market truth** — who it competes with, what the market has already been
+   sold, how sophisticated it is, where it breaks. (Stage 1, then stage 3.)
+3. **Customer truth** — who buys, in their own words: avatars, awareness, the
+   language bank. (Review mining, stage 3.)
+4. **Synthesis** — mechanism, claim ladder, positioning, the angle map.
+5. **Ads that convert** — long-form statics and other formats written from the
+   angle map, launched, measured, and the results fed back into 1–4.
+
+The research compartment PDF (`research-compartment-supplement-mrr-v2.pdf`) is
+the map of 1–4. The playbooks uploaded to the library are the method for 5.
+
+## How it should work
+
+- **Always on.** Not a button that runs a stage and stops. A standing operator
+  per brand that watches for change, plans work, runs it, and comes to the owner
+  only for decisions. `spec-always-on.md`.
+- **Evidence, never opinion.** Code checks what agents claim. A finding without
+  a source is not a finding. `invalid` is information, not noise.
+- **The owner steers; the system learns.** Every correction, rejection and
+  approval is feedback, and the system gets measurably better from it without
+  someone editing a prompt.
+- **Knowledge comes from the owner's documents too.** Strategy PDFs and
+  playbooks are uploaded once and every agent can read them.
+- **Everything is async and streams.** Nothing blocks a request while work runs;
+  every unit of work reports progress live to the dashboard.
+- **Cost is billed, shown and bounded.** Every dollar spent is a measured
+  charge, visible per agent, and money-spending work asks first.
+- **A dashboard, not a chat.** The owner watches the work and its outcome, and
+  intervenes where judgement is needed.
+
+## How we know it is working
+
+- Ads produced by the system beat the owner's previous ads on their own
+  numbers (cost per acquisition, return on ad spend).
+- A finding's source can be opened in one click, and the source says what the
+  finding says.
+- Corrections given once are not needed again.
+- A brief costs less, in dollars and in the owner's hours, than the agency
+  retainer it replaces.

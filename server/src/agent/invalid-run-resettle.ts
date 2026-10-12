@@ -5,7 +5,7 @@ import type { LiveRuns } from "./live-runs.js";
 import { RunEnd } from "./run-end.js";
 import { StoredRunAssembly } from "./stored-run-assembly.js";
 
-/** Stage-1 runs that ended invalid with no packet but rows in their ledger, from before settlement repaired rows, settled again from their ledgers so what they found is shown. No model or paid tool is called. */
+/** Stage-1 runs that ended invalid with rows in their ledger, settled again from those ledgers under today's checks, so a run only a since-relaxed rule made invalid is shown as it now settles. No model or paid tool is called. */
 export class InvalidRunResettle {
   constructor(
     private readonly store: ResearchStore,
@@ -16,7 +16,7 @@ export class InvalidRunResettle {
     Trace.line(import.meta.url, "InvalidRunResettle.resettleAll");
     const stale: ResearchRun[] = [];
     for (const run of await this.store.listRuns(Scope.everything, 200)) {
-      if (run.status === "invalid" && run.packet === null && run.stage === 1 && (await this.store.findings.list(run.id)).length > 0) stale.push(run);
+      if (run.status === "invalid" && run.stage === 1 && (await this.store.findings.list(run.id)).length > 0) stale.push(run);
     }
     const end = new RunEnd(this.store, this.runs);
     const done: string[] = [];

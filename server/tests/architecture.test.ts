@@ -42,6 +42,7 @@ const PACKAGE_OWNERS: Record<string, string> = {
   "apify-client": "adapters",
   "better-sqlite3": "adapters",
   pg: "adapters",
+  unpdf: "adapters",
   hono: "http",
   "@hono/node-server": "http",
   "@earendil-works/pi-agent-core": "agent",

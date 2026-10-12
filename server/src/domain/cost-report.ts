@@ -23,6 +23,8 @@ export const TOOL_COST_COLUMNS: Readonly<Record<ToolName, readonly CostColumn[]>
   discover_competitors: ["parallel"],
   ad_library_search: ["trendtrack"],
   amazon_find_product: ["apify"],
+  library_index: [],
+  library_read: [],
   wait_for: [],
 };
 

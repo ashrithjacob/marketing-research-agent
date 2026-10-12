@@ -17,3 +17,10 @@ export const AMAZON_SEARCH_LINE =
   "- `amazon_find_product` — search Amazon (amazon.com) by product name for asin, title, stars " +
   "and `reviewsCount`, most-reviewed first: how the genre is ranked to pick the champion " +
   "product, and a way to find competitors and see which sell. It may be absent.\n";
+
+export const LIBRARY_INDEX_LINE =
+  "- `library_index` — the owner's uploaded strategy documents and playbooks, each with its sections by heading. " +
+  "Read it once, early, and follow any method that applies to your task.\n";
+
+export const LIBRARY_READ_LINE =
+  "- `library_read` — one section of a library document, as markdown. It is method, not evidence: never record or cite it as a source.\n";

@@ -142,8 +142,8 @@ describe("validation: the cross-object rules", () => {
     expect(() => packets.validate(data)).not.toThrow();
   });
 
-  it("requires a gap recording an undated ad", () => {
-    // Longevity is the only outside performance signal there is.
+  it("accepts an undated ad with no gap: the date is shown as not found, not a reason to reject the run", () => {
+    // Run 33c8b754: an agent with no competitors node cited an ad search, which has no first-seen date, and the run ended invalid.
     const data = minimalPacket();
     data.sources.push({
       id: "sha256:ccc",
@@ -153,25 +153,8 @@ describe("validation: the cross-object rules", () => {
       first_seen: null,
       admitted: true,
       archived: true,
-      node: "competitors",
+      node: "product_data",
     });
-    // The gap that exists is about the COA, not about the ad.
-    expect(() => packets.validate(data)).toThrow(/first_seen/);
-  });
-
-  it("accepts an undated ad when it is gapped", () => {
-    const data = minimalPacket();
-    data.sources.push({
-      id: "sha256:ccc",
-      url: "https://facebook.com/ads/library?id=1",
-      kind: "ad_library",
-      fetched_at: "2026-09-10T09:00:00Z",
-      first_seen: null,
-      admitted: true,
-      archived: true,
-      node: "competitors",
-    });
-    data.gaps.push({ node: "competitors", missing: "CalmWell ad carries no first-seen date" });
     expect(() => packets.validate(data)).not.toThrow();
   });
 
@@ -479,13 +462,11 @@ describe("validation: competitors, direct and indirect", () => {
     );
   });
 
-  it("needs each side to say who its customer is", () => {
+  it("accepts a customer neither page states: an empty icp on either side passes", () => {
     const data = withCompetitors();
     data.competitors[0].icp_as_printed = "";
-    expect(() => packets.validate(data)).toThrow(/competitor 'CalmWell 400' has no icp_as_printed/);
-    const noIcp = withCompetitors();
-    noIcp.competitor_reference.icp = "";
-    expect(() => packets.validate(noIcp)).toThrow(/the champion 'MagnaCalm 400mg' records no icp/);
+    data.competitor_reference.icp = "";
+    expect(() => packets.validate(data)).not.toThrow();
   });
 
   it("takes shared actives as picks from the champion's list, whatever the competitor's page calls them", () => {

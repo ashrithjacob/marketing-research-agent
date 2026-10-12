@@ -17,6 +17,7 @@ mra up | down | logs [n]  the local stack
 mra health [local|live]
 mra run "<brief>" [nodes] start a run          mra watch [runId]   follow it
 mra calls [runId]         the LLM call log     mra deployed        what is live
+mra library [file.pdf]    upload a PDF and watch it convert; no file lists the library
 ```
 
 ## The gate

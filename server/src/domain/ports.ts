@@ -20,6 +20,7 @@ import type { Finding, FindingDraft } from "./findings.js";
 import type { FetchedPage, SearchPage, SearchScope } from "./web.js";
 import type { DiscoveryQuestion, DiscoveryReport } from "./competitor-discovery.js";
 import type { AdPage, AdQuery } from "./ad-library.js";
+import type { DocumentLibrary } from "./library.js";
 
 /** Products and what their runs found, counted only over the runs a scope admits. */
 export interface ProductCatalog {
@@ -96,6 +97,7 @@ export interface ResearchStore {
   readonly charges: ChargeLedger;
   readonly pulls: ReviewPullStore;
   readonly accounts: AccountDirectory;
+  readonly library: DocumentLibrary;
   createRun(input: {
     workspaceId: string;
     brief: Record<string, unknown>;

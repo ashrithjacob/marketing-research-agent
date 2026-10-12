@@ -13,7 +13,7 @@ import { factText } from '../api';
 import { AmazonLink } from './amazon-link';
 import { BarList } from './charts';
 import { Chip, Tile, TileGaps } from './tile';
-import { Cite, Cites } from './cite';
+import { AdCites, Cite } from './cite';
 import { FactValue } from './fact-value';
 import { SourceRow } from './packet-sections';
 
@@ -48,7 +48,7 @@ function CompetitorRow({ competitor: c, listing, runId, sources }: { competitor:
           {c.shared_actives.length > 0 && <span>shares {c.shared_actives.join(', ')}</span>}
           {c.dose_per_serving && <span>{c.dose_per_serving}</span>}
           {c.price_per_dose && <span>price per dose: {c.price_per_dose}</span>}
-          {ads > 0 && <span>{ads} ad{ads === 1 ? '' : 's'}: <Cites runId={runId} ids={c.ad_source_ids ?? []} sources={sources} /></span>}
+          {ads > 0 && <span>{ads} ad{ads === 1 ? '' : 's'}: <AdCites runId={runId} ids={c.ad_source_ids ?? []} sources={sources} /></span>}
         </div>
         {c.icp_as_printed && <div className="comp-copy">For: <FactValue value={c.icp_as_printed} runId={runId} sources={sources} /></div>}
         {c.positioning_copy && <div className="comp-copy">“<FactValue value={c.positioning_copy} runId={runId} sources={sources} />”</div>}

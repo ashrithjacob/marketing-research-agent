@@ -255,7 +255,7 @@ describe("each agent gets only its own task", () => {
     const text = build({}, "champion");
     expect(text).toMatch(/The listing with the highest\s+`reviewsCount` is the champion/);
     expect(text).toMatch(/`runner_up_name`,\s+`runner_up_reviews`/);
-    expect(text).toMatch(/`icp` is the customer: who the page\s+says the product is for and the problem it solves/);
+    expect(text).toMatch(/`icp` is the customer: who the product is for and the problem it\s+solves, in the page's words where it says so, otherwise as the page implies/);
     expect(text).toMatch(/champion ranking unavailable/);
     expect(text).not.toContain("## The champion\n");
   });
