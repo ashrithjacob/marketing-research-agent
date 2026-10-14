@@ -426,7 +426,15 @@ Every time a worker's model stops without calling a tool, pi-durable calls the
    answer against it (hermes's `goal_judge` role). A `stop` verdict ends the task
    and posts an `ask_owner` card. Code decides done; the judge only decides "ask".
 
-`max_usd` is checked in the same hook against the task's billed charges so far.
+`max_usd` is checked in the same hook against the task's billed charges so
+far. Decided 2026-10-14: billed, accepting a small overshoot. OpenRouter's
+billed cost for a turn is readable only about 4 s after the turn ends
+(`/generation` 404s until then, `workings.md` §2a), so the check can miss the
+last turn or two and a task can end slightly over its cap. The alternative,
+estimating from tokens × list price for the cap alone, was rejected: the house
+rule is that cost is billed, never calculated, and a cap that bends it would be
+the one place two cost figures disagree. Tool charges (Parallel, Trendtrack,
+Apify, Firecrawl) are written as each call returns and have no lag.
 
 ### 6.5 Playbooks and documents, as one extension
 
