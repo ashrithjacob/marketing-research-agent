@@ -47,6 +47,8 @@ const PACKAGE_OWNERS: Record<string, string> = {
   "@hono/node-server": "http",
   "@earendil-works/pi-agent-core": "agent",
   "@earendil-works/pi-ai": "agent",
+  "@earendil-works/pi-durable": "agent",
+  "@earendil-works/chord": "agent",
 };
 
 /**

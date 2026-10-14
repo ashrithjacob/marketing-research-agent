@@ -26,6 +26,8 @@ browser (React, frontend/src)
 mra container — one Node process (server/src, layered — see CLAUDE.md)
    ├─ http/         App (auth, the SPA), ResearchApi (/api/research/*)
    ├─ agent/        RunSupervisor: up to four pi-agent-core Agents per stage-1 run, in-process
+   │                PiHarness: a pi-durable Harness on /data/harness.sqlite, opened,
+   │                           resumed and closed by main.ts; nothing runs on it yet
    │                LlmCallLog wraps the streamFn: every call, prompt and answer
    │                prompt/   brief + scope + rules + judgements → instructions
    │                tools/    the only things the agent can do (below)
@@ -45,6 +47,17 @@ mra container — one Node process (server/src, layered — see CLAUDE.md)
 ```
 
 Host port `127.0.0.1:8080` maps to the container's `8000`.
+
+pi-agent-core and pi-ai are at 1.2.0 (since 2026-10-14, part 1 of
+`docs/spec-always-on.md`). At startup `main.ts` also opens a pi-durable
+`Harness` (`agent/pi-harness.ts`, behind the `DurableHarness` port in
+`domain/harness.ts`) on the SQLite file at `MRA_HARNESS_PATH` (default
+`/data/harness.sqlite`), calls `resume()`, and logs `harness created at …` the
+first time or `harness reopened at …` after; on `SIGINT`/`SIGTERM` it closes it
+after the app. The registry is empty and no conversation is created, so nothing
+runs on it: the stages below still run on pi-agent-core's `Agent`. pi-durable
+opens the file with Node's built-in `node:sqlite`, which prints an
+`ExperimentalWarning: SQLite is an experimental feature` line at startup on Node 22.
 
 ---
 

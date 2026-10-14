@@ -54,6 +54,7 @@ export interface Settings {
   databasePath: string;
   databaseUrl: string;
   databaseConnections: number;
+  harnessPath: string;
   traceDir: string;
   traceKeepDays: number;
   traceMaxMb: number;

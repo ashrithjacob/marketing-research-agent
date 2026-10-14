@@ -119,7 +119,7 @@ export class RunSupervisor {
     await this.runs.drain();
   }
 
-  private static defaultModels(): Models {
+  static defaultModels(): Models {
     Trace.line(import.meta.url, "RunSupervisor.defaultModels");
     const models = createModels();
     models.setProvider(openrouterProvider());

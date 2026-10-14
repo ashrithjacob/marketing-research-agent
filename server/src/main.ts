@@ -3,6 +3,7 @@ import { setDefaultAutoSelectFamilyAttemptTimeout } from "node:net";
 import { serve } from "@hono/node-server";
 
 import { SqlResearchStore, StoreDatabase } from "./adapters/index.js";
+import { PiHarness, RunSupervisor } from "./agent/index.js";
 import { Env } from "./config/index.js";
 import { App } from "./http/index.js";
 import { Trace, WireTap } from "./trace/index.js";
@@ -17,6 +18,9 @@ new WireTap().attach();
 traces.prune();
 const store = await SqlResearchStore.open(StoreDatabase.forSettings(settings));
 const app = new App({ settings, traces, store });
+const harness = await PiHarness.open(settings.harnessPath, RunSupervisor.defaultModels());
+harness.resume();
+console.log(`harness ${harness.reopened ? "reopened" : "created"} at ${harness.path}`);
 
 await app.supervisor.recoverRunsKilledByRestart();
 const abandoned = await app.intake.recover();
@@ -43,12 +47,15 @@ for (const signal of ["SIGINT", "SIGTERM"] as const) {
     shuttingDown = true;
     console.log(`${signal} — stopping`);
     server.close();
-    void app.close().then(
-      () => process.exit(0),
-      (error) => {
-        console.error("shutdown failed", error);
-        process.exit(1);
-      },
-    );
+    void app
+      .close()
+      .then(() => harness.close())
+      .then(
+        () => process.exit(0),
+        (error) => {
+          console.error("shutdown failed", error);
+          process.exit(1);
+        },
+      );
   });
 }

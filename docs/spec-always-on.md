@@ -676,8 +676,14 @@ calls `harness.close()`. Nothing else is needed to be always on.
   rerun would pay twice. Its charge row is already written when the call returns.
 - **Layers.** `pi-durable` and `chord` belong to the `agent` layer, next to
   `pi-ai`; `architecture.test.ts` gets the two ownership entries. Opening the
-  SQLite storage is I/O, so a small adapter in `adapters/` wraps it behind a
-  port.
+  SQLite storage is I/O, so a small adapter wraps it behind a port: the port
+  is `DurableHarness` (`domain/harness.ts`), the adapter `PiHarness`
+  (`agent/pi-harness.ts`).
+  *Superseded 2026-10-14, part 1:* this said the adapter goes in `adapters/`.
+  It cannot: `openNodeSqliteStorage` comes from `pi-durable`, which only
+  `agent/` may import, and the `Harness` it returns is a `pi-durable` type. The
+  adapter sits in `agent/`, next to the package it wraps, as pi-agent-core's
+  `Agent` already does.
 
 ### 7.2 The operator
 
@@ -844,6 +850,33 @@ code that shares types, so the first step is to move both pi packages to 1.2.0
 and keep the current stages working on them. How much breaks between 0.87.1 and
 1.2.0 has not been measured; part 1 measures it, with `mra check` and one run.
 pi-durable is experimental, so its version is pinned exactly (no `^`).
+
+**Measured, part 1 (2026-10-14).** Nothing broke. After moving both packages
+to 1.2.0, `tsc` reported no errors and all 582 server tests passed with no
+code change. A url brief on 1.2.0 (`mra run "https://thedropletco.co.uk"
+product_data`, run `b544de8c…`, local) ended `completed`: 12 sources, 2
+rejected, 14 attributes, 3 gaps; 13 LLM calls, all `stop_reason` `toolUse` as
+on the run before the upgrade; 817,573 tokens; $0.0456 billed by OpenRouter
+`/generation`, 13 of 13 turns resolved. The
+reason is how little of pi the app touches: it imports only `Agent` and its
+types from `pi-agent-core`, and from `pi-ai` the package root and
+`providers/openrouter`. The breaking changes between the two versions, read
+from both changelogs, are all elsewhere:
+
+- pi-agent-core 1.0.0 removed its experimental harness (`AgentHarness`,
+  sessions, compaction, skills, the `./node` and `./harness/*` exports),
+  which moved to pi-durable. The app used none of it.
+- pi-ai 0.99.0 folded image models into the regular `Models` surface; 1.0.3
+  renamed the Azure provider; 1.1.0 requires a stream function to return an
+  `AssistantMessageEventStream`. The app has no image models, no Azure, and
+  `LlmCallLog` wraps pi-ai's own stream rather than writing a stream class.
+
+Additions it now receives unasked: a `durationMs` on each `AssistantMessage`
+and tool result. pi-durable 1.2.0 depends on `pi-ai` `^1.2.0`, not exactly
+1.2.0 as written above; `npm ls` shows one deduplicated copy. All four pi
+packages (`pi-agent-core`, `pi-ai`, `pi-durable`, `chord`) are pinned exactly
+in `server/package.json`, so the ones not under the experimental warning are
+pinned too: a minor pi-ai bump would otherwise move under pi-durable alone.
 
 ### 9.2 What moves, what stays
 

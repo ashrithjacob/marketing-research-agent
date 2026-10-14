@@ -6,11 +6,13 @@
 #
 #     bash ~/mra-compose/mra-snapshot.sh
 #
-# Two archives, both landing beside agentchat's so pull-backups.sh brings them
+# Three archives, all landing beside agentchat's so pull-backups.sh brings them
 # down to the laptop with no change:
 #   mra-pg-<stamp>.dump         the store, from Neon (pg_dump custom format), when
 #                               DATABASE_URL is set; otherwise
 #   mra-<stamp>.tar.gz          research.db — runs, events, packets, judgements
+#   mra-harness-<stamp>.tar.gz  harness.sqlite — pi-durable's conversations and
+#                               tasks; SQLite on /data whichever store is in use
 #   mra-corpus-<stamp>.tar.gz   raw fetched bodies, content-addressed
 #
 # mra is NOT stopped, which is the opposite of what the agentchat half does.
@@ -56,6 +58,20 @@ elif docker volume inspect mra_mra_data >/dev/null 2>&1; then
   # Not running, so nothing is writing: a plain volume copy is consistent.
   docker run --rm -v mra_mra_data:/data:ro -v "${OUT}:/out" alpine \
     tar czf "/out/mra-${STAMP}.tar.gz" -C /data .
+fi
+
+# pi-durable has no Postgres storage, so harness.sqlite stays on /data even on
+# Neon. node:sqlite, because that is the driver pi-durable opens it with.
+if docker ps --format '{{.Names}}' | grep -qx mra && docker exec mra test -f /data/harness.sqlite; then
+  docker exec mra sh -c 'rm -rf /data/.harness-snapshot && mkdir /data/.harness-snapshot'
+  docker exec -w /app mra node --no-warnings -e '
+    const { DatabaseSync } = require("node:sqlite");
+    const db = new DatabaseSync("/data/harness.sqlite");
+    db.prepare("VACUUM INTO ?").run("/data/.harness-snapshot/harness.sqlite");
+    db.close();'
+  docker run --rm -v mra_mra_data:/data:ro -v "${OUT}:/out" alpine \
+    tar czf "/out/mra-harness-${STAMP}.tar.gz" -C /data/.harness-snapshot harness.sqlite
+  docker exec mra rm -rf /data/.harness-snapshot
 fi
 
 # Write-once and content-addressed, so copying it live is consistent.

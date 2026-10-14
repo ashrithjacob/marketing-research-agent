@@ -131,6 +131,7 @@ export class Env {
       databasePath: Env.text("MRA_DATABASE_PATH", "/data/research.db"),
       databaseUrl: Env.text("DATABASE_URL", ""),
       databaseConnections: Env.number("MRA_DATABASE_CONNECTIONS", 5),
+      harnessPath: Env.text("MRA_HARNESS_PATH", "/data/harness.sqlite"),
       traceDir: Env.text("MRA_TRACE_DIR", "/data/traces"),
       traceKeepDays: Env.number("MRA_TRACE_KEEP_DAYS", 30),
       traceMaxMb: Env.number("MRA_TRACE_MAX_MB", 20),

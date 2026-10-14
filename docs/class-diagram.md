@@ -169,6 +169,11 @@ classDiagram
       name()
       live()
     }
+    class DurableHarness {
+      <<interface>>
+      resume()
+      close()
+    }
     class LibraryDocument {
       <<interface>>
     }
@@ -1105,6 +1110,11 @@ classDiagram
     class PartClose {
       close()
     }
+    class PiHarness {
+      open()
+      resume()
+      close()
+    }
     class ModelPricing {
       apply()
     }
@@ -1310,6 +1320,7 @@ classDiagram
       steer()
       stop()
       close()
+      defaultModels()
     }
     class RunWrapUp {
       lookUpListings()
@@ -1796,6 +1807,7 @@ classDiagram
 | `agent` | `agent/model-chain.ts` | ModelChain |
 | `agent` | `agent/operator-inputs.ts` | OperatorInputs |
 | `agent` | `agent/part-close.ts` | CloseReason, PartClose |
+| `agent` | `agent/pi-harness.ts` | PiHarness |
 | `agent` | `agent/pricing.ts` | ModelPricing |
 | `agent` | `agent/product-truth-run-assembly.ts` | ProductTruthRunAssembly |
 | `agent` | `agent/product-truth-run.ts` | ProductTruthBrief, ProductTruthRun |
@@ -1869,6 +1881,7 @@ classDiagram
 | `domain` | `domain/cost-report.ts` | CostCell, CostRow, CostReport |
 | `domain` | `domain/deliverable.ts` | FieldSpec, ItemPart, ItemNeed, FieldsDeliverable, ListDeliverable, OneMarked, PerItemDeliverable, Deliverables |
 | `domain` | `domain/findings.ts` | FindingDraft, Finding, Findings |
+| `domain` | `domain/harness.ts` | DurableHarness |
 | `domain` | `domain/library.ts` | LibraryDocument, ConvertedDocument, DocumentSection, DocumentLibrary, DocumentConverter, DocumentSections |
 | `domain` | `domain/logs.ts` | RunEvent, Judgement, PacketCheck, RunUpdate, LlmCallRecord, Generation, LlmCall |
 | `domain` | `domain/nodes.ts` | Stages |
