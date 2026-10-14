@@ -298,6 +298,16 @@ The gate is on by default and per store. An owner can switch brand memory to
 auto-apply once they trust it; playbooks stay gated. That matches hermes's
 `write_approval`, inverted: hermes defaults to writing freely.
 
+**Brand memory is visible and editable from day one.** Decided 2026-10-14.
+The owner sees every entry in a list (§11) and can add, change or delete one
+directly, without going through a lesson card. The reason is hermes's own: its
+`write_approval` gate exists because "the agent saved a wrong assumption about
+me", and a wrong entry nobody can see steers every task quietly. Nothing is
+overwritten in place even then: a direct edit or delete is a new version marked
+`by: owner`, so what changed and when stays on record and §5.5 can still compare
+versions. An owner's edit also counts as feedback (§5.2, a correction), so the
+reviewer learns from it and does not propose the removed entry again.
+
 ### 5.5 Measuring whether a lesson helped
 
 Every task records which playbook versions it read. Per version the store
@@ -527,6 +537,18 @@ calls `harness.close()`. Nothing else is needed to be always on.
 
 ### 7.2 The operator
 
+**Switched on per workspace, off by default.** Decided 2026-10-14. A
+workspace is one brand. The operator, its watchers and its curator spend money
+with nobody watching (model calls, Trendtrack credits, searches), so none of
+them runs for a workspace until its owner turns on **Always on** for it, and
+turning it on requires a **daily spend cap** in dollars, with no default. While
+it is off, the workspace works as the app does today: work starts only when
+someone starts it, and no operator conversation or watcher task exists. Turning
+it off stops the watchers and the operator's inbox at once; tasks already
+running finish, inside their own caps. The switch and the cap are two columns on
+`research_workspaces` (`always_on`, `daily_cap_usd`), added by migration. The
+default may become "on" once the spend of a few always-on brands is measured.
+
 A long-lived conversation per workspace. Most of what it reads is in prompt
 sections rendered fresh before each request (goals, memory, tasks, ledger
 summary, playbook index); the transcript holds only what happened. Automatic
@@ -562,8 +584,8 @@ operator and the owner can.
 
 ### 7.4 Limits
 
-Per workspace: tasks running at once (default 3), spend per day, spend per
-task. `create_task` refuses past the running cap; `mra.money`'s `beforeTool`
+Per workspace: tasks running at once (default 3), spend per day (the daily cap
+set when Always on is turned on, §7.2), spend per task. `create_task` refuses past the running cap; `mra.money`'s `beforeTool`
 hook blocks any paid call past the spend caps and any Apify call without an
 approval. The Apify rule is enforced in code, not only written in a prompt.
 
@@ -676,14 +698,18 @@ formats, or turn a document into a playbook (§5.7).
 ## 11. The dashboard
 
 `../goal.md` (the parent) says it: the UI is a dashboard where agent actions take
-place and the owner follows and steers them, not a chat. Four areas:
+place and the owner follows and steers them, not a chat. Five areas:
 
 1. **Inbox** — what needs the owner: approval cards (money, contracts marked
    `owner`), questions from `ask_owner`, lessons to approve.
 2. **Work** — the task graph as a board by status, each task opening into its
    worker conversation: agent turns, tool lanes, costs.
-3. **Knowledge** — the ledger by node (today's tiles), brand memory, and the
-   library: uploaded documents and playbooks, with versions and their numbers.
+3. **Knowledge** — the ledger by node (today's tiles); brand memory as a list
+   the owner can add to, edit and delete from, each change a version (§5.4); and
+   the library: uploaded documents and playbooks, with versions and their
+   numbers.
+5. **Always on** — per workspace, the switch and its daily cap (§7.2), with
+   today's spend against the cap.
 4. **Feed** — the operator's notes and the live stream, in words.
 
 A message box exists, as one way to put something in the operator's inbox, not
@@ -699,8 +725,8 @@ as the main surface.
 | 3 | The workspace stream (§8): task graph and conversation watches over SSE; library tools move into `mra.playbooks` | a browser sees a task from start to end, and reconnects to a snapshot |
 | 4 | The other primitives; stage 1 as a saved plan of four tasks with child-task waiting | a stage-1 plan's result matches a `StageOneRun`'s on the same brief |
 | 5 | Feedback events (§5.2) and the inbox cards | the owner's actions are recorded against what they were about |
-| 6 | Reviewer as a fork, lessons, the gate, playbook versions (§5.3–5.4, §6.6) | a correction given once produces a lesson; approved, the next task reads it |
-| 7 | The operator conversation (§7.2), `create_task`, `mra.money`, the schedule watcher | the system starts work nobody clicked, inside its limits |
+| 6 | Reviewer as a fork, lessons, the gate, playbook versions, the editable brand-memory list (§5.3–5.4, §6.6) | a correction given once produces a lesson; approved, the next task reads it |
+| 7 | The Always on switch and daily cap, the operator conversation (§7.2), `create_task`, `mra.money`, the schedule watcher | the system starts work nobody clicked, inside its limits |
 | 8 | `write` and `critique` primitives; the long-form statics playbook | an ad draft that cites its findings |
 | 9 | Measurement per playbook version (§5.5), curator watcher (§5.6), `distil` (§5.7) | a lesson that hurt is visible with numbers |
 | 10 | Ad-results feedback, competitor and review watchers | the loop closes on real ad performance |
@@ -729,6 +755,6 @@ as the main surface.
 - **Contracts the model writes badly.** The contract check refuses impossible
   ones but not pointless ones. `verify: owner` for anything new is the
   defence until there is data.
-- **Open — yours:** should the operator run for every workspace, or only those
-  that switch it on? Which ad account (Meta first?) for outcome feedback? Is
-  brand memory visible to and editable by the owner from day one?
+- **Open — yours:** which ad account (Meta first?) for outcome feedback.
+  Decided 2026-10-14: the operator is opt-in per workspace with a required daily
+  cap (§7.2), and brand memory is visible and editable from day one (§5.4).
