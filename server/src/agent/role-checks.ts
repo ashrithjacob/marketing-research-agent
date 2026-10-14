@@ -1,4 +1,4 @@
-import { RoleRecords, Roles, type Brief, type Node, type RoleSpec } from "../domain/index.js";
+import { RoleRecords, Roles, type Brief, type Node, type RoleSpec, type Trip } from "../domain/index.js";
 import { DeliverableChecks } from "../extract/index.js";
 import { Trace } from "../trace/index.js";
 
@@ -21,12 +21,12 @@ export class RoleChecks {
     return new RoleDone(findings, DeliverableChecks.of(role.deliverable, run.markets), RoleChecks.consistency(role, findings, run));
   }
 
-  /** The champion has no node of its own to gap and report, so its turn limit only stops it. */
-  static closer(role: RoleSpec, findings: RunFindings, repair: RowRepair, check: DoneCheck, run: CheckedRun): (() => Promise<LimitClosed>) | null {
+  /** The champion has no node of its own to gap and report, so a breaker only stops it. */
+  static closer(role: RoleSpec, findings: RunFindings, repair: RowRepair, check: DoneCheck, run: CheckedRun): ((trip: Trip) => Promise<LimitClosed>) | null {
     Trace.line(import.meta.url, "RoleChecks.closer", { role: role.id });
     if (role.consistency === "champion") return null;
-    const part = { node: Roles.node(role, run.nodes), limit: role.maxTurns, reports: RoleRecords.of(role).includes("node_status") };
-    return () => new LimitClose(findings, repair, check, DeliverableChecks.of(role.deliverable, run.markets), part).close();
+    const part = { node: Roles.node(role, run.nodes), reports: RoleRecords.of(role).includes("node_status") };
+    return (trip) => new LimitClose(findings, repair, check, DeliverableChecks.of(role.deliverable, run.markets), part).close(trip);
   }
 
   private static consistency(role: RoleSpec, findings: RunFindings, run: CheckedRun): DoneCheck {

@@ -30,7 +30,7 @@ import {
   WebFetchTool,
   type ToolContext,
 } from "../src/agent/tools/index.js";
-import { AgentRoster, RoleChecks, RunFindings } from "../src/agent/index.js";
+import { AgentRoster, RoleChecks, RunFindings, TurnBreakers } from "../src/agent/index.js";
 import { ServiceClients } from "../src/adapters/index.js";
 import {
   STAGE_NODES,
@@ -468,6 +468,7 @@ describe("the ledger tools", () => {
       records: RoleRecords.of(Roles.of(agent)),
       check,
       onChecked: async (v, problems) => { checked.push({ valid: v, problems }); },
+      tally: new TurnBreakers({ stepCeiling: 15, maxUsd: null, maxMinutes: null }, async () => 0),
       ...(options.roster ? { roster: options.roster } : {}),
       ...(options.pollMs !== undefined ? { pollMs: options.pollMs } : {}),
     }).build();
@@ -723,17 +724,17 @@ describe("the ledger tools", () => {
     expect(text(await tool("finish").execute("3", {}))).toMatch(/^FINISHED/);
   });
 
-  it("refuses a sixth check without spending anything, and ends the loop", async () => {
+  it("after three refusals, ends the loop without checking again", async () => {
     const { tool, checked } = ledgerTools("product", { nodes: ["product_data"] });
-    for (let i = 1; i <= 5; i++) {
-      expect(text(await tool("finish").execute(String(i), {}))).toContain(`Checks used: ${i} of 5.`);
+    for (let i = 1; i <= 3; i++) {
+      expect(text(await tool("finish").execute(String(i), {}))).toContain(`Refused ${i} of 3:`);
     }
-    for (const call of ["6", "7"]) {
+    for (const call of ["4", "5"]) {
       const refused = await tool("finish").execute(call, {});
-      expect(text(refused)).toMatch(/^NOT CHECKED — your 5 checks are spent/);
+      expect(text(refused)).toMatch(/^NOT CHECKED — finish was refused 3 times/);
       expect(refused.terminate).toBe(true);
     }
-    expect(checked).toHaveLength(5);
+    expect(checked).toHaveLength(3);
   });
 
   it("runs finish after the records it arrived with", () => {

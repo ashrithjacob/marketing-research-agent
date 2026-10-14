@@ -69,7 +69,8 @@ export class StageOneRun {
     try {
       const outcomes = await team.run(StageOneRun.members(StageOnePlans.of(brief, nodes)), (id) => factory.build(Roles.of(id), context), context.roster);
       const errors = outcomes.filter((o) => o.error).map((o) => `${o.agentId}: ${o.error}`).join("; ");
-      ending = { kind: "settled", errorMessage: errors || undefined };
+      const trips = outcomes.flatMap((o) => (o.trip ? [o.trip] : []));
+      ending = trips.length > 0 ? { kind: "cut_short", trips, errorMessage: errors || undefined } : { kind: "settled", errorMessage: errors || undefined };
       output = AgentTeam.output(outcomes);
     } catch (error) {
       console.error(`research run ${runId}: stage 1 failed`, error);

@@ -17,7 +17,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { OpenRouterPrices } from "../src/adapters/index.js";
 import { RunSupervisor } from "../src/agent/index.js";
-import { COMPETITORS_DELIVERABLE, CheckProblems, RejectKinds, Roles, StageOnePlans } from "../src/domain/index.js";
+import { Breakers, COMPETITORS_DELIVERABLE, CheckProblems, RejectKinds, Roles, StageOnePlans } from "../src/domain/index.js";
 import { DEFAULT_RETRY, Retries } from "../src/agent/retry.js";
 import { RoleChecks } from "../src/agent/role-checks.js";
 import { DeliverableChecks } from "../src/extract/index.js";
@@ -37,6 +37,7 @@ import { SqliteStores } from "./sqlite-stores.js";
 
 const MODEL_ID = "faux-model";
 const FAST_RETRY = { attempts: 3, baseMs: 0, capMs: 0 };
+const STEP_CEILING_20 = Breakers.trip({ responses: 20, quietResponses: 0, refusedFinishes: 0, spentUsd: null, minutes: null }, { stepCeiling: 20, maxUsd: null, maxMinutes: null })!;
 
 let dir: string;
 let store: SqlResearchStore;
@@ -325,9 +326,9 @@ describe("finish", () => {
     expect((await store.getRun(runId))!.status).toBe("completed");
   });
 
-  it("stops at five checks, and settles the ledger as it stands", async () => {
-    // An agent that cannot fix a cross-row problem would otherwise resend its
-    // whole context after every failed finish until it stopped of its own accord.
+  it("stops after three refused finishes, gaps what is missing, and ends partial", async () => {
+    // spec-always-on §3.2: a refused finish is a tool call, so without this breaker
+    // an agent that cannot fix a problem would ask to finish until another limit.
     const finishTurn = () => fauxAssistantMessage(fauxToolCall("finish", {}), { stopReason: "toolUse" });
     const runId = await runWith([
       fauxAssistantMessage(recordCalls({ ...productPacket(), gaps: [] }), { stopReason: "toolUse" }),
@@ -335,12 +336,15 @@ describe("finish", () => {
       fauxAssistantMessage("never reached"),
     ]);
     const answers = (await toolAnswer(runId, "finish"));
-    expect(answers).toHaveLength(5);
-    expect(answers[4]).toMatch(/Checks used: 5 of 5\.$/);
-    expect((await store.listLlmCalls(runId))).toHaveLength(7);
+    expect(answers).toHaveLength(2);
+    expect(answers[1]).toMatch(/Refused 2 of 3:/);
+    expect((await store.listLlmCalls(runId))).toHaveLength(4);
     const run = (await store.getRun(runId))!;
-    expect(run.status).toBe("completed");
-    expect((await store.listPacketChecks(runId)).map((c) => c.valid)).toEqual([false, false, false, false, false]);
+    expect(run.status).toBe("partial");
+    expect(run.error).toBe("stopped early: finish was refused 3 times");
+    expect((await store.listPacketChecks(runId)).map((c) => c.valid)).toEqual([false, false, false]);
+    const limit = (await store.listEvents(runId)).find((e) => e.kind === "agent.limit_reached")!.payload as any;
+    expect(limit).toMatchObject({ agent_id: "product", breaker: "refused_finish" });
   });
 
   it("leaves a retracted row out of the packet", async () => {
@@ -1076,19 +1080,32 @@ describe("the two steps of a stage-1 run", () => {
 
   it("ends an agent at its turn limit and records what it left open as gaps", async () => {
     // workings_stage1.md 14: a limit on model turns, then gaps rather than more tries.
-    const turn = () => fauxAssistantMessage(fauxToolCall("read_ledger", {}), { stopReason: "toolUse" });
-    const runId = await runWith([...Array.from({ length: 15 }, turn), fauxAssistantMessage("never reached")]);
+    const turn = (i: number) =>
+      fauxAssistantMessage(fauxToolCall("record_gap", { item: { node: "product_data", missing: `searched ${i}`, would_need: "more" } }), { stopReason: "toolUse" });
+    const runId = await runWith([...Array.from({ length: 15 }, (_, i) => turn(i)), fauxAssistantMessage("never reached")]);
     expect((await store.listLlmCalls(runId))).toHaveLength(15);
     const limit = (await store.listEvents(runId)).find((e) => e.kind === "agent.limit_reached")!.payload as any;
-    expect(limit).toMatchObject({ agent_id: "product", limit: 15 });
+    expect(limit).toMatchObject({ agent_id: "product", limit: 15, breaker: "step_ceiling" });
     expect(limit.gapped).toHaveLength(10);
     const run = (await store.getRun(runId))!;
-    expect(run.status).toBe("completed");
+    expect(run.status).toBe("partial");
+    expect(run.error).toBe("stopped early: the 15-turn limit was reached");
     expect((run.packet as any).gaps.map((g: any) => g.missing)).toContain("price: not found within the 15-turn limit");
     expect((run.packet as any).nodes[0]).toMatchObject({ node: "product_data", status: "incomplete" });
   });
 
-  it("at the turn limit, retracts the agent's rows that fail its check and keeps the rest, instead of rejecting the part", async () => {
+  it("ends an agent whose five responses in a row added nothing, and gaps what it left open with why", async () => {
+    const turn = () => fauxAssistantMessage(fauxToolCall("read_ledger", {}), { stopReason: "toolUse" });
+    const runId = await runWith([...Array.from({ length: 15 }, turn), fauxAssistantMessage("never reached")]);
+    expect((await store.listLlmCalls(runId))).toHaveLength(5);
+    const limit = (await store.listEvents(runId)).find((e) => e.kind === "agent.limit_reached")!.payload as any;
+    expect(limit).toMatchObject({ agent_id: "product", breaker: "no_progress", reason: "5 responses in a row added nothing new" });
+    const run = (await store.getRun(runId))!;
+    expect(run.status).toBe("partial");
+    expect((run.packet as any).gaps.map((g: any) => g.missing)).toContain("price: not found: 5 responses in a row added nothing new");
+  });
+
+  it("when a breaker trips, retracts the agent's rows that fail its check and keeps the rest, instead of rejecting the part", async () => {
     const stray = { node: "product_data", key: "price", value: "£14.99", source_id: "sha256:never-recorded" };
     const recordAll = fauxAssistantMessage(recordCalls(productPacket({ attributes: [...minimalPacket().attributes, stray] })), {
       stopReason: "toolUse",
@@ -1100,11 +1117,11 @@ describe("the two steps of a stage-1 run", () => {
     expect(limit.retracted).toEqual([price.id]);
     expect(price.retracted_at).not.toBe("");
     const run = (await store.getRun(runId))!;
-    expect(run.status).toBe("completed");
+    expect(run.status).toBe("partial");
     const packet = run.packet as any;
     expect(packet.attributes.map((a: any) => a.key)).toEqual(["dose_per_serving"]);
     expect(packet.gaps.map((g: any) => g.missing)).toContainEqual(
-      expect.stringMatching(new RegExp(`^attribute ${price.id} retracted at the 15-turn limit: .*sha256:never-recorded`)),
+      expect.stringMatching(new RegExp(`^attribute ${price.id} retracted when 5 responses in a row added nothing new: .*sha256:never-recorded`)),
     );
   });
 
@@ -1122,7 +1139,7 @@ describe("the two steps of a stage-1 run", () => {
     await findings.record("saturation", curve("indirect_active"));
     await findings.record("node_status", statusRow);
     const check = RoleChecks.done(Roles.of("competitors"), findings, { brief: genre, nodes: ["competitors"], markets: [] });
-    const closed = (await new LimitClose(findings, new RowRepair(store.findings, runId, ["competitors"]), check, DeliverableChecks.of(COMPETITORS_DELIVERABLE, []), { node: "competitors", limit: 20, reports: true }).close());
+    const closed = (await new LimitClose(findings, new RowRepair(store.findings, runId, ["competitors"]), check, DeliverableChecks.of(COMPETITORS_DELIVERABLE, []), { node: "competitors", reports: true }).close(STEP_CEILING_20));
     expect(closed.retracted.map((id) => id.replace(/\d+$/, ""))).toEqual(["sat", "sat", "sat", "ns"]);
     expect((await findings.own()).find((row) => row.kind === "node_status")!.payload).toMatchObject({ status: "incomplete" });
     expect(CheckProblems.texts((await check.problems())).filter((p) => /saturation|complete with no/.test(p))).toEqual([]);

@@ -6,6 +6,7 @@ export const RUN_STATUSES = [
   "running",
   "stopping",
   "completed",
+  "partial",
   "invalid",
   "failed",
   "cancelled",
@@ -14,6 +15,7 @@ export type RunStatus = (typeof RUN_STATUSES)[number];
 
 export const TERMINAL_STATUSES: ReadonlySet<string> = new Set([
   "completed",
+  "partial",
   "invalid",
   "failed",
   "cancelled",

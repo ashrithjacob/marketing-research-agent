@@ -7,6 +7,8 @@ export type RunStatus =
   | 'running'
   | 'stopping'
   | 'completed'
+  /** Stopped early by a breaker: what was found is kept, and every missing item is a gap saying why. */
+  | 'partial'
   /** The agent finished and what it produced broke the contract; not the same as `failed`. */
   | 'invalid'
   | 'failed'
@@ -24,10 +26,13 @@ export type ResearchNode =
 
 export const TERMINAL_STATUSES: ReadonlySet<RunStatus> = new Set([
   'completed',
+  'partial',
   'invalid',
   'failed',
   'cancelled',
 ]);
+
+export const DELIVERED_STATUSES: ReadonlySet<RunStatus> = new Set(['completed', 'partial']);
 
 export interface Brief {
   product: string;

@@ -10,7 +10,7 @@ import { RunFindings } from "../src/agent/run-findings.js";
 import { RoleChecks } from "../src/agent/role-checks.js";
 import { RowRepair } from "../src/agent/row-repair.js";
 import { MemoryLedger } from "./fixtures.js";
-import { CATEGORY_DELIVERABLE, COMPETITORS_DELIVERABLE, FORMULA_DELIVERABLE, PRODUCT_DELIVERABLE, Roles, STAGE_NODES, briefSchema, type Finding, type FindingKind } from "../src/domain/index.js";
+import { Breakers, CATEGORY_DELIVERABLE, COMPETITORS_DELIVERABLE, FORMULA_DELIVERABLE, PRODUCT_DELIVERABLE, Roles, STAGE_NODES, briefSchema, type Finding, type FindingKind } from "../src/domain/index.js";
 import { FieldsCheck, ListCheck } from "../src/extract/index.js";
 
 let seq = 0;
@@ -145,7 +145,7 @@ describe("one LimitClose for every role", () => {
     const role = Roles.of("mechanism");
     const run = { brief: briefSchema.parse({ product: "Mullevia" }), nodes: STAGE_NODES[2], markets: [] };
     const close = RoleChecks.closer(role, mechanism, new RowRepair(ledger, "r", STAGE_NODES[2]), RoleChecks.done(role, mechanism, run), run)!;
-    expect((await close())).toEqual({ gapped: ["mechanism: Mullein"], retracted: [] });
+    expect((await close(Breakers.trip({ responses: 15, quietResponses: 0, refusedFinishes: 0, spentUsd: null, minutes: null }, { stepCeiling: 15, maxUsd: null, maxMinutes: null })!))).toEqual({ gapped: ["mechanism: Mullein"], retracted: [] });
     expect((await mechanism.own()).map((row) => [row.kind, row.payload.node, row.payload.missing])).toEqual([["gap", "mechanism", "mechanism: Mullein: not found within the 15-turn limit"]]);
   });
 

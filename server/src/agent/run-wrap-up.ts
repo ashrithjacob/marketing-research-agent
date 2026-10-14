@@ -1,5 +1,5 @@
 import type { RunBilling } from "../adapters/index.js";
-import { stagePacketSchema, type Node, type ResearchStore } from "../domain/index.js";
+import { RunStatuses, stagePacketSchema, type Node, type ResearchStore } from "../domain/index.js";
 import { Trace } from "../trace/index.js";
 
 import type { LiveRuns } from "./live-runs.js";
@@ -23,7 +23,7 @@ export class RunWrapUp {
       if (!listings?.available || !nodes.includes("competitors")) return;
       const run = await store.getRun(runId);
       const packet = stagePacketSchema.safeParse(run?.packet);
-      if (run?.status !== "completed" || !packet.success) return;
+      if (!run || !RunStatuses.delivered(run.status) || !packet.success) return;
       const rows = await listings.lookUp(runId, packet.data, new RunMeter(store, runs, runId, null));
       runs.emit(runId, "packet.listings", { total: rows.length, matched: rows.filter((row) => row.matches).length });
     } catch (error) {

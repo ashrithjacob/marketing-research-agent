@@ -27,6 +27,8 @@ function runState(status: RunStatus): { cls: string; label: string } {
       return { cls: 'active', label: 'stopping' };
     case 'completed':
       return { cls: 'done', label: 'complete' };
+    case 'partial':
+      return { cls: 'done', label: 'partly complete' };
     case 'invalid':
       return { cls: 'blocked', label: 'packet rejected' };
     case 'failed':

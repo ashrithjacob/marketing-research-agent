@@ -20,7 +20,7 @@ export function milestoneText(event: RunEvent): { text: string; cls: string } {
     case 'agent.limit_reached': {
       const gapped = (p.gapped as string[] | undefined) ?? [];
       return {
-        text: `${p.agent_id} agent reached its ${p.limit}-turn limit — ${gapped.length ? `gapped ${gapped.join(', ')}` : 'nothing left open'}`,
+        text: `${p.agent_id} agent stopped: ${p.reason ?? `its ${p.limit}-turn limit was reached`} — ${gapped.length ? `gapped ${gapped.join(', ')}` : 'nothing left open'}`,
         cls: 'rule',
       };
     }
@@ -60,6 +60,8 @@ export function milestoneText(event: RunEvent): { text: string; cls: string } {
       return { text: `Run failed — ${p.error ?? ''}`, cls: 'bad' };
     case 'run.completed':
       return { text: 'Run completed', cls: 'good' };
+    case 'run.partial':
+      return { text: `Run ended partly complete — ${p.error ?? ''}`, cls: 'rule' };
     case 'run.billed': {
       const billed = p.billed as { total: number; resolved: number; turns: number };
       return {

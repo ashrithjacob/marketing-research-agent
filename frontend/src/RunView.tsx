@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import {
   api,
+  DELIVERED_STATUSES,
   TERMINAL_STATUSES,
   type Judgement,
   type ResearchNode,
@@ -92,7 +93,7 @@ export default function RunView({
   const now = nowPanel(run, live, lastTool);
   const progress = subjectProgress(runs, run);
   const stage = runStage(run);
-  const next = stage < 3 && run.status === 'completed' ? ((stage + 1) as 2 | 3) : null;
+  const next = stage < 3 && DELIVERED_STATUSES.has(run.status) ? ((stage + 1) as 2 | 3) : null;
   const nextStage = next && !progress.done[next] && !progress.live[next] ? NEXT_STAGE[next] : null;
   const nodesInRun = new Set((run.nodes ?? packet?.nodes.map((n) => n.node) ?? []) as string[]);
   const stagePacket = packet && packet.stage !== 2 ? (packet as StagePacket) : null;

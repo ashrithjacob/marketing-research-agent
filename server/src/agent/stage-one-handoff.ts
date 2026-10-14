@@ -1,4 +1,4 @@
-import { Briefs, ProductFolders, stagePacketSchema, type Brief, type ResearchRun, type ResearchStore, type Scope, type StagePacket } from "../domain/index.js";
+import { Briefs, ProductFolders, RunStatuses, stagePacketSchema, type Brief, type ResearchRun, type ResearchStore, type Scope, type StagePacket } from "../domain/index.js";
 import { PacketDraft } from "../extract/index.js";
 import { Trace } from "../trace/index.js";
 
@@ -10,7 +10,7 @@ export class StageOneHandoff {
     Trace.line(import.meta.url, "StageOneHandoff.forBrief", { brief, scope });
     const product = await this.store.products.byKey(Briefs.key(brief));
     if (!product) return null;
-    const heads = (await this.store.products.runHeads(scope)).filter((head) => head.stage === 1 && head.status === "completed");
+    const heads = (await this.store.products.runHeads(scope)).filter((head) => head.stage === 1 && RunStatuses.delivered(head.status));
     for (const id of ProductFolders.runIds(heads, product.id)) {
       const run = await this.store.getRun(id);
       if (!run) continue;
@@ -34,7 +34,7 @@ export class StageOneHandoff {
     const source = await this.store.getRun(sourceRunId);
     if (!source) return false;
     const heads = (await this.store.products.runHeads(scope)).filter(
-      (head) => head.stage === stage && head.status === "completed" && head.product_id === source.product_id,
+      (head) => head.stage === stage && RunStatuses.delivered(head.status) && head.product_id === source.product_id,
     );
     for (const head of heads) if ((await this.store.getRun(head.id))?.source_run_id === sourceRunId) return true;
     return false;

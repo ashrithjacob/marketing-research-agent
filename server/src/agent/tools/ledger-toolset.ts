@@ -9,7 +9,7 @@ import { RECORD_TOOLS } from "../prompt/text/record-tools.js";
 import { TRUTH_RECORD_TOOLS } from "../prompt/text/truth-record-tools.js";
 import type { RunFindings } from "../run-findings.js";
 
-import { FinishTool } from "./finish-tool.js";
+import { FinishTool, type FinishTally } from "./finish-tool.js";
 import { ReadLedgerTool, WaitForTool } from "./ledger-read-tools.js";
 import { RecordTool, RetractTool } from "./ledger-tools.js";
 
@@ -18,6 +18,7 @@ export interface LedgerOptions {
   records: readonly FindingKind[];
   check: DoneCheck;
   onChecked: (valid: boolean, problems: readonly string[]) => Promise<void>;
+  tally: FinishTally;
   roster?: AgentRoster;
   pollMs?: number;
 }
@@ -38,7 +39,7 @@ export class LedgerToolset {
       new RetractTool(ledger.findings).tool(),
       new ReadLedgerTool(ledger.findings).tool(),
       ...wait,
-      new FinishTool(ledger.check, ledger.onChecked).tool(),
+      new FinishTool(ledger.check, ledger.onChecked, ledger.tally).tool(),
     ];
   }
 }

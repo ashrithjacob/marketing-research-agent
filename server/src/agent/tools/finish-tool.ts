@@ -1,27 +1,29 @@
 import type { AgentTool } from "@earendil-works/pi-agent-core";
 
-import { CheckProblems } from "../../domain/index.js";
+import { CheckProblems, REFUSED_FINISH_LIMIT } from "../../domain/index.js";
 import type { DoneCheck } from "../done-check.js";
 import { FINISH_DESCRIPTION } from "../prompt/text/record-tools.js";
 import { Trace } from "../../trace/index.js";
 
 import { finishParameters } from "./parameters.js";
 
-export const FINISH_BUDGET = 5;
+/** How many times this agent's finish has been refused; the refused-finish breaker reads the same count. */
+export interface FinishTally {
+  readonly refusedFinishes: number;
+  refuse(): void;
+}
 
-/** Checks this agent's part of the ledger; a pass ends the agent, a failure hands back what to fix, at most FINISH_BUDGET times. */
+/** Checks this agent's part of the ledger; a pass ends the agent, a failure hands back what to fix and counts toward the refused-finish breaker. */
 export class FinishTool {
-  private spent = 0;
-
   constructor(
     private readonly check: DoneCheck,
     private readonly onChecked: (valid: boolean, problems: readonly string[]) => Promise<void>,
+    private readonly tally: FinishTally,
   ) {}
 
   tool(): AgentTool<typeof finishParameters> {
     Trace.line(import.meta.url, "FinishTool.tool");
-    const { check, onChecked } = this;
-    const tool = this;
+    const { check, onChecked, tally } = this;
     return {
       name: "finish",
       label: "Finish",
@@ -29,20 +31,19 @@ export class FinishTool {
       parameters: finishParameters,
       executionMode: "sequential",
       async execute() {
-        Trace.line(import.meta.url, "FinishTool.tool.execute", { spent: tool.spent });
-        if (tool.spent >= FINISH_BUDGET) {
+        Trace.line(import.meta.url, "FinishTool.tool.execute", { refused: tally.refusedFinishes });
+        if (tally.refusedFinishes >= REFUSED_FINISH_LIMIT) {
           return {
             content: [
               {
                 type: "text",
-                text: `NOT CHECKED — your ${FINISH_BUDGET} checks are spent. You end now, with what the ledger holds.`,
+                text: `NOT CHECKED — finish was refused ${REFUSED_FINISH_LIMIT} times. You end now, with what the ledger holds; what is still missing is recorded as gaps.`,
               },
             ],
-            details: { checked: false, reason: "budget_spent" },
+            details: { checked: false, reason: "refused_finish" },
             terminate: true,
           };
         }
-        tool.spent += 1;
         const problems = CheckProblems.texts(await check.problems());
         await onChecked(problems.length === 0, problems);
         if (problems.length === 0) {
@@ -52,6 +53,7 @@ export class FinishTool {
             terminate: true,
           };
         }
+        tally.refuse();
         const numbered = problems.map((problem, i) => `${i + 1}. ${problem}`).join("\n");
         return {
           content: [
@@ -60,7 +62,7 @@ export class FinishTool {
               text:
                 `NOT FINISHED — ${problems.length} problem${problems.length === 1 ? "" : "s"}. ` +
                 `Fix them with record_* or retract, then call finish again:\n${numbered}\n` +
-                `Checks used: ${tool.spent} of ${FINISH_BUDGET}.`,
+                `Refused ${tally.refusedFinishes} of ${REFUSED_FINISH_LIMIT}: at ${REFUSED_FINISH_LIMIT} you are stopped, and what is missing is recorded as gaps.`,
             },
           ],
           details: { valid: false, problems },

@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { api, TERMINAL_STATUSES, type Judgement, type ProductTruthPacket, type ResearchNode, type RunDetail, type RunSummary, type StagePacket } from '../api';
+import { api, DELIVERED_STATUSES, TERMINAL_STATUSES, type Judgement, type ProductTruthPacket, type ResearchNode, type RunDetail, type RunSummary, type StagePacket } from '../api';
 import StageRail, { type StageProgress } from '../StageRail';
 import { scopeLabel, type CollectingStage } from '../stages';
 import { CostTable } from './CostTable';
@@ -15,15 +15,15 @@ export function subjectProgress(runs: RunSummary[], run: RunSummary): StageProgr
       .filter((r) => runStage(r) === stage && (runStage(run) === stage ? r.id === run.id : r.source_run_id === anchor))
       .sort((a, b) => b.created_at.localeCompare(a.created_at));
   const pick = (list: RunSummary[]) =>
-    list.find((r) => !TERMINAL_STATUSES.has(r.status)) ?? list.find((r) => r.status === 'completed') ?? list[0];
+    list.find((r) => !TERMINAL_STATUSES.has(r.status)) ?? list.find((r) => DELIVERED_STATUSES.has(r.status)) ?? list[0];
   const truth = on(2);
   const mining = on(3);
   const newestStageOne = runs
-    .filter((r) => runStage(r) === 1 && r.status === 'completed')
+    .filter((r) => runStage(r) === 1 && DELIVERED_STATUSES.has(r.status))
     .sort((a, b) => b.created_at.localeCompare(a.created_at))[0];
   const superseded = runStage(run) !== 1 && !!newestStageOne && newestStageOne.id !== run.source_run_id;
   return {
-    done: { 1: stageOneRun?.status === 'completed', 2: truth.some((r) => r.status === 'completed'), 3: mining.some((r) => r.status === 'completed') },
+    done: { 1: (!!stageOneRun && DELIVERED_STATUSES.has(stageOneRun.status)), 2: truth.some((r) => DELIVERED_STATUSES.has(r.status)), 3: mining.some((r) => DELIVERED_STATUSES.has(r.status)) },
     live: { 1: false, 2: truth.some((r) => !TERMINAL_STATUSES.has(r.status)), 3: mining.some((r) => !TERMINAL_STATUSES.has(r.status)) },
     runIds: { 1: stageOneRun?.id, 2: pick(truth)?.id, 3: pick(mining)?.id },
     ...(superseded ? { newerStageOne: newestStageOne } : {}),

@@ -1,4 +1,4 @@
-import type { ResearchStore } from "../domain/index.js";
+import type { ResearchStore, Trip } from "../domain/index.js";
 import { Trace } from "../trace/index.js";
 
 import { AgentEventRecorder, type TurnEnd } from "./event-recorder.js";
@@ -15,6 +15,7 @@ export interface AgentOutcome {
   status: AgentEnd;
   text: string;
   error: string;
+  trip: Trip | null;
 }
 
 /** Drives one agent to its end — a dropped stream retried on the next model in the chain — and says how it ended. */
@@ -51,10 +52,10 @@ export class AgentDriver {
     } finally {
       unsubscribe();
     }
-    await this.closeAtLimit(agentId, built, finished);
+    const trip = await this.closeAtLimit(agentId, built, finished);
     const status: AgentEnd = (await this.stopping()) ? "cancelled" : finished() ? "complete" : error ? "failed" : "incomplete";
-    runs.emit(runId, "agent.ended", { agent_id: agentId, status, ...(error ? { error } : {}) });
-    return { agentId, status, text: recorder.text(), error };
+    runs.emit(runId, "agent.ended", { agent_id: agentId, status, ...(error ? { error } : {}), ...(trip ? { breaker: trip.breaker } : {}) });
+    return { agentId, status, text: recorder.text(), error, trip };
   }
 
   private async resumeDropped(agentId: string, { agent }: BuiltAgent): Promise<void> {
@@ -72,12 +73,14 @@ export class AgentDriver {
     }
   }
 
-  /** An agent its turn limit ended: rows that fail its check are retracted and whatever it left open is gapped, so the run shows what it found rather than a rejected part. */
-  private async closeAtLimit(agentId: string, built: BuiltAgent, finished: () => boolean): Promise<void> {
-    Trace.line(import.meta.url, "AgentDriver.closeAtLimit", { agentId, spent: built.budget.spent });
-    if (!built.budget.spent || finished() || (await this.stopping()) || !built.closeOnLimit) return;
-    const { gapped, retracted } = await built.closeOnLimit();
-    this.runs.emit(this.runId, "agent.limit_reached", { agent_id: agentId, limit: built.budget.limit, gapped, retracted });
+  /** An agent a breaker ended: rows that fail its check are retracted and whatever it left open is gapped with why it stopped, so the run shows what it found rather than a rejected part. */
+  private async closeAtLimit(agentId: string, built: BuiltAgent, finished: () => boolean): Promise<Trip | null> {
+    Trace.line(import.meta.url, "AgentDriver.closeAtLimit", { agentId });
+    const trip = built.breakers.tripped;
+    if (!trip || finished() || (await this.stopping())) return null;
+    const { gapped, retracted } = built.closeOnLimit ? await built.closeOnLimit(trip) : { gapped: [], retracted: [] };
+    this.runs.emit(this.runId, "agent.limit_reached", { agent_id: agentId, limit: built.breakers.ceiling, breaker: trip.breaker, reason: trip.status, gapped, retracted });
+    return trip;
   }
 
   private async stopping(): Promise<boolean> {

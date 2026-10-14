@@ -25,7 +25,7 @@ import { RowRepair } from "./row-repair.js";
 import { RunFindings } from "./run-findings.js";
 import { ToolSteps } from "./tool-steps.js";
 import { LedgerToolset, LibraryTools, TracedTool, type ToolRegistry } from "./tools/index.js";
-import { TurnBudget } from "./turn-budget.js";
+import { TurnBreakers } from "./turn-breakers.js";
 
 /** What every role's agent needs from the run it belongs to, whichever stage. */
 export interface RoleContext {
@@ -57,7 +57,7 @@ export class ResearchAgentFactory {
     Trace.line(import.meta.url, "ResearchAgentFactory.build", { role: role.id, runId: run.runId });
     const findings = new RunFindings(this.store.findings, run.runId, role.id, Roles.scope(role, run.nodes), run.markets);
     const check = RoleChecks.done(role, findings, run);
-    const budget = new TurnBudget(role.maxTurns);
+    const breakers = new TurnBreakers({ stepCeiling: role.maxTurns, maxUsd: null, maxMinutes: null }, async () => (await findings.rows()).filter((row) => row.agent_id === role.id).length);
     const steps = new ToolSteps();
     const rows = await findings.rows();
     const workspaceId = (await this.store.getRun(run.runId))?.workspace_id ?? "";
@@ -74,6 +74,7 @@ export class ResearchAgentFactory {
       records: RoleRecords.of(role),
       check,
       onChecked: (valid, problems) => run.onChecked(role.id, valid, problems),
+      tally: breakers,
       ...(role.tools.includes("wait_for") ? { roster: run.roster } : {}),
       ...(run.pollMs !== undefined ? { pollMs: run.pollMs } : {}),
     }).build();
@@ -86,10 +87,10 @@ export class ResearchAgentFactory {
         model: run.chain.current,
         tools: [...research.map((built) => built.tool), ...ledger].map((tool) => TracedTool.wrap(tool, steps)),
       },
-      finishTurn: budget.finishTurn,
+      finishTurn: breakers.finishTurn,
     });
     const instructions = run.briefing.instructions(role, rows);
     const closeOnLimit = RoleChecks.closer(role, findings, new RowRepair(this.store.findings, run.runId, run.nodes), check, run);
-    return { agent, instructions, steps, check, budget, closeOnLimit };
+    return { agent, instructions, steps, check, breakers, closeOnLimit };
   }
 }

@@ -1,3 +1,4 @@
+import { RunStatuses } from "./breakers.js";
 import { Trace } from "../trace/index.js";
 
 export interface RunHead {
@@ -38,7 +39,7 @@ export class ProductFolders {
             run_count: runs.length,
             latest_at: newest.created_at,
             latest_status: newest.status,
-            default_run_id: (runs.find((r) => r.status === "completed") ?? newest).id,
+            default_run_id: (runs.find((r) => RunStatuses.delivered(r.status)) ?? newest).id,
           },
         ];
       })

@@ -23,6 +23,11 @@ export function nowPanel(
           title: `Stage ${stage} complete`,
           sub: `packet accepted — ${run.counts.sources} sources, ${stage === 2 ? '' : `${run.counts.excerpts} excerpts, `}${run.counts.gaps} gaps`,
         };
+      case 'partial':
+        return {
+          title: `Stage ${stage} partly complete`,
+          sub: `${run.error} — ${run.counts.sources} sources, ${run.counts.gaps} gaps`,
+        };
       case 'invalid':
         return { title: 'Packet rejected', sub: run.error };
       case 'failed':

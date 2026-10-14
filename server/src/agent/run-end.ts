@@ -1,4 +1,4 @@
-import { Clock, Scope, type ResearchStore } from "../domain/index.js";
+import { Clock, RunStatuses, Scope, type ResearchStore, type Trip } from "../domain/index.js";
 import { Trace } from "../trace/index.js";
 
 import type { LiveRuns } from "./live-runs.js";
@@ -6,11 +6,12 @@ import type { Assembled, RunAssembly } from "./run-assembly.js";
 
 export type RunEnding =
   | { kind: "settled"; errorMessage?: string }
+  | { kind: "cut_short"; trips: readonly Trip[]; errorMessage?: string }
   | { kind: "stopped"; reason?: string }
   | { kind: "crashed"; error: string }
   | { kind: "restarted" };
 
-export type FinalStatus = "completed" | "invalid" | "failed" | "cancelled";
+export type FinalStatus = "completed" | "partial" | "invalid" | "failed" | "cancelled";
 
 /** The only way a run reaches a final status: its ledger is assembled and the packet stored first, so whatever was found is shown however the run ended; the status then says how it ended. */
 export class RunEnd {
@@ -25,7 +26,8 @@ export class RunEnd {
     Trace.line(import.meta.url, "RunEnd.end", { runId: assembly.runId, ending: ending.kind });
     const runId = assembly.runId;
     const run = await this.store.getRun(runId);
-    const stopped: RunEnding | null = ending.kind === "settled" && run?.status === "stopping" ? { kind: "stopped", reason: ending.errorMessage } : null;
+    const finishing = ending.kind === "settled" || ending.kind === "cut_short";
+    const stopped: RunEnding | null = finishing && run?.status === "stopping" ? { kind: "stopped", reason: ending.errorMessage } : null;
     await this.store.updateRun(runId, { ...record, ...(run?.ended_at ? {} : { ended_at: Clock.nowIso() }) });
     const { assembled, crash } = await RunEnd.assembleOrCrash(assembly);
     const actual = crash ?? stopped ?? ending;
@@ -36,8 +38,9 @@ export class RunEnd {
       this.runs.emit(runId, "packet.invalid", { error });
     }
     await this.store.updateRun(runId, { status, error });
-    this.runs.emit(runId, `run.${status}`, status === "completed" ? { usage: record.usage } : error ? { error } : {});
-    if (status === "completed") await this.countJudgementApplications(runId, assembled);
+    const delivered = RunStatuses.delivered(status);
+    this.runs.emit(runId, `run.${status}`, delivered ? { usage: record.usage, ...(error ? { error } : {}) } : error ? { error } : {});
+    if (delivered) await this.countJudgementApplications(runId, assembled);
     if (status === "completed" && actual.kind === "settled" && actual.errorMessage) this.runs.emit(runId, "run.ended_early", { error: actual.errorMessage });
     return status;
   }
@@ -87,6 +90,12 @@ export class RunEnd {
         if (broken && ending.errorMessage) return { status: "failed", error: ending.errorMessage };
         if (broken) return { status: "invalid", error: assembled.problems.join("; ") };
         return { status: "completed", error: "" };
+      }
+      case "cut_short": {
+        const broken = !assembled.packet || assembled.problems.length > 0;
+        if (broken && ending.errorMessage) return { status: "failed", error: ending.errorMessage };
+        if (broken) return { status: "invalid", error: assembled.problems.join("; ") };
+        return { status: "partial", error: `stopped early: ${ending.trips.map((trip) => trip.status).join("; ")}` };
       }
     }
   }
