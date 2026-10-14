@@ -134,6 +134,16 @@ commit that closed it; do not delete it.
 32. **Only write playbooks exist.** Distil proposes a `write` playbook; research
     tasks read no playbook, so §5.5's per-version numbers cover writing only.
 
+33. **Stage 2 can build on the wrong stage-1 run after a plan.** Product truth
+    starts from the newest delivered stage-1 run of the product
+    (`StageOneHandoff.forBrief`, `agent/stage-one-handoff.ts`), and every task run
+    is stored as stage 1: each plan task is its own run of one node, and write and
+    critique runs (part 8) are stage 1 too. So **Start stage 2 →** after a plan may
+    read one task's packet or a draft's. Until fixed, run a whole stage 1 with
+    **Stage run** before stage 2. Needs: stage 2 reading a plan's tasks together,
+    and never a write or critique run. Product truth and review mining are still
+    not plan tasks (gap 9), so stages 2 and 3 start only from the stage rail.
+
 ## Built but not seen live
 
 The owner asked on 2026-10-14 for no more live runs; these are covered by tests
