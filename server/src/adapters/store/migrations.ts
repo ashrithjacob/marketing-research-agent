@@ -27,6 +27,9 @@ const MIGRATIONS: ReadonlyArray<readonly [string, string, string]> = [
       " AND s.workspace_id = research_runs.workspace_id AND s.created_at <= research_runs.created_at" +
       " ORDER BY s.created_at DESC LIMIT 1), '') WHERE stage = 2",
   ],
+  ["research_runs", "task_id", "ALTER TABLE research_runs ADD COLUMN task_id TEXT NOT NULL DEFAULT ''"],
+  ["research_runs", "conversation_id", "ALTER TABLE research_runs ADD COLUMN conversation_id TEXT NOT NULL DEFAULT ''"],
+  ["research_runs", "contract", "ALTER TABLE research_runs ADD COLUMN contract TEXT NOT NULL DEFAULT ''"],
 ];
 
 /** CREATE TABLE IF NOT EXISTS never alters an existing table, so columns migrate here, and a table not yet created gets them from its own DDL; a change to rows already stored runs once, by name. */

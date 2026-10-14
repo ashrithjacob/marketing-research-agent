@@ -63,6 +63,8 @@ export interface RunUpdate {
   ended_at?: string;
   packet_source?: "ledger" | "pipeline" | "";
   source_run_id?: string;
+  task_id?: string;
+  conversation_id?: string;
 }
 
 export interface LlmCallRecord {

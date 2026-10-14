@@ -28,3 +28,4 @@ export * from "./packet-assembly.js";
 export * from "./review-mining-offer.js";
 export * from "./review-mining-packet.js";
 export * from "./cost-reports.js";
+export * from "./contract-check.js";

@@ -33,12 +33,27 @@ export interface ResearchRun {
   packet: Record<string, unknown> | null;
   packet_source: string;
   source_run_id: string;
+  task_id: string;
+  conversation_id: string;
+  contract: Record<string, unknown> | null;
   error: string;
   output: string;
   usage: Record<string, unknown>;
   created_at: string;
   updated_at: string;
   ended_at: string;
+}
+
+/** What a new run is created from; a task's run also carries its contract. */
+export interface RunDraft {
+  workspaceId: string;
+  brief: Record<string, unknown>;
+  model: string;
+  rejectKinds: string[];
+  judgementIds: string[];
+  nodes?: string[];
+  stage?: number;
+  contract?: Record<string, unknown>;
 }
 
 export interface RunSummary {

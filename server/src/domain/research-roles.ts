@@ -13,6 +13,7 @@ import {
   PRODUCT_DELIVERABLE,
 } from "./role-deliverables.js";
 import type { StageOneAgent } from "./stage-one-agents.js";
+import type { PrimitiveName } from "./task-contract.js";
 import { Trace } from "../trace/index.js";
 
 export const TOOL_NAMES = [
@@ -32,7 +33,7 @@ export type ToolName = (typeof TOOL_NAMES)[number];
 export const CONSISTENCY_CHECKS = ["stage_one_node", "champion", "product_truth"] as const;
 export type Consistency = (typeof CONSISTENCY_CHECKS)[number];
 
-export type RoleId = StageOneAgent | ProductTruthAgent;
+export type RoleId = StageOneAgent | ProductTruthAgent | PrimitiveName;
 
 /** Everything that makes one research agent different from another, except its prompt text. */
 export interface RoleSpec {

@@ -34,3 +34,5 @@ export * from "./research-roles.js";
 export * from "./role-records.js";
 export * from "./library.js";
 export * from "./harness.js";
+export * from "./task-contract.js";
+export * from "./primitives.js";

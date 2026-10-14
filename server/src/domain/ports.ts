@@ -9,7 +9,7 @@ import type {
   RunUpdate,
 } from "./logs.js";
 import type { Account, AccountListing, Scope, Workspace } from "./accounts.js";
-import type { ResearchRun } from "./records.js";
+import type { ResearchRun, RunDraft } from "./records.js";
 import type { Product, RunHead } from "./products.js";
 import type { StoredPacketRows } from "./packet-rows.js";
 import type { ReviewAnalysis } from "./review-analysis.js";
@@ -98,15 +98,7 @@ export interface ResearchStore {
   readonly pulls: ReviewPullStore;
   readonly accounts: AccountDirectory;
   readonly library: DocumentLibrary;
-  createRun(input: {
-    workspaceId: string;
-    brief: Record<string, unknown>;
-    model: string;
-    rejectKinds: string[];
-    judgementIds: string[];
-    nodes?: string[];
-    stage?: number;
-  }): Promise<ResearchRun>;
+  createRun(input: RunDraft): Promise<ResearchRun>;
   getRun(runId: string): Promise<ResearchRun | null>;
   listRuns(scope: Scope, limit?: number): Promise<ResearchRun[]>;
   updateRun(runId: string, fields: RunUpdate): Promise<void>;

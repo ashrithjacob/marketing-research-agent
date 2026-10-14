@@ -1,5 +1,5 @@
 
-import { Clock, Ids, type ResearchRun, type RunHead, type RunUpdate, type Scope } from "../../domain/index.js";
+import { Clock, Ids, type ResearchRun, type RunDraft, type RunHead, type RunUpdate, type Scope } from "../../domain/index.js";
 
 import { Rows } from "./rows.js";
 import type { SqlDatabase } from "./sql-database.js";
@@ -22,6 +22,8 @@ const COLUMNS = new Set([
   "ended_at",
   "packet_source",
   "source_run_id",
+  "task_id",
+  "conversation_id",
 ]);
 
 const JSON_COLUMNS = new Set(["brief", "reject_kinds", "judgement_ids", "packet", "usage"]);
@@ -29,22 +31,13 @@ const JSON_COLUMNS = new Set(["brief", "reject_kinds", "judgement_ids", "packet"
 export class RunTable {
   constructor(private readonly db: SqlDatabase) {}
 
-  async create(input: {
-    workspaceId: string;
-    brief: Record<string, unknown>;
-    model: string;
-    rejectKinds: string[];
-    judgementIds: string[];
-    nodes?: string[];
-    stage?: number;
-    productId: string;
-  }): Promise<ResearchRun> {
+  async create(input: RunDraft & { productId: string }): Promise<ResearchRun> {
     Trace.line(import.meta.url, "RunTable.create", { input });
     const now = Clock.nowIso();
     const runId = Ids.next();
     await this.db.run(
       "INSERT INTO research_runs (id, workspace_id, product_id, status, stage, model, brief, reject_kinds," +
-        " judgement_ids, nodes, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+        " judgement_ids, nodes, contract, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
       [
         runId,
         input.workspaceId,
@@ -56,6 +49,7 @@ export class RunTable {
         JSON.stringify(input.rejectKinds),
         JSON.stringify(input.judgementIds),
         JSON.stringify(input.nodes ?? []),
+        input.contract ? JSON.stringify(input.contract) : "",
         now,
         now,
       ],
