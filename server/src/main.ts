@@ -18,7 +18,7 @@ new WireTap().attach();
 traces.prune();
 const store = await SqlResearchStore.open(StoreDatabase.forSettings(settings));
 const models = RunSupervisor.defaultModels();
-const harness = await PiHarness.open(settings.harnessPath, models);
+const harness = await PiHarness.open(settings.harnessPath, models, [settings.model, ...settings.backupModels]);
 const app = new App({ settings, traces, store, harness });
 
 await app.supervisor.recoverRunsKilledByRestart();

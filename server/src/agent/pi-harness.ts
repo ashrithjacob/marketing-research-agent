@@ -8,6 +8,8 @@ import { openNodeSqliteStorage } from "@earendil-works/pi-durable/storage/sqlite
 import type { DurableHarness } from "../domain/index.js";
 import { Trace } from "../trace/index.js";
 
+import { FallbackModels } from "./fallback-models.js";
+
 export class PiHarness implements DurableHarness {
   private constructor(
     readonly session: Harness,
@@ -19,12 +21,13 @@ export class PiHarness implements DurableHarness {
     Trace.line(import.meta.url, "PiHarness.constructor", { path, reopened });
   }
 
-  static async open(path: string, models: Models): Promise<PiHarness> {
-    Trace.line(import.meta.url, "PiHarness.open", { path });
+  /** `models` serve the app as they are; the harness gets them wrapped with the backup chain, `chain` being the primary model then its backups. */
+  static async open(path: string, models: Models, chain: readonly string[] = []): Promise<PiHarness> {
+    Trace.line(import.meta.url, "PiHarness.open", { path, chain });
     const reopened = existsSync(path);
     const storage = await openNodeSqliteStorage(path);
     const registry = createRegistry();
-    const harness = await Harness.open(storage, { models, registry }, BACKGROUND_CONTEXT);
+    const harness = await Harness.open(storage, { models: FallbackModels.wrap(models, chain), registry }, BACKGROUND_CONTEXT);
     return new PiHarness(harness, registry, models, path, reopened);
   }
 
