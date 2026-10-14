@@ -6,8 +6,9 @@ import { Trace } from "../../trace/index.js";
 
 import type { LiveRuns } from "../live-runs.js";
 
-import { RunDoc } from "./run-doc.js";
+import { RunDoc, TaskIndex } from "./run-doc.js";
 import type { TaskEnd } from "./task-end.js";
+import type { TaskEvents } from "./task-events.js";
 import { TaskExtensions } from "./task-extensions.js";
 import type { TaskReadings } from "./task-readings.js";
 import type { TaskSignals } from "./task-signals.js";
@@ -25,6 +26,7 @@ export interface ResearchTaskDeps {
   signals: TaskSignals;
   readings: TaskReadings;
   ending: TaskEnd;
+  events: TaskEvents;
   registry: Registry;
   model: string;
 }
@@ -67,6 +69,7 @@ export class ResearchTasks {
       const conversation = await tx.createConversation({ ownership: { kind: "task", taskId: runtime.taskId } });
       await configure(tx, conversation.id, { model, extensions: [extension] });
       (await tx.doc(RunDoc, conversation.id)).run_id = runId;
+      (await tx.doc(TaskIndex)).conversations[runId] = conversation.id;
       return { status: "running", checkpoint: { phase: "work", conversationId: conversation.id } };
     }, context);
   }
@@ -97,13 +100,15 @@ export class ResearchTasks {
     const status = await this.deps.ending.finish(runId, trip, error);
     await runtime.commit(() => ({ status: "terminal", outcome: { status: "completed", result: { status } } }), context);
     this.forget(runId);
+    await this.deps.events.ended(runId, status);
   }
 
   private async aborted(runId: string, runtime: Runtime, context: Context): Promise<void> {
     Trace.line(import.meta.url, "ResearchTasks.aborted", { runId });
-    await this.deps.ending.stop(runId);
+    const status = await this.deps.ending.stop(runId);
     await runtime.commit(() => ({ status: "terminal", outcome: { status: "aborted" } }), context);
     this.forget(runId);
+    await this.deps.events.ended(runId, status);
   }
 
   private forget(runId: string): void {

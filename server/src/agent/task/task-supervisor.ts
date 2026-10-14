@@ -13,6 +13,7 @@ import type { ToolRegistry } from "../tools/index.js";
 import { ResearchTasks } from "./research-task.js";
 import { TaskIndex } from "./run-doc.js";
 import { TaskEnd } from "./task-end.js";
+import type { TaskEvents } from "./task-events.js";
 import { TaskExtensions } from "./task-extensions.js";
 import { TaskIntake } from "./task-intake.js";
 import { TaskReadings } from "./task-readings.js";
@@ -26,6 +27,7 @@ export interface TaskSupervisorDeps {
   harness: PiHarness;
   tools: ToolRegistry;
   costs: OpenRouterPrices;
+  events: TaskEvents;
 }
 
 /** Durable tasks on the harness: a contract checked and queued as a run, a restart's tasks picked back up, a stop delivered as an abort. */
@@ -35,13 +37,13 @@ export class TaskSupervisor {
 
   constructor(private readonly deps: TaskSupervisorDeps) {
     Trace.line(import.meta.url, "TaskSupervisor.constructor");
-    const { store, runs, settings, tools, costs, harness } = deps;
+    const { store, runs, settings, tools, costs, harness, events } = deps;
     const works = new TaskWorks({ store, runs, settings, tools, costs });
     const signals = new TaskSignals();
     const readings = new TaskReadings(store);
     const ending = new TaskEnd({ store, runs, costs, works, signals, readings });
     const extensions = new TaskExtensions(works, signals, readings);
-    this.tasks = new ResearchTasks({ store, runs, works, extensions, signals, readings, ending, registry: harness.registry, model: settings.model });
+    this.tasks = new ResearchTasks({ store, runs, works, extensions, signals, readings, ending, events, registry: harness.registry, model: settings.model });
     this.intake = new TaskIntake(store, settings);
     harness.registry.install(defineExtension({ name: "mra.worker", tasks: [this.tasks.definition] }));
   }
@@ -71,6 +73,16 @@ export class TaskSupervisor {
     Trace.line(import.meta.url, "TaskSupervisor.stop", { runId });
     const taskId = (await this.deps.harness.session.snapshot(TaskIndex, BACKGROUND_CONTEXT))?.tasks[runId];
     if (taskId !== undefined) await this.deps.harness.session.abortTask(taskId, BACKGROUND_CONTEXT);
+  }
+
+  /** The owner's guidance, delivered to a running task's worker at its next step. */
+  async guide(runId: string, text: string): Promise<boolean> {
+    Trace.line(import.meta.url, "TaskSupervisor.guide", { runId });
+    const conversationId = (await this.deps.harness.session.snapshot(TaskIndex, BACKGROUND_CONTEXT))?.conversations[runId];
+    const worker = conversationId === undefined ? undefined : await this.deps.harness.session.conversation(conversationId, BACKGROUND_CONTEXT);
+    if (!worker) return false;
+    await worker.submit({ type: "input", content: `Guidance from the owner: ${text}`, whenBusy: "steer" }, BACKGROUND_CONTEXT);
+    return true;
   }
 
   /** Creates the run's task once: the index is read and written in the same commit, so a second call finds the first task. */

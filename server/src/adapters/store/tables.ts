@@ -10,6 +10,7 @@ import { EventLog } from "./event-log.js";
 import { FindingTable } from "./finding-table.js";
 import { JudgementTable } from "./judgement-table.js";
 import { PacketRowTable } from "./packet-row-table.js";
+import { PlanTable } from "./plan-table.js";
 import { ProductBackfill } from "./product-backfill.js";
 import { SqlProductCatalog } from "./product-catalog.js";
 import { ProductTable } from "./product-table.js";
@@ -39,6 +40,7 @@ export class StoreTables {
   readonly charges: ChargeLedger;
   readonly pulls: ReviewPullStore;
   readonly library: DocumentLibrary;
+  readonly plans: PlanTable;
 
   private constructor(readonly db: SqlDatabase) {
     Trace.line(import.meta.url, "StoreTables.constructor");
@@ -57,6 +59,7 @@ export class StoreTables {
     this.charges = new ChargeTable(db);
     this.pulls = new ReviewPullTable(db);
     this.library = new DocumentTable(db);
+    this.plans = new PlanTable(db);
     this.catalog = new SqlProductCatalog(this.products, this.runs, this.packetRows);
   }
 

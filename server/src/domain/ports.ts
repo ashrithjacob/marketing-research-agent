@@ -1,13 +1,5 @@
 import type { SourceKind } from "./vocabulary.js";
-import type {
-  Generation,
-  Judgement,
-  LlmCall,
-  LlmCallRecord,
-  PacketCheck,
-  RunEvent,
-  RunUpdate,
-} from "./logs.js";
+import type { Generation, Judgement, LlmCall, LlmCallRecord, PacketCheck, RunEvent, RunUpdate } from "./logs.js";
 import type { Account, AccountListing, Scope, Workspace } from "./accounts.js";
 import type { ResearchRun, RunDraft } from "./records.js";
 import type { Product, RunHead } from "./products.js";
@@ -21,6 +13,7 @@ import type { FetchedPage, SearchPage, SearchScope } from "./web.js";
 import type { DiscoveryQuestion, DiscoveryReport } from "./competitor-discovery.js";
 import type { AdPage, AdQuery } from "./ad-library.js";
 import type { DocumentLibrary } from "./library.js";
+import type { PlanBook } from "./plans.js";
 
 /** Products and what their runs found, counted only over the runs a scope admits. */
 export interface ProductCatalog {
@@ -98,6 +91,7 @@ export interface ResearchStore {
   readonly pulls: ReviewPullStore;
   readonly accounts: AccountDirectory;
   readonly library: DocumentLibrary;
+  readonly plans: PlanBook;
   createRun(input: RunDraft): Promise<ResearchRun>;
   getRun(runId: string): Promise<ResearchRun | null>;
   listRuns(scope: Scope, limit?: number): Promise<ResearchRun[]>;

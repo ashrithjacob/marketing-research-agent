@@ -26,7 +26,7 @@ const abandoned = await app.intake.recover();
 if (abandoned > 0) console.log(`${abandoned} document conversion(s) were cut off by the restart and marked failed`);
 const resettled = await app.supervisor.resettleInvalidRuns();
 if (resettled.length > 0) console.log(`re-settled ${resettled.length} invalid run(s) from their ledgers: ${resettled.join(", ")}`);
-const picked = app.tasks ? await app.tasks.recover() : 0;
+const picked = app.workspace ? await app.workspace.tasks.recover() : 0;
 harness.resume();
 console.log(`harness ${harness.reopened ? "reopened" : "created"} at ${harness.path}; ${picked} task(s) to pick back up`);
 app.supervisor.costs.start();

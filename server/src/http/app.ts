@@ -1,6 +1,6 @@
 import { Hono, type Context, type Next } from "hono";
 
-import { LibraryIntake, RunSupervisor, TaskSupervisor, ToolRegistry, type PiHarness } from "../agent/index.js";
+import { LibraryIntake, RunSupervisor, ToolRegistry, WorkspaceServices, type PiHarness } from "../agent/index.js";
 import { MarkdownLayout, PdfMarkdown, ServiceClients } from "../adapters/index.js";
 import { AmazonListingLookup } from "../adapters/apify/index.js";
 import { Env, type Settings } from "../config/index.js";
@@ -17,7 +17,7 @@ export class App {
   readonly fetch: Hono["fetch"];
   readonly supervisor: RunSupervisor;
   readonly intake: LibraryIntake;
-  readonly tasks: TaskSupervisor | null;
+  readonly workspace: WorkspaceServices | null;
   readonly store: ResearchStore;
   readonly settings: Settings;
   readonly traces: TraceFile;
@@ -38,8 +38,8 @@ export class App {
     this.supervisor =
       overrides.supervisor ?? new RunSupervisor({ store: this.store, settings: this.settings, services, ...(overrides.harness ? { models: overrides.harness.models } : {}) });
     const { supervisor, store, settings } = this;
-    this.tasks = overrides.harness
-      ? new TaskSupervisor({ store, runs: supervisor.live, settings, harness: overrides.harness, tools: new ToolRegistry(services, settings), costs: supervisor.costs })
+    this.workspace = overrides.harness
+      ? new WorkspaceServices({ store, runs: supervisor.live, settings, harness: overrides.harness, tools: new ToolRegistry(services, settings), costs: supervisor.costs })
       : null;
 
     this.intake = new LibraryIntake(this.store.library, new PdfMarkdown(new MarkdownLayout()));
@@ -58,7 +58,7 @@ export class App {
         traces: this.traces,
         listingSource: overrides.listingSource !== undefined ? overrides.listingSource : App.listingSource(services),
         pages: services.pages,
-        tasks: this.tasks,
+        workspace: this.workspace,
       }).router(),
     );
     new Frontend(this.settings.staticDir).mount(hono);
