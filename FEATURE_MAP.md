@@ -277,7 +277,7 @@ it was saved as a standing judgement because the run had already settled.
 
 Strategy PDFs every research agent can read. A drop zone and **Choose files**
 (PDF only, several at once), then one row per document, newest first. Design:
-`docs/spec-always-on.md` §9.
+`docs/spec-always-on.md` §10.
 
 | Control | Calls | Broken looks like |
 |---|---|---|
