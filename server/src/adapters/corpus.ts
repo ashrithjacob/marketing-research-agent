@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { Trace } from "../trace/index.js";
 
@@ -22,6 +22,18 @@ export class Corpus {
       return { sourceId, archived: true };
     } catch {
       return { sourceId, archived: false };
+    }
+  }
+
+  /** The archived body a source id names, or null when this run never archived it. */
+  async read(runId: string, sourceId: string): Promise<string | null> {
+    Trace.line(import.meta.url, "Corpus.read", { runId, sourceId });
+    const digest = sourceId.startsWith("sha256:") ? sourceId.slice("sha256:".length) : "";
+    if (!/^[0-9a-f]{64}$/.test(digest)) return null;
+    try {
+      return await readFile(join(this.corpusPath, "runs", runId, "sources", digest), "utf-8");
+    } catch {
+      return null;
     }
   }
 }

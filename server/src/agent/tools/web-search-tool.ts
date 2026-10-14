@@ -2,6 +2,8 @@ import type { AgentTool } from "@earendil-works/pi-agent-core";
 
 import type { WebSearch } from "../../domain/index.js";
 
+import { EXTERNAL_RESULTS_NOTE } from "../prompt/text/external.js";
+
 import { searchParameters } from "./parameters.js";
 import { Trace } from "../../trace/index.js";
 
@@ -33,7 +35,7 @@ export class WebSearchTool {
           .map((hit, index) => `${index + 1}. ${hit.title}\n   ${hit.url}\n   ${hit.snippet}`)
           .join("\n\n");
         return {
-          content: [{ type: "text", text: rendered }],
+          content: [{ type: "text", text: `<search_results>\n${rendered}\n</search_results>\n${EXTERNAL_RESULTS_NOTE}` }],
           details: { query: params.query, hits, service: report },
         };
       },

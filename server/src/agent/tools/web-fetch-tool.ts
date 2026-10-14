@@ -4,7 +4,10 @@ import { Corpus } from "../../adapters/corpus.js";
 import type { Settings } from "../../config/index.js";
 import type { FetchGate, PageFetcher } from "../../domain/index.js";
 
+import { EXTERNAL_PAGE_NOTE } from "../prompt/text/external.js";
+
 import type { FetchRecord } from "./lanes.js";
+import { PlainPage, type PageView } from "./page-views.js";
 import { fetchParameters } from "./parameters.js";
 import { Trace } from "../../trace/index.js";
 
@@ -18,11 +21,12 @@ export class WebFetchTool {
     private readonly gate?: FetchGate,
     private readonly subject = "",
     private readonly market = "",
+    private readonly view: PageView = new PlainPage(),
   ) {}
 
   tool(): AgentTool<typeof fetchParameters> {
     Trace.line(import.meta.url, "WebFetchTool.tool");
-    const { settings, firecrawl, corpus, runId, onFetch, gate, subject, market } = this;
+    const { settings, firecrawl, corpus, runId, onFetch, gate, subject, market, view } = this;
     return {
       name: "web_fetch",
       label: "Fetch page",
@@ -72,8 +76,7 @@ export class WebFetchTool {
         }
 
         const { sourceId, archived } = await corpus.write(runId, text);
-        const truncated = text.length > settings.fetchCharLimit;
-        const shown = truncated ? text.slice(0, settings.fetchCharLimit) : text;
+        const { shown, truncated, note } = view.render(text, settings.fetchCharLimit);
 
         const record: FetchRecord = {
           source_id: sourceId,
@@ -94,16 +97,13 @@ export class WebFetchTool {
             ? ""
             : "NOTE: the corpus volume could not be written. Record this source " +
               "with archived: false and add a gap entry saying so.",
-          truncated
-            ? `NOTE: showing the first ${settings.fetchCharLimit} of ${text.length} characters. ` +
-              "The archived copy is complete; character offsets in a locator still refer to it."
-            : "",
+          note,
         ]
           .filter(Boolean)
           .join("\n");
 
         return {
-          content: [{ type: "text", text: `${header}\n\n---\n\n${shown}` }],
+          content: [{ type: "text", text: `${header}\n\n<page source_id="${sourceId}">\n${shown}\n</page>\n${EXTERNAL_PAGE_NOTE}` }],
           details: record,
         };
       },
