@@ -9,7 +9,10 @@ generalises). **Read for this revision:** pi's `packages/durable/README.md` and
 `packages/durable/docs/spec.md`, its examples 20–28, and
 `packages/coding-agent/docs/skills.md`; hermes-agent's
 `agent/background_review.py`, `agent/curator.py`, and the docs
-`website/docs/user-guide/features/{memory,skills,curator,cron,goals,heartbeat,loops,kanban}.md`.
+`website/docs/user-guide/features/{memory,skills,curator,cron,goals,heartbeat,loops,kanban}.md`;
+and the Stanford CS146S lecture "How always-on agents work"
+(`docs/Stanford-CS146S-How-always-on-agents-work.txt`), whose changes are
+listed in §14.
 
 **What changed on 2026-10-14, and why.** The first version (2026-10-12)
 invented its own runtime: a `tasks` table, a lease loop, a hand-written resume,
@@ -59,7 +62,7 @@ and runs a loop that never ends:
                     operator run (pi-durable generation, compacted)
                  reads: goals, brand memory, open tasks, ledger summary,
                         playbook index — all as prompt sections
-               calls: create_task (with a contract) · ask_owner · note
+               calls: create_task (with a contract) · send_owner
                                             │
                ┌────────────────────────────┼────────────────────────────┐
                ▼                            ▼                            ▼
@@ -79,7 +82,9 @@ and runs a loop that never ends:
 ```
 
 The operator plans; it never researches. Workers research; they never plan
-beyond their own task. Code checks both.
+beyond their own task. Code checks both. Like the lecture's main agent, the
+operator keeps its own conversation sparse: workers do the expensive reading,
+and only their outcome comes back (§7.2).
 
 Nothing here waits on a request. A browser opens one stream per workspace and
 sees every part of this as it happens (§8).
@@ -100,7 +105,7 @@ of pi-durable **extensions** (§6.3): its tools, its prompt sections, its hooks.
 | `analyse` | ledger reads, library | derived findings that cite ledger rows, not pages | LLM only | the review analyst (`ReviewAnalyst`) |
 | `write` | ledger reads, library | drafts (an ad, a brief, a report) that cite findings | LLM only | nothing yet |
 | `critique` | ledger reads, library | a verdict on another task's output, against named criteria | LLM only | nothing yet |
-| `ask_owner` | none | a question card; the answer comes back as feedback | nothing | `steer`, in reverse |
+| `ask_owner` | none: opened by `send_owner` with kind `question` (§7.2) | a question card; the answer comes back as feedback | nothing | `steer`, in reverse |
 
 "Library" is the playbook and document tools of §6.5.
 
@@ -115,6 +120,14 @@ Rules:
 - **A primitive is built from data**, as `ResearchAgentFactory` builds a role
   today. The difference is that what it builds is a pi-durable conversation's
   agent (model, extensions, tools, instructions), not an in-memory `Agent`.
+- **Cheapest source first.** A worker, and the operator deciding whether to
+  start one, climbs a fixed ladder and stops at the first rung that answers:
+  findings already in the ledger from earlier runs → the library → free page
+  reads → paid tools (Parallel, Trendtrack, then Apify by approval) → the owner,
+  last. The lecture's version runs conversation → API → web search → browser →
+  full computer → user. Asking the owner is the most expensive rung, not the
+  first, and reusing a finding beats paying for it again (as review pulls are
+  reused today).
 - **Stages become saved plans.** Stage 1 is a plan of four tasks
   (`champion`, then `product`/`competitors`/`category` side by side). The operator
   can run it as is, run part of it, or compose something new. The current
@@ -326,7 +339,32 @@ overlapping playbooks, **as lessons through the same gate**. Before any change,
 the current versions are already kept, because nothing is overwritten (§5.4),
 so rollback needs no separate snapshot.
 
-### 5.7 From documents to playbooks
+### 5.7 Evals: the engineering loop
+
+The learning loop above changes playbooks and memory while the product runs.
+The lecture describes a second loop that the team runs: a failure becomes an
+**eval case**, the harness or prompt is fixed, the fix is checked against the
+evals, and only then shipped. The same models, prompts and pi versions change
+here too, so the same guard is needed.
+
+- **What becomes a case:** every task that ends `invalid` or stops for no
+  progress, and every owner correction that produces a lesson. A case is the
+  contract, the tool results the worker received, and what should have
+  happened.
+- **Why replay is possible:** every page a tool reads is already archived in
+  the corpus under its sha256, and every paid result is a stored row. A case
+  replays the model against those recorded results, so it spends LLM tokens
+  but no search, page or Apify money.
+- **When the suite runs:** on demand, before a change to a prompt, a
+  primitive's definition, a model, or the pi version, with the pass rate
+  compared to the last run. Not inside `mra check`, because it calls a real
+  model.
+- **Long tasks:** the lecture's open problem is evaluating an agent that runs
+  for a month while models ship monthly. Here a task is short (minutes to
+  hours) and the operator is the long-running part, so the suite evaluates
+  tasks, and the operator is judged by the production numbers of §5.5 and §7.2.
+
+### 5.8 From documents to playbooks
 
 An uploaded PDF is read as it is (§10). The next step, borrowed from hermes's
 `/learn`, is a `distil` task: an `analyse` worker reads a document and proposes a
@@ -349,6 +387,14 @@ pi is three layers, all in `agent-collection/pi/packages` and on npm at 1.2.0:
 pi-durable is built on `pi-ai` (models) and `chord` (document state). It does
 not use pi-agent-core: its own `pi.generation` and `pi.tool` tasks replace the
 `Agent` loop.
+
+The lecture makes the same choice for the same reason: what an always-on agent
+needs underneath is a **durable workflow**, not a job queue. If a job queue
+crashes at step three, a restart replays steps one to three; a durable workflow
+resumes at step three. The lecture's team uses Temporal so as not to build that
+themselves; pi-durable is that layer here. Its other rule applies to this whole
+spec: models are the worst they will ever be, so build as little as possible,
+expect to rebuild the surface within months, and keep primitives thin.
 
 ### 6.2 What pi-durable gives, mapped onto this spec
 
@@ -405,7 +451,7 @@ Extensions, each a `defineExtension({ name, tools, sections, hooks })`:
 
 | Extension | Tools | Sections | Hooks |
 |---|---|---|---|
-| `mra.operator` | `create_task`, `cancel_task`, `ask_owner`, `note` | goals, open and recent tasks, ledger summary | — |
+| `mra.operator` | `create_task`, `cancel_task`, `list_tasks`, `search_log`, `send_owner` | its role and the brand's goals: stable text only (§7.2) | — |
 | `mra.web`, `mra.evidence`, `mra.ads`, `mra.ledger` | today's research tools, rewritten as `defineTool` (§9.2) | the tool lines | — |
 | `mra.contract` | `finish` | what the task must cover, rendered from the contract | `onYield` runs the primitive's completion check (§3.1, §6.4) |
 | `mra.money` | — | — | `beforeTool` blocks a paid tool without an approval |
@@ -414,7 +460,10 @@ Extensions, each a `defineExtension({ name, tools, sections, hooks })`:
 | `mra.reviewer` | `propose_lesson` | the lesson rules | — |
 
 A primitive (§3) is a row in a table: its extensions, its model, and its
-definition of complete (§3.1). `create_task` resolves the row and calls `configure()` on the new worker
+definition of complete (§3.1). Models are chosen by role, as the lecture
+describes: the operator runs on a fast, low-latency model because the owner
+waits on it; workers run on whatever model does their job best per dollar,
+because ten minutes or twelve makes no difference to a background task. `create_task` resolves the row and calls `configure()` on the new worker
 conversation. The contract goes into that conversation's `instructions` and
 into its `mra.contract` document, where the hook reads it.
 
@@ -549,16 +598,65 @@ running finish, inside their own caps. The switch and the cap are two columns on
 `research_workspaces` (`always_on`, `daily_cap_usd`), added by migration. The
 default may become "on" once the spend of a few always-on brands is measured.
 
-A long-lived conversation per workspace. Most of what it reads is in prompt
-sections rendered fresh before each request (goals, memory, tasks, ledger
-summary, playbook index); the transcript holds only what happened. Automatic
-compaction keeps it under the context window. If the transcript drifts, a
-`reset` with a handoff note starts it clean. A `create_task` whose contract
-fails §4 comes back to it as a tool error in the same run.
+A long-lived conversation per workspace. A `create_task` whose contract fails
+§4 comes back to it as a tool error in the same run. If the transcript drifts,
+a `reset` with a handoff note starts it clean.
 
-Owner messages are `submit` with `whenBusy: "followUp"`, and corrections to
-work in flight are `"steer"`. Signals and task reports are inputs with an
-`mra.signal` entry and a `requestId`, so a restart never delivers one twice.
+**The inbox is a router.** What arrives is not handled in arrival order:
+
+- **The owner comes first.** An owner message is submitted with
+  `whenBusy: "steer"`, so it joins the running work at the next tool boundary
+  instead of waiting behind signals. The lecture's rule: "my message is gonna
+  have priority over everything else that's happening".
+- **Everything else is batched.** Signals and task reports are follow-ups, and
+  the operator conversation uses pi-durable's `followUpMode: "all"`, so a burst
+  of five signals becomes one run, not five.
+- **Duplicates are dropped.** A signal's `requestId` is its natural key
+  (`ads:<brand>:<date>`, `task:<run_id>:ended`), so two watchers reporting the
+  same thing, or a restart redelivering it, add one entry.
+
+**When to bother the owner.** The operator speaks to the owner through one
+tool, `send_owner`, with a kind: `note` (the feed only, never a notification),
+`question`, or `approval` (an inbox card, with an editable draft when what it
+approves is irreversible). The dashboard decides how each kind looks, as the
+lecture's clients render one "send user" tool richly. The rule the prompt
+carries: progress is a note, a decision is a card, and finishing a task is a
+note unless the owner asked to be told. The lecture's speaker says his team
+does not have this balance right yet; the dashboard counts cards per day per
+workspace so it can be measured, and an owner can mute a kind.
+
+**What stays in the prompt, and what does not.** Prompt caching makes the
+unchanged start of a request cheap, and pi-durable re-sends a section only when
+its text changes, so "a section that returns something different every time
+defeats that" (pi-durable README). The lecture goes further: a cache miss is a
+bug. So:
+
+- sections hold only what changes rarely, in a fixed order: the operator's
+  role, the brand's goals, brand memory, the playbook index;
+- what changes with every event never goes in a section. Task reports arrive
+  as inbox entries, and `list_tasks` reads the current board on demand;
+- tools are fixed for the life of a conversation; nothing is added or removed
+  mid-run;
+- the cache hit rate is measured per call from the call log (`cacheRead`
+  against input tokens, already recorded) and shown per workspace; a drop after
+  a deploy is a regression.
+
+**Memory in layers**, following the lecture's split:
+
+| Layer | Held in | Read |
+|---|---|---|
+| core facts | brand memory (§5.1) | every request, as a section |
+| dated work log | one `mra.log` entry per day: what was started, what ended, what the owner decided | on demand, through `search_log` |
+| scratch notes | the worker conversation's own document, ending with the task | by that task only |
+| everything else | the ledger, past runs, the library | through the tools that read them |
+
+**Compaction while the cache is warm.** Compacting a long conversation is
+cheap while its prefix is still cached, and the cache lives only minutes (the
+lecture cites 10 to 60; it depends on the model's provider). So when the
+operator has been idle for a few minutes and its context is past half the
+window, a watcher (§7.3) calls `compact()` then, rather than waiting for the
+owner's next message to trigger it at full price. pi-durable's own background
+compaction stays on as the backstop.
 
 ### 7.3 Watchers and schedules
 
@@ -577,6 +675,7 @@ idle watcher does not wake the operator to invent work.
 | schedule | the owner's cadence ("refresh market truth monthly") | none |
 | curator | the playbooks, when the workspace is idle | none, or an LLM pass if consolidation is on |
 | ad results | the owner's ad account, once connected | none |
+| compaction | the operator conversation: idle a few minutes and past half its window (§7.2) | one summary request, at the cached price |
 
 Hermes refuses to let a cron job create cron jobs, to stop runaway scheduling.
 The same rule holds here: workers cannot create tasks or watchers; only the
@@ -588,6 +687,30 @@ Per workspace: tasks running at once (default 3), spend per day (the daily cap
 set when Always on is turned on, §7.2), spend per task. `create_task` refuses past the running cap; `mra.money`'s `beforeTool`
 hook blocks any paid call past the spend caps and any Apify call without an
 approval. The Apify rule is enforced in code, not only written in a prompt.
+
+### 7.5 Untrusted input
+
+Workers read text written by strangers: web pages, Amazon reviews, competitors'
+ad copy, and later emails. Any of it can carry a prompt injection ("ignore your
+instructions and…"). The lecture's rule is that such input is never treated as
+an instruction.
+
+- **External text is data.** Every tool that returns external text returns it
+  labelled with its source and as quoted content, never as plain prompt text.
+  Today's tools already archive the body and return a `source_id`; the label is
+  added in the same place.
+- **The operator takes instructions only from the owner.** A signal carries
+  structured fields set by code (a brand, a count, a date, a run id), not
+  external prose. A worker's report to the operator is its outcome and run id,
+  not quoted page text.
+- **Nothing irreversible without the owner.** No tool today publishes or sends
+  anything outside the app. When one is added (publishing an ad, emailing a
+  report), it is an `approval` card with the draft (§7.2), and its calls go
+  through a review model before they run, as the lecture's "auto review" does
+  for shell commands.
+- **Secrets stay out of conversations.** Tokens (Meta, Apify, OpenRouter) are
+  read by adapters from settings or the encrypted store, never placed in a
+  prompt or a tool result.
 
 ## 8. Everything async, everything streaming
 
@@ -693,7 +816,7 @@ latest frame to a late follower.
 
 What it does not do yet: read scanned PDFs (no text layer means an empty
 document, reported as `failed` with that reason), read images, accept other
-formats, or turn a document into a playbook (§5.7).
+formats, or turn a document into a playbook (§5.8).
 
 ## 11. The dashboard
 
@@ -721,14 +844,14 @@ as the main surface.
 |---|---|---|
 | 0 | Document library (§10) | **done** |
 | 1 | `pi-agent-core` and `pi-ai` to 1.2.0 (§9.1); pi-durable installed, pinned; a harness opened in `main.ts` on `/data/harness.sqlite`, resumed at start, closed on stop; nothing runs on it yet | today's stages still pass `mra check` and one url brief on 1.2.0; the harness survives `mra down` / `mra up` |
-| 2 | One worker primitive (`research`) as extensions; a run row per task with its three new columns (§6.7); a durable worker task running a hand-written contract through `onYield` (§6.4); `RunEnd` at its end | a task given by hand meets its contract or ends `invalid`, and a restart mid-task resumes it |
+| 2 | One worker primitive (`research`) as extensions; a run row per task with its three new columns (§6.7); a durable worker task running a hand-written contract through `onYield` (§6.4); `RunEnd` at its end; external text labelled as data (§7.5) | a task given by hand meets its contract or ends `invalid`, and a restart mid-task resumes it |
 | 3 | The workspace stream (§8): task graph and conversation watches over SSE; library tools move into `mra.playbooks` | a browser sees a task from start to end, and reconnects to a snapshot |
 | 4 | The other primitives; stage 1 as a saved plan of four tasks with child-task waiting | a stage-1 plan's result matches a `StageOneRun`'s on the same brief |
 | 5 | Feedback events (§5.2) and the inbox cards | the owner's actions are recorded against what they were about |
-| 6 | Reviewer as a fork, lessons, the gate, playbook versions, the editable brand-memory list (§5.3–5.4, §6.6) | a correction given once produces a lesson; approved, the next task reads it |
-| 7 | The Always on switch and daily cap, the operator conversation (§7.2), `create_task`, `mra.money`, the schedule watcher | the system starts work nobody clicked, inside its limits |
+| 6 | Reviewer as a fork, lessons, the gate, playbook versions, the editable brand-memory list (§5.3–5.4, §6.6); eval cases from invalid tasks and corrections, and the replay suite (§5.7) | a correction given once produces a lesson; approved, the next task reads it |
+| 7 | The Always on switch and daily cap, the operator conversation (§7.2) with its router, `send_owner`, stable sections, work log and warm-cache compaction; `create_task`, `mra.money`, the schedule watcher | the system starts work nobody clicked, inside its limits; the operator's cache hit rate holds across a day |
 | 8 | `write` and `critique` primitives; the long-form statics playbook | an ad draft that cites its findings |
-| 9 | Measurement per playbook version (§5.5), curator watcher (§5.6), `distil` (§5.7) | a lesson that hurt is visible with numbers |
+| 9 | Measurement per playbook version (§5.5), curator watcher (§5.6), `distil` (§5.8) | a lesson that hurt is visible with numbers |
 | 10 | Ad-results feedback (`docs/plan-meta-integration.md` Phase D; its Phases A–B start alongside parts 1–2, because Meta's App Review needs a reader already running), competitor and review watchers | the loop closes on real ad performance |
 
 ## 13. Risks and open questions
@@ -758,3 +881,38 @@ as the main surface.
 - **Ad results:** Meta first, planned in `docs/plan-meta-integration.md`.
   Decided 2026-10-14: the operator is opt-in per workspace with a required daily
   cap (§7.2), and brand memory is visible and editable from day one (§5.4).
+
+## 14. What the CS146S lecture changed
+
+Read 2026-10-14: the Stanford CS146S lecture "How always-on agents work", by
+an engineer building an always-on agent at SpaceX
+(`docs/Stanford-CS146S-How-always-on-agents-work.txt`).
+
+**Already in this spec, and confirmed:** an agent loop on a server with state
+saved to storage (§7.1); a durable workflow, not a job queue, under every
+helper (§6.1); helpers as sub-agents with their own context, reporting back
+only results (§2, §6.3); triggers other than the user (§7.3); skills and
+memory as files read on demand (§5.1, §6.5); a thin client subscribed to the
+server's changes (§8).
+
+**Changed:**
+
+| Lecture point | What it changed here | Section |
+|---|---|---|
+| A message from the user has priority over everything; several queued messages become one turn; a router dedupes | Owner messages steer; signals are batched with `followUpMode: "all"`; signals carry a natural-key `requestId` | §7.2 |
+| The agent knows when to stay quiet; one "send user" tool, rendered richly by each client | One `send_owner` tool with kinds; progress is a note, a decision is a card; cards per day are counted | §7.2 |
+| Keep tool definitions and the system prompt static; fixed section order; a cache miss is a bug | Volatile state left the operator's sections for inbox entries and `list_tasks`; no tool changes mid-run; cache hit rate measured | §6.3, §7.2 |
+| Compact while the cache is still warm | A compaction watcher compacts an idle operator before its cache expires | §7.2, §7.3 |
+| Memory in layers: core facts, dated logs, scratch notes, everything else in files | Brand memory, `mra.log` with `search_log`, per-task notes, the ledger and library | §7.2 |
+| Try the cheapest source first; ask the user last | The cheapest-source ladder for workers and the operator | §3 |
+| Fast model for the main agent, slow is fine for helpers | Models chosen by role | §6.3 |
+| Untrusted input is never an instruction; auto-review before irreversible actions; keep secrets out of the conversation | Untrusted input rules | §7.5 |
+| Failures become evals; fix, check, ship | The eval loop | §5.7 |
+| Build as little as possible; the models are the worst they will ever be | Stated as the reason pi-durable is used rather than built | §6.1 |
+
+**Not taken, and why:** a cloud computer per agent, with a browser and a
+desktop, for sites with no API. Research here reads pages through Parallel,
+Firecrawl and crawl4ai, and the browser work that exists has its own spec
+(`spec-browser-harvest.md`). Triggers from Slack, email and meetings: the
+owner reaches the operator through the dashboard for now. Training the model on
+the harness: this app uses models through OpenRouter and does not train them.
