@@ -80,6 +80,22 @@ classDiagram
     class AdPage {
       <<interface>>
     }
+    class Trip {
+      <<interface>>
+    }
+    class BreakerReadings {
+      <<interface>>
+    }
+    class BreakerLimits {
+      <<interface>>
+    }
+    class Breakers {
+      trip()
+      warnNow()
+    }
+    class RunStatuses {
+      delivered()
+    }
     class Briefs {
       markets()
       looksLikeUrl()
@@ -234,6 +250,13 @@ classDiagram
     class PacketRows {
       of()
     }
+    class Paragraph {
+      <<interface>>
+    }
+    class Paragraphs {
+      split()
+      range()
+    }
     class ProductCatalog {
       <<interface>>
       list()
@@ -312,6 +335,13 @@ classDiagram
       latest()
       save()
     }
+    class PrimitiveSpec {
+      <<interface>>
+    }
+    class Primitives {
+      role()
+      node()
+    }
     class RunHead {
       <<interface>>
     }
@@ -332,6 +362,9 @@ classDiagram
       next()
     }
     class ResearchRun {
+      <<interface>>
+    }
+    class RunDraft {
       <<interface>>
     }
     class RunSummary {
@@ -485,6 +518,12 @@ classDiagram
       problems()
     }
     class CompletenessCheck {
+      problems()
+    }
+    class ContractGrounds {
+      <<interface>>
+    }
+    class ContractCheck {
       problems()
     }
     class CostReports {
@@ -651,6 +690,7 @@ classDiagram
     }
     class Corpus {
       write()
+      read()
     }
     class Crawl4aiPayload {
       <<interface>>
@@ -1038,6 +1078,9 @@ classDiagram
       record()
       text()
     }
+    class FallbackModels {
+      wrap()
+    }
     class EventFrame {
       <<interface>>
     }
@@ -1141,6 +1184,9 @@ classDiagram
       system()
       instructions()
     }
+    class ContractTable {
+      render()
+    }
     class DeliverableTable {
       render()
       stop()
@@ -1159,6 +1205,10 @@ classDiagram
       instructions()
     }
     class ProductTruthBriefing {
+      system()
+      instructions()
+    }
+    class TaskBriefing {
       system()
       instructions()
     }
@@ -1347,6 +1397,63 @@ classDiagram
     class StoredRunAssembly {
       of()
     }
+    class CountedTally {
+      refuse()
+    }
+    class DurableTool {
+      from()
+    }
+    class ResearchTaskDeps {
+      <<interface>>
+    }
+    class ResearchTasks {
+      install()
+    }
+    class TaskCallLog {
+      sent()
+      answered()
+      count()
+      written()
+    }
+    class TaskEnd {
+      finish()
+      stop()
+    }
+    class TaskExtensions {
+      nameOf()
+      build()
+    }
+    class TaskIntake {
+      admit()
+    }
+    class TaskReadings {
+      read()
+      trip()
+    }
+    class TaskSignals {
+      trip()
+      tripped()
+      wait()
+      forget()
+    }
+    class TaskSupervisorDeps {
+      <<interface>>
+    }
+    class TaskSupervisor {
+      start()
+      recover()
+      stop()
+    }
+    class TaskWork {
+      <<interface>>
+    }
+    class TaskWorkDeps {
+      <<interface>>
+    }
+    class TaskWorks {
+      of()
+      forget()
+    }
     class ToolSteps {
       start()
       take()
@@ -1360,8 +1467,15 @@ classDiagram
     class EvidenceSearchTool {
       tool()
     }
+    class ExcerptTool {
+      tool()
+    }
     class FindProductTool {
       tool()
+    }
+    class FinishTally {
+      <<interface>>
+      refuse()
     }
     class FinishTool {
       tool()
@@ -1395,6 +1509,16 @@ classDiagram
       read()
       forWorkspace()
     }
+    class PageView {
+      <<interface>>
+      render()
+    }
+    class PlainPage {
+      render()
+    }
+    class NumberedPage {
+      render()
+    }
     class BuiltTool {
       <<interface>>
     }
@@ -1413,7 +1537,8 @@ classDiagram
     class WebSearchTool {
       tool()
     }
-    class TurnBudget {
+    class TurnBreakers {
+      refuse()
     }
     class UsageTotals {
       empty()
@@ -1493,6 +1618,9 @@ classDiagram
       resolve()
       revoke()
       local()
+    }
+    class TaskRoutes {
+      register()
     }
     class TokenService {
       issue()
@@ -1654,6 +1782,18 @@ classDiagram
   StageOneListings --> PageFetcher
   StageOneParts --> FindingLedger
   StageOneRunAssembly --> FindingLedger
+  ResearchTasks --> ResearchTaskDeps
+  TaskCallLog --> ResearchStore
+  TaskCallLog --> OpenRouterPrices
+  TaskEnd --> TaskReadings
+  TaskExtensions --> TaskWorks
+  TaskExtensions --> TaskSignals
+  TaskExtensions --> TaskReadings
+  TaskIntake --> ResearchStore
+  TaskIntake --> Settings
+  TaskReadings --> ResearchStore
+  TaskSupervisor --> TaskSupervisorDeps
+  TaskWorks --> TaskWorkDeps
   AdLibraryTool --> AdLibrary
   AdLibraryTool --> Corpus
   DiscoverCompetitorsTool --> CompetitorDiscovery
@@ -1661,8 +1801,11 @@ classDiagram
   DiscoverCompetitorsTool --> Corpus
   EvidenceSearchTool --> WebSearch
   EvidenceSearchTool --> Corpus
+  ExcerptTool --> RunFindings
+  ExcerptTool --> Corpus
   FindProductTool --> AmazonProducts
   FinishTool --> DoneCheck
+  FinishTool --> FinishTally
   ReadLedgerTool --> RunFindings
   WaitForTool --> RunFindings
   WaitForTool --> AgentRoster
@@ -1676,7 +1819,9 @@ classDiagram
   WebFetchTool --> PageFetcher
   WebFetchTool --> Corpus
   WebFetchTool --> FetchGate
+  WebFetchTool --> PageView
   WebSearchTool --> WebSearch
+  TurnBreakers --> BreakerLimits
   PacketError --> CheckProblem
   FieldsCheck --> FieldsDeliverable
   ListCheck --> ListDeliverable
@@ -1703,6 +1848,7 @@ classDiagram
   LibraryRoutes --> LibraryIntake
   ProductRoutes --> ResearchStore
   ResearchApi --> AmazonListingSource
+  ResearchApi --> TaskSupervisor
   ReviewAnalysisRoutes --> ResearchStore
   ReviewAnalysisRoutes --> RunSupervisor
   ReviewAnalysisRoutes --> ReviewAnalyst
@@ -1716,6 +1862,8 @@ classDiagram
   ScopeGuard --> ResearchStore
   Sessions --> AccountDirectory
   Sessions --> Settings
+  TaskRoutes --> ResearchStore
+  TaskRoutes --> TaskSupervisor
   TraceRoute --> TraceFile
   TraceFile --> TraceLimits
 ```
@@ -1797,6 +1945,7 @@ classDiagram
 | `agent` | `agent/done-check.ts` | DoneCheck, NodeContract, ChampionContract, TruthContract |
 | `agent` | `agent/errors.ts` | RunError |
 | `agent` | `agent/event-recorder.ts` | TurnEnd, AgentEventRecorder |
+| `agent` | `agent/fallback-models.ts` | FallbackModels |
 | `agent` | `agent/frames.ts` | EventFrame, Frames |
 | `agent` | `agent/invalid-run-resettle.ts` | InvalidRunResettle |
 | `agent` | `agent/library/library-intake.ts` | LiveConversion, LibraryIntake |
@@ -1813,9 +1962,11 @@ classDiagram
 | `agent` | `agent/product-truth-run.ts` | ProductTruthBrief, ProductTruthRun |
 | `agent` | `agent/prompt/blocks.ts` | PromptBlocks |
 | `agent` | `agent/prompt/builder.ts` | AgentInstructions, PromptBuilder |
+| `agent` | `agent/prompt/contract-table.ts` | ContractTable |
 | `agent` | `agent/prompt/deliverable-table.ts` | DeliverableTable |
 | `agent` | `agent/prompt/messages.ts` | AgentMessages |
 | `agent` | `agent/prompt/role-briefing.ts` | RoleBriefing, StageOneBriefing, ProductTruthBriefing |
+| `agent` | `agent/prompt/task-briefing.ts` | TaskBriefing |
 | `agent` | `agent/prompt/truth-blocks.ts` | TruthBlocks |
 | `agent` | `agent/prompt/truth-builder.ts` | TruthInstructions, ProductTruthPrompts |
 | `agent` | `agent/research-agent-factory.ts` | RoleContext, ResearchAgentFactory |
@@ -1853,27 +2004,41 @@ classDiagram
 | `agent` | `agent/stage-one-run-assembly.ts` | StageOneRunAssembly |
 | `agent` | `agent/stage-one-run.ts` | StageOneRun |
 | `agent` | `agent/stored-run-assembly.ts` | StoredRunAssembly |
+| `agent` | `agent/task/counted-tally.ts` | CountedTally |
+| `agent` | `agent/task/durable-tool.ts` | DurableTool |
+| `agent` | `agent/task/research-task.ts` | ResearchTaskDeps, ResearchTasks |
+| `agent` | `agent/task/task-call-log.ts` | TaskCallLog |
+| `agent` | `agent/task/task-end.ts` | TaskEnd |
+| `agent` | `agent/task/task-extensions.ts` | TaskExtensions |
+| `agent` | `agent/task/task-intake.ts` | TaskIntake |
+| `agent` | `agent/task/task-readings.ts` | TaskReadings |
+| `agent` | `agent/task/task-signals.ts` | TaskSignals |
+| `agent` | `agent/task/task-supervisor.ts` | TaskSupervisorDeps, TaskSupervisor |
+| `agent` | `agent/task/task-work.ts` | TaskWork, TaskWorkDeps, TaskWorks |
 | `agent` | `agent/tool-steps.ts` | ToolSteps |
 | `agent` | `agent/tools/ad-library-tool.ts` | AdLibraryTool |
 | `agent` | `agent/tools/discover-competitors-tool.ts` | DiscoverCompetitorsTool |
 | `agent` | `agent/tools/evidence-search-tool.ts` | EvidenceSearchTool |
+| `agent` | `agent/tools/excerpt-tool.ts` | ExcerptTool |
 | `agent` | `agent/tools/find-product-tool.ts` | FindProductTool |
-| `agent` | `agent/tools/finish-tool.ts` | FinishTool |
+| `agent` | `agent/tools/finish-tool.ts` | FinishTally, FinishTool |
 | `agent` | `agent/tools/lanes.ts` | FetchRecord |
 | `agent` | `agent/tools/ledger-read-tools.ts` | LedgerRows, ReadLedgerTool, WaitForTool |
 | `agent` | `agent/tools/ledger-tools.ts` | RecordTool, RetractTool |
 | `agent` | `agent/tools/ledger-toolset.ts` | LedgerOptions, LedgerToolset |
 | `agent` | `agent/tools/library-tools.ts` | LibraryTools |
+| `agent` | `agent/tools/page-views.ts` | PageView, PlainPage, NumberedPage |
 | `agent` | `agent/tools/registry.ts` | BuiltTool, ToolContext, ToolRegistry |
 | `agent` | `agent/tools/traced-tool.ts` | TracedTool |
 | `agent` | `agent/tools/web-fetch-tool.ts` | WebFetchTool |
 | `agent` | `agent/tools/web-search-tool.ts` | WebSearchTool |
-| `agent` | `agent/turn-budget.ts` | TurnBudget |
+| `agent` | `agent/turn-breakers.ts` | TurnBreakers |
 | `agent` | `agent/usage.ts` | UsageTotals |
 | `config` | `config/settings-shape.ts` | ServicePrices, Settings |
 | `config` | `config/settings.ts` | Env |
 | `domain` | `domain/accounts.ts` | Workspace, Account, AccountListing, Principal, Scope |
 | `domain` | `domain/ad-library.ts` | AdQuery, AdHit, AdPage |
+| `domain` | `domain/breakers.ts` | Trip, BreakerReadings, BreakerLimits, Breakers, RunStatuses |
 | `domain` | `domain/brief.ts` | Briefs |
 | `domain` | `domain/charges.ts` | ChargeDraft, Charge, ChargeMeter, ServiceUse |
 | `domain` | `domain/check-problem.ts` | RowRef, CheckProblem, CheckProblems |
@@ -1886,9 +2051,11 @@ classDiagram
 | `domain` | `domain/logs.ts` | RunEvent, Judgement, PacketCheck, RunUpdate, LlmCallRecord, Generation, LlmCall |
 | `domain` | `domain/nodes.ts` | Stages |
 | `domain` | `domain/packet-rows.ts` | PacketRowSet, PacketRows |
+| `domain` | `domain/paragraphs.ts` | Paragraph, Paragraphs |
 | `domain` | `domain/ports.ts` | ProductCatalog, AccountDirectory, AmazonListingSource, TargetListings, ChargeLedger, FindingLedger, PageFetcher, WebSearch, AdLibrary, CompetitorDiscovery, ResearchStore, GateVerdict, FetchGate, ReviewPullStore |
+| `domain` | `domain/primitives.ts` | PrimitiveSpec, Primitives |
 | `domain` | `domain/products.ts` | RunHead, Product, ProductSummary, ProductFolders |
-| `domain` | `domain/records.ts` | Clock, Ids, ResearchRun, RunSummary, Runs |
+| `domain` | `domain/records.ts` | Clock, Ids, ResearchRun, RunDraft, RunSummary, Runs |
 | `domain` | `domain/reject-kinds.ts` | RejectKinds |
 | `domain` | `domain/relations.ts` | Relations |
 | `domain` | `domain/research-roles.ts` | RoleSpec, Roles |
@@ -1905,6 +2072,7 @@ classDiagram
 | `extract` | `extract/citation-check.ts` | CitationCheck |
 | `extract` | `extract/competitor-check.ts` | CompetitorCheck |
 | `extract` | `extract/completeness-check.ts` | CompletenessCheck |
+| `extract` | `extract/contract-check.ts` | ContractGrounds, ContractCheck |
 | `extract` | `extract/cost-reports.ts` | CostReports |
 | `extract` | `extract/deliverable-check.ts` | Missing, DeliverableCheck, DeliverableChecks |
 | `extract` | `extract/dose-bands.ts` | DoseBands |
@@ -1951,6 +2119,7 @@ classDiagram
 | `http` | `http/scope-guard.ts` | ScopeGuard |
 | `http` | `http/secret-prompt.ts` | SecretPrompt |
 | `http` | `http/sessions.ts` | Sessions |
+| `http` | `http/task-routes.ts` | TaskRoutes |
 | `http` | `http/token-service.ts` | TokenService |
 | `http` | `http/trace-route.ts` | TraceRoute |
 | `trace` | `trace/trace-file.ts` | TraceLimits, TraceFile |

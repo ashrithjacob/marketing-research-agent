@@ -27,7 +27,7 @@ mra container — one Node process (server/src, layered — see CLAUDE.md)
    ├─ http/         App (auth, the SPA), ResearchApi (/api/research/*)
    ├─ agent/        RunSupervisor: up to four pi-agent-core Agents per stage-1 run, in-process
    │                PiHarness: a pi-durable Harness on /data/harness.sqlite, opened,
-   │                           resumed and closed by main.ts; nothing runs on it yet
+   │                           resumed and closed by main.ts; durable tasks run on it (§2g)
    │                LlmCallLog wraps the streamFn: every call, prompt and answer
    │                prompt/   brief + scope + rules + judgements → instructions
    │                tools/    the only things the agent can do (below)
@@ -52,10 +52,11 @@ pi-agent-core and pi-ai are at 1.2.0 (since 2026-10-14, part 1 of
 `docs/spec-always-on.md`). At startup `main.ts` also opens a pi-durable
 `Harness` (`agent/pi-harness.ts`, behind the `DurableHarness` port in
 `domain/harness.ts`) on the SQLite file at `MRA_HARNESS_PATH` (default
-`/data/harness.sqlite`), calls `resume()`, and logs `harness created at …` the
-first time or `harness reopened at …` after; on `SIGINT`/`SIGTERM` it closes it
-after the app. The registry is empty and no conversation is created, so nothing
-runs on it: the stages below still run on pi-agent-core's `Agent`. pi-durable
+`/data/harness.sqlite`), picks up live tasks, calls `resume()`, and logs
+`harness created at …` the first time or `harness reopened at …; N task(s) to
+pick back up` after; on `SIGINT`/`SIGTERM` it closes it before the app, since a
+task's end writes to the store. Durable tasks run on it (§2g); the stages below
+still run on pi-agent-core's `Agent`. pi-durable
 opens the file with Node's built-in `node:sqlite`, which prints an
 `ExperimentalWarning: SQLite is an experimental feature` line at startup on Node 22.
 
@@ -967,6 +968,73 @@ effect any source states; 10 of 10 market × platform claim limits; 15 prices
 (1, 3 and 5 bottles in 5 currencies), with every margin gapped for want of a
 landed cost; 39 sources, 17 gaps.
 
+### §2g — a durable task: one contract, on the harness (always-on part 2)
+
+Since 2026-10-14 there is a second way to run research besides the stages: a
+**task**, which runs on the pi-durable harness and survives a restart. Spec:
+`docs/spec-always-on.md` §3–§6, §12.1. No screen starts one yet; `mra task
+<file>` or `POST /api/research/tasks` does, with `{brief, contract}`
+(`docs/tasks/` has examples).
+
+1. **Admitted** (`agent/task/task-intake.ts`). The body is parsed by
+   `taskRequestSchema` (`domain/task-contract.ts`): the contract names its
+   `primitive` (only `research` exists), a `Deliverable` as `complete`, inputs,
+   a budget and `verify`. `ContractCheck` (`extract/contract-check.ts`, pure)
+   refuses one that cannot be met: no node the primitive files under, a finding
+   kind it has no record tool for, inputs not in the workspace, `max_usd` over
+   `MRA_TASK_MAX_USD` (default 2), Apify in reach, or a `verify` other than
+   `code`. A refusal is a 400 with the reasons and writes nothing. Accepted, it
+   becomes a `queued` run whose `contract` column holds the contract.
+2. **Queued** (`TaskSupervisor.queue`). In one harness commit, the session
+   document `mra.tasks` is checked for the run and, if absent, a background
+   `mra.research` task is created and recorded there, so a second call finds
+   the first task.
+3. **start** (`agent/task/research-task.ts`). The run's extension
+   `mra.task.<run id>` is built and installed (`TaskExtensions`): the run's own
+   tools (today's `AgentTool`s, built by `TaskWorks` with the run's meter,
+   ledger and corpus, and bridged by `DurableTool`), its worker prompt
+   (`TaskBriefing`), and four generation hooks. A worker conversation owned by
+   the task is created on that extension alone, with an `mra.run` document
+   holding the run id. The run row gets `task_id` and `conversation_id`.
+4. **work**. The task's instructions are submitted with `requestId
+   task:<run id>`; the phase then waits for whichever comes first, the answer
+   or a tripped breaker. A tripped breaker aborts the conversation.
+   - `beforeRequest` opens the call-log row and, on the response at 80% of the
+     step ceiling (24 of 30), adds "record what you have, then call finish".
+   - `afterResponse` writes the call-log row (agent `research`) and queues the
+     OpenRouter `/generation` lookup that bills it.
+   - `afterTools` reads the four breakers from the research store
+     (`TaskReadings`): call-log rows for responses, call-log rows started
+     after the newest finding for no progress, refused `packet_checks` for finish, billed
+     calls plus charges for spend, and time since the run was created. A trip
+     reaches the waiting phase through `TaskSignals`.
+   - `onYield`, when the model stops without calling `finish`, runs the
+     deliverable check and continues the run with "Still missing: …".
+5. **end** (`agent/task/task-end.ts`). A trip closes the part through
+   `LimitClose` (each missing field gapped with the breaker's words) and ends
+   the run `partial`; otherwise it ends through `RunEnd` as a stage-1 run of
+   that one node would. Every call is then looked up at OpenRouter once more, so
+   the billed total holds even when a restart lost a pending lookup.
+
+**Across a restart.** The harness file keeps the task at its last checkpoint.
+At startup `recoverRunsKilledByRestart` skips every run with a contract;
+`TaskSupervisor.recover` installs each live task's extension again (its tools
+are run-bound, so they are rebuilt from the run row) and creates the task for a
+run queued before it had one; then `harness.resume()` continues it. A tool call
+the restart cut off is not rerun: every tool is `replay: "unsafe"`, so the
+model is told it was interrupted and nothing is paid for twice.
+
+**What tasks changed for the stages too.** The same breakers end today's stage
+agents (`TurnBreakers`, pi-agent-core's `finishTurn` hook): three refused
+finishes, five responses in a row with no new row, or the turn limit; money
+and time caps apply only to tasks. A tripped stage run ends `partial`, no
+longer `completed`. `web_fetch` and `web_search` label what they return as
+quoted data (`<page source_id=…>`, `<search_results>`), for every run.
+A task's `web_fetch` numbers paragraphs `[pN]`, and its `record_excerpt` takes
+paragraph numbers: code copies the quote and its character range from the
+archived page (`ExcerptTool`, `domain/paragraphs.ts`). Stage 1 has no
+`record_excerpt`.
+
 ### Step 7 — the screen fills in
 
 The `packet.ready` event triggers a re-fetch of `GET /runs/:id`, which now carries the
@@ -1118,6 +1186,18 @@ What the start modal needs to warn you before you pay for a run.
 - **Errors:** `400` on a bad body (`"Unrecognized key(s) in object: 'colour'"`) or
   an empty brief (`"brief.product or brief.url is required"`); `502` when the model id is unknown
   — the run row exists and is `failed`.
+
+#### `POST /api/research/tasks` — start a durable task
+
+Body `{brief, contract}` (`taskRequestSchema`; §2g). `202` with the run summary,
+status `queued`; `400 {"detail": "task refused: …"}` when the schema or
+`ContractCheck` refuses it, and no run is written. The run is then read through
+the run routes like any other.
+
+#### `POST /api/research/tasks/:runId/stop`
+
+Aborts the run's harness task; the run ends `cancelled` through `RunEnd`. `409`
+for a run that is not a task, `404` for one the caller cannot see.
 
 #### `GET /api/research/runs/:runId`
 

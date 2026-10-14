@@ -13,6 +13,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { SqlResearchStore } from "../src/adapters/index.js";
 import { LiveRuns, RunEnd, RunSupervisor, RunWrapUp, StageOneRunAssembly, type RunAssembly } from "../src/agent/index.js";
 import { RunFindings } from "../src/agent/run-findings.js";
+import { StageOneParts } from "../src/agent/stage-one-parts.js";
 import { Env, type Settings } from "../src/config/index.js";
 import { Findings, runRequestSchema, type Brief } from "../src/domain/index.js";
 import { productPacket, recordCalls } from "./fixtures.js";
@@ -57,7 +58,7 @@ async function runWithRows(status: string): Promise<string> {
 }
 
 function assembly(runId: string): StageOneRunAssembly {
-  return new StageOneRunAssembly(store.findings, runId, { brief, nodes: ["product_data"] });
+  return new StageOneRunAssembly(store.findings, runId, { brief, nodes: ["product_data"], roles: StageOneParts.planned(brief, ["product_data"]) });
 }
 
 describe("a run killed by a restart", () => {

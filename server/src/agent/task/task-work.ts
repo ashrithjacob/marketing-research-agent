@@ -109,7 +109,7 @@ export class TaskWorks {
       calls: new TaskCallLog(store, runId, role.id, costs),
       system: briefing.system(role, research.map((built) => built.line).join("")),
       instructions: briefing.instructions(),
-      assembly: new StageOneRunAssembly(store.findings, runId, { brief, nodes: [node] }),
+      assembly: new StageOneRunAssembly(store.findings, runId, { brief, nodes: [node], roles: [role] }),
     };
   }
 }

@@ -14,6 +14,7 @@ import { RunWrapUp } from "./run-wrap-up.js";
 import { PromptBuilder, StageOneBriefing } from "./prompt/index.js";
 import type { ResearchAgentFactory, RoleContext } from "./research-agent-factory.js";
 import type { StageOneListings } from "./stage-one-listings.js";
+import { StageOneParts } from "./stage-one-parts.js";
 import { StageOneRunAssembly } from "./stage-one-run-assembly.js";
 
 type RunBrief = Pick<RoleContext, "runId" | "brief" | "nodes" | "rejectKinds" | "judgements" | "chain" | "pollMs">;
@@ -63,7 +64,7 @@ export class StageOneRun {
       onChecked: team.onChecked,
     };
     const wrapUp = new RunWrapUp(store, runs, runId, this.deps.listings);
-    const assembly = new StageOneRunAssembly(store.findings, runId, { brief, nodes });
+    const assembly = new StageOneRunAssembly(store.findings, runId, { brief, nodes, roles: StageOneParts.planned(brief, nodes) });
     let ending: RunEnding;
     let output = "";
     try {

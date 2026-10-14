@@ -173,8 +173,8 @@ as that URL. Market is not part of the key, so Vitamin D US and UK share a produ
 
 - **`/`** lists products, newest activity first: label, newest run's status, run
   count, review count (distinct reviews over all its runs). No dashboard here.
-- **A product** opens on its `default_run_id`: the newest **completed** run of
-  either stage, even when a newer run is running or failed; the newest run when none
+- **A product** opens on its `default_run_id`: the newest **completed** (or
+  `partial`) run of either stage, even when a newer run is running or failed; the newest run when none
   completed. The left column ends with `← All products` and every run of the
   product — completed, failed, cancelled, invalid, running — newest first. Each run
   row, and each stage header in the rail, is a link to that run's URL.
@@ -241,6 +241,16 @@ Source also carries a `node`, so source counts are per tile.
 > **Billed cost lags by about four seconds.** OpenRouter's `/generation` 404s
 > for a few seconds after a turn ends. A blank billed cost on a run that has
 > just finished is the API, not the code. `workings.md` §2a.
+
+Since 2026-10-14 a run a circuit breaker stopped ends **`partial`**, an amber
+chip reading *partly complete* (`spec-always-on.md` §3.2). Before, the same run
+ended `completed`, so "everything found" and "half found" looked alike. Its
+`run.error` names the breaker (`stopped early: 5 responses in a row added
+nothing new`), each field it left open is a gap (`price: not found: …`), and the
+activity log shows `<agent> agent stopped: <why> — gapped …`. For everything
+downstream it counts as complete: the next stage's button, the rail, a
+product's default run (`DELIVERED_STATUSES` in `api/runs.ts`, mirroring
+`RunStatuses.delivered` on the server).
 
 A red `.error` block under a `failed` run shows `run.error`. A red block on an
 `invalid` run is different and more useful: the agent finished and produced

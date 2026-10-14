@@ -176,6 +176,11 @@ real tasks use, which the call log records. At 80% of the ceiling the model is
 told, once, "record what you have, then call `finish`", as hermes's task board
 warns its workers at 90% of their iteration budget.
 
+*Built 2026-10-14, part 2:* the refused-finish breaker trips at the end of the
+turn whose `finish` was refused the third time, so the "next call" is never
+made; if one is already in flight, `finish` answers it NOT CHECKED and ends the
+agent. Stage agents used to get five checks; they now get the same three.
+
 **A tripped breaker does not fail the task.** It ends through `RunEnd` like any
 other: `LimitClose` records each item still missing as a gap with the reason
 (refused finish, no progress, step ceiling, spend cap, time cap), the packet is
@@ -511,6 +516,19 @@ because ten minutes or twelve makes no difference to a background task. `create_
 conversation. The contract goes into that conversation's `instructions` and
 into its `mra.contract` document, where the hook reads it.
 
+*Superseded 2026-10-14, part 2:* a worker does not select shared
+`mra.web`/`mra.evidence`/`mra.ledger`/`mra.contract` extensions. Each task gets
+its own, `mra.task.<run id>`, built from its run row and installed for the
+task's life: its tools, its prompt section and its contract hooks. The reason
+is that today's tools are bound to a run when they are built (its charge
+meter, its ledger, its corpus folder), and pi-durable registers a tool once per
+process, so a shared tool would have to look its run up on every call. pi-durable
+allows the registry to change while it runs, and a conversation stores the
+extension's name, so the per-run extension is selected by name like any other.
+The cost is that startup must install the extensions of live tasks before
+`harness.resume()`, which `TaskSupervisor.recover` does. The contract is read
+from the run row, not an `mra.contract` document.
+
 ### 6.4 The contract, run by the harness
 
 **One exit.** Only `finish` ends a task as complete. `finish` runs the
@@ -534,6 +552,16 @@ counts toward the refused-`finish` breaker (§3.2).
    answer against it (hermes's `goal_judge` role). A `stop` verdict ends the task
    `partial` and posts an `ask_owner` card. Code decides done; the judge only
    decides "ask".
+
+*Superseded 2026-10-14, part 2:* the breakers are read in `afterTools`, not
+`afterResponse`, and `onYield` reads them again before it continues a run.
+`afterResponse` runs before the response's tool calls, so a response that
+records a finding would be counted as one that added nothing: its rows are not
+written yet. `afterResponse` writes the call-log row and queues the billing
+lookup. A breaker that trips in `afterTools` stops the run by aborting the
+worker conversation from the task, so one more request can start before the
+abort lands. The `stop_when` judge (4.) is not built; a contract may carry
+`stop_when`, and nothing reads it yet.
 
 `max_usd` is checked in the `afterResponse` hook against the task's billed
 charges so far, and `max_minutes` against the task's start time. Decided 2026-10-14: billed, accepting a small overshoot. OpenRouter's
@@ -611,6 +639,14 @@ pi-durable resumes those from their last checkpoint after `harness.resume()`,
 and failing them first would end work that is about to continue. Runs without a
 `task_id` (today's stages) are recovered as before.
 
+*Superseded 2026-10-14, part 2:* recovery skips any run with a `contract`, not
+only one with a `task_id`. A run is written `queued` before its task starts, so
+a restart in between leaves a task's run with a contract and no `task_id` yet;
+skipping by `task_id` would end it `failed`. Also, `createTask` takes no
+`requestId` (submissions do): a session document `mra.tasks`, read and written in
+the same commit that creates the task, maps each run to its task, so creating
+it twice finds the first.
+
 **The end.** A task ends only through `RunEnd` with its run id, which assembles
 the packet from the run's findings and sets the final status, as for every run
 today. The reporter task (§6.3) reads that status to tell the operator.
@@ -652,6 +688,15 @@ it with the archived page. Part 2 ports the record tools to pi-durable, and the
 ported `record_excerpt` takes a `source_id` and paragraph numbers instead of
 `text`; `web_fetch` numbers the paragraphs it returns. The stored excerpt keeps
 its `text` field, filled by code, so nothing that reads excerpts changes.
+
+*Corrected 2026-10-14, part 2:* stage 1 has no `record_excerpt` tool
+(`RECORD_TOOLS`, `agent/prompt/text/record-tools.ts`), so no stage-1 agent can
+record an excerpt at all, and there was nothing to port. Part 2 built
+`record_excerpt` new, for tasks only (`ExcerptTool`): it takes a `source_id` and
+`from`/`to` paragraph numbers, and code fills `text` and a `char_range` locator
+from the archived body (`Paragraphs`, `domain/paragraphs.ts`). A task's
+`web_fetch` numbers paragraphs `[pN]` (`NumberedPage`); stage runs keep the
+plain page.
 
 ## 7. The runtime
 
@@ -903,8 +948,14 @@ stream options (`packages/durable/src/harness/generation.ts:431`), and its
 retries repeat the same model. Without a replacement, a rate-limited model
 stalls a task until a breaker trips (§3.2).
 
-The way in is the `models` object, which this app supplies to the harness. A
-small provider registered in it wraps pi-ai's OpenRouter provider: it adds the
+The way in is the `models` object, which this app supplies to the harness.
+*Corrected 2026-10-14, part 2:* not a provider: a pi-ai `Provider` has no stream
+function (streams are dispatched by API on `Models`). Built as `FallbackModels`
+(`agent/fallback-models.ts`), which wraps the `Models` object the harness is
+opened with and replaces only `streamSimple`, the one method pi-durable calls on
+it; it keys a conversation's failures by the `sessionId` pi-durable sends.
+pi-durable retries what pi-ai's `isRetryableAssistantError` accepts. The
+original text: a small provider registered in it wraps pi-ai's OpenRouter provider: it adds the
 fallback list to every request body, and on pi-durable's retry of a failed
 attempt it moves to the next model in the chain. Built and tested in part 2
 with the faux provider failing on cue; the chain itself (`MRA_MODEL`,

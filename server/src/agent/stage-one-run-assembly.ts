@@ -1,4 +1,4 @@
-import { CheckProblems, Findings, type Brief, type CheckProblem, type FindingLedger, type Node, type StagePacket } from "../domain/index.js";
+import { CheckProblems, Findings, type Brief, type CheckProblem, type FindingLedger, type Node, type RoleSpec, type StagePacket } from "../domain/index.js";
 import { PacketAssembly, PacketValidator, RowBlame } from "../extract/index.js";
 import { Trace } from "../trace/index.js";
 
@@ -13,7 +13,7 @@ export class StageOneRunAssembly implements RunAssembly {
   constructor(
     private readonly ledger: FindingLedger,
     readonly runId: string,
-    private readonly run: { brief: Brief; nodes: readonly Node[] },
+    private readonly run: { brief: Brief; nodes: readonly Node[]; roles: readonly RoleSpec[] },
   ) {}
 
   async assemble(): Promise<Assembled> {
@@ -31,7 +31,8 @@ export class StageOneRunAssembly implements RunAssembly {
   private async inspect(): Promise<{ packet: StagePacket | null; problems: CheckProblem[] }> {
     Trace.line(import.meta.url, "StageOneRunAssembly.inspect", { runId: this.runId });
     const rows = await this.ledger.list(this.runId);
-    const draft = new PacketAssembly(rows).draft({ runId: this.runId, ...this.run });
+    const { brief, nodes } = this.run;
+    const draft = new PacketAssembly(rows).draft({ runId: this.runId, brief, nodes });
     return new PacketValidator().inspect(draft, this.run.nodes, this.run.brief, new RowBlame(Findings.live(rows), PacketAssembly.SECTIONS));
   }
 }

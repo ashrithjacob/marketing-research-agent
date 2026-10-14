@@ -84,6 +84,7 @@ describe("a research task", () => {
     expect(ended.conversation_id).not.toBe("");
     expect((await store.listLlmCalls(run.id)).map((call) => call.agent_id)).toEqual(["research", "research"]);
     expect((await store.findings.list(run.id)).filter((row) => row.kind === "attribute")).toHaveLength(1);
+    expect(new Set((await store.findings.list(run.id)).map((row) => row.agent_id))).toEqual(new Set(["research"]));
   });
 
   it("is told what is still missing when the model stops without finishing, and goes on", async () => {

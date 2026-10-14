@@ -1,4 +1,4 @@
-import { Briefs, briefSchema, type Node, type ResearchRun, type ResearchStore } from "../domain/index.js";
+import { Briefs, Primitives, briefSchema, taskContractSchema, type Node, type ResearchRun, type ResearchStore } from "../domain/index.js";
 import { Trace } from "../trace/index.js";
 
 import type { LiveRuns } from "./live-runs.js";
@@ -6,6 +6,7 @@ import { ProductTruthRunAssembly } from "./product-truth-run-assembly.js";
 import { ReviewLedger } from "./review-ledger.js";
 import { ReviewMiningRunAssembly } from "./review-mining-run-assembly.js";
 import type { RunAssembly } from "./run-assembly.js";
+import { StageOneParts } from "./stage-one-parts.js";
 import { StageOneRunAssembly } from "./stage-one-run-assembly.js";
 
 /** The assembly for a run no live process holds — one a restart killed, or an old one settled again — rebuilt from what the store keeps of it. No model or paid tool is called. */
@@ -16,6 +17,7 @@ export class StoredRunAssembly {
     if (run.stage === 2) return new ProductTruthRunAssembly(store.findings, run.id, { sourceRunId: run.source_run_id, brief, markets: Briefs.markets(brief) });
     if (run.stage === 3) return new ReviewMiningRunAssembly(store, runs, run.id, brief, new ReviewLedger(), () => ({ targets: [], failures: [] }));
     const nodes = run.nodes as Node[];
-    return new StageOneRunAssembly(store.findings, run.id, { brief, nodes });
+    const roles = run.contract ? [Primitives.role(taskContractSchema.parse(run.contract))] : StageOneParts.planned(brief, nodes);
+    return new StageOneRunAssembly(store.findings, run.id, { brief, nodes, roles });
   }
 }
