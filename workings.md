@@ -1025,7 +1025,9 @@ go on. A stop aborts the worker's run, emits `run.asked`, sets the run
 `waiting`, and moves the task to its `asking` phase, which waits for a
 `run.answered` event (`TaskPause`; given by the operator's `answer_task` or
 `POST /api/research/tasks/:runId/answer`). The answer is then submitted to the
-same worker conversation as the next round. Judge calls are call-log rows with
+same worker conversation as the next round. The question reaches the owner as a
+question card (`CardDesk`, `research_cards`), answered on the card or in the
+chat; either way the card closes with the answer. Judge calls are call-log rows with
 agent `judge`: billed, but not counted as the worker's turns; waiting time is
 left out of the time cap.
 

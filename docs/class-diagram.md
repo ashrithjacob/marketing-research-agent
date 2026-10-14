@@ -103,6 +103,19 @@ classDiagram
       label()
       key()
     }
+    class Card {
+      <<interface>>
+    }
+    class CardDraft {
+      <<interface>>
+    }
+    class CardBook {
+      <<interface>>
+      create()
+      get()
+      list()
+      resolve()
+    }
     class ChargeDraft {
       <<interface>>
     }
@@ -554,6 +567,7 @@ classDiagram
     }
     class ContractCheck {
       problems()
+      asksFirst()
     }
     class CostReports {
       of()
@@ -860,6 +874,12 @@ classDiagram
       setGeneration()
       list()
     }
+    class CardTable {
+      create()
+      get()
+      list()
+      resolve()
+    }
     class ChargeTable {
       add()
       list()
@@ -1107,6 +1127,8 @@ classDiagram
     }
     class RunError {
     }
+    class ApprovalNeeded {
+    }
     class TurnEnd {
       <<interface>>
     }
@@ -1179,6 +1201,12 @@ classDiagram
       fallbacksAfter()
       failover()
       withFallbacks()
+    }
+    class CardDesk {
+      open()
+      answer()
+      approve()
+      reject()
     }
     class ChatView {
       of()
@@ -1489,6 +1517,8 @@ classDiagram
       on()
       onAsked()
       asked()
+      onAnswered()
+      answered()
       ended()
     }
     class TaskExtensions {
@@ -1658,6 +1688,9 @@ classDiagram
     class CallStats {
       of()
     }
+    class CardRoutes {
+      register()
+    }
     class ConfigRoute {
       register()
     }
@@ -1770,6 +1803,7 @@ classDiagram
   ServiceClients --> AdLibrary
   AccountTable --> SqlDatabase
   CallLog --> SqlDatabase
+  CardTable --> SqlDatabase
   ChargeTable --> SqlDatabase
   PacketCheckLog --> SqlDatabase
   CompetitorKinds --> SqlDatabase
@@ -1827,6 +1861,10 @@ classDiagram
   LimitClose --> DoneCheck
   LimitClose --> DeliverableCheck
   LiveRuns --> ResearchStore
+  CardDesk --> ResearchStore
+  CardDesk --> PlanBook
+  CardDesk --> TaskSupervisor
+  CardDesk --> TaskEvents
   OperatorDesk --> PiHarness
   OperatorDesk --> ResearchStore
   OperatorDesk --> TaskSupervisor
@@ -1834,10 +1872,12 @@ classDiagram
   OperatorTools --> ResearchStore
   OperatorTools --> PlanDesk
   OperatorTools --> TaskSupervisor
+  OperatorTools --> CardDesk
   OwnerDesk --> PlanDesk
   OwnerDesk --> OperatorDesk
   PlanDesk --> PlanBook
   PlanDesk --> TaskSupervisor
+  PlanDesk --> CardDesk
   WorkspaceBoard --> ResearchStore
   WorkspaceBoard --> TaskSupervisor
   WorkspaceServices --> OpenRouterPrices
@@ -1966,6 +2006,7 @@ classDiagram
   App --> AmazonListingSource
   AuthGate --> Settings
   AuthGate --> AccountDirectory
+  CardRoutes --> CardDesk
   ConfigRoute --> Settings
   CorpusRoute --> ResearchStore
   CorpusRoute --> Settings
@@ -2037,6 +2078,7 @@ classDiagram
 | `adapters` | `adapters/service-queue.ts` | Waiter, ServiceQueue |
 | `adapters` | `adapters/store/account-table.ts` | AccountTable |
 | `adapters` | `adapters/store/call-log.ts` | CallLog |
+| `adapters` | `adapters/store/card-table.ts` | CardTable |
 | `adapters` | `adapters/store/charge-table.ts` | ChargeTable |
 | `adapters` | `adapters/store/check-log.ts` | PacketCheckLog |
 | `adapters` | `adapters/store/competitor-kinds.ts` | CompetitorKinds |
@@ -2077,7 +2119,7 @@ classDiagram
 | `agent` | `agent/billed-costs.ts` | BilledCosts |
 | `agent` | `agent/built-agent.ts` | BuiltAgent |
 | `agent` | `agent/done-check.ts` | DoneCheck, NodeContract, ChampionContract, TruthContract |
-| `agent` | `agent/errors.ts` | RunError |
+| `agent` | `agent/errors.ts` | RunError, ApprovalNeeded |
 | `agent` | `agent/event-recorder.ts` | TurnEnd, AgentEventRecorder |
 | `agent` | `agent/fallback-models.ts` | FallbackModels |
 | `agent` | `agent/frames.ts` | EventFrame, Frames |
@@ -2088,6 +2130,7 @@ classDiagram
 | `agent` | `agent/live-runs.ts` | RunControl, Live, LiveRuns |
 | `agent` | `agent/llm-call-log.ts` | CallSequence, LlmCallLog |
 | `agent` | `agent/model-chain.ts` | ModelChain |
+| `agent` | `agent/operator/card-desk.ts` | CardDesk |
 | `agent` | `agent/operator/chat-view.ts` | ChatView |
 | `agent` | `agent/operator/operator-desk.ts` | OperatorDesk |
 | `agent` | `agent/operator/operator-tools.ts` | OperatorTools |
@@ -2184,6 +2227,7 @@ classDiagram
 | `domain` | `domain/ad-library.ts` | AdQuery, AdHit, AdPage |
 | `domain` | `domain/breakers.ts` | Trip, BreakerReadings, BreakerLimits, Breakers, RunStatuses |
 | `domain` | `domain/brief.ts` | Briefs |
+| `domain` | `domain/cards.ts` | Card, CardDraft, CardBook |
 | `domain` | `domain/charges.ts` | ChargeDraft, Charge, ChargeMeter, ServiceUse |
 | `domain` | `domain/chat.ts` | ChatMessage, TaskCard, Board |
 | `domain` | `domain/check-problem.ts` | RowRef, CheckProblem, CheckProblems |
@@ -2249,6 +2293,7 @@ classDiagram
 | `http` | `http/app.ts` | App |
 | `http` | `http/auth-gate.ts` | AuthGate |
 | `http` | `http/call-stats.ts` | CallStats |
+| `http` | `http/card-routes.ts` | CardRoutes |
 | `http` | `http/config-route.ts` | ConfigRoute |
 | `http` | `http/corpus-route.ts` | CorpusRoute |
 | `http` | `http/cost-route.ts` | CostRoute |

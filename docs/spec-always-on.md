@@ -268,7 +268,7 @@ contract that cannot be met or should not run without a human:
 | reachable | a field whose finding kind the primitive cannot record | a task that can never finish |
 | inputs exist | a `finding_id` or `document_id` not in this workspace | a task built on nothing |
 | budget | `max_usd` over the workspace's per-task cap | spend stays bounded |
-| money | any `review_mine` task, any task with Apify in reach | **CLAUDE.md rule 5**: Apify spend is asked for first. The task becomes an approval card, not a queued task |
+| money | any `review_mine` task, any task with Apify in reach | **CLAUDE.md rule 5**: Apify spend is asked for first. The task becomes an approval card, not a queued task. *Built 2026-10-14:* `ContractCheck.asksFirst`, not a refusal; approving a plan opens the card, and its Approve starts the task |
 
 `verify` says who signs the task off once code is satisfied: `code` alone
 (the contract check is enough), `critique` (a `critique` task is created against
@@ -800,6 +800,18 @@ carries: progress is a note, a decision is a card, and finishing a task is a
 note unless the owner asked to be told. The lecture's speaker says his team
 does not have this balance right yet; the dashboard counts cards per day per
 workspace so it can be measured, and an owner can mute a kind.
+
+*Built 2026-10-14* (`agent/operator/card-desk.ts`, `research_cards`). Where it
+differs: `send_owner` has one kind, a **question card** whose answer comes back
+to the operator as a message. There is no `note` kind (the operator's own reply
+is already a chat line) and no `approval` kind from the operator: approving
+starts work, so only code makes approval cards (the Apify check, §4). A paused
+task's question (§6.4) is a question card too, answered on the card or in the
+chat. Cards are counted per day per workspace on the board; muting a kind is
+not built. Measured on the local stack: a plan's product-facts task paused,
+its question ("The Droplet site sells many products … which one should I focus
+on?") arrived as a card, the answer on the card resumed it, and it ended
+`completed`, 22 calls, $0.0475 billed.
 
 **What stays in the prompt, and what does not.** Prompt caching makes the
 unchanged start of a request cheap, and pi-durable re-sends a section only when

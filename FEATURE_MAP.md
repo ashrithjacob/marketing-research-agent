@@ -434,5 +434,10 @@ older stage-1 modal (`StartRun.tsx`).
   approved, a task ended) and the operator's tool calls stay in its transcript
   but are not shown: the plan card already says the same. The dot in the header
   is green while the stream is connected.
+- **Cards** (`Cards.tsx`), above the plan: what is waiting for the owner. A
+  question (a paused task's, or the operator's `send_owner`) has an answer box;
+  an approval (a task that would spend Apify money) has Approve and Reject.
+  Settled ones from today stay below, with the answer; the head counts today's
+  cards. Routes: `POST /api/research/cards/:id/answer`, `/approve`, `/reject`.
 - Both come from one stream, `GET /api/research/workspace/stream`
   (`use-workspace.ts`), which sends whole snapshots: `chat` and `board`.

@@ -37,6 +37,10 @@ commit that closed it; do not delete it.
    store has a `category_data` contract. Needs: one real run before it is shown
    to anyone.
 
+8. **Cards cannot be muted, and show only on a plan page.** Spec §7.2 lets the
+   owner mute a kind; not built. The cards list sits on the plan page, so a card
+   raised while no plan page is open is seen the next time one is.
+
 ## Outside the code
 
 - **Nothing is deployed.** Parts 1–3 are only on the `ubiquitous` branch and the
