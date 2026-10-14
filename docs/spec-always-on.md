@@ -729,7 +729,7 @@ as the main surface.
 | 7 | The Always on switch and daily cap, the operator conversation (§7.2), `create_task`, `mra.money`, the schedule watcher | the system starts work nobody clicked, inside its limits |
 | 8 | `write` and `critique` primitives; the long-form statics playbook | an ad draft that cites its findings |
 | 9 | Measurement per playbook version (§5.5), curator watcher (§5.6), `distil` (§5.7) | a lesson that hurt is visible with numbers |
-| 10 | Ad-results feedback, competitor and review watchers | the loop closes on real ad performance |
+| 10 | Ad-results feedback (`docs/plan-meta-integration.md` Phase D; its Phases A–B start alongside parts 1–2, because Meta's App Review needs a reader already running), competitor and review watchers | the loop closes on real ad performance |
 
 ## 13. Risks and open questions
 
@@ -755,6 +755,6 @@ as the main surface.
 - **Contracts the model writes badly.** The contract check refuses impossible
   ones but not pointless ones. `verify: owner` for anything new is the
   defence until there is data.
-- **Open — yours:** which ad account (Meta first?) for outcome feedback.
+- **Ad results:** Meta first, planned in `docs/plan-meta-integration.md`.
   Decided 2026-10-14: the operator is opt-in per workspace with a required daily
   cap (§7.2), and brand memory is visible and editable from day one (§5.4).
