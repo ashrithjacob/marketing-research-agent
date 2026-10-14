@@ -4,8 +4,9 @@ import { join } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import { PRODUCT_DELIVERABLE, Primitives, RoleRecords, SavedPlans, taskContractSchema, taskRequestSchema, type PlanTask, type FindingKind, type TaskContract } from "../src/domain/index.js";
+import { PRODUCT_DELIVERABLE, Primitives, RoleRecords, SavedPlans, Scope, taskContractSchema, taskRequestSchema, type PlanTask, type FindingKind, type TaskContract } from "../src/domain/index.js";
 import { ContractCheck, type ContractGrounds } from "../src/extract/index.js";
+import { SqliteDatabase, SqlResearchStore } from "../src/adapters/index.js";
 import { SqliteStores } from "./sqlite-stores.js";
 
 export function productContract(overrides: Record<string, unknown> = {}): TaskContract {
@@ -141,5 +142,23 @@ describe("stage 1 as a saved plan", () => {
     expect(plan.map((t) => Primitives.role(t.contract).id)).toEqual(["champion", "product", "competitors", "category"]);
     expect(plan.map((t) => ContractCheck.asksFirst(t.contract).length > 0)).toEqual([true, false, true, false]);
     expect(plan.map((t) => ContractCheck.problems(t.contract, grounds()))).toEqual([[], [], [], []]);
+  });
+});
+
+describe("a plan saved by an older build", () => {
+  let dir = "";
+  afterEach(() => rmSync(dir, { recursive: true, force: true }));
+
+  it("reads with the fields added since filled in, so startup does not trip on it", async () => {
+    dir = mkdtempSync(join(tmpdir(), "mra-old-plan-"));
+    const db = SqliteDatabase.open(join(dir, "research.db"));
+    const store = await SqlResearchStore.open(db);
+    const old = [{ key: "product_facts", title: "Product facts", contract: productContract(), selected: true, run_id: "", error: "" }];
+    await db.run("INSERT INTO research_plans (id, workspace_id, brief, tasks, status, created_at, updated_at) VALUES (?,?,?,?,?,?,?)", [
+      "p1", "admin", JSON.stringify({ url: "https://x.example" }), JSON.stringify(old), "approved", "2026-10-14T00:00:00Z", "2026-10-14T00:00:00Z",
+    ]);
+    const [plan] = await store.plans.list(Scope.everything, 5);
+    expect(plan!.tasks[0]).toMatchObject({ key: "product_facts", auto: false, after: [] });
+    await store.close();
   });
 });

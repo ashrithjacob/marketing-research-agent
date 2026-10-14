@@ -62,13 +62,19 @@ CREATE INDEX IF NOT EXISTS research_plans_workspace ON research_plans(workspace_
     return updated;
   }
 
+  /** A task as stored, with the fields added since it was written filled in, so a plan saved by an older build reads as one saved now. */
+  private static task(stored: Partial<PlanTask>): PlanTask {
+    Trace.tick(import.meta.url, "PlanTable.task");
+    return { auto: false, after: [], run_id: "", error: "", selected: true, ...stored } as PlanTask;
+  }
+
   private static plan(row: PlanRow): Plan {
     Trace.line(import.meta.url, "PlanTable.plan", { id: row.id });
     return {
       id: row.id,
       workspace_id: row.workspace_id,
       brief: JSON.parse(row.brief) as Brief,
-      tasks: JSON.parse(row.tasks) as PlanTask[],
+      tasks: (JSON.parse(row.tasks) as Partial<PlanTask>[]).map(PlanTable.task),
       status: row.status as Plan["status"],
       created_at: row.created_at,
       updated_at: row.updated_at,
