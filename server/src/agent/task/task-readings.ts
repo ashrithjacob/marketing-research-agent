@@ -1,20 +1,25 @@
+import type { Corpus } from "../../adapters/corpus.js";
 import { Breakers, type BreakerReadings, type ResearchStore, type TaskContract, type Trip } from "../../domain/index.js";
 import { Trace } from "../../trace/index.js";
 
-/** A task's breaker readings, all from the research store, so a restarted process reads what the last one counted. */
+/** A task's breaker readings, from the research store and the corpus, so a restarted process reads what the last one counted. Progress is a new ledger row or a page archived for the first time. */
 export class TaskReadings {
-  constructor(private readonly store: ResearchStore) {}
+  constructor(
+    private readonly store: ResearchStore,
+    private readonly corpus: Corpus,
+  ) {}
 
   async read(runId: string, now: number): Promise<BreakerReadings> {
     Trace.line(import.meta.url, "TaskReadings.read", { runId });
-    const [run, calls, rows, checks, charges] = await Promise.all([
+    const [run, calls, rows, checks, charges, pages] = await Promise.all([
       this.store.getRun(runId),
       this.store.listLlmCalls(runId),
       this.store.findings.list(runId),
       this.store.listPacketChecks(runId),
       this.store.charges.list(runId),
+      this.corpus.pages(runId),
     ]);
-    const lastRow = rows.reduce((latest, row) => (row.created_at > latest ? row.created_at : latest), "");
+    const lastRow = rows.reduce((latest, row) => (row.created_at > latest ? row.created_at : latest), pages.newest);
     const billed = calls.reduce((sum, call) => sum + (call.generation?.cost ?? 0), 0);
     const charged = charges.reduce((sum, charge) => sum + (charge.usd ?? 0), 0);
     return {

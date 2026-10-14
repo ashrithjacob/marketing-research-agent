@@ -16,10 +16,13 @@ import ProductsPage from './ProductsPage';
 import { Link, navigate, paths, useRoute } from './route';
 import RunView from './RunView';
 import StartRun from './StartRun';
+import StartPlan from './StartPlan';
+import PlanPage from './PlanPage';
 import ProductTruthStart from './ProductTruthStart';
 import ReviewMiningPlan from './ReviewMiningPlan';
 import { stageOfNode } from './stages';
 import StepIn from './StepIn';
+import { useClock } from './use-clock';
 import { useProduct, useProducts } from './use-products';
 
 export default function App() {
@@ -29,6 +32,7 @@ export default function App() {
   /** The Start run modal: null when closed, the nodes to run when open ([] = whole stage). */
   const [startNodes, setStartNodes] = useState<ResearchNode[] | null>(null);
   const [stepInOpen, setStepInOpen] = useState(false);
+  const [planOpen, setPlanOpen] = useState(false);
   const [error, setError] = useState('');
   const [judgementsRev, setJudgementsRev] = useState(0);
   const route = useRoute();
@@ -134,8 +138,11 @@ export default function App() {
               Stop
             </button>
           )}
-          <button className="primary" onClick={() => setStartNodes([])}>
-            Start run
+          <button className="ghost" title="Start a stage-1 run directly, without a plan" onClick={() => setStartNodes([])}>
+            Stage run
+          </button>
+          <button className="primary" onClick={() => setPlanOpen(true)}>
+            Start
           </button>
           {who?.auth_required && (
             <span className="chip" title="Signed in as, in workspace">
@@ -163,6 +170,7 @@ export default function App() {
 
       {route.page === 'products' && <ProductsPage products={products} />}
       {route.page === 'library' && <LibraryPage onError={setError} />}
+      {route.page === 'plan' && <PlanPage planId={route.planId} onError={setError} />}
       {(route.page === 'missing' || missing) && (
         <div className="empty">
           No page here. <Link to={paths.products()}>All products</Link>
@@ -210,6 +218,15 @@ export default function App() {
           onFailed={async () => reload()}
         />
       )}
+      {planOpen && (
+        <StartPlan
+          onClose={() => setPlanOpen(false)}
+          onStarted={(plan) => {
+            setPlanOpen(false);
+            navigate(paths.plan(plan.id));
+          }}
+        />
+      )}
       {stepInOpen && activeRun && (
         <StepIn
           live={live}
@@ -219,22 +236,4 @@ export default function App() {
       )}
     </div>
   );
-}
-
-/** Elapsed run time, ticking once a second while the run is live. */
-function useClock(run: RunSummary | null): string {
-  const live = !!run && !TERMINAL_STATUSES.has(run.status);
-  const [, setTick] = useState(0);
-  useEffect(() => {
-    if (!live) return;
-    const iv = setInterval(() => setTick((t) => t + 1), 1000);
-    return () => clearInterval(iv);
-  }, [live]);
-  if (!run) return '';
-  const start = new Date(run.created_at).getTime();
-  const end = run.ended_at ? new Date(run.ended_at).getTime() : Date.now();
-  const s = Math.max(0, Math.floor((end - start) / 1000));
-  const mm = String(Math.floor(s / 60)).padStart(2, '0');
-  const ss = String(s % 60).padStart(2, '0');
-  return `${mm}:${ss}`;
 }

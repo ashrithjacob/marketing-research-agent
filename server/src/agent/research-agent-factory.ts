@@ -1,6 +1,8 @@
 import { Agent } from "@earendil-works/pi-agent-core";
 import type { Models } from "@earendil-works/pi-ai";
 
+import type { Corpus } from "../adapters/corpus.js";
+
 import {
   DiscoveryQuestions,
   RoleRecords,
@@ -51,13 +53,15 @@ export class ResearchAgentFactory {
     private readonly store: ResearchStore,
     private readonly models: Models,
     private readonly tools: ToolRegistry,
+    private readonly corpus: Corpus,
   ) {}
 
   async build(role: RoleSpec, run: RoleContext): Promise<BuiltAgent> {
     Trace.line(import.meta.url, "ResearchAgentFactory.build", { role: role.id, runId: run.runId });
     const findings = new RunFindings(this.store.findings, run.runId, role.id, Roles.scope(role, run.nodes), run.markets);
     const check = RoleChecks.done(role, findings, run);
-    const breakers = new TurnBreakers({ stepCeiling: role.maxTurns, maxUsd: null, maxMinutes: null }, async () => (await findings.rows()).filter((row) => row.agent_id === role.id).length);
+    const progress = async () => (await findings.rows()).filter((row) => row.agent_id === role.id).length + (await this.corpus.pages(run.runId)).count;
+    const breakers = new TurnBreakers({ stepCeiling: role.maxTurns, maxUsd: null, maxMinutes: null }, progress);
     const steps = new ToolSteps();
     const rows = await findings.rows();
     const workspaceId = (await this.store.getRun(run.runId))?.workspace_id ?? "";

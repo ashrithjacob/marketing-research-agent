@@ -1,9 +1,9 @@
 import { createHash } from "node:crypto";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { Trace } from "../trace/index.js";
 
-/** Writes a fetched body under its own sha256, so a quote can be re-read later. */
+/** Writes a fetched body under its own sha256, so a quote can be re-read later. A body already archived is not written again, so a file's time is when the run first saw that page. */
 export class Corpus {
   constructor(private readonly corpusPath: string) {}
 
@@ -18,10 +18,10 @@ export class Corpus {
     try {
       const dir = join(this.corpusPath, "runs", runId, "sources");
       await mkdir(dir, { recursive: true });
-      await writeFile(join(dir, digest), body);
+      await writeFile(join(dir, digest), body, { flag: "wx" });
       return { sourceId, archived: true };
-    } catch {
-      return { sourceId, archived: false };
+    } catch (error) {
+      return { sourceId, archived: (error as NodeJS.ErrnoException).code === "EEXIST" };
     }
   }
 
@@ -35,5 +35,14 @@ export class Corpus {
     } catch {
       return null;
     }
+  }
+
+  /** How many distinct pages a run has archived, and when the newest was first archived ("" for none). */
+  async pages(runId: string): Promise<{ count: number; newest: string }> {
+    Trace.line(import.meta.url, "Corpus.pages", { runId });
+    const dir = join(this.corpusPath, "runs", runId, "sources");
+    const names = await readdir(dir).catch(() => [] as string[]);
+    const times = await Promise.all(names.map(async (name) => (await stat(join(dir, name))).mtime.toISOString()));
+    return { count: names.length, newest: times.reduce((latest, time) => (time > latest ? time : latest), "") };
   }
 }

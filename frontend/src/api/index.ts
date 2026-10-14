@@ -11,3 +11,4 @@ export * from './review-mining';
 export * from './product-truth';
 export * from './review-analysis';
 export * from './library';
+export * from './workspace';

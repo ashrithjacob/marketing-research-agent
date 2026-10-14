@@ -7,7 +7,7 @@ import type { ReviewAnalysisResponse } from './review-analysis';
 import type { ProductTruthInputs } from './product-truth';
 import type { ReviewMiningPlanResponse, TargetListing } from './review-mining';
 
-async function request<T>(url: string, init?: RequestInit): Promise<T> {
+export async function request<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, {
     credentials: 'same-origin',
     headers: init?.body ? { 'Content-Type': 'application/json' } : undefined,

@@ -1,6 +1,7 @@
 import { createModels, type Models } from "@earendil-works/pi-ai";
 import { openrouterProvider } from "@earendil-works/pi-ai/providers/openrouter";
 
+import { Corpus } from "../adapters/corpus.js";
 import { OpenRouterPrices, ServiceClients } from "../adapters/index.js";
 import type { Settings } from "../config/index.js";
 import {
@@ -53,7 +54,7 @@ export class RunSupervisor {
     this.models = options.models ?? RunSupervisor.defaultModels();
     const services = options.services ?? ServiceClients.forSettings(options.settings);
     this.launcher = new RunLauncher(this.store, this.settings, this.models, this.costs, this.runs, options.retry ?? DEFAULT_RETRY, {
-      factory: new ResearchAgentFactory(this.store, this.models, new ToolRegistry(services, this.settings)),
+      factory: new ResearchAgentFactory(this.store, this.models, new ToolRegistry(services, this.settings), new Corpus(this.settings.corpusPath)),
       listings: new StageOneListings(this.store.listings, services.actors, services.pages, this.settings.apifyConcurrency),
       handoff: new StageOneHandoff(this.store),
       mining: new ReviewMiningJob(this.store, this.runs, this.settings, services.actors, options.pullRetryDelayMs),

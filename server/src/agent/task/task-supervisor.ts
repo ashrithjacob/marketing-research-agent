@@ -1,6 +1,7 @@
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import { defineExtension } from "@earendil-works/pi-durable";
 
+import { Corpus } from "../../adapters/corpus.js";
 import type { OpenRouterPrices } from "../../adapters/index.js";
 import type { Settings } from "../../config/index.js";
 import { Scope, TERMINAL_STATUSES, type ResearchRun, type ResearchStore } from "../../domain/index.js";
@@ -40,7 +41,7 @@ export class TaskSupervisor {
     const { store, runs, settings, tools, costs, harness, events } = deps;
     const works = new TaskWorks({ store, runs, settings, tools, costs });
     const signals = new TaskSignals();
-    const readings = new TaskReadings(store);
+    const readings = new TaskReadings(store, new Corpus(settings.corpusPath));
     const ending = new TaskEnd({ store, runs, costs, works, signals, readings });
     const extensions = new TaskExtensions(works, signals, readings);
     this.tasks = new ResearchTasks({ store, runs, works, extensions, signals, readings, ending, events, registry: harness.registry, model: settings.model });
