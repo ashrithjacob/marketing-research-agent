@@ -1,4 +1,4 @@
-import { Briefs, SAVED_TASKS, SavedPlans, Scope, briefSchema, type Plan, type PlanBook } from "../../domain/index.js";
+import { Briefs, SAVED_TASKS, SavedPlans, Scope, briefSchema, type Plan, type PlanBook, type PlanTask } from "../../domain/index.js";
 import { ContractCheck } from "../../extract/index.js";
 import { Trace } from "../../trace/index.js";
 
@@ -39,6 +39,8 @@ export class PlanDesk {
     const brief = change.market === undefined ? plan.brief : { ...plan.brief, market: change.market };
     const unknown = [...(change.add ?? [])].filter((key) => !SAVED_TASKS[key]);
     if (unknown.length > 0) throw new RunError(`no saved task ${unknown.join(", ")}; the saved tasks are ${Object.keys(SAVED_TASKS).join(", ")}`);
+    const auto = [...(change.drop ?? []), ...(change.keep ?? [])].filter((key) => plan.tasks.some((task) => task.key === key && task.auto));
+    if (auto.length > 0) throw new RunError(`${auto.join(", ")} is kept or dropped by the plan itself, by what the other tasks need`);
     const added = (change.add ?? []).filter((key) => !plan.tasks.some((task) => task.key === key)).map((key) => SavedPlans.task(key, brief));
     const tasks = [...plan.tasks, ...added].map((task) => {
       const fresh = SavedPlans.task(task.key, brief);
@@ -49,37 +51,37 @@ export class PlanDesk {
         selected: change.drop?.includes(task.key) ? false : change.keep?.includes(task.key) || change.add?.includes(task.key) ? true : task.selected,
       };
     });
-    return this.plans.save({ ...plan, brief, tasks });
+    return this.plans.save({ ...plan, brief, tasks: SavedPlans.arrange(brief, tasks) });
   }
 
-  /** The owner's approval: each kept task is checked and started as a durable task; a task refused is kept on the plan with why. */
+  /** The owner's approval: each kept task with nothing to wait for is started; a task that waits on another starts when that one ends (PlanRelease). */
   async approve(planId: string, scope: Scope): Promise<Plan> {
     Trace.line(import.meta.url, "PlanDesk.approve", { planId });
     const plan = await this.open(planId, scope);
-    if (!plan.tasks.some((task) => task.selected)) throw new RunError("the plan keeps no task; keep at least one before approving");
+    if (!plan.tasks.some((task) => task.selected && !task.auto)) throw new RunError("the plan keeps no task; keep at least one before approving");
     const tasks = [];
-    for (const task of plan.tasks) {
-      if (!task.selected) {
-        tasks.push(task);
-        continue;
-      }
-      try {
-        const run = await this.tasks.start({ brief: plan.brief, contract: task.contract }, plan.workspace_id);
-        tasks.push({ ...task, run_id: run.id });
-      } catch (error) {
-        if (!(error instanceof RunError)) throw error;
-        if (error instanceof ApprovalNeeded) await this.askApproval(plan, task.key);
-        tasks.push({ ...task, error: error instanceof ApprovalNeeded ? "waiting for your approval: it would spend Apify money" : error.message });
-      }
-    }
+    for (const task of plan.tasks) tasks.push(task.selected && task.after.length === 0 ? await this.startTask(plan, task) : task);
     return this.plans.save({ ...plan, tasks, status: "approved" });
   }
 
-  private async askApproval(plan: Plan, key: string): Promise<void> {
-    Trace.line(import.meta.url, "PlanDesk.askApproval", { planId: plan.id, key });
-    const task = plan.tasks.find((t) => t.key === key)!;
+  /** One task of a plan started, past its contract check: as a run, or, when it would spend Apify money, as an approval card the owner presses first. */
+  async startTask(plan: Plan, task: PlanTask): Promise<PlanTask> {
+    Trace.line(import.meta.url, "PlanDesk.startTask", { planId: plan.id, key: task.key });
+    try {
+      const run = await this.tasks.start({ brief: plan.brief, contract: task.contract }, plan.workspace_id);
+      return { ...task, run_id: run.id, error: "" };
+    } catch (error) {
+      if (!(error instanceof RunError)) throw error;
+      if (!(error instanceof ApprovalNeeded)) return { ...task, error: error.message };
+      await this.askApproval(plan, task);
+      return { ...task, error: "waiting for your approval: it would spend Apify money" };
+    }
+  }
+
+  private async askApproval(plan: Plan, task: PlanTask): Promise<void> {
+    Trace.line(import.meta.url, "PlanDesk.askApproval", { planId: plan.id, key: task.key });
     const body = `${task.contract.objective}. ${ContractCheck.asksFirst(task.contract).join("; ")}; at most $${task.contract.budget.max_usd.toFixed(2)}.`;
-    const action = { kind: "start_task" as const, brief: plan.brief, contract: task.contract, plan_id: plan.id, task_key: key };
+    const action = { kind: "start_task" as const, brief: plan.brief, contract: task.contract, plan_id: plan.id, task_key: task.key };
     await this.cards.open(plan.workspace_id, { kind: "approval", title: `Approve ${task.title}?`, body, action });
   }
 

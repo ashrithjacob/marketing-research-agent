@@ -1,5 +1,5 @@
 import type { Corpus } from "../../adapters/corpus.js";
-import { Breakers, type BreakerReadings, type ResearchStore, type TaskContract, type Trip } from "../../domain/index.js";
+import { Breakers, Primitives, type BreakerReadings, type ResearchStore, type TaskContract, type Trip } from "../../domain/index.js";
 import { Trace } from "../../trace/index.js";
 
 /** A task's breaker readings, from the research store and the corpus, so a restarted process reads what the last one counted. Progress is a new ledger row or a page archived for the first time. */
@@ -53,6 +53,6 @@ export class TaskReadings {
   async trip(runId: string, contract: TaskContract, stepCeiling: number, now: number): Promise<Trip | null> {
     Trace.line(import.meta.url, "TaskReadings.trip", { runId, stepCeiling });
     const limits = { stepCeiling, maxUsd: contract.budget.max_usd, maxMinutes: contract.budget.max_minutes };
-    return Breakers.trip(await this.read(runId, now, contract.primitive), limits);
+    return Breakers.trip(await this.read(runId, now, Primitives.role(contract).id), limits);
   }
 }

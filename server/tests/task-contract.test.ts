@@ -4,7 +4,7 @@ import { join } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import { PRODUCT_DELIVERABLE, Primitives, RoleRecords, taskContractSchema, taskRequestSchema, type FindingKind, type TaskContract } from "../src/domain/index.js";
+import { PRODUCT_DELIVERABLE, Primitives, RoleRecords, SavedPlans, taskContractSchema, taskRequestSchema, type PlanTask, type FindingKind, type TaskContract } from "../src/domain/index.js";
 import { ContractCheck, type ContractGrounds } from "../src/extract/index.js";
 import { SqliteStores } from "./sqlite-stores.js";
 
@@ -20,7 +20,7 @@ export function productContract(overrides: Record<string, unknown> = {}): TaskCo
 
 function grounds(overrides: Partial<ContractGrounds> = {}): ContractGrounds {
   return {
-    recordable: new Set<FindingKind>(["source", "attribute", "measurement", "excerpt", "competitor", "gap", "saturation", "node_status"]),
+    recordable: new Set<FindingKind>(["source", "attribute", "measurement", "excerpt", "competitor", "competitor_reference", "gap", "saturation", "node_status"]),
     findings: new Set(),
     documents: new Set(),
     maxUsd: 2,
@@ -105,5 +105,41 @@ describe("a task's run row", () => {
     await store.updateRun(run.id, { task_id: "t1", conversation_id: "c1" });
     expect(await store.getRun(run.id)).toMatchObject({ task_id: "t1", conversation_id: "c1" });
     await store.close();
+  });
+});
+
+describe("stage 1 as a saved plan", () => {
+  const keys = (tasks: PlanTask[]) => tasks.map((t) => [t.key, t.selected, t.after.join(",")]);
+  const site = { product: "", url: "https://brand.example", market: "", notes: "" };
+
+  it("keeps the champion for a site only while competitors are kept, and starts the others after it", () => {
+    const plan = SavedPlans.tasks(site);
+    expect(keys(plan)).toEqual([
+      ["champion", true, ""],
+      ["product_facts", true, "champion"],
+      ["competitors", true, "champion"],
+      ["category_numbers", true, "champion"],
+    ]);
+    const without = SavedPlans.arrange(site, plan.map((t) => (t.key === "competitors" ? { ...t, selected: false } : t)));
+    expect(keys(without)).toEqual([
+      ["champion", false, ""],
+      ["product_facts", true, ""],
+      ["competitors", false, ""],
+      ["category_numbers", true, ""],
+    ]);
+  });
+
+  it("always keeps the champion for a product name, which only the champion turns into a product", () => {
+    const genre = { product: "magnesium glycinate", url: "", market: "", notes: "" };
+    const plan = SavedPlans.arrange(genre, SavedPlans.tasks(genre).map((t) => (t.key === "competitors" ? { ...t, selected: false } : t)));
+    expect(plan.find((t) => t.key === "champion")!.selected).toBe(true);
+    expect(plan.find((t) => t.key === "product_facts")!.after).toEqual(["champion"]);
+  });
+
+  it("works each task as its stage-1 role, and asks first for the ones that can reach Apify", () => {
+    const plan = SavedPlans.tasks(site);
+    expect(plan.map((t) => Primitives.role(t.contract).id)).toEqual(["champion", "product", "competitors", "category"]);
+    expect(plan.map((t) => ContractCheck.asksFirst(t.contract).length > 0)).toEqual([true, false, true, false]);
+    expect(plan.map((t) => ContractCheck.problems(t.contract, grounds()))).toEqual([[], [], [], []]);
   });
 });

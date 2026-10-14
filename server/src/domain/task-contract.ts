@@ -4,6 +4,7 @@ import { briefSchema } from "./brief.js";
 import type { Deliverable } from "./deliverable.js";
 import { FINDING_KINDS } from "./finding-kinds.js";
 import { nodeSchema } from "./nodes.js";
+import { STAGE_ONE_AGENTS } from "./stage-one-agents.js";
 
 export const PRIMITIVE_NAMES = ["research"] as const;
 export type PrimitiveName = (typeof PRIMITIVE_NAMES)[number];
@@ -74,6 +75,7 @@ export const taskContractSchema = z
   .object({
     objective: z.string().min(1),
     primitive: z.enum(PRIMITIVE_NAMES),
+    method: z.enum(STAGE_ONE_AGENTS).optional(),
     complete: deliverableSchema,
     inputs: z
       .object({ finding_ids: z.array(z.string()).default([]), document_ids: z.array(z.string()).default([]) })

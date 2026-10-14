@@ -15,7 +15,7 @@ import { PiHarness } from "../src/agent/index.js";
 import { Env, type Settings } from "../src/config/index.js";
 import { Scope, TERMINAL_STATUSES, type ChatMessage, type Plan } from "../src/domain/index.js";
 import { App } from "../src/http/index.js";
-import { productPacket, recordCalls } from "./fixtures.js";
+import { minimalPacket, productPacket, recordCalls } from "./fixtures.js";
 import { SqliteStores } from "./sqlite-stores.js";
 
 const MODEL_ID = "faux-model";
@@ -75,11 +75,17 @@ describe("start, review, chat", () => {
     const started = await call("POST", "/plans", { brief: BRIEF });
     expect(started.status).toBe(201);
     const plan = (await started.json()) as Plan;
-    expect(plan).toMatchObject({ status: "draft", tasks: [{ key: "product_facts", selected: true }, { key: "category_numbers", selected: true }] });
+    expect(plan.status).toBe("draft");
+    expect(plan.tasks.map((t) => [t.key, t.selected, t.auto, t.after])).toEqual([
+      ["champion", true, true, []],
+      ["product_facts", true, false, ["champion"]],
+      ["competitors", true, false, ["champion"]],
+      ["category_numbers", true, false, ["champion"]],
+    ]);
     expect((await store.listRuns({ workspaceId: null } as never)).length).toBe(0);
 
     faux.setResponses([
-      fauxAssistantMessage(fauxToolCall("revise_plan", { plan_id: plan.id, drop: ["category_numbers"], market: "UK" }), { stopReason: "toolUse" }),
+      fauxAssistantMessage(fauxToolCall("revise_plan", { plan_id: plan.id, drop: ["category_numbers", "competitors"], market: "UK" }), { stopReason: "toolUse" }),
       fauxAssistantMessage("Done: only the product facts, for the UK. Approve it when you are ready."),
     ]);
     expect((await call("POST", "/chat", { text: "Skip the category numbers, UK only", plan_id: plan.id })).status).toBe(202);
@@ -90,19 +96,25 @@ describe("start, review, chat", () => {
     ]);
     const revised = (await (await call("GET", `/plans/${plan.id}`)).json()) as Plan;
     expect(revised.brief.market).toBe("UK");
-    expect(revised.tasks.map((t) => [t.key, t.selected])).toEqual([["product_facts", true], ["category_numbers", false]]);
+    expect(revised.tasks.map((t) => [t.key, t.selected, t.after])).toEqual([
+      ["champion", false, []],
+      ["product_facts", true, []],
+      ["competitors", false, []],
+      ["category_numbers", false, []],
+    ]);
 
     const toggled = (await (await call("POST", `/plans/${plan.id}/tasks/category_numbers`, { selected: false })).json()) as Plan;
-    expect(toggled.tasks[1]!.selected).toBe(false);
+    expect(toggled.tasks.find((t) => t.key === "category_numbers")!.selected).toBe(false);
+    expect((await call("POST", `/plans/${plan.id}/tasks/champion`, { selected: true })).status).toBe(400);
 
     faux.setResponses([recordAll(), finish()]);
     const approved = await call("POST", `/plans/${plan.id}/approve`);
     expect(approved.status).toBe(202);
     const body = (await approved.json()) as Plan;
     expect(body.status).toBe("approved");
-    const runId = body.tasks[0]!.run_id;
+    const runId = body.tasks.find((t) => t.key === "product_facts")!.run_id;
     expect(runId).not.toBe("");
-    expect(body.tasks[1]!.run_id).toBe("");
+    expect(body.tasks.filter((t) => t.run_id).map((t) => t.key)).toEqual(["product_facts"]);
     const ended = await until(() => store.getRun(runId), (run) => !!run && TERMINAL_STATUSES.has(run.status));
     expect(ended!.status).toBe("completed");
     expect(ended!.brief).toMatchObject({ market: "UK" });
@@ -144,9 +156,9 @@ describe("a task that stops and asks", () => {
     };
     faux.setResponses(Array.from({ length: 30 }, () => route));
     const plan = (await (await call("POST", "/plans", { brief: BRIEF })).json()) as Plan;
-    expect(plan.tasks[0]!.contract.stop_when).toContain("more than one product");
-    await call("POST", `/plans/${plan.id}/tasks/category_numbers`, { selected: false });
-    runId = ((await (await call("POST", `/plans/${plan.id}/approve`)).json()) as Plan).tasks[0]!.run_id;
+    expect(plan.tasks.find((t) => t.key === "product_facts")!.contract.stop_when).toContain("more than one product");
+    for (const key of ["category_numbers", "competitors"]) await call("POST", `/plans/${plan.id}/tasks/${key}`, { selected: false });
+    runId = ((await (await call("POST", `/plans/${plan.id}/approve`)).json()) as Plan).tasks.find((t) => t.key === "product_facts")!.run_id;
     await until(() => store.getRun(runId), (run) => run?.status === "waiting");
     const board = (await until(() => app.workspace!.board.snapshot("admin"), (b) => b.tasks.some((t) => t.question !== ""))).tasks[0]!;
     expect(board).toMatchObject({ status: "waiting", question: "Drops or the diffuser?" });
@@ -181,8 +193,8 @@ describe("cards", () => {
     };
     faux.setResponses(Array.from({ length: 30 }, () => route));
     const plan = (await (await call("POST", "/plans", { brief: BRIEF })).json()) as Plan;
-    await call("POST", `/plans/${plan.id}/tasks/category_numbers`, { selected: false });
-    const runId = ((await (await call("POST", `/plans/${plan.id}/approve`)).json()) as Plan).tasks[0]!.run_id;
+    for (const key of ["category_numbers", "competitors"]) await call("POST", `/plans/${plan.id}/tasks/${key}`, { selected: false });
+    const runId = ((await (await call("POST", `/plans/${plan.id}/approve`)).json()) as Plan).tasks.find((t) => t.key === "product_facts")!.run_id;
     const card = (await until(() => store.cards.list(Scope.of("admin"), 10), (cards) => cards.length > 0))[0]!;
     const answered = await call("POST", `/cards/${card.id}/answer`, { answer: "The drops." });
     expect(answered.status).toBe(202);
@@ -194,7 +206,7 @@ describe("cards", () => {
   it("an approval card starts its task only when approved, and a rejection is kept on the plan", async () => {
     faux.setResponses([recordAll(), finish()]);
     const plan = (await (await call("POST", "/plans", { brief: BRIEF })).json()) as Plan;
-    const contract = { ...plan.tasks[0]!.contract, stop_when: undefined };
+    const contract = { ...plan.tasks.find((t) => t.key === "product_facts")!.contract, stop_when: undefined };
     const approval = await app.workspace!.cards.open("admin", {
       kind: "approval",
       title: "Approve Product facts?",
@@ -205,12 +217,12 @@ describe("cards", () => {
     const approved = (await (await call("POST", `/cards/${approval.id}/approve`)).json()) as { answer: string };
     const run = await until(() => store.getRun(approved.answer), (r) => !!r && TERMINAL_STATUSES.has(r.status));
     expect(run!.status).toBe("completed");
-    expect(((await (await call("GET", `/plans/${plan.id}`)).json()) as Plan).tasks[0]!.run_id).toBe(approved.answer);
+    expect(((await (await call("GET", `/plans/${plan.id}`)).json()) as Plan).tasks.find((t) => t.key === "product_facts")!.run_id).toBe(approved.answer);
 
     const action = { kind: "start_task" as const, brief: plan.brief, contract, plan_id: plan.id, task_key: "category_numbers" };
     const second = await app.workspace!.cards.open("admin", { kind: "approval", title: approval.title, body: approval.body, action });
     expect((await call("POST", `/cards/${second.id}/reject`)).status).toBe(202);
-    expect(((await (await call("GET", `/plans/${plan.id}`)).json()) as Plan).tasks[1]!.error).toBe("rejected by the owner");
+    expect(((await (await call("GET", `/plans/${plan.id}`)).json()) as Plan).tasks.find((t) => t.key === "category_numbers")!.error).toBe("rejected by the owner");
   });
 
   it("the operator's question becomes a card, and the answer comes back to it", async () => {
@@ -225,5 +237,53 @@ describe("cards", () => {
     await call("POST", `/cards/${card.id}/answer`, { answer: "UK only." });
     const lines = await until(chat, (seen) => seen.some((line) => line.text === "Thanks: UK only."));
     expect(lines.map((line) => line.text)).toContain('My answer to your question "UK only, or Ireland too?": UK only.');
+  });
+});
+
+describe("stage 1 as a plan", () => {
+  it("starts the champion first behind its Apify approval, then the tasks that measure against it, each with the champion's row copied in", async () => {
+    const champion = {
+      sources: [{ ...minimalPacket().sources[0], id: "sha256:ccc", url: "https://amazon.example/magnacalm", kind: "competitor_marketing", node: "competitors" }],
+      competitor_reference: { name: "MagnaCalm Glycinate", form: "capsule", actives: ["magnesium glycinate"], icp: "adults with a cough", source_id: "sha256:ccc" },
+      gaps: [{ node: "competitors", missing: "champion ranking unavailable: no Amazon search in tests" }],
+    };
+    const text = (content: unknown) => (typeof content === "string" ? content : JSON.stringify(content));
+    const route: FauxResponseStep = (context) => {
+      const task = text(context.messages.find((m) => m.role === "user")?.content ?? "");
+      const started = context.messages.some((m) => m.role === "toolResult");
+      if (task.includes("Your task: find the champion")) return started ? finish() : fauxAssistantMessage(recordCalls(champion), { stopReason: "toolUse" });
+      if (task.includes("Your task: the product's fact sheet")) return started ? finish() : recordAll();
+      return fauxAssistantMessage("nothing to do here");
+    };
+    faux.setResponses(Array.from({ length: 30 }, () => route));
+    const plan = (await (await call("POST", "/plans", { brief: { product: "magnesium glycinate" } })).json()) as Plan;
+    await call("POST", `/plans/${plan.id}/tasks/category_numbers`, { selected: false });
+    const approved = (await (await call("POST", `/plans/${plan.id}/approve`)).json()) as Plan;
+    expect(approved.tasks.map((t) => [t.key, t.run_id !== "", t.error])).toEqual([
+      ["champion", false, "waiting for your approval: it would spend Apify money"],
+      ["product_facts", false, ""],
+      ["competitors", false, ""],
+      ["category_numbers", false, ""],
+    ]);
+    expect((await store.listRuns(Scope.of("admin"), 10)).length).toBe(0);
+
+    const first = (await store.cards.list(Scope.of("admin"), 10)).find((c) => c.kind === "approval")!;
+    expect(first.title).toBe("Approve Champion product?");
+    await call("POST", `/cards/${first.id}/approve`);
+    const released = await until(
+      async () => ((await (await call("GET", `/plans/${plan.id}`)).json()) as Plan).tasks,
+      (tasks) => tasks.find((t) => t.key === "product_facts")!.run_id !== "",
+    );
+    const productRun = released.find((t) => t.key === "product_facts")!.run_id;
+    expect(released.find((t) => t.key === "competitors")!.error).toBe("waiting for your approval: it would spend Apify money");
+    const copied = (await store.findings.list(productRun)).filter((row) => row.agent_id === "champion");
+    expect(copied.map((row) => [row.kind, row.payload.node ?? null])).toEqual([
+      ["source", "product_data"],
+      ["competitor_reference", null],
+      ["gap", "product_data"],
+    ]);
+    expect((await until(() => store.getRun(productRun), (run) => !!run && TERMINAL_STATUSES.has(run.status)))!.status).toBe("completed");
+    const open = (await store.cards.list(Scope.of("admin"), 10)).filter((c) => c.status === "open").map((c) => c.title);
+    expect(open).toEqual(["Approve Competitors?"]);
   });
 });

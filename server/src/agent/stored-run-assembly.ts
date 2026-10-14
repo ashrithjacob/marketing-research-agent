@@ -8,6 +8,7 @@ import { ReviewMiningRunAssembly } from "./review-mining-run-assembly.js";
 import type { RunAssembly } from "./run-assembly.js";
 import { StageOneParts } from "./stage-one-parts.js";
 import { StageOneRunAssembly } from "./stage-one-run-assembly.js";
+import { TaskWorks } from "./task/task-work.js";
 
 /** The assembly for a run no live process holds — one a restart killed, or an old one settled again — rebuilt from what the store keeps of it. No model or paid tool is called. */
 export class StoredRunAssembly {
@@ -17,7 +18,10 @@ export class StoredRunAssembly {
     if (run.stage === 2) return new ProductTruthRunAssembly(store.findings, run.id, { sourceRunId: run.source_run_id, brief, markets: Briefs.markets(brief) });
     if (run.stage === 3) return new ReviewMiningRunAssembly(store, runs, run.id, brief, new ReviewLedger(), () => ({ targets: [], failures: [] }));
     const nodes = run.nodes as Node[];
-    const roles = run.contract ? [Primitives.role(taskContractSchema.parse(run.contract))] : StageOneParts.planned(brief, nodes);
-    return new StageOneRunAssembly(store.findings, run.id, { brief, nodes, roles });
+    if (run.contract) {
+      const contract = taskContractSchema.parse(run.contract);
+      return TaskWorks.assembly(store, run.id, contract, brief, Primitives.role(contract));
+    }
+    return new StageOneRunAssembly(store.findings, run.id, { brief, nodes, roles: StageOneParts.planned(brief, nodes) });
   }
 }

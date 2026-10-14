@@ -1,11 +1,13 @@
 import type { Settings } from "../../config/index.js";
-import { Briefs, Scope, taskRequestSchema, type FindingKind, type ResearchRun, type ResearchStore, type TaskContract } from "../../domain/index.js";
+import { Briefs, Primitives, Scope, taskRequestSchema, type FindingKind, type ResearchRun, type ResearchStore, type TaskContract } from "../../domain/index.js";
 import { ContractCheck, ZodProblems } from "../../extract/index.js";
 import { Trace } from "../../trace/index.js";
 
 import { ApprovalNeeded, RunError } from "../errors.js";
 import { EXCERPT_RECORD } from "../prompt/text/excerpt-tool.js";
 import { RECORD_TOOLS } from "../prompt/text/record-tools.js";
+
+import { TaskInputs } from "./task-inputs.js";
 
 /** A task request read, its contract checked against what exists, and written as a queued run that carries the contract; nothing is written for a refused one. */
 export class TaskIntake {
@@ -31,16 +33,18 @@ export class TaskIntake {
     if (problems.length > 0) throw new RunError(`task refused: ${problems.join("; ")}`);
     const asks = ContractCheck.asksFirst(contract);
     if (asks.length > 0 && !approved) throw new ApprovalNeeded(`needs the owner's approval: ${asks.join("; ")}`);
-    return this.store.createRun({
+    const run = await this.store.createRun({
       workspaceId,
       brief: brief as unknown as Record<string, unknown>,
       model: this.settings.model,
       rejectKinds: [],
       judgementIds: [],
-      nodes: contract.complete.node ? [contract.complete.node] : [],
+      nodes: Primitives.nodes(contract),
       stage: 1,
       contract: contract as unknown as Record<string, unknown>,
     });
+    await new TaskInputs(this.store.findings).copy(contract.inputs.finding_ids, run.id, contract.complete.node);
+    return run;
   }
 
   /** Of the findings a contract names as `<run id>/<row id>`, the ones that exist in a run this workspace can see. */

@@ -1,14 +1,15 @@
-import { RoleRecords, type Brief, type RoleSpec, type TaskContract } from "../../domain/index.js";
+import { RoleRecords, type Brief, type Finding, type RoleSpec, type TaskContract } from "../../domain/index.js";
 import { Trace } from "../../trace/index.js";
 
 import { PromptBlocks } from "./blocks.js";
 import { ContractTable } from "./contract-table.js";
+import type { RoleBriefing } from "./role-briefing.js";
 import { EXCERPT_RECORD } from "./text/excerpt-tool.js";
 import { RECORD_TOOLS } from "./text/record-tools.js";
 import { TASK_EXCERPTS, TASK_INSTRUCTIONS, TASK_SYSTEM } from "./text/task.js";
 
 /** A task's prompts, from its contract: the worker's rules around the tools it was given, and its objective with what done means. */
-export class TaskBriefing {
+export class TaskBriefing implements RoleBriefing {
   constructor(
     private readonly contract: TaskContract,
     private readonly brief: Brief,
@@ -23,7 +24,7 @@ export class TaskBriefing {
       .replace("{excerpts}", kinds.includes("excerpt") ? TASK_EXCERPTS : "");
   }
 
-  instructions(): string {
+  instructions(_role: RoleSpec, _rows: readonly Finding[]): string {
     Trace.line(import.meta.url, "TaskBriefing.instructions");
     const { contract, brief } = this;
     const task = TASK_INSTRUCTIONS.replace("{objective}", contract.objective)

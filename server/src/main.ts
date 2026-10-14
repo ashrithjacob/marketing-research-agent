@@ -27,6 +27,8 @@ if (abandoned > 0) console.log(`${abandoned} document conversion(s) were cut off
 const resettled = await app.supervisor.resettleInvalidRuns();
 if (resettled.length > 0) console.log(`re-settled ${resettled.length} invalid run(s) from their ledgers: ${resettled.join(", ")}`);
 const picked = app.workspace ? await app.workspace.tasks.recover() : 0;
+const released = app.workspace ? await app.workspace.release.recover() : 0;
+if (released > 0) console.log(`started ${released} plan task(s) whose wait ended while the server was down`);
 harness.resume();
 console.log(`harness ${harness.reopened ? "reopened" : "created"} at ${harness.path}; ${picked} task(s) to pick back up`);
 app.supervisor.costs.start();

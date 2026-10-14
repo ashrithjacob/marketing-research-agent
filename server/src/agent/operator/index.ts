@@ -7,3 +7,4 @@ export * from "./owner-desk.js";
 export * from "./workspace-board.js";
 export * from "./workspace-services.js";
 export * from "./card-desk.js";
+export * from "./plan-release.js";

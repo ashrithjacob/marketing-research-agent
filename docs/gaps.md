@@ -41,6 +41,15 @@ commit that closed it; do not delete it.
    owner mute a kind; not built. The cards list sits on the plan page, so a card
    raised while no plan page is open is seen the next time one is.
 
+9. **Part 4 built stage 1 as a plan, not the other primitives.** `evidence`,
+   `ad_scan`, `review_mine`, `analyse` (spec §3) are not tasks yet: product truth
+   and review mining still run only as stage runs. Stage 1's four roles are tasks
+   through a contract's `method`.
+10. **Two writers can save one plan at once.** `PlanRelease` (a champion ended)
+    and `CardDesk` (an approval pressed) each read a plan, change one task and
+    save it whole; if both happen together, the later save drops the other's
+    change. Needs: saving one task of a plan, not the whole plan.
+
 ## Outside the code
 
 - **Nothing is deployed.** Parts 1–3 are only on the `ubiquitous` branch and the

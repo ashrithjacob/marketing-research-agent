@@ -2,12 +2,14 @@ import type { Scope } from "./accounts.js";
 import type { Brief } from "./brief.js";
 import type { TaskContract } from "./task-contract.js";
 
-/** One task a plan proposes: its contract, whether the owner keeps it, and the run it became once approved, or why it could not start. */
+/** One task a plan proposes: its contract, whether it is kept (`auto`: by the plan, not the owner), the tasks it starts after, and the run it became once approved, or why it could not start. */
 export interface PlanTask {
   key: string;
   title: string;
   contract: TaskContract;
   selected: boolean;
+  auto: boolean;
+  after: string[];
   run_id: string;
   error: string;
 }

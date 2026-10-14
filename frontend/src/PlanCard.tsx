@@ -21,6 +21,7 @@ export default function PlanCard({ plan, tasks, onError }: { plan: Plan; tasks: 
   }
 
   const kept = plan.tasks.filter((task) => task.selected);
+  const owned = kept.filter((task) => !task.auto);
   const cap = kept.reduce((sum, task) => sum + task.contract.budget.max_usd, 0);
 
   return (
@@ -39,13 +40,21 @@ export default function PlanCard({ plan, tasks, onError }: { plan: Plan; tasks: 
                 <input
                   type="checkbox"
                   checked={task.selected}
-                  disabled={!draft || busy}
+                  disabled={!draft || busy || task.auto}
                   onChange={() => act(() => workspaceApi.editTask(plan.id, task.key, { selected: !task.selected }))}
                 />
                 <span className="t">{task.title}</span>
                 {card && <span className={`status ${card.status}`}>{card.status}</span>}
               </label>
               <div className="d">{task.contract.objective}</div>
+              {task.auto && (
+                <div className="d muted">
+                  {task.selected ? 'Needed first: the tasks after it measure against what it finds.' : 'Not needed for the tasks kept.'}
+                </div>
+              )}
+              {!draft && task.selected && task.after.length > 0 && !task.run_id && !task.error && (
+                <div className="d muted">Starts when {plan.tasks.filter((t) => task.after.includes(t.key)).map((t) => t.title).join(', ')} finishes.</div>
+              )}
               <StopWhen
                 text={task.contract.stop_when ?? ''}
                 editable={draft && task.selected && !busy}
@@ -71,7 +80,7 @@ export default function PlanCard({ plan, tasks, onError }: { plan: Plan; tasks: 
       {draft && (
         <div className="plan-approve">
           <p className="muted small">Nothing runs until you approve. Anything that would spend Apify money gets its own approval button.</p>
-          <button className="primary" disabled={busy || kept.length === 0} onClick={() => act(() => workspaceApi.approve(plan.id))}>
+          <button className="primary" disabled={busy || owned.length === 0} onClick={() => act(() => workspaceApi.approve(plan.id))}>
             Approve {kept.length} task{kept.length === 1 ? '' : 's'} · up to ${cap.toFixed(2)}
           </button>
         </div>

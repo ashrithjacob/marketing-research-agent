@@ -13,3 +13,5 @@ export * from "./task-supervisor.js";
 export * from "./task-events.js";
 export * from "./task-judge.js";
 export * from "./task-pause.js";
+export * from "./champion-run-assembly.js";
+export * from "./task-inputs.js";

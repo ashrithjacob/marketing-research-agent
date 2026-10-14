@@ -12,6 +12,8 @@ export interface PlanTask {
   title: string;
   contract: TaskContract;
   selected: boolean;
+  auto: boolean;
+  after: string[];
   run_id: string;
   error: string;
 }
