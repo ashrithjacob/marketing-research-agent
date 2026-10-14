@@ -1011,3 +1011,13 @@ details[open].tile-gap > summary.tile-gap-missing { white-space: normal; }
 .memory-add { display: flex; gap: 8px; }
 .card-answer .lesson-text { width: 100%; resize: vertical; }
 .card.approval .card-answer { flex-wrap: wrap; }
+.always { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 16px 18px; }
+.always-head { display: flex; justify-content: space-between; align-items: center; }
+.always h2 { margin: 0; font-family: var(--font-display); font-weight: 400; font-size: 18px; }
+.always h3 { margin: 14px 0 0; font-size: 13px; }
+.always ul { list-style: none; margin: 6px 0; padding: 0; display: flex; flex-direction: column; gap: 4px; font-size: 13px; }
+.always li { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.always-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 8px; font-size: 13px; }
+.always-row input, .always-row select { background: var(--bg); border: 1px solid var(--line); color: var(--ink); border-radius: 10px; padding: 7px 9px; font-size: 13px; }
+.always-row input.days { width: 52px; margin: 0 4px; }
+.always-row label input { width: 70px; margin-left: 4px; }

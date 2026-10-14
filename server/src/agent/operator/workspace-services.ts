@@ -1,6 +1,6 @@
 import type { OpenRouterPrices } from "../../adapters/index.js";
 import type { Settings } from "../../config/index.js";
-import type { ResearchStore } from "../../domain/index.js";
+import type { ResearchStore, Schedule } from "../../domain/index.js";
 import { Trace } from "../../trace/index.js";
 
 import type { LiveRuns } from "../live-runs.js";
@@ -9,6 +9,12 @@ import { TaskEvents } from "../task/task-events.js";
 import { TaskSupervisor } from "../task/task-supervisor.js";
 import type { ToolRegistry } from "../tools/index.js";
 
+import { AlwaysOnDesk } from "../always/always-on-desk.js";
+import { AlwaysOnTools } from "../always/always-on-tools.js";
+import { ScheduleDesk } from "../always/schedule-desk.js";
+import { ScheduleWatchers } from "../always/schedule-watchers.js";
+import { TaskCreation } from "../always/task-creation.js";
+import { WorkspaceSpend } from "../always/workspace-spend.js";
 import { LessonDesk } from "../learning/lesson-desk.js";
 import { MemoryDesk } from "../learning/memory-desk.js";
 import { Reviewer } from "../learning/reviewer.js";
@@ -32,6 +38,8 @@ export class WorkspaceServices {
   readonly memory: MemoryDesk;
   readonly lessons: LessonDesk;
   readonly reviewer: Reviewer;
+  readonly alwaysOn: AlwaysOnDesk;
+  readonly schedules: ScheduleDesk;
 
   constructor(deps: { store: ResearchStore; runs: LiveRuns; settings: Settings; harness: PiHarness; tools: ToolRegistry; costs: OpenRouterPrices }) {
     Trace.line(import.meta.url, "WorkspaceServices.constructor");
@@ -45,9 +53,14 @@ export class WorkspaceServices {
     this.reviewer = new Reviewer(deps.store, deps.harness, this.lessons, deps.settings.model);
     const plans = new PlanDesk(deps.store.plans, this.tasks, this.cards, deps.store.feedback);
     this.release = new PlanRelease(deps.store, deps.store.plans, plans, events);
-    const tools = new OperatorTools(deps.store, plans, this.tasks, this.cards, this.memory);
+    this.schedules = new ScheduleDesk(deps.store);
+    const always = new AlwaysOnTools(new TaskCreation(this.tasks, plans), this.schedules);
+    const tools = new OperatorTools(deps.store, plans, this.tasks, this.cards, this.memory, always);
     this.operator = new OperatorDesk(deps.harness, deps.store, tools.extension(), deps.settings.model, this.tasks, events);
     this.owner = new OwnerDesk(plans, this.operator);
-    this.board = new WorkspaceBoard(deps.store, this.tasks);
+    this.board = new WorkspaceBoard(deps.store, this.tasks, () => this.alwaysOn);
+    const due = (workspaceId: string, schedule: Schedule, dueAt: string) =>
+      this.operator.signal(workspaceId, `Scheduled: ${schedule.task_key} for ${schedule.brief.product || schedule.brief.url} is due (every ${schedule.every_days} days).`, `schedule:${schedule.id}:${dueAt.slice(0, 10)}`);
+    this.alwaysOn = new AlwaysOnDesk(deps.store, new ScheduleWatchers(deps.store, deps.harness, due), new WorkspaceSpend(deps.store));
   }
 }

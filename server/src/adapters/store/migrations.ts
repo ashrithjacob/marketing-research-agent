@@ -30,6 +30,8 @@ const MIGRATIONS: ReadonlyArray<readonly [string, string, string]> = [
   ["research_runs", "task_id", "ALTER TABLE research_runs ADD COLUMN task_id TEXT NOT NULL DEFAULT ''"],
   ["research_runs", "conversation_id", "ALTER TABLE research_runs ADD COLUMN conversation_id TEXT NOT NULL DEFAULT ''"],
   ["research_runs", "contract", "ALTER TABLE research_runs ADD COLUMN contract TEXT NOT NULL DEFAULT ''"],
+  ["research_workspaces", "always_on", "ALTER TABLE research_workspaces ADD COLUMN always_on INTEGER NOT NULL DEFAULT 0"],
+  ["research_workspaces", "daily_cap_usd", "ALTER TABLE research_workspaces ADD COLUMN daily_cap_usd REAL"],
 ];
 
 /** CREATE TABLE IF NOT EXISTS never alters an existing table, so columns migrate here, and a table not yet created gets them from its own DDL; a change to rows already stored runs once, by name. */

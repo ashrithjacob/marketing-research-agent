@@ -1,4 +1,5 @@
 import type { Feedback } from './api';
+import AlwaysOnPanel from './AlwaysOnPanel';
 import Cards from './Cards';
 import MemoryList from './MemoryList';
 import { useWorkspace } from './use-workspace';
@@ -31,6 +32,7 @@ export default function InboxPage({ onError }: { onError: (message: string) => v
   if (!board) return <div className="empty">Loading…</div>;
   return (
     <div className="inbox">
+      <AlwaysOnPanel status={board.always_on} schedules={board.schedules} onError={onError} />
       <Cards cards={board.cards} today={board.cards_today} onError={onError} />
       {board.cards.length === 0 && <div className="empty">Nothing is waiting for you.</div>}
       <MemoryList entries={board.memory} onError={onError} />

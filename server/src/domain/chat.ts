@@ -1,6 +1,7 @@
 import type { Card } from "./cards.js";
 import type { Feedback } from "./feedback.js";
 import type { MemoryEntry } from "./memory.js";
+import type { AlwaysOn, Schedule } from "./always-on.js";
 import type { Plan } from "./plans.js";
 
 /** One line of the owner's chat with the operator, as the cockpit shows it. */
@@ -36,4 +37,6 @@ export interface Board {
   cards_today: number;
   feedback: Feedback[];
   memory: MemoryEntry[];
+  always_on: AlwaysOn & { spent_today: number; running: number };
+  schedules: Schedule[];
 }

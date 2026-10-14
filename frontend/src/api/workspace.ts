@@ -81,6 +81,22 @@ export interface MemoryEntry {
   created_at: string;
 }
 
+export interface AlwaysOnStatus {
+  on: boolean;
+  daily_cap_usd: number | null;
+  spent_today: number;
+  running: number;
+}
+
+export interface Schedule {
+  id: string;
+  brief: Brief;
+  task_key: string;
+  every_days: number;
+  last_due_at: string;
+  created_at: string;
+}
+
 export interface Board {
   plans: Plan[];
   tasks: TaskCard[];
@@ -88,6 +104,8 @@ export interface Board {
   cards_today: number;
   feedback: Feedback[];
   memory: MemoryEntry[];
+  always_on: AlwaysOnStatus;
+  schedules: Schedule[];
 }
 
 export const workspaceApi = {
@@ -99,6 +117,11 @@ export const workspaceApi = {
   answerCard: (id: string, answer: string) =>
     request<Card>(`/api/research/cards/${id}/answer`, { method: 'POST', body: JSON.stringify({ answer }) }),
   approveCard: (id: string, text = '') => request<Card>(`/api/research/cards/${id}/approve`, { method: 'POST', body: JSON.stringify({ text }) }),
+  setAlwaysOn: (on: boolean, cap: number | null) =>
+    request<AlwaysOnStatus>('/api/research/always-on', { method: 'POST', body: JSON.stringify({ on, daily_cap_usd: cap }) }),
+  addSchedule: (taskKey: string, everyDays: number, brief: Brief) =>
+    request<Schedule>('/api/research/schedules', { method: 'POST', body: JSON.stringify({ task_key: taskKey, every_days: everyDays, brief }) }),
+  removeSchedule: (id: string) => request<{ ok: boolean }>(`/api/research/schedules/${id}`, { method: 'DELETE' }),
   addMemory: (text: string) => request<MemoryEntry>('/api/research/memory', { method: 'POST', body: JSON.stringify({ text }) }),
   editMemory: (id: string, text: string) => request<MemoryEntry>(`/api/research/memory/${id}`, { method: 'POST', body: JSON.stringify({ text }) }),
   deleteMemory: (id: string) => request<MemoryEntry>(`/api/research/memory/${id}`, { method: 'DELETE' }),

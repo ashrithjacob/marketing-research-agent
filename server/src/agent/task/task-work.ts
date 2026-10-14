@@ -27,6 +27,7 @@ import { TaskCallLog } from "./task-call-log.js";
 export interface TaskWork {
   runId: string;
   workspaceId: string;
+  approved: boolean;
   contract: TaskContract;
   role: RoleSpec;
   brief: Brief;
@@ -106,6 +107,7 @@ export class TaskWorks {
     return {
       runId,
       workspaceId: run.workspace_id,
+      approved: (await store.listEvents(runId)).some((event) => event.kind === "run.approved"),
       contract,
       role,
       brief,

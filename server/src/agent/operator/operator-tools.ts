@@ -2,7 +2,7 @@ import type { Context } from "@earendil-works/chord";
 import { Type } from "@earendil-works/pi-ai";
 import { defineExtension, section, defineTool, type Extension, type ToolExecutionApi, type ToolExecutionResult } from "@earendil-works/pi-durable";
 
-import { Runs, SAVED_TASKS, Scope, type ResearchStore } from "../../domain/index.js";
+import { SAVED_TASKS, Scope, type ResearchStore } from "../../domain/index.js";
 import { Trace } from "../../trace/index.js";
 
 import { RunError } from "../errors.js";
@@ -10,10 +10,13 @@ import { OPERATOR_SYSTEM } from "../prompt/text/operator.js";
 import type { TaskSupervisor } from "../task/task-supervisor.js";
 
 import { WorkspaceDoc } from "./operator-docs.js";
+import type { AlwaysOnTools } from "../always/always-on-tools.js";
 import type { MemoryDesk } from "../learning/memory-desk.js";
 
 import type { CardDesk } from "./card-desk.js";
+import { OperatorAct } from "./operator-act.js";
 import type { PlanDesk } from "./plan-desk.js";
+import { WorkReport } from "./work-report.js";
 
 const list = Type.Array(Type.String());
 
@@ -25,6 +28,7 @@ export class OperatorTools {
     private readonly tasks: TaskSupervisor,
     private readonly cards: CardDesk,
     private readonly memory: MemoryDesk,
+    private readonly always: AlwaysOnTools,
   ) {}
 
   extension(): Extension {
@@ -41,7 +45,7 @@ export class OperatorTools {
           name: "list_work",
           description: "The brand's newest plans, and its newest tasks with their status and what they found.",
           parameters: Type.Object({}),
-          execute: (_args, api, context) => this.act(api, context, (workspace) => this.work(workspace)),
+          execute: (_args, api, context) => OperatorAct.run(api, context, (workspace) => new WorkReport(this.store, this.tasks).write(workspace)),
         }),
         defineTool({
           name: "revise_plan",
@@ -55,7 +59,7 @@ export class OperatorTools {
             stop_when: Type.Optional(Type.Record(Type.String(), Type.String(), { description: "Per task key, when the task must stop and ask the owner; \"\" removes it." })),
           }),
           execute: (args, api, context) =>
-            this.act(api, context, async (workspace) => {
+            OperatorAct.run(api, context, async (workspace) => {
               const { plan_id, ...change } = args;
               const plan = await this.plans.revise(plan_id, Scope.of(workspace), change);
               return `Plan ${plan.id} now: market ${plan.brief.market || "none"}; ${plan.tasks.map((t) => `${t.key} ${t.selected ? "kept" : "dropped"}`).join(", ")}. The owner approves it with its button.`;
@@ -65,14 +69,15 @@ export class OperatorTools {
           name: "stop_task",
           description: "Stop a running task by its run id. What it found so far is kept.",
           parameters: Type.Object({ run_id: Type.String() }),
-          execute: (args, api, context) => this.act(api, context, async (workspace) => (await this.running(args.run_id, workspace), await this.tasks.stop(args.run_id), `Stopping ${args.run_id}.`)),
+          execute: (args, api, context) => OperatorAct.run(api, context, async (workspace) => (await this.running(args.run_id, workspace), await this.tasks.stop(args.run_id), `Stopping ${args.run_id}.`)),
         }),
+        ...this.always.tools(),
         defineTool({
           name: "send_owner",
           description: "Put a question to the owner as a card they answer; their answer comes back to you as a message. For a decision only they can make; progress needs no card.",
           parameters: Type.Object({ question: Type.String() }),
           execute: (args, api, context) =>
-            this.act(api, context, async (workspace) => {
+            OperatorAct.run(api, context, async (workspace) => {
               await this.cards.open(workspace, { kind: "question", title: "The operator asks", body: args.question, action: { kind: "reply_operator" } });
               return "Asked; the owner answers on a card, and their answer comes back to you.";
             }),
@@ -82,7 +87,7 @@ export class OperatorTools {
           description: "Pass the owner's answer to a task that is paused and waiting on its question; it goes on with the answer.",
           parameters: Type.Object({ run_id: Type.String(), answer: Type.String() }),
           execute: (args, api, context) =>
-            this.act(api, context, async (workspace) => {
+            OperatorAct.run(api, context, async (workspace) => {
               await this.owned(args.run_id, workspace);
               await this.tasks.answer(args.run_id, args.answer);
               return `Passed the answer to ${args.run_id}; it goes on.`;
@@ -92,38 +97,10 @@ export class OperatorTools {
           name: "guide_task",
           description: "Pass the owner's guidance to a running task, by its run id; the task reads it at its next step.",
           parameters: Type.Object({ run_id: Type.String(), text: Type.String() }),
-          execute: (args, api, context) => this.act(api, context, (workspace) => this.guide(args.run_id, args.text, workspace)),
+          execute: (args, api, context) => OperatorAct.run(api, context, (workspace) => this.guide(args.run_id, args.text, workspace)),
         }),
       ],
     });
-  }
-
-  private async act(api: ToolExecutionApi, context: Context, work: (workspace: string) => Promise<string>): Promise<ToolExecutionResult> {
-    Trace.line(import.meta.url, "OperatorTools.act", { conversation: api.conversationId });
-    const workspace = (await api.snapshot(WorkspaceDoc, api.conversationId, context))?.workspace_id ?? "";
-    try {
-      return { output: [{ type: "text", text: await work(workspace) }] };
-    } catch (error) {
-      if (!(error instanceof RunError)) throw error;
-      return { output: [{ type: "text", text: error.message }], isError: true };
-    }
-  }
-
-  private async work(workspace: string): Promise<string> {
-    Trace.line(import.meta.url, "OperatorTools.work", { workspace });
-    const scope = Scope.of(workspace);
-    const plans = (await this.store.plans.list(scope, 3)).map((plan) => ({
-      plan_id: plan.id,
-      status: plan.status,
-      brief: plan.brief,
-      tasks: plan.tasks.map((task) => ({ key: task.key, title: task.title, kept: task.selected, stop_when: task.contract.stop_when ?? "", run_id: task.run_id, error: task.error })),
-    }));
-    const tasks = (await this.store.listRuns(scope, 50)).filter((run) => run.contract).slice(0, 10).map((run) => {
-      const { status, error, counts } = Runs.summary(run);
-      return { run_id: run.id, objective: String(run.contract?.objective ?? ""), status, error, sources: counts.sources, gaps: counts.gaps };
-    });
-    const waiting = await this.tasks.waiting(workspace);
-    return JSON.stringify({ plans, tasks, waiting }, null, 1);
   }
 
   private async owned(runId: string, workspace: string): Promise<string> {

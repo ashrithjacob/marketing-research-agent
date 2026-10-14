@@ -44,6 +44,7 @@ export class TaskIntake {
       contract: contract as unknown as Record<string, unknown>,
     });
     await new TaskInputs(this.store.findings).copy(contract.inputs.finding_ids, run.id, contract.complete.node);
+    if (approved) await this.store.addEvent(run.id, "run.approved", { reasons: asks });
     return run;
   }
 

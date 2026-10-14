@@ -8,3 +8,5 @@ export * from "./workspace-board.js";
 export * from "./workspace-services.js";
 export * from "./card-desk.js";
 export * from "./plan-release.js";
+export * from "./operator-act.js";
+export * from "./work-report.js";

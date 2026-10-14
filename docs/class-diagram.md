@@ -80,6 +80,28 @@ classDiagram
     class AdPage {
       <<interface>>
     }
+    class AlwaysOn {
+      <<interface>>
+    }
+    class AlwaysOnBook {
+      <<interface>>
+      get()
+      set()
+      on()
+    }
+    class Schedule {
+      <<interface>>
+    }
+    class ScheduleBook {
+      <<interface>>
+      add()
+      list()
+      remove()
+      signalled()
+    }
+    class Schedules {
+      nextDue()
+    }
     class Trip {
       <<interface>>
     }
@@ -914,6 +936,15 @@ classDiagram
       list()
       setPassword()
     }
+    class AlwaysOnTable {
+      get()
+      set()
+      on()
+      add()
+      list()
+      remove()
+      signalled()
+    }
     class CallLog {
       add()
       setGeneration()
@@ -1167,6 +1198,40 @@ classDiagram
       written()
       output()
     }
+    class AlwaysOnStatus {
+      <<interface>>
+    }
+    class AlwaysOnDesk {
+      set()
+      status()
+      recover()
+    }
+    class AlwaysOnTools {
+      tools()
+    }
+    class MoneyGate {
+      block()
+      paid()
+    }
+    class ScheduleDesk {
+      add()
+      list()
+      remove()
+    }
+    class ScheduleWatchers {
+      start()
+      stop()
+    }
+    class TaskCreation {
+      create()
+    }
+    class WorkspaceLimits {
+      blocks()
+      overCap()
+    }
+    class WorkspaceSpend {
+      today()
+    }
     class BilledCosts {
       written()
     }
@@ -1290,8 +1355,12 @@ classDiagram
     class ChatView {
       of()
     }
+    class OperatorAct {
+      run()
+    }
     class OperatorDesk {
       say()
+      signal()
       note()
       watch()
     }
@@ -1315,6 +1384,9 @@ classDiagram
     }
     class PlanRelease {
       recover()
+    }
+    class WorkReport {
+      write()
     }
     class WorkspaceBoard {
       snapshot()
@@ -1768,6 +1840,9 @@ classDiagram
     class AccountCommands {
       run()
     }
+    class AlwaysOnRoutes {
+      register()
+    }
     class App {
       listingSource()
       traceFile()
@@ -1899,6 +1974,7 @@ classDiagram
   ServiceClients --> CompetitorDiscovery
   ServiceClients --> AdLibrary
   AccountTable --> SqlDatabase
+  AlwaysOnTable --> SqlDatabase
   CallLog --> SqlDatabase
   CardTable --> SqlDatabase
   ChargeTable --> SqlDatabase
@@ -1945,6 +2021,19 @@ classDiagram
   AgentDriver --> ModelChain
   AgentTeam --> RetryPolicy
   AgentTeam --> ModelChain
+  AlwaysOnDesk --> ResearchStore
+  AlwaysOnDesk --> ScheduleWatchers
+  AlwaysOnDesk --> WorkspaceSpend
+  AlwaysOnTools --> TaskCreation
+  AlwaysOnTools --> ScheduleDesk
+  ScheduleDesk --> ResearchStore
+  ScheduleWatchers --> ResearchStore
+  ScheduleWatchers --> PiHarness
+  TaskCreation --> TaskSupervisor
+  TaskCreation --> PlanDesk
+  WorkspaceLimits --> ResearchStore
+  WorkspaceLimits --> WorkspaceSpend
+  WorkspaceSpend --> ResearchStore
   BilledCosts --> ResearchStore
   BilledCosts --> LiveRuns
   NodeContract --> RunFindings
@@ -1981,6 +2070,7 @@ classDiagram
   OperatorTools --> TaskSupervisor
   OperatorTools --> CardDesk
   OperatorTools --> MemoryDesk
+  OperatorTools --> AlwaysOnTools
   OwnerDesk --> PlanDesk
   OwnerDesk --> OperatorDesk
   PlanDesk --> PlanBook
@@ -1991,8 +2081,11 @@ classDiagram
   PlanRelease --> PlanBook
   PlanRelease --> PlanDesk
   PlanRelease --> TaskEvents
+  WorkReport --> ResearchStore
+  WorkReport --> TaskSupervisor
   WorkspaceBoard --> ResearchStore
   WorkspaceBoard --> TaskSupervisor
+  WorkspaceBoard --> AlwaysOnDesk
   WorkspaceServices --> OpenRouterPrices
   OperatorInputs --> FindingLedger
   PartClose --> RunFindings
@@ -2067,6 +2160,7 @@ classDiagram
   TaskExtensions --> TaskJudge
   TaskExtensions --> TaskPause
   TaskExtensions --> MemoryDesk
+  TaskExtensions --> WorkspaceLimits
   TaskInputs --> FindingLedger
   TaskIntake --> ResearchStore
   TaskIntake --> Settings
@@ -2119,6 +2213,8 @@ classDiagram
   RowBlame --> Finding
   PacketValidator --> ReviewLedgerSnapshot
   AccountCommands --> AccountDirectory
+  AlwaysOnRoutes --> AlwaysOnDesk
+  AlwaysOnRoutes --> ScheduleDesk
   App --> AmazonListingSource
   AuthGate --> Settings
   AuthGate --> AccountDirectory
@@ -2195,6 +2291,7 @@ classDiagram
 | `adapters` | `adapters/service-clients.ts` | EvidenceServices, ServiceClients |
 | `adapters` | `adapters/service-queue.ts` | Waiter, ServiceQueue |
 | `adapters` | `adapters/store/account-table.ts` | AccountTable |
+| `adapters` | `adapters/store/always-on-table.ts` | AlwaysOnTable |
 | `adapters` | `adapters/store/call-log.ts` | CallLog |
 | `adapters` | `adapters/store/card-table.ts` | CardTable |
 | `adapters` | `adapters/store/charge-table.ts` | ChargeTable |
@@ -2237,6 +2334,14 @@ classDiagram
 | `agent` | `agent/agent-driver.ts` | AgentOutcome, AgentDriver |
 | `agent` | `agent/agent-roster.ts` | AgentRoster |
 | `agent` | `agent/agent-team.ts` | TeamMember, AgentTeam |
+| `agent` | `agent/always/always-on-desk.ts` | AlwaysOnStatus, AlwaysOnDesk |
+| `agent` | `agent/always/always-on-tools.ts` | AlwaysOnTools |
+| `agent` | `agent/always/money-gate.ts` | MoneyGate |
+| `agent` | `agent/always/schedule-desk.ts` | ScheduleDesk |
+| `agent` | `agent/always/schedule-watchers.ts` | ScheduleWatchers |
+| `agent` | `agent/always/task-creation.ts` | TaskCreation |
+| `agent` | `agent/always/workspace-limits.ts` | WorkspaceLimits |
+| `agent` | `agent/always/workspace-spend.ts` | WorkspaceSpend |
 | `agent` | `agent/billed-costs.ts` | BilledCosts |
 | `agent` | `agent/built-agent.ts` | BuiltAgent |
 | `agent` | `agent/done-check.ts` | DoneCheck, NodeContract, ChampionContract, TruthContract |
@@ -2257,11 +2362,13 @@ classDiagram
 | `agent` | `agent/model-chain.ts` | ModelChain |
 | `agent` | `agent/operator/card-desk.ts` | CardDesk |
 | `agent` | `agent/operator/chat-view.ts` | ChatView |
+| `agent` | `agent/operator/operator-act.ts` | OperatorAct |
 | `agent` | `agent/operator/operator-desk.ts` | OperatorDesk |
 | `agent` | `agent/operator/operator-tools.ts` | OperatorTools |
 | `agent` | `agent/operator/owner-desk.ts` | OwnerDesk |
 | `agent` | `agent/operator/plan-desk.ts` | PlanChange, PlanDesk |
 | `agent` | `agent/operator/plan-release.ts` | PlanRelease |
+| `agent` | `agent/operator/work-report.ts` | WorkReport |
 | `agent` | `agent/operator/workspace-board.ts` | WorkspaceBoard |
 | `agent` | `agent/operator/workspace-services.ts` | WorkspaceServices |
 | `agent` | `agent/operator-inputs.ts` | OperatorInputs |
@@ -2353,6 +2460,7 @@ classDiagram
 | `config` | `config/settings.ts` | Env |
 | `domain` | `domain/accounts.ts` | Workspace, Account, AccountListing, Principal, Scope |
 | `domain` | `domain/ad-library.ts` | AdQuery, AdHit, AdPage |
+| `domain` | `domain/always-on.ts` | AlwaysOn, AlwaysOnBook, Schedule, ScheduleBook, Schedules |
 | `domain` | `domain/breakers.ts` | Trip, BreakerReadings, BreakerLimits, Breakers, RunStatuses |
 | `domain` | `domain/brief.ts` | Briefs |
 | `domain` | `domain/cards.ts` | Card, CardDraft, CardBook |
@@ -2421,6 +2529,7 @@ classDiagram
 | `extract` | `extract/truth-citations.ts` | TruthCitations |
 | `extract` | `extract/validator.ts` | ZodProblems, PacketValidator |
 | `http` | `http/account-commands.ts` | AccountCommands |
+| `http` | `http/always-on-routes.ts` | AlwaysOnRoutes |
 | `http` | `http/app.ts` | App |
 | `http` | `http/auth-gate.ts` | AuthGate |
 | `http` | `http/call-stats.ts` | CallStats |

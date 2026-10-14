@@ -31,6 +31,8 @@ const released = app.workspace ? await app.workspace.release.recover() : 0;
 if (released > 0) console.log(`started ${released} plan task(s) whose wait ended while the server was down`);
 harness.resume();
 app.workspace?.reviewer.start();
+const alwaysOn = app.workspace ? await app.workspace.alwaysOn.recover() : 0;
+if (alwaysOn > 0) console.log(`Always on for ${alwaysOn} workspace(s): their schedule watchers are running`);
 console.log(`harness ${harness.reopened ? "reopened" : "created"} at ${harness.path}; ${picked} task(s) to pick back up`);
 app.supervisor.costs.start();
 

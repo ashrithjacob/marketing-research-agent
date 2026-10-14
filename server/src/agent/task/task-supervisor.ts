@@ -7,6 +7,8 @@ import type { Settings } from "../../config/index.js";
 import { FeedbackStrengths, Scope, TERMINAL_STATUSES, type ResearchRun, type ResearchStore } from "../../domain/index.js";
 import { Trace } from "../../trace/index.js";
 
+import { WorkspaceLimits } from "../always/workspace-limits.js";
+import { WorkspaceSpend } from "../always/workspace-spend.js";
 import type { MemoryDesk } from "../learning/memory-desk.js";
 import type { LiveRuns } from "../live-runs.js";
 import type { PiHarness } from "../pi-harness.js";
@@ -40,6 +42,7 @@ export class TaskSupervisor {
   private readonly tasks: ResearchTasks;
   private readonly extensions: TaskExtensions;
   private readonly pause: TaskPause;
+  readonly limits: WorkspaceLimits;
   private readonly intake: TaskIntake;
 
   constructor(private readonly deps: TaskSupervisorDeps) {
@@ -51,7 +54,8 @@ export class TaskSupervisor {
     const ending = new TaskEnd({ store, runs, costs, works, signals, readings });
     this.pause = new TaskPause(store, runs, signals, events);
     const judge = new TaskJudge(harness, harness.models, settings.judgeModel);
-    const extensions = new TaskExtensions(works, signals, readings, harness.registry, judge, this.pause, deps.memory);
+    this.limits = new WorkspaceLimits(store, new WorkspaceSpend(store));
+    const extensions = new TaskExtensions(works, signals, readings, harness.registry, judge, this.pause, deps.memory, this.limits);
     this.extensions = extensions;
     this.tasks = new ResearchTasks({ store, runs, works, extensions, signals, readings, ending, events, pause: this.pause, model: settings.model });
     this.intake = new TaskIntake(store, settings);

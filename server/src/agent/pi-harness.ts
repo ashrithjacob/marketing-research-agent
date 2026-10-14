@@ -27,7 +27,8 @@ export class PiHarness implements DurableHarness {
     const reopened = existsSync(path);
     const storage = await openNodeSqliteStorage(path);
     const registry = createRegistry();
-    const harness = await Harness.open(storage, { models: FallbackModels.wrap(models, chain), registry }, BACKGROUND_CONTEXT);
+    const settings = { followUpMode: "all" as const };
+    const harness = await Harness.open(storage, { models: FallbackModels.wrap(models, chain), registry, settings }, BACKGROUND_CONTEXT);
     return new PiHarness(harness, registry, models, path, reopened);
   }
 

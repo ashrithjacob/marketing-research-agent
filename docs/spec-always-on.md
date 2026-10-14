@@ -910,6 +910,25 @@ set when Always on is turned on, §7.2), spend per task. `create_task` refuses p
 hook blocks any paid call past the spend caps and any Apify call without an
 approval. The Apify rule is enforced in code, not only written in a prompt.
 
+*Built 2026-10-14, part 7* (`agent/always/`). The switch and daily cap are the
+two `research_workspaces` columns; on needs a cap above zero and starts the
+workspace's schedule watcher (a durable task: `check`, then `sleep` until the
+next due schedule or a day; a missed period fires once; nothing due says
+nothing); off stops it. `create_task` (the operator's) starts a saved task at
+once only with Always on, inside the limits, and only product facts or category
+numbers; anything else, or anything past a limit, becomes a draft plan with the
+reason. The limits (`WorkspaceLimits`): fewer than 3 tasks queued, running or
+waiting; today's billed spend (charges plus priced model calls of runs made
+today, UTC) under the cap. `mra.money` is a `beforeTool` hook on every task:
+an Apify tool is blocked unless the owner approved that task (a `run.approved`
+event written when an approval card starts it), and any paid tool is blocked
+once the cap is reached with Always on. With Always on, a finished task and a
+due schedule reach the operator as `[Signal]` follow-ups (`followUpMode: "all"`,
+`requestId` per signal, so a repeat adds nothing); without it they stay silent
+notes. Where it differs: the limits apply to work nobody clicked; tasks the owner
+approves are not refused by the running cap, though paid calls past the daily
+cap are blocked for all tasks. Tested against the faux model; not seen live.
+
 ### 7.5 Untrusted input
 
 Workers read text written by strangers: web pages, Amazon reviews, competitors'
@@ -1167,7 +1186,7 @@ dashboard; a button starts it. Decided with the owner:
 | 4 | **Stage 1 as a plan built 2026-10-14** (§12.4); the other primitives are not. The other primitives; stage 1 as a saved plan of four tasks with child-task waiting | a stage-1 plan's result matches a `StageOneRun`'s on the same brief |
 | 5 | **done 2026-10-14** (§5.2, built). Feedback events (§5.2) and the inbox cards | the owner's actions are recorded against what they were about |
 | 6 | **Learning from corrections built 2026-10-14** (§5.4, built); evals, the replay suite and playbook versions are not. Reviewer as a fork, lessons, the gate, playbook versions, the editable brand-memory list (§5.3–5.4, §6.6); eval cases from invalid tasks and corrections, and the replay suite (§5.7) | a correction given once produces a lesson; approved, the next task reads it |
-| 7 | The Always on switch and daily cap, the operator's router for signals, stable sections, work log and warm-cache compaction (the operator conversation itself moved to part 3); `create_task`, `mra.money`, the schedule watcher | the system starts work nobody clicked, inside its limits; the operator's cache hit rate holds across a day |
+| 7 | **Work nobody clicked built 2026-10-14** (§7.4, built); the work log, warm-cache compaction and cache-rate measurement are not. The Always on switch and daily cap, the operator's router for signals, stable sections, work log and warm-cache compaction (the operator conversation itself moved to part 3); `create_task`, `mra.money`, the schedule watcher | the system starts work nobody clicked, inside its limits; the operator's cache hit rate holds across a day |
 | 8 | `write` and `critique` primitives; the long-form statics playbook | an ad draft that cites its findings |
 | 9 | Measurement per playbook version (§5.5), curator watcher (§5.6), `distil` (§5.8) | a lesson that hurt is visible with numbers |
 | 10 | Ad-results feedback (`docs/plan-meta-integration.md` Phase D; its Phases A–B start alongside parts 1–2, because Meta's App Review needs a reader already running), competitor and review watchers | the loop closes on real ad performance |

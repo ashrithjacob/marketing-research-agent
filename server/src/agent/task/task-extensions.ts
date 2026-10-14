@@ -1,5 +1,5 @@
 import type { Message } from "@earendil-works/pi-ai";
-import { defineExtension, GenerationTask, hook, section, type ConversationId, type Extension, type HookApi, type Registry, type UserInput } from "@earendil-works/pi-durable";
+import { defineExtension, GenerationTask, hook, section, ToolTask, type ConversationId, type Extension, type HookApi, type Registry, type UserInput } from "@earendil-works/pi-durable";
 
 import { Breakers, CheckProblems } from "../../domain/index.js";
 import { Trace } from "../../trace/index.js";
@@ -8,6 +8,8 @@ import { TASK_CEILING_WARNING } from "../prompt/text/task.js";
 
 import { DurableTool } from "./durable-tool.js";
 import type { TaskJudge } from "./task-judge.js";
+import { MoneyGate } from "../always/money-gate.js";
+import type { WorkspaceLimits } from "../always/workspace-limits.js";
 import type { MemoryDesk } from "../learning/memory-desk.js";
 
 import type { TaskPause } from "./task-pause.js";
@@ -25,6 +27,7 @@ export class TaskExtensions {
     private readonly judge: TaskJudge,
     private readonly pause: TaskPause,
     private readonly memory: MemoryDesk,
+    private readonly limits: WorkspaceLimits,
   ) {}
 
   /** The run's extension, built and installed if this process has not yet: before a task's first phase, and after a restart before resume. */
@@ -61,6 +64,7 @@ export class TaskExtensions {
           afterTools: (_assistant, _results, api) => this.afterTools(work, api.conversationId),
           onYield: () => this.onYield(work),
         }),
+        hook(ToolTask, { beforeTool: (call) => this.money(work, call.name) }),
       ],
     });
   }
@@ -71,6 +75,14 @@ export class TaskExtensions {
     const sent = (await work.calls.count()) + 1;
     if (!Breakers.warnNow(sent, work.role.maxTurns)) return undefined;
     return { messages: [...messages, { role: "user", content: TASK_CEILING_WARNING, timestamp: Date.now() }] };
+  }
+
+  /** mra.money: the gate decides, in code, before any paid tool runs. */
+  private async money(work: TaskWork, tool: string): Promise<{ block: string } | undefined> {
+    Trace.line(import.meta.url, "TaskExtensions.money", { runId: work.runId, tool });
+    const overCap = MoneyGate.paid(tool) ? await this.limits.overCap(work.workspaceId) : null;
+    const block = MoneyGate.block(tool, work.approved, overCap);
+    return block ? { block } : undefined;
   }
 
   private async afterTools(work: TaskWork, conversationId: ConversationId): Promise<void> {

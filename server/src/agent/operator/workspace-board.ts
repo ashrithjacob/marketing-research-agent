@@ -1,6 +1,7 @@
 import { Runs, Scope, type Board, type ResearchRun, type ResearchStore, type TaskCard } from "../../domain/index.js";
 import { Trace } from "../../trace/index.js";
 
+import type { AlwaysOnDesk } from "../always/always-on-desk.js";
 import type { TaskSupervisor } from "../task/task-supervisor.js";
 
 /** The board, read from the research store, where a task's progress is written as it happens: its findings, its calls, its status, and the question it waits on. */
@@ -8,6 +9,7 @@ export class WorkspaceBoard {
   constructor(
     private readonly store: ResearchStore,
     private readonly tasks: TaskSupervisor,
+    private readonly alwaysOn: () => AlwaysOnDesk,
   ) {}
 
   async snapshot(workspaceId: string): Promise<Board> {
@@ -24,6 +26,8 @@ export class WorkspaceBoard {
       cards_today: cards.filter((card) => card.created_at.slice(0, 10) === today).length,
       feedback: await this.store.feedback.list(scope, 30),
       memory: await this.store.memory.current(scope),
+      always_on: await this.alwaysOn().status(workspaceId),
+      schedules: await this.store.schedules.list(workspaceId),
     };
   }
 

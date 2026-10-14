@@ -1050,6 +1050,23 @@ paragraph numbers: code copies the quote and its character range from the
 archived page (`ExcerptTool`, `domain/paragraphs.ts`). Stage 1 has no
 `record_excerpt`.
 
+### §2l — Always on: work nobody clicked (always-on part 7)
+
+`AlwaysOnDesk.set` stores the switch and daily cap on `research_workspaces` and
+starts or stops the workspace's `mra.schedule-watcher` task
+(`ScheduleWatchers`, session document `mra.watchers`); startup calls
+`AlwaysOnDesk.recover` for every workspace that is on. The watcher's `check`
+signals the operator for each schedule past its next due time
+(`Schedules.nextDue`: `every_days` after it was last due, or made), marks it
+signalled, and sleeps until the next due time or a day. A signal
+(`OperatorDesk.signal`) is a follow-up input `[Signal] …` with entry kind
+`mra.signal` and a `requestId`, so a repeat is one input; the chat does not
+show it. The operator answers it with `create_task` (`TaskCreation`): with
+Always on, inside `WorkspaceLimits`, product facts or category numbers start at
+once; otherwise it drafts a plan with the reason. Every task's extension has a
+`beforeTool` hook (`MoneyGate`): Apify only with a `run.approved` event, no
+paid tool past the daily cap. With Always on, a finished task is a signal too.
+
 ### §2k — learning from corrections (always-on part 6)
 
 `Reviewer` (`agent/learning/reviewer.ts`) sweeps every 15 s for feedback that is

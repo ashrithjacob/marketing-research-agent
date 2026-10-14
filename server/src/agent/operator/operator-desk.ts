@@ -35,6 +35,13 @@ export class OperatorDesk {
     await (await this.conversation(workspaceId)).submit({ type: "input", content, whenBusy: "steer", entry }, BACKGROUND_CONTEXT);
   }
 
+  /** Something code noticed, for the operator to act on (spec §7.2): a follow-up, so it never interrupts the owner's turn; several arriving together become one run; the same `key` twice adds it once. */
+  async signal(workspaceId: string, text: string, key: string): Promise<void> {
+    Trace.line(import.meta.url, "OperatorDesk.signal", { workspaceId, key });
+    const entry = { kind: "mra.signal", data: { text, key } };
+    await (await this.conversation(workspaceId)).submit({ type: "input", content: `[Signal] ${text}`, whenBusy: "followUp", requestId: key, entry }, BACKGROUND_CONTEXT);
+  }
+
   async note(workspaceId: string, text: string): Promise<void> {
     Trace.line(import.meta.url, "OperatorDesk.note", { workspaceId });
     await (await this.conversation(workspaceId)).submit({ type: "write", entry: { kind: "mra.note", data: { text } } }, BACKGROUND_CONTEXT);
@@ -58,7 +65,9 @@ export class OperatorDesk {
     if (!run) return;
     const { counts, error } = Runs.summary(run);
     const objective = String(run.contract?.objective ?? runId);
-    await this.note(run.workspace_id, `Task ${runId} ended ${status}: ${objective} — ${counts.sources} sources, ${counts.gaps} gaps${error ? `; ${error}` : ""}.`);
+    const text = `Task ${runId} ended ${status}: ${objective} — ${counts.sources} sources, ${counts.gaps} gaps${error ? `; ${error}` : ""}.`;
+    if ((await this.store.alwaysOn.get(run.workspace_id)).on) await this.signal(run.workspace_id, text, `task:${runId}:ended`);
+    else await this.note(run.workspace_id, text);
   }
 
   private async conversation(workspaceId: string): Promise<Conversation> {

@@ -427,6 +427,11 @@ older stage-1 modal (`StartRun.tsx`).
   it reads *Starts when Champion product finishes* once approved. Champion and
   Competitors would spend Apify money, so approving opens an approval card for
   each instead of starting it.
+- **Always on** (`AlwaysOnPanel.tsx`, top of the inbox): the switch with its
+  daily cap (turning on needs a cap), today's billed spend against it, how many
+  tasks are running, and the schedules, each a saved task for a product or site
+  every so many days, with Add and Remove (`/api/research/always-on`,
+  `/api/research/schedules`).
 - **Inbox** (`InboxPage.tsx`, `/inbox`, linked in the header): every open card
   of the workspace (a lesson card has its text in an editable box; Approve saves
   the edit), **What we know about this brand** (`MemoryList.tsx`: every memory

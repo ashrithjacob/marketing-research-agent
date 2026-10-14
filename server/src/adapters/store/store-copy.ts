@@ -17,7 +17,7 @@ export class StoreCopy {
     "research_events", "research_packet_checks", "research_judgements", "research_reviews", "research_run_reviews",
     "research_llm_calls", "research_packet_sources", "research_packet_attributes", "research_packet_measurements",
     "research_packet_excerpts", "research_packet_competitors", "research_packet_gaps", "research_review_analyses",
-    "research_target_listings", "research_findings", "research_charges", "research_review_pulls", "research_documents", "research_plans", "research_cards", "research_feedback", "research_memory", "research_lessons",
+    "research_target_listings", "research_findings", "research_charges", "research_review_pulls", "research_documents", "research_plans", "research_cards", "research_feedback", "research_memory", "research_lessons", "research_schedules",
   ];
 
   static readonly RETIRED = new Set(["discovery_runs", "trendtrack_cache"]);

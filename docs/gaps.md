@@ -69,6 +69,21 @@ commit that closed it; do not delete it.
 14. **Today's stage runs do not read brand memory.** Only tasks and the operator
     do (as a prompt section). A stage run's prompt has no memory block.
 
+15. **Part 7 left out the operator's work log, warm-cache compaction and cache
+    hit-rate measurement.** No `mra.log` entries or `search_log` tool; the
+    compaction watcher is not built (pi-durable's own background compaction is
+    the only one); the cache hit rate cannot be measured until the operator's
+    calls are logged (gap 13). Spec §12's proof for part 7, "the operator's
+    cache hit rate holds across a day", is not met.
+16. **Only the schedule watcher exists.** The competitor-ads, reviews and
+    ad-results watchers of §7.3 are later parts (10).
+17. **The money gate reads today's spend on every paid tool call.** Each paid
+    call scans the day's runs, charges and calls; fine at today's volume, slow
+    for a busy workspace. Needs: a running total, or a short cache.
+18. **`create_task` starts only product facts and category numbers.** A task that
+    waits on the champion or reaches Apify always becomes a draft plan, even
+    with Always on; a whole stage-1 plan cannot be started unattended.
+
 ## Built but not seen live
 
 The owner asked on 2026-10-14 for no more live runs; these are covered by tests
@@ -80,6 +95,10 @@ against the faux model only.
   result matches a `StageOneRun`'s on the same brief (spec §12, part 4).
 - **The judge reading the brief** (`TaskJudge.brief`), added after a live task
   asked which product although its brief was that product's page.
+- **Always on.** Work started by a due schedule, `create_task` within the limits,
+  the money gate and signals are tested against the faux model; on the local
+  stack the routes answer and Always on reads off, but it has not been switched
+  on there.
 - **The learning loop.** A correction becoming a lesson, approved and read by
   the next task, is tested against the faux model; the reviewer has not run on
   a real model.
