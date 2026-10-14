@@ -226,6 +226,12 @@ Still only written down, because no rule catches them:
 - **`npm run hashpw` separates its hash with `:`, not `$`.** The value lands in a
   `.env` read by `docker compose`, which interpolates `$...` and would mangle it
   silently.
+- **A model never copies content by writing it out.** When a quote, a review,
+  a finding or a draft moves from one place to another, the model names it by
+  id (`source_id`, `ref`, finding id, paragraph number) and code copies it.
+  Re-typed text costs output tokens and can change silently. See
+  `docs/spec-always-on.md` §6.8; the stage-1 `excerpt.text` still breaks this
+  until part 2.
 - **`invalid` is not `failed`.** `failed` is a crash; `invalid` means the agent
   finished and produced something the schema refused, which is the most
   informative failure this app has. Do not collapse them.
