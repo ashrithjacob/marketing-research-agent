@@ -415,6 +415,50 @@ does not change.
 | brand memory in the prompt | a frozen snapshot taken at session start, for the prompt cache | the `mra.memory` section. pi-durable re-sends a section only when its text changes, so an approved lesson reaches the next request and leaves the cache alone otherwise. |
 | curator | a gateway housekeeping chore, when idle | a watcher task (§7.3) per workspace: wakes daily, runs only if no task has run for an hour |
 
+### 6.7 Every task is a run
+
+Decided 2026-10-14. Each durable task has a `research_runs` row, created before
+the task, and the two are linked both ways.
+
+**Why.** Everything a task produces lives in the research store and is keyed by
+run id: `research_findings.run_id` references `research_runs(id)`, and
+`RunEnd`, `research_charges`, the cost report, the LLM call log, the packet and
+the run view all look a run up by its id. A run row per task means all of that
+keeps working unchanged. pi-durable cannot be that record: its storage is a
+separate SQLite file (§7.1), and research rows cannot reference it.
+
+**How pi does the same thing.** pi keeps no run table; the record of a piece of
+work is the conversation. The coding agent stores one session per JSONL file,
+named by session id, and extensions keep their state as custom entries in it.
+pi-durable scopes app state to a conversation as documents, writes the first
+one in the commit that creates the conversation (`init`), and finds a task's
+child conversation through the ownership index
+(`scanConversations({ ownerTaskId })`). This app does the same on its side:
+the run row is the app's record of the conversation, and each points at the
+other.
+
+**The link.**
+
+| Side | Holds |
+|---|---|
+| `research_runs` | new columns `task_id`, `conversation_id`, `contract` (the contract as JSON). `stage` stays the integer research stage of the contract's node, as for any run. A non-empty `task_id` is what marks a run as a durable task. |
+| worker conversation | an `mra.run` document `{ run_id }`, written by `init` in the commit that creates the conversation |
+
+The three columns are `ALTER TABLE` migrations in `StoreMigrations`
+(`check-conventions.mjs` enforces that).
+
+**Order across two stores.** The run row is on Neon and the task is in the
+harness file, so creating both cannot be one transaction. The run is written
+first, `queued`, with its contract. The task is created with `requestId` set to
+the run id, so creating it twice finds the same task. At startup, a `queued`
+run with an empty `task_id` (the process died between the two writes) gets its
+task created then. The task fills in `task_id` and `conversation_id` when it
+starts, and sets the run `running`.
+
+**The end.** A task ends only through `RunEnd` with its run id, which assembles
+the packet from the run's findings and sets the final status, as for every run
+today. The reporter task (§6.3) reads that status to tell the operator.
+
 ## 7. The runtime
 
 ### 7.1 One process, one harness
@@ -610,7 +654,7 @@ as the main surface.
 |---|---|---|
 | 0 | Document library (§10) | **done** |
 | 1 | `pi-agent-core` and `pi-ai` to 1.2.0 (§9.1); pi-durable installed, pinned; a harness opened in `main.ts` on `/data/harness.sqlite`, resumed at start, closed on stop; nothing runs on it yet | today's stages still pass `mra check` and one url brief on 1.2.0; the harness survives `mra down` / `mra up` |
-| 2 | One worker primitive (`research`) as extensions; a durable worker task running a hand-written contract through `onYield` (§6.4); `RunEnd` at its end | a task given by hand meets its contract or ends `invalid`, and a restart mid-task resumes it |
+| 2 | One worker primitive (`research`) as extensions; a run row per task with its three new columns (§6.7); a durable worker task running a hand-written contract through `onYield` (§6.4); `RunEnd` at its end | a task given by hand meets its contract or ends `invalid`, and a restart mid-task resumes it |
 | 3 | The workspace stream (§8): task graph and conversation watches over SSE; library tools move into `mra.playbooks` | a browser sees a task from start to end, and reconnects to a snapshot |
 | 4 | The other primitives; stage 1 as a saved plan of four tasks with child-task waiting | a stage-1 plan's result matches a `StageOneRun`'s on the same brief |
 | 5 | Feedback events (§5.2) and the inbox cards | the owner's actions are recorded against what they were about |
