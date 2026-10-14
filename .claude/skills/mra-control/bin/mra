@@ -169,6 +169,18 @@ cmd_watch() {
   [ "$status" = "succeeded" ] || echo "(status is $status — 'invalid' means the packet was rejected, not that the run crashed; see \`mra calls $id\`)"
 }
 
+cmd_task() {
+  need curl "mra task"; need jq "mra task"
+  local file="${1:-}"
+  [ -n "$file" ] && [ -f "$file" ] || die 'usage: mra task <task.json>   ({"brief": {...}, "contract": {...}}; see docs/tasks/)'
+  jq -e '.brief and .contract' "$file" >/dev/null 2>&1 || die "$file is not a task: it needs .brief and .contract"
+  local out; out=$(api POST /api/research/tasks "$(jq -c . "$file")")
+  printf '%s\n' "$out" | jq -e '.id' >/dev/null 2>&1 || die "task refused: $out"
+  printf '%s\n' "$out" | jq -r '"task run \(.id)  status=\(.status)  nodes=\(.nodes|join(","))"'
+  printf '%s\n' "$out" | jq -r '.id' > "${TMPDIR:-/tmp}/mra-last-run"
+  cmd_watch "$(printf '%s' "$out" | jq -r '.id')"
+}
+
 cmd_calls() {
   need curl "mra calls"; need jq "mra calls"
   local id="${1:-$(cat "${TMPDIR:-/tmp}/mra-last-run" 2>/dev/null || true)}"
@@ -245,6 +257,8 @@ mra — drive and inspect the research cockpit
                            INPUTS='{"landed_unit_cost":4.1,"currency":"USD"}'
                            sets the operator's costs); review_mining (stage 3,
                            needs product truth complete)
+  task <task.json>         start a durable task from a contract and follow it to
+                           its end ({"brief", "contract"}; examples in docs/tasks/)
   watch [runId]            poll until the run settles, then print the totals
   calls [runId]            the LLM call log, one line per turn
   trace [runId] [file]     download the run's trace: one line per function
@@ -266,6 +280,7 @@ case "${1:-help}" in
   health)   shift; cmd_health "$@" ;;
   login)    shift; cmd_login "$@" ;;
   run)      shift; cmd_run "$@" ;;
+  task)     shift; cmd_task "$@" ;;
   watch)    shift; cmd_watch "$@" ;;
   calls)    shift; cmd_calls "$@" ;;
   trace)    shift; cmd_trace "$@" ;;

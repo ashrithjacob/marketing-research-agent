@@ -60,6 +60,11 @@ export class RunSupervisor {
     });
   }
 
+  get live(): LiveRuns {
+    Trace.line(import.meta.url, "RunSupervisor.live");
+    return this.runs;
+  }
+
   readonly subscribe = (runId: string, subscriber: Subscriber): (() => void) | null => {
     Trace.line(import.meta.url, "RunSupervisor.subscribe", { runId, subscriber });
     return this.runs.subscribe(runId, subscriber);
@@ -80,12 +85,12 @@ export class RunSupervisor {
     return this.launcher.launch(request, workspaceId);
   }
 
-  /** Every run a restart left unfinished ends from its ledger, so what its agents found is shown; no model or paid tool is called. */
+  /** Every stage run a restart left unfinished ends from its ledger, so what its agents found is shown; no model or paid tool is called. A task's run is left to the harness, which resumes it. */
   async recoverRunsKilledByRestart(): Promise<void> {
     Trace.line(import.meta.url, "RunSupervisor.recoverRunsKilledByRestart");
     const end = new RunEnd(this.store, this.runs);
     for (const run of await this.store.listRuns(Scope.everything, 200)) {
-      if (TERMINAL_STATUSES.has(run.status)) continue;
+      if (TERMINAL_STATUSES.has(run.status) || run.contract) continue;
       await end.end(StoredRunAssembly.of(this.store, this.runs, run), { kind: "restarted" });
     }
   }

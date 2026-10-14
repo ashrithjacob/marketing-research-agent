@@ -12,6 +12,7 @@ export class PiHarness implements DurableHarness {
   private constructor(
     readonly session: Harness,
     readonly registry: Registry,
+    readonly models: Models,
     readonly path: string,
     readonly reopened: boolean,
   ) {
@@ -24,7 +25,7 @@ export class PiHarness implements DurableHarness {
     const storage = await openNodeSqliteStorage(path);
     const registry = createRegistry();
     const harness = await Harness.open(storage, { models, registry }, BACKGROUND_CONTEXT);
-    return new PiHarness(harness, registry, path, reopened);
+    return new PiHarness(harness, registry, models, path, reopened);
   }
 
   resume(): void {

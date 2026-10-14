@@ -1,0 +1,92 @@
+{
+  "brief": {
+    "url": "https://thedropletco.co.uk"
+  },
+  "contract": {
+    "objective": "The product The Droplet Co sells: its own fact sheet, read off its own site",
+    "primitive": "research",
+    "complete": {
+      "shape": "fields",
+      "node": "product_data",
+      "fields": [
+        {
+          "key": "name",
+          "record": "attribute",
+          "required": true,
+          "describe": "the name as the product's own page writes it, nothing appended"
+        },
+        {
+          "key": "brand",
+          "record": "attribute",
+          "required": true,
+          "describe": "the brand"
+        },
+        {
+          "key": "form",
+          "record": "attribute",
+          "required": true,
+          "describe": "the form as the page states it (drops, capsules, gummies…)"
+        },
+        {
+          "key": "dose_per_serving",
+          "record": "attribute",
+          "required": true,
+          "describe": "the active amount per serving, with its unit"
+        },
+        {
+          "key": "servings_per_container",
+          "record": "attribute",
+          "required": true,
+          "describe": "servings per pack"
+        },
+        {
+          "key": "full_ingredient_panel",
+          "record": "attribute",
+          "required": true,
+          "describe": "every ingredient as listed, in order"
+        },
+        {
+          "key": "price",
+          "record": "attribute",
+          "required": true,
+          "describe": "price and currency for each pack size sold"
+        },
+        {
+          "key": "subscription_terms",
+          "record": "attribute",
+          "required": true,
+          "describe": "subscribe price, frequency, minimum orders, how to cancel — or \"none offered\""
+        },
+        {
+          "key": "claims_made_on_own_site",
+          "record": "attribute",
+          "required": true,
+          "describe": "the claims the product page makes, word for word, separated by \" \\| \""
+        },
+        {
+          "key": "coa_present",
+          "record": "attribute",
+          "required": true,
+          "describe": "\"yes — <where>\" if a certificate of analysis is published, else \"no\""
+        },
+        {
+          "key": "ad_activity",
+          "record": "attribute",
+          "required": false,
+          "describe": "how many Meta ads, which pages run them, first and last seen"
+        },
+        {
+          "key": "ad_claims",
+          "record": "attribute",
+          "required": false,
+          "describe": "the claims the ads make, word for word, separated by \" \\| \""
+        }
+      ]
+    },
+    "budget": {
+      "max_usd": 0.5,
+      "max_minutes": 20
+    },
+    "verify": "code"
+  }
+}

@@ -12,7 +12,8 @@ import { fauxAssistantMessage, fauxProvider, fauxToolCall, type FauxResponseStep
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { OpenRouterPrices, type SqlResearchStore } from "../src/adapters/index.js";
-import { LiveRuns, PiHarness, RunError, TaskSupervisor, ToolRegistry } from "../src/agent/index.js";
+import { LiveRuns, PiHarness, RunError, RunSupervisor, TaskSupervisor, ToolRegistry } from "../src/agent/index.js";
+import { App } from "../src/http/index.js";
 import { Env, type Settings } from "../src/config/index.js";
 import { PRODUCT_DELIVERABLE, TERMINAL_STATUSES } from "../src/domain/index.js";
 import { productPacket, recordCalls, services } from "./fixtures.js";
@@ -135,5 +136,35 @@ describe("a research task", () => {
     expect(await settled(run.id)).toBe("completed");
     expect((await store.findings.list(run.id)).slice(0, before)).toHaveLength(before);
     expect((await store.getRun(run.id))!.packet).not.toBeNull();
+  });
+
+  it("is left to the harness by the startup recovery that ends today's interrupted stage runs", async () => {
+    let release: () => void = () => {};
+    const held = new Promise<void>((resolve) => (release = resolve));
+    faux.setResponses([async () => (await held, recordAll()), finish()]);
+    const run = await tasks.start({ brief: BRIEF, contract: CONTRACT }, "admin");
+    for (let i = 0; i < 100 && (await store.getRun(run.id))!.status !== "running"; i++) await new Promise((r) => setTimeout(r, 10));
+    await new RunSupervisor({ store, settings, models }).recoverRunsKilledByRestart();
+    expect((await store.getRun(run.id))!.status).toBe("running");
+    release();
+    expect(await settled(run.id)).toBe("completed");
+  });
+});
+
+describe("POST /api/research/tasks", () => {
+  const post = (app: App, body: unknown) =>
+    app.fetch(new Request("http://mra.test/api/research/tasks", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) }));
+
+  it("answers 202 with the queued run, and 400 with the reasons for a refused contract", async () => {
+    faux.setResponses([recordAll(), finish()]);
+    const app = new App({ settings: { ...settings, appPasswordHash: "", staticDir: join(dir, "static") }, store, harness });
+    const accepted = await post(app, { brief: BRIEF, contract: CONTRACT });
+    expect(accepted.status).toBe(202);
+    const body = (await accepted.json()) as { id: string; status: string };
+    expect(body.status).toBe("queued");
+    expect(await settled(body.id)).toBe("completed");
+    const refused = await post(app, { brief: BRIEF, contract: { ...CONTRACT, verify: "owner" } });
+    expect(refused.status).toBe(400);
+    expect(((await refused.json()) as { detail: string }).detail).toBe("task refused: verify 'owner' has nothing to run it yet; only 'code' is built");
   });
 });

@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 
-import { ReviewAnalyst, RunSupervisor, StageOneHandoff, ReviewMiningListings, type LibraryIntake } from "../agent/index.js";
+import { ReviewAnalyst, RunSupervisor, StageOneHandoff, ReviewMiningListings, type LibraryIntake, type TaskSupervisor } from "../agent/index.js";
 import { TrustpilotProfiles } from "../adapters/index.js";
 import type { Settings } from "../config/index.js";
 import type { AmazonListingSource, PageFetcher, ResearchStore } from "../domain/index.js";
@@ -18,6 +18,7 @@ import { RunRoutes } from "./run-routes.js";
 import { ReviewMiningRoutes } from "./review-mining-routes.js";
 import { ProductRoutes } from "./product-routes.js";
 import { ScopeGuard } from "./scope-guard.js";
+import { TaskRoutes } from "./task-routes.js";
 import { TraceRoute } from "./trace-route.js";
 
 /** `/api/research/*` — the cockpit's surface. */
@@ -31,17 +32,19 @@ export class ResearchApi {
       traces: TraceFile;
       listingSource: AmazonListingSource | null;
       pages: PageFetcher;
+      tasks: TaskSupervisor | null;
     },
   ) {}
 
   router(): Hono<ApiEnv> {
     Trace.line(import.meta.url, "ResearchApi.router");
     const api = new Hono<ApiEnv>();
-    const { store, supervisor, intake, settings, traces, listingSource, pages } = this.options;
+    const { store, supervisor, intake, settings, traces, listingSource, pages, tasks } = this.options;
     const handoff = new StageOneHandoff(store);
     new ScopeGuard(store).register(api);
     const listings = new ReviewMiningListings(store.listings, listingSource, settings.apifyConcurrency, new TrustpilotProfiles(pages));
     new RunRoutes(store, supervisor, handoff, listings).register(api);
+    if (tasks) new TaskRoutes(store, tasks).register(api);
     new CostRoute(store).register(api);
     new ReviewMiningRoutes(handoff, settings, listings).register(api);
     new ReviewAnalysisRoutes(store, supervisor, new ReviewAnalyst(store, settings, supervisor.models, supervisor.costs)).register(api);

@@ -17,16 +17,18 @@ Trace.install(traces);
 new WireTap().attach();
 traces.prune();
 const store = await SqlResearchStore.open(StoreDatabase.forSettings(settings));
-const app = new App({ settings, traces, store });
-const harness = await PiHarness.open(settings.harnessPath, RunSupervisor.defaultModels());
-harness.resume();
-console.log(`harness ${harness.reopened ? "reopened" : "created"} at ${harness.path}`);
+const models = RunSupervisor.defaultModels();
+const harness = await PiHarness.open(settings.harnessPath, models);
+const app = new App({ settings, traces, store, harness });
 
 await app.supervisor.recoverRunsKilledByRestart();
 const abandoned = await app.intake.recover();
 if (abandoned > 0) console.log(`${abandoned} document conversion(s) were cut off by the restart and marked failed`);
 const resettled = await app.supervisor.resettleInvalidRuns();
 if (resettled.length > 0) console.log(`re-settled ${resettled.length} invalid run(s) from their ledgers: ${resettled.join(", ")}`);
+const picked = app.tasks ? await app.tasks.recover() : 0;
+harness.resume();
+console.log(`harness ${harness.reopened ? "reopened" : "created"} at ${harness.path}; ${picked} task(s) to pick back up`);
 app.supervisor.costs.start();
 
 const server = serve(
@@ -47,9 +49,9 @@ for (const signal of ["SIGINT", "SIGTERM"] as const) {
     shuttingDown = true;
     console.log(`${signal} — stopping`);
     server.close();
-    void app
+    void harness
       .close()
-      .then(() => harness.close())
+      .then(() => app.close())
       .then(
         () => process.exit(0),
         (error) => {

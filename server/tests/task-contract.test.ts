@@ -1,10 +1,10 @@
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import { PRODUCT_DELIVERABLE, Primitives, RoleRecords, taskContractSchema, type FindingKind, type TaskContract } from "../src/domain/index.js";
+import { PRODUCT_DELIVERABLE, Primitives, RoleRecords, taskContractSchema, taskRequestSchema, type FindingKind, type TaskContract } from "../src/domain/index.js";
 import { ContractCheck, type ContractGrounds } from "../src/extract/index.js";
 import { SqliteStores } from "./sqlite-stores.js";
 
@@ -73,6 +73,14 @@ describe("a task contract", () => {
     const role = Primitives.role(productContract());
     expect(role).toMatchObject({ id: "research", tools: ["web_search", "web_fetch"], maxTurns: 30, consistency: "stage_one_node" });
     expect(RoleRecords.of(role)).toEqual(["source", "attribute", "node_status", "gap"]);
+  });
+});
+
+describe("the example tasks in docs/tasks", () => {
+  const folder = new URL("../../docs/tasks/", import.meta.url).pathname;
+  it.each(readdirSync(folder).filter((name) => name.endsWith(".json")))("%s parses and passes the contract check", (name) => {
+    const request = taskRequestSchema.parse(JSON.parse(readFileSync(join(folder, name), "utf-8")));
+    expect(ContractCheck.problems(request.contract, grounds())).toEqual([]);
   });
 });
 
