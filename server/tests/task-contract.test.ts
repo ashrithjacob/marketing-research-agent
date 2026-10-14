@@ -24,6 +24,7 @@ function grounds(overrides: Partial<ContractGrounds> = {}): ContractGrounds {
     recordable: new Set<FindingKind>(["source", "attribute", "measurement", "excerpt", "competitor", "competitor_reference", "gap", "saturation", "node_status"]),
     findings: new Set(),
     documents: new Set(),
+    writePlaybooks: new Set(["long_form_static"]),
     maxUsd: 2,
     ...overrides,
   };

@@ -1,11 +1,12 @@
 import { useRef, useState, type DragEvent } from 'react';
-import { library, type LibraryDocument, type LibraryDocumentText } from './api';
+import { learningApi, library, type LibraryDocument, type LibraryDocumentText } from './api';
 import { useLibrary, type Progress } from './use-library';
 
 export default function LibraryPage({ onError }: { onError: (message: string) => void }) {
   const { documents, progress, upload, remove } = useLibrary(onError);
   const [open, setOpen] = useState<LibraryDocumentText | null>(null);
   const [dragging, setDragging] = useState(false);
+  const [notice, setNotice] = useState('');
   const picker = useRef<HTMLInputElement>(null);
 
   const drop = (e: DragEvent<HTMLDivElement>) => {
@@ -13,6 +14,15 @@ export default function LibraryPage({ onError }: { onError: (message: string) =>
     setDragging(false);
     void upload([...e.dataTransfer.files]);
   };
+
+  async function distil(documentId: string) {
+    try {
+      await learningApi.distil(documentId);
+      setNotice('A playbook is being distilled from it. Its card arrives in the inbox for you to approve.');
+    } catch (err) {
+      onError((err as Error).message);
+    }
+  }
 
   async function read(doc: LibraryDocument) {
     try {
@@ -56,6 +66,7 @@ export default function LibraryPage({ onError }: { onError: (message: string) =>
         <span className="muted">PDF only for now. A scanned PDF with no text layer cannot be read yet.</span>
       </div>
 
+      {notice && <p className="muted small">{notice}</p>}
       {documents === null && <div className="empty">Loading library…</div>}
       {documents?.length === 0 && <div className="empty">Nothing uploaded yet.</div>}
       <div className="library-list">
@@ -66,6 +77,7 @@ export default function LibraryPage({ onError }: { onError: (message: string) =>
             progress={progress[doc.id]}
             onRead={() => void read(doc)}
             onRemove={() => void remove(doc.id)}
+            onDistil={() => void distil(doc.id)}
           />
         ))}
       </div>
@@ -93,11 +105,13 @@ function DocumentRow({
   progress,
   onRead,
   onRemove,
+  onDistil,
 }: {
   doc: LibraryDocument;
   progress: Progress | undefined;
   onRead: () => void;
   onRemove: () => void;
+  onDistil: () => void;
 }) {
   const pct = progress ? Math.round((progress.page / progress.pages) * 100) : 0;
   return (
@@ -123,6 +137,11 @@ function DocumentRow({
         {doc.status === 'ready' && (
           <button className="ghost" onClick={onRead}>
             Read
+          </button>
+        )}
+        {doc.status === 'ready' && (
+          <button className="ghost" title="An agent reads it and proposes a playbook, as a card for you to approve" onClick={onDistil}>
+            Make a playbook
           </button>
         )}
         <button className="ghost" onClick={onRemove} disabled={doc.status === 'converting'}>

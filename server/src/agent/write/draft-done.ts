@@ -1,4 +1,4 @@
-import { CheckProblems, Findings, PLAYBOOKS, Scope, type CheckProblem, type DraftBook, type FindingLedger } from "../../domain/index.js";
+import { CheckProblems, Findings, Scope, type CheckProblem, type DraftBook, type FindingLedger, type Playbook } from "../../domain/index.js";
 import { DraftCheck } from "../../extract/index.js";
 import { Trace } from "../../trace/index.js";
 
@@ -9,12 +9,13 @@ export class DraftDone implements DoneCheck {
   constructor(
     private readonly drafts: DraftBook,
     private readonly ledger: FindingLedger,
-    private readonly run: { runId: string; playbook: string },
+    private readonly run: { runId: string; playbook: () => Promise<Playbook | null> },
   ) {}
 
   async problems(): Promise<CheckProblem[]> {
     Trace.line(import.meta.url, "DraftDone.problems", { runId: this.run.runId });
-    const playbook = PLAYBOOKS[this.run.playbook]!;
+    const playbook = await this.run.playbook();
+    if (!playbook) return [CheckProblems.of("the draft's playbook is missing from this workspace")];
     const rows = Findings.live(await this.ledger.list(this.run.runId));
     return DraftCheck.problems(playbook, await this.drafts.ofRun(this.run.runId), rows);
   }

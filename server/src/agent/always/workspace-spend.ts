@@ -1,7 +1,7 @@
 import { Scope, type ResearchStore } from "../../domain/index.js";
 import { Trace } from "../../trace/index.js";
 
-/** What a brand has spent today, billed: every paid call's charge and every model call OpenRouter has priced, over the runs made today (UTC). */
+/** What a brand has spent today, billed: every paid call's charge and every model call OpenRouter has priced, over the runs made today (UTC), and what watchers spent today outside any run. */
 export class WorkspaceSpend {
   constructor(private readonly store: ResearchStore) {}
 
@@ -14,6 +14,7 @@ export class WorkspaceSpend {
       for (const charge of await this.store.charges.list(run.id)) total += charge.usd ?? 0;
       for (const call of await this.store.listLlmCalls(run.id)) total += call.generation?.cost ?? 0;
     }
+    for (const charge of await this.store.watch.charges(workspaceId, `${day}T00:00:00`)) total += charge.usd ?? 0;
     return total;
   }
 }

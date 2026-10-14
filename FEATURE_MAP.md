@@ -45,6 +45,7 @@ every URL survives a reload, a bookmark and the back button.
 | `/plans/:planId` | A plan, with the chat (below) |
 | `/inbox` | Cards, memory, drafts and feedback (below) |
 | `/drafts/:draftId` | One draft (below) |
+| `/playbooks` | Playbooks, their versions and numbers (below) |
 
 Anything else renders *No page here*; an unknown product id renders the same,
 under a `no such product` banner.
@@ -454,6 +455,25 @@ older stage-1 modal (`StartRun.tsx`).
   **Edit** (the raw text with `[[id]]` and `{{id}}`; **Save as a new version**
   calls `POST /drafts/:id/edit`), and the page has **Reject** and **Approve this
   draft** (`/reject`, `/approve`). It reloads every 3 s.
+- **Playbooks** (`PlaybooksPage.tsx`, `/playbooks`, linked in the header; since
+  part 9). One card per playbook: status (active, stale, archived, with **Restore**
+  on archived), version and who made it, a warning line when the newest version
+  did worse than the one before, and a table per version: drafts, passed first
+  try, accepted unchanged of decided, corrected, ads and spend, return on ad
+  spend, and **Roll back to this** on older versions
+  (`POST /api/research/playbooks/:key/rollback`). **Show sections and criteria**
+  opens the body. In the library, each ready document has **Make a playbook**
+  (`POST /api/research/library/:id/distil`); its result is a lesson card in the
+  inbox. A playbook lesson card has no edit box.
+- **Watching** (`WatchPanel.tsx`, in the inbox under Always on; since part 10):
+  competitors to watch for new ads (a name with a dot is watched as a domain) with
+  Watch and Remove (`/api/research/watch/brands`), and Meta ad accounts with
+  Connect, Disconnect, when each was read and *reconnect needed* when Meta refused
+  (`/api/research/ad-accounts`). On an approved draft's page, **The ad it became**
+  (`DraftAds.tsx`) shows the tag to put in the ad's name, a box to paste an ad id
+  (`POST /api/research/drafts/:id/ads`), and each linked ad's settled and
+  provisional totals. Outcome feedback reads *Results came in for the ad a draft
+  became* in the feedback log.
 - **Stop and ask me when** (`StopWhen.tsx`): under each kept task of a draft
   plan, a text box with the saved task's default; leaving it saves it
   (`POST /plans/:id/tasks/:key` with `stop_when`). Once approved it reads

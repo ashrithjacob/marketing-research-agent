@@ -7,6 +7,9 @@ import { MemoryTable } from "./memory-table.js";
 import { FeedbackTable } from "./feedback-table.js";
 import { AlwaysOnTable } from "./always-on-table.js";
 import { DraftTable } from "./draft-table.js";
+import { PlaybookTable } from "./playbook-table.js";
+import { AdTable } from "./ad-table.js";
+import { WatchTable } from "./watch-table.js";
 import { CardTable } from "./card-table.js";
 import { PlanTable } from "./plan-table.js";
 import { DocumentTable } from "./document-table.js";
@@ -29,7 +32,7 @@ export class StoreSchema {
     await db.exec(CallLog.DDL);
     await StoreMigrations.apply(db);
     await db.exec(StoreSchema.INDEXES);
-    for (const ddl of [PacketRowTable.DDL, ReviewAnalysisTable.DDL, TargetListingTable.DDL, FindingTable.DDL, ChargeTable.DDL, ReviewPullTable.DDL, DocumentTable.DDL, PlanTable.DDL, CardTable.DDL, FeedbackTable.DDL, MemoryTable.DDL, LessonTable.DDL, AlwaysOnTable.DDL, DraftTable.DDL]) await db.exec(ddl);
+    for (const ddl of [PacketRowTable.DDL, ReviewAnalysisTable.DDL, TargetListingTable.DDL, FindingTable.DDL, ChargeTable.DDL, ReviewPullTable.DDL, DocumentTable.DDL, PlanTable.DDL, CardTable.DDL, FeedbackTable.DDL, MemoryTable.DDL, LessonTable.DDL, AlwaysOnTable.DDL, DraftTable.DDL, PlaybookTable.DDL, AdTable.DDL, WatchTable.DDL]) await db.exec(ddl);
     await StoreMigrations.once(db, CompetitorKinds.NAME, (tx) => new CompetitorKinds(tx).apply());
     await StoreMigrations.once(db, ReviewPullBackfill.NAME, async (tx) => { await new ReviewPullBackfill(tx).apply(); });
   }

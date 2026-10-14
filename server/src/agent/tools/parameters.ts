@@ -84,3 +84,12 @@ export const recordVerdictParameters = Type.Object({
   pass: Type.Boolean({ description: "Whether the draft meets it." }),
   why: Type.String({ description: "One or two sentences pointing at the words that decide it." }),
 });
+
+export const proposePlaybookParameters = Type.Object({
+  key: Type.String({ description: "A new key, lower_snake_case, e.g. long_form_static." }),
+  title: Type.String({ description: "What it writes, e.g. Long-form static ad." }),
+  read_first: Type.Array(Type.String(), { description: "The document's sections to read first, e.g. [\"Section 05\"]." }),
+  sections: Type.Array(Type.Object({ key: Type.String(), title: Type.String(), describe: Type.String() }), { description: "The parts a draft has, in order." }),
+  criteria: Type.Array(Type.String(), { description: "What an editor checks, one sentence each." }),
+  why: Type.String({ description: "One line: what in the document this comes from." }),
+});

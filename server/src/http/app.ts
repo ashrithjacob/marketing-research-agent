@@ -29,17 +29,18 @@ export class App {
     supervisor?: RunSupervisor;
     listingSource?: AmazonListingSource | null;
     harness?: PiHarness;
+    services?: ServiceClients;
   }) {
     Trace.line(import.meta.url, "App.constructor");
     this.settings = overrides.settings ?? Env.settings();
     this.traces = overrides.traces ?? App.traceFile(this.settings);
     this.store = overrides.store;
-    const services = ServiceClients.forSettings(this.settings);
+    const services = overrides.services ?? ServiceClients.forSettings(this.settings);
     this.supervisor =
       overrides.supervisor ?? new RunSupervisor({ store: this.store, settings: this.settings, services, ...(overrides.harness ? { models: overrides.harness.models } : {}) });
     const { supervisor, store, settings } = this;
     this.workspace = overrides.harness
-      ? new WorkspaceServices({ store, runs: supervisor.live, settings, harness: overrides.harness, tools: new ToolRegistry(services, settings), costs: supervisor.costs })
+      ? new WorkspaceServices({ store, runs: supervisor.live, settings, harness: overrides.harness, tools: new ToolRegistry(services, settings), costs: supervisor.costs, ads: services.ads, insights: services.insights })
       : null;
 
     this.intake = new LibraryIntake(this.store.library, new PdfMarkdown(new MarkdownLayout()));

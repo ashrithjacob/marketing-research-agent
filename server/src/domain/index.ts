@@ -49,3 +49,6 @@ export * from "./always-on.js";
 export * from "./contracts.js";
 export * from "./playbooks.js";
 export * from "./drafts.js";
+export * from "./ad-results.js";
+export * from "./watching.js";
+export * from "./workspace-books.js";

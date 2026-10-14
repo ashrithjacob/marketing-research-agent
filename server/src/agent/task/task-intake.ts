@@ -4,6 +4,7 @@ import { ContractCheck, ZodProblems } from "../../extract/index.js";
 import { Trace } from "../../trace/index.js";
 
 import { ApprovalNeeded, RunError } from "../errors.js";
+import { PlaybookShelf } from "../learning/playbook-shelf.js";
 import { EXCERPT_RECORD } from "../prompt/text/excerpt-tool.js";
 import { RECORD_TOOLS } from "../prompt/text/record-tools.js";
 
@@ -28,6 +29,7 @@ export class TaskIntake {
       recordable: new Set<FindingKind>([...RECORD_TOOLS, EXCERPT_RECORD].map((tool) => tool.kind)),
       findings: await this.findings(contract, workspaceId),
       documents: new Set((await this.store.library.list(Scope.of(workspaceId))).map((doc) => doc.id)),
+      writePlaybooks: new Set((await new PlaybookShelf(this.store).list(workspaceId)).filter((p) => p.primitive === "write" && p.status !== "archived").map((p) => p.key)),
       maxUsd: this.settings.taskMaxUsd,
     });
     if (problems.length > 0) throw new RunError(`task refused: ${problems.join("; ")}`);

@@ -80,6 +80,41 @@ classDiagram
     class AdPage {
       <<interface>>
     }
+    class AdAccount {
+      <<interface>>
+    }
+    class AdInsight {
+      <<interface>>
+    }
+    class AdResult {
+      <<interface>>
+    }
+    class AdLink {
+      <<interface>>
+    }
+    class AdInsights {
+      <<interface>>
+      read()
+    }
+    class AdBook {
+      <<interface>>
+      accounts()
+      connect()
+      disconnect()
+      markRead()
+      save()
+      results()
+      link()
+      links()
+    }
+    class AdTotals {
+      <<interface>>
+    }
+    class AdSums {
+      of()
+      tag()
+      settledBefore()
+    }
     class AlwaysOn {
       <<interface>>
     }
@@ -187,6 +222,7 @@ classDiagram
       deliverable()
       draft()
       verdict()
+      playbook()
       node()
     }
     class CostCell {
@@ -396,8 +432,20 @@ classDiagram
     class PlaybookSection {
       <<interface>>
     }
+    class PlaybookBody {
+      <<interface>>
+    }
     class Playbook {
       <<interface>>
+    }
+    class PlaybookBook {
+      <<interface>>
+      current()
+      at()
+      list()
+      history()
+      add()
+      mark()
     }
     class ProductCatalog {
       <<interface>>
@@ -475,6 +523,7 @@ classDiagram
     class ReviewPullStore {
       <<interface>>
       latest()
+      newest()
       save()
     }
     class PrimitiveSpec {
@@ -616,6 +665,23 @@ classDiagram
       of()
       nodeOf()
     }
+    class WatchedBrand {
+      <<interface>>
+    }
+    class WorkspaceCharge {
+      <<interface>>
+    }
+    class WatchBook {
+      <<interface>>
+      brands()
+      addBrand()
+      removeBrand()
+      checked()
+      mark()
+      setMark()
+      charge()
+      charges()
+    }
     class SearchHit {
       <<interface>>
     }
@@ -629,6 +695,9 @@ classDiagram
       <<interface>>
     }
     class ServiceUnavailableError {
+    }
+    class WorkspaceBooks {
+      <<interface>>
     }
   }
   namespace config {
@@ -879,6 +948,14 @@ classDiagram
     class MarkdownLayout {
       render()
     }
+    class InsightRow {
+      <<interface>>
+    }
+    class MetaInsights {
+      read()
+      insight()
+      purchase()
+    }
     class MeteredWebSearch {
       find()
     }
@@ -983,6 +1060,16 @@ classDiagram
       list()
       setPassword()
     }
+    class AdTable {
+      accounts()
+      connect()
+      disconnect()
+      markRead()
+      save()
+      results()
+      link()
+      links()
+    }
     class AlwaysOnTable {
       get()
       set()
@@ -1078,6 +1165,14 @@ classDiagram
       list()
       save()
     }
+    class PlaybookTable {
+      current()
+      at()
+      list()
+      history()
+      add()
+      mark()
+    }
     class PostgresStatements {
       all()
       get()
@@ -1127,6 +1222,7 @@ classDiagram
     }
     class ReviewPullTable {
       latest()
+      newest()
       save()
     }
     class ReviewTable {
@@ -1211,6 +1307,16 @@ classDiagram
       save()
       list()
     }
+    class WatchTable {
+      brands()
+      addBrand()
+      removeBrand()
+      checked()
+      mark()
+      setMark()
+      charge()
+      charges()
+    }
     class ThrottledPageFetcher {
       scrape()
     }
@@ -1273,10 +1379,6 @@ classDiagram
       list()
       remove()
     }
-    class ScheduleWatchers {
-      start()
-      stop()
-    }
     class TaskCreation {
       create()
     }
@@ -1331,18 +1433,55 @@ classDiagram
     class InvalidRunResettle {
       resettleAll()
     }
+    class DistilWorks {
+      build()
+      check()
+      assembly()
+    }
+    class LessonChecks {
+      problems()
+    }
     class LessonDesk {
       stage()
       nothing()
       decide()
+    }
+    class LessonText {
+      title()
+      body()
+      said()
     }
     class MemoryDesk {
       list()
       section()
       write()
     }
+    class PlaybookDesk {
+      list()
+      rollback()
+      restore()
+      distil()
+    }
+    class VersionScore {
+      <<interface>>
+    }
+    class PlaybookReport {
+      <<interface>>
+    }
+    class PlaybookScores {
+      report()
+      flag()
+    }
+    class PlaybookShelf {
+      current()
+      at()
+      list()
+    }
     class ReviewCase {
       write()
+    }
+    class ReviewerTools {
+      extension()
     }
     class Reviewer {
       start()
@@ -1890,6 +2029,45 @@ classDiagram
       tokens()
       add()
     }
+    class AdOutcomes {
+      link()
+      record()
+    }
+    class AdResultsWatch {
+      check()
+    }
+    class CompetitorAdsWatch {
+      check()
+      line()
+    }
+    class CuratorWatch {
+      check()
+      status()
+    }
+    class ReviewsWatch {
+      check()
+    }
+    class ScheduleWatch {
+      check()
+    }
+    class WatchDesk {
+      addBrand()
+      connect()
+      link()
+      draftAds()
+    }
+    class WatchSet {
+      build()
+    }
+    class Watch {
+      <<interface>>
+      check()
+    }
+    class Watchers {
+      kinds()
+      start()
+      stop()
+    }
     class CriticTools {
       readDraft()
       recordVerdict()
@@ -1916,6 +2094,7 @@ classDiagram
       build()
       check()
       assembly()
+      playbook()
     }
     class WriterTools {
       readInputs()
@@ -1984,6 +2163,9 @@ classDiagram
       hash()
       verify()
     }
+    class PlaybookRoutes {
+      register()
+    }
     class ProductRoutes {
       register()
     }
@@ -2021,6 +2203,9 @@ classDiagram
     class TraceRoute {
       register()
     }
+    class WatchRoutes {
+      register()
+    }
     class WorkspaceRoutes {
       register()
     }
@@ -2038,6 +2223,7 @@ classDiagram
   FallbackPageFetcher --> PageFetcher
   OpenRouterGate --> Settings
   Firecrawl --> Settings
+  MetaInsights --> Settings
   MeteredWebSearch --> WebSearch
   MeteredWebSearch --> ServicePrices
   MeteredWebSearch --> ChargeMeter
@@ -2063,7 +2249,9 @@ classDiagram
   ServiceClients --> EvidenceServices
   ServiceClients --> CompetitorDiscovery
   ServiceClients --> AdLibrary
+  ServiceClients --> AdInsights
   AccountTable --> SqlDatabase
+  AdTable --> SqlDatabase
   AlwaysOnTable --> SqlDatabase
   CallLog --> SqlDatabase
   CardTable --> SqlDatabase
@@ -2080,6 +2268,7 @@ classDiagram
   MemoryTable --> SqlDatabase
   PacketRowTable --> SqlDatabase
   PlanTable --> SqlDatabase
+  PlaybookTable --> SqlDatabase
   ProductBackfill --> SqlDatabase
   ProductBackfill --> ProductTable
   ProductBackfill --> PacketRowTable
@@ -2096,6 +2285,7 @@ classDiagram
   SqlResearchStore --> StoreTables
   StoreTables --> SqlDatabase
   TargetListingTable --> SqlDatabase
+  WatchTable --> SqlDatabase
   ThrottledPageFetcher --> PageFetcher
   ThrottledPageFetcher --> ServiceQueue
   ThrottledWebSearch --> WebSearch
@@ -2113,13 +2303,11 @@ classDiagram
   AgentTeam --> RetryPolicy
   AgentTeam --> ModelChain
   AlwaysOnDesk --> ResearchStore
-  AlwaysOnDesk --> ScheduleWatchers
+  AlwaysOnDesk --> Watchers
   AlwaysOnDesk --> WorkspaceSpend
   AlwaysOnTools --> TaskCreation
   AlwaysOnTools --> ScheduleDesk
   ScheduleDesk --> ResearchStore
-  ScheduleWatchers --> ResearchStore
-  ScheduleWatchers --> PiHarness
   TaskCreation --> TaskSupervisor
   TaskCreation --> PlanDesk
   WorkspaceLimits --> ResearchStore
@@ -2134,10 +2322,17 @@ classDiagram
   AgentEventRecorder --> ToolSteps
   InvalidRunResettle --> ResearchStore
   InvalidRunResettle --> LiveRuns
+  DistilWorks --> OpenRouterPrices
+  LessonChecks --> ResearchStore
   LessonDesk --> ResearchStore
-  LessonDesk --> CardDesk
   MemoryDesk --> ResearchStore
+  PlaybookDesk --> ResearchStore
+  PlaybookDesk --> TaskSupervisor
+  PlaybookScores --> ResearchStore
+  PlaybookShelf --> ResearchStore
   ReviewCase --> ResearchStore
+  ReviewerTools --> ResearchStore
+  ReviewerTools --> LessonDesk
   Reviewer --> ResearchStore
   Reviewer --> PiHarness
   Reviewer --> LessonDesk
@@ -2177,7 +2372,8 @@ classDiagram
   WorkspaceBoard --> ResearchStore
   WorkspaceBoard --> TaskSupervisor
   WorkspaceBoard --> AlwaysOnDesk
-  WorkspaceServices --> OpenRouterPrices
+  WorkspaceServices --> AdLibrary
+  WorkspaceServices --> AdInsights
   OperatorInputs --> FindingLedger
   PartClose --> RunFindings
   PartClose --> DeliverableCheck
@@ -2292,6 +2488,19 @@ classDiagram
   WebFetchTool --> PageView
   WebSearchTool --> WebSearch
   TurnBreakers --> BreakerLimits
+  AdOutcomes --> ResearchStore
+  AdResultsWatch --> ResearchStore
+  AdResultsWatch --> AdInsights
+  CompetitorAdsWatch --> ResearchStore
+  CompetitorAdsWatch --> AdLibrary
+  CompetitorAdsWatch --> WorkspaceLimits
+  CuratorWatch --> ResearchStore
+  ReviewsWatch --> ResearchStore
+  ScheduleWatch --> ResearchStore
+  WatchDesk --> ResearchStore
+  Watchers --> ResearchStore
+  Watchers --> PiHarness
+  Watchers --> Watch
   CriticTools --> DraftBook
   CriticTools --> FindingLedger
   CriticTools --> LiveRuns
@@ -2308,6 +2517,7 @@ classDiagram
   WriterTools --> DraftBook
   WriterTools --> FindingLedger
   WriterTools --> LiveRuns
+  WriterTools --> Playbook
   PacketError --> CheckProblem
   FieldsCheck --> FieldsDeliverable
   ListCheck --> ListDeliverable
@@ -2339,6 +2549,7 @@ classDiagram
   LibraryRoutes --> DocumentLibrary
   LibraryRoutes --> LibraryIntake
   MemoryRoutes --> MemoryDesk
+  PlaybookRoutes --> PlaybookDesk
   ProductRoutes --> ResearchStore
   ResearchApi --> AmazonListingSource
   ResearchApi --> WorkspaceServices
@@ -2358,6 +2569,8 @@ classDiagram
   TaskRoutes --> ResearchStore
   TaskRoutes --> TaskSupervisor
   TraceRoute --> TraceFile
+  WatchRoutes --> WatchDesk
+  WatchRoutes --> ResearchStore
   WorkspaceRoutes --> OwnerDesk
   WorkspaceRoutes --> PlanBook
   WorkspaceStream --> OperatorDesk
@@ -2385,6 +2598,7 @@ classDiagram
 | `adapters` | `adapters/firecrawl.ts` | FirecrawlPayload, Firecrawl |
 | `adapters` | `adapters/http.ts` | Http |
 | `adapters` | `adapters/markdown-layout.ts` | PrintedLine, MarkdownLayout |
+| `adapters` | `adapters/meta-insights.ts` | InsightRow, MetaInsights |
 | `adapters` | `adapters/metered.ts` | MeteredWebSearch, MeteredPageFetcher, MeteredAdLibrary, MeteredDiscovery |
 | `adapters` | `adapters/openrouter-generation.ts` | OpenRouterGeneration |
 | `adapters` | `adapters/openrouter-prices.ts` | OpenRouterPrices |
@@ -2400,6 +2614,7 @@ classDiagram
 | `adapters` | `adapters/service-clients.ts` | EvidenceServices, ServiceClients |
 | `adapters` | `adapters/service-queue.ts` | Waiter, ServiceQueue |
 | `adapters` | `adapters/store/account-table.ts` | AccountTable |
+| `adapters` | `adapters/store/ad-table.ts` | AdTable |
 | `adapters` | `adapters/store/always-on-table.ts` | AlwaysOnTable |
 | `adapters` | `adapters/store/call-log.ts` | CallLog |
 | `adapters` | `adapters/store/card-table.ts` | CardTable |
@@ -2417,6 +2632,7 @@ classDiagram
 | `adapters` | `adapters/store/migrations.ts` | StoreMigrations |
 | `adapters` | `adapters/store/packet-row-table.ts` | PacketRowTable |
 | `adapters` | `adapters/store/plan-table.ts` | PlanTable |
+| `adapters` | `adapters/store/playbook-table.ts` | PlaybookTable |
 | `adapters` | `adapters/store/postgres-database.ts` | PostgresStatements, PostgresDatabase |
 | `adapters` | `adapters/store/postgres-dialect.ts` | PostgresDialect |
 | `adapters` | `adapters/store/product-backfill.ts` | ProductBackfill |
@@ -2438,6 +2654,7 @@ classDiagram
 | `adapters` | `adapters/store/store.ts` | SqlResearchStore |
 | `adapters` | `adapters/store/tables.ts` | StoreTables |
 | `adapters` | `adapters/store/target-listing-table.ts` | TargetListingTable |
+| `adapters` | `adapters/store/watch-table.ts` | WatchTable |
 | `adapters` | `adapters/throttled.ts` | ThrottledPageFetcher, ThrottledWebSearch, ThrottledActorRunner, ThrottledAdLibrary |
 | `adapters` | `adapters/trendtrack-ads.ts` | TrendtrackAd, TrendtrackAds |
 | `adapters` | `adapters/trustpilot-profiles.ts` | TrustpilotProfiles |
@@ -2448,7 +2665,6 @@ classDiagram
 | `agent` | `agent/always/always-on-tools.ts` | AlwaysOnTools |
 | `agent` | `agent/always/money-gate.ts` | MoneyGate |
 | `agent` | `agent/always/schedule-desk.ts` | ScheduleDesk |
-| `agent` | `agent/always/schedule-watchers.ts` | ScheduleWatchers |
 | `agent` | `agent/always/task-creation.ts` | TaskCreation |
 | `agent` | `agent/always/workspace-limits.ts` | WorkspaceLimits |
 | `agent` | `agent/always/workspace-spend.ts` | WorkspaceSpend |
@@ -2460,9 +2676,16 @@ classDiagram
 | `agent` | `agent/fallback-models.ts` | FallbackModels |
 | `agent` | `agent/frames.ts` | EventFrame, Frames |
 | `agent` | `agent/invalid-run-resettle.ts` | InvalidRunResettle |
+| `agent` | `agent/learning/distil-works.ts` | DistilWorks |
+| `agent` | `agent/learning/lesson-checks.ts` | LessonChecks |
 | `agent` | `agent/learning/lesson-desk.ts` | LessonDesk |
+| `agent` | `agent/learning/lesson-text.ts` | LessonText |
 | `agent` | `agent/learning/memory-desk.ts` | MemoryDesk |
+| `agent` | `agent/learning/playbook-desk.ts` | PlaybookDesk |
+| `agent` | `agent/learning/playbook-scores.ts` | VersionScore, PlaybookReport, PlaybookScores |
+| `agent` | `agent/learning/playbook-shelf.ts` | PlaybookShelf |
 | `agent` | `agent/learning/review-case.ts` | ReviewCase |
+| `agent` | `agent/learning/reviewer-tools.ts` | ReviewerTools |
 | `agent` | `agent/learning/reviewer.ts` | Reviewer |
 | `agent` | `agent/library/library-intake.ts` | LiveConversion, LibraryIntake |
 | `agent` | `agent/limit-close.ts` | LimitClosed, LimitClose |
@@ -2566,6 +2789,15 @@ classDiagram
 | `agent` | `agent/tools/web-search-tool.ts` | WebSearchTool |
 | `agent` | `agent/turn-breakers.ts` | TurnBreakers |
 | `agent` | `agent/usage.ts` | UsageTotals |
+| `agent` | `agent/watch/ad-outcomes.ts` | AdOutcomes |
+| `agent` | `agent/watch/ad-results-watch.ts` | AdResultsWatch |
+| `agent` | `agent/watch/competitor-ads-watch.ts` | CompetitorAdsWatch |
+| `agent` | `agent/watch/curator-watch.ts` | CuratorWatch |
+| `agent` | `agent/watch/reviews-watch.ts` | ReviewsWatch |
+| `agent` | `agent/watch/schedule-watch.ts` | ScheduleWatch |
+| `agent` | `agent/watch/watch-desk.ts` | WatchDesk |
+| `agent` | `agent/watch/watch-set.ts` | WatchSet |
+| `agent` | `agent/watch/watchers.ts` | Watch, Watchers |
 | `agent` | `agent/write/critic-tools.ts` | CriticTools |
 | `agent` | `agent/write/draft-desk.ts` | DraftDesk |
 | `agent` | `agent/write/draft-done.ts` | DraftDone, VerdictDone |
@@ -2577,6 +2809,7 @@ classDiagram
 | `config` | `config/settings.ts` | Env |
 | `domain` | `domain/accounts.ts` | Workspace, Account, AccountListing, Principal, Scope |
 | `domain` | `domain/ad-library.ts` | AdQuery, AdHit, AdPage |
+| `domain` | `domain/ad-results.ts` | AdAccount, AdInsight, AdResult, AdLink, AdInsights, AdBook, AdTotals, AdSums |
 | `domain` | `domain/always-on.ts` | AlwaysOn, AlwaysOnBook, Schedule, ScheduleBook, Schedules |
 | `domain` | `domain/breakers.ts` | Trip, BreakerReadings, BreakerLimits, Breakers, RunStatuses |
 | `domain` | `domain/brief.ts` | Briefs |
@@ -2600,7 +2833,7 @@ classDiagram
 | `domain` | `domain/packet-rows.ts` | PacketRowSet, PacketRows |
 | `domain` | `domain/paragraphs.ts` | Paragraph, Paragraphs |
 | `domain` | `domain/plans.ts` | PlanTask, Plan, PlanBook |
-| `domain` | `domain/playbooks.ts` | PlaybookSection, Playbook |
+| `domain` | `domain/playbooks.ts` | PlaybookSection, PlaybookBody, Playbook, PlaybookBook |
 | `domain` | `domain/ports.ts` | ProductCatalog, AccountDirectory, AmazonListingSource, TargetListings, ChargeLedger, FindingLedger, PageFetcher, WebSearch, AdLibrary, CompetitorDiscovery, ResearchStore, GateVerdict, FetchGate, ReviewPullStore |
 | `domain` | `domain/primitives.ts` | PrimitiveSpec, Primitives |
 | `domain` | `domain/products.ts` | RunHead, Product, ProductSummary, ProductFolders |
@@ -2615,7 +2848,9 @@ classDiagram
 | `domain` | `domain/saved-plans.ts` | SavedTask, SavedPlans |
 | `domain` | `domain/service-report.ts` | ServicePart, ServiceReport, ServiceReports |
 | `domain` | `domain/stage-one-agents.ts` | StageOnePlan, StageOnePlans |
+| `domain` | `domain/watching.ts` | WatchedBrand, WorkspaceCharge, WatchBook |
 | `domain` | `domain/web.ts` | SearchHit, SearchPage, SearchScope, FetchedPage, ServiceUnavailableError |
+| `domain` | `domain/workspace-books.ts` | WorkspaceBooks |
 | `extract` | `extract/brief-check.ts` | BriefCheck |
 | `extract` | `extract/champion-check.ts` | ChampionCheck |
 | `extract` | `extract/check.ts` | PacketContext, PacketCheck |
@@ -2667,6 +2902,7 @@ classDiagram
 | `http` | `http/login-throttle.ts` | LoginThrottle |
 | `http` | `http/memory-routes.ts` | MemoryRoutes |
 | `http` | `http/passwords.ts` | Passwords |
+| `http` | `http/playbook-routes.ts` | PlaybookRoutes |
 | `http` | `http/product-routes.ts` | ProductRoutes |
 | `http` | `http/research-api.ts` | ResearchApi |
 | `http` | `http/review-analysis-routes.ts` | ReviewAnalysisRoutes |
@@ -2678,6 +2914,7 @@ classDiagram
 | `http` | `http/task-routes.ts` | TaskRoutes |
 | `http` | `http/token-service.ts` | TokenService |
 | `http` | `http/trace-route.ts` | TraceRoute |
+| `http` | `http/watch-routes.ts` | WatchRoutes |
 | `http` | `http/workspace-routes.ts` | WorkspaceRoutes |
 | `http` | `http/workspace-stream.ts` | WorkspaceStream |
 | `trace` | `trace/trace-file.ts` | TraceLimits, TraceFile |

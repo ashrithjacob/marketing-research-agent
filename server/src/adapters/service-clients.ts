@@ -1,5 +1,5 @@
 import type { Settings } from "../config/index.js";
-import type { AdLibrary, CompetitorDiscovery, PageFetcher, WebSearch } from "../domain/index.js";
+import type { AdInsights, AdLibrary, CompetitorDiscovery, PageFetcher, WebSearch } from "../domain/index.js";
 import { Trace } from "../trace/index.js";
 
 import { ActorRunners, type ActorRunner } from "./apify/index.js";
@@ -14,6 +14,7 @@ import { ParallelTask } from "./parallel-task.js";
 import { ServiceQueue } from "./service-queue.js";
 import { ThrottledActorRunner, ThrottledAdLibrary, ThrottledPageFetcher, ThrottledWebSearch } from "./throttled.js";
 import { TrendtrackAds } from "./trendtrack-ads.js";
+import { MetaInsights } from "./meta-insights.js";
 
 /** What product truth searches and reads with: Parallel, with Crawl4AI reading only when Parallel can answer nothing. Never Firecrawl. */
 export interface EvidenceServices {
@@ -30,6 +31,7 @@ export class ServiceClients {
     readonly evidence: EvidenceServices = { search, pages },
     readonly discovery: CompetitorDiscovery | null = null,
     readonly ads: AdLibrary | null = null,
+    readonly insights: AdInsights | null = null,
   ) {}
 
   static forSettings(settings: Settings): ServiceClients {
@@ -45,6 +47,7 @@ export class ServiceClients {
       ServiceClients.evidence(settings, api, parallel, search),
       new ParallelCompetitorDiscovery(new ParallelTask(api, 10_000, settings.discoveryTimeoutSeconds), settings.discoveryProcessor),
       settings.trendtrackApiKey ? new ThrottledAdLibrary(new TrendtrackAds(settings), new ServiceQueue("trendtrack", settings.trendtrackConcurrency)) : null,
+      new MetaInsights(settings),
     );
   }
 

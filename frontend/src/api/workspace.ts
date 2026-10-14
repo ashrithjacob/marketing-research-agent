@@ -55,7 +55,7 @@ export interface TaskCard {
 export interface Card {
   id: string;
   kind: 'question' | 'approval';
-  action: { kind: string; draft_id?: string };
+  action: { kind: string; draft_id?: string; editable?: boolean };
   status: 'open' | 'answered' | 'approved' | 'rejected';
   title: string;
   body: string;

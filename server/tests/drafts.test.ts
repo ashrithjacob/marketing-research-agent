@@ -14,7 +14,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { SqlResearchStore } from "../src/adapters/index.js";
 import { PiHarness } from "../src/agent/index.js";
 import { Env } from "../src/config/index.js";
-import { PLAYBOOKS, Scope, TERMINAL_STATUSES, type Draft, type Finding } from "../src/domain/index.js";
+import { SEED_PLAYBOOKS, Scope, TERMINAL_STATUSES, type Draft, type Finding } from "../src/domain/index.js";
 import { DraftCheck } from "../src/extract/index.js";
 import { App } from "../src/http/index.js";
 import { minimalPacket } from "./fixtures.js";
@@ -22,7 +22,7 @@ import { SqliteStores } from "./sqlite-stores.js";
 
 const MODEL_ID = "faux-model";
 const BRIEF = { product: "MagnaCalm 400mg", url: "", market: "UK", notes: "" };
-const PLAYBOOK = PLAYBOOKS.long_form_static!;
+const PLAYBOOK = SEED_PLAYBOOKS.long_form_static!;
 let dir: string;
 let store: SqlResearchStore;
 let harness: PiHarness;
@@ -164,7 +164,7 @@ describe("a long-form static, from a plan's findings to the owner", () => {
 describe("DraftCheck", () => {
   const row = (id: string): Finding => ({ id, seq: 1, run_id: "r", kind: "attribute", entity: "product", agent_id: "a", source_id: "s", payload: { value: "400 mg" }, created_at: "", retracted_at: "", retracted_why: "" });
   const draft = (sections: Record<string, string>): Draft => ({
-    id: "d", version: 1, workspace_id: "w", run_id: "r", playbook: PLAYBOOK.key, by: "writer", status: "writing", verdicts: [], created_at: "",
+    id: "d", version: 1, workspace_id: "w", run_id: "r", playbook: PLAYBOOK.key, playbook_version: 1, by: "writer", status: "writing", verdicts: [], created_at: "",
     sections: Object.entries(sections).map(([key, text]) => ({ key, text })),
   });
   const all = (text: string) => Object.fromEntries(PLAYBOOK.sections.map((s) => [s.key, text]));

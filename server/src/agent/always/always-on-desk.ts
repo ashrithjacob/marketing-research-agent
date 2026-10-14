@@ -4,7 +4,7 @@ import { Trace } from "../../trace/index.js";
 
 import { RunError } from "../errors.js";
 
-import type { ScheduleWatchers } from "./schedule-watchers.js";
+import type { Watchers } from "../watch/watchers.js";
 import type { WorkspaceSpend } from "./workspace-spend.js";
 
 export interface AlwaysOnStatus extends AlwaysOn {
@@ -12,11 +12,11 @@ export interface AlwaysOnStatus extends AlwaysOn {
   running: number;
 }
 
-/** The Always on switch (spec §7.2): on needs a daily cap and starts the schedule watcher; off stops it at once. Tasks already running finish inside their own caps. */
+/** The Always on switch (spec §7.2): on needs a daily cap and starts the workspace's watchers; off stops them at once. Tasks already running finish inside their own caps. */
 export class AlwaysOnDesk {
   constructor(
     private readonly store: ResearchStore,
-    private readonly watchers: ScheduleWatchers,
+    private readonly watchers: Watchers,
     private readonly spend: WorkspaceSpend,
   ) {}
 

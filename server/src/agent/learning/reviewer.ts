@@ -1,17 +1,15 @@
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
-import { Type } from "@earendil-works/pi-ai";
-import { configure, defineDoc, defineExtension, defineTool, section, type ConversationId, type Extension } from "@earendil-works/pi-durable";
+import { configure, defineDoc, type ConversationId, type Extension } from "@earendil-works/pi-durable";
 
-import { Scope, type Feedback, type LessonChange, type ResearchStore } from "../../domain/index.js";
+import { Scope, type Feedback, type ResearchStore } from "../../domain/index.js";
 import { Trace } from "../../trace/index.js";
 
-import { RunError } from "../errors.js";
 import { WorkspaceDoc } from "../operator/operator-docs.js";
 import type { PiHarness } from "../pi-harness.js";
-import { REVIEWER_SYSTEM } from "../prompt/text/reviewer.js";
 
 import type { LessonDesk } from "./lesson-desk.js";
 import { ReviewCase } from "./review-case.js";
+import { ReviewerTools } from "./reviewer-tools.js";
 
 const ReviewerIndex = defineDoc<{ workspaces: Record<string, ConversationId> }>({ kind: "mra.reviewers", version: 1, scope: "session", initial: () => ({ workspaces: {} }) });
 
@@ -99,36 +97,6 @@ export class Reviewer {
 
   private build(): Extension {
     Trace.line(import.meta.url, "Reviewer.build");
-    const propose = defineTool({
-      name: "propose_lesson",
-      description: "Propose one lesson for the owner to approve: add to brand memory, change an entry (entry_id), or remove one (entry_id). Name the feedback ids it comes from.",
-      parameters: Type.Object({
-        change: Type.Union([Type.Literal("add"), Type.Literal("change"), Type.Literal("remove")]),
-        entry_id: Type.Optional(Type.String()),
-        text: Type.Optional(Type.String()),
-        why: Type.String(),
-        feedback_ids: Type.Array(Type.String()),
-      }),
-      execute: async (args, api, context) => {
-        Trace.line(import.meta.url, "Reviewer.build.execute", { change: args.change });
-        const workspace = (await api.snapshot(WorkspaceDoc, api.conversationId, context))?.workspace_id ?? "";
-        try {
-          const lesson = await this.lessons.stage(workspace, Reviewer.change(args), args.why, args.feedback_ids);
-          return { output: [{ type: "text", text: `Staged lesson ${lesson.id}; the owner decides on its card.` }] };
-        } catch (error) {
-          if (!(error instanceof RunError)) throw error;
-          return { output: [{ type: "text", text: `Refused: ${error.message}` }], isError: true };
-        }
-      },
-    });
-    return defineExtension({ name: "mra.reviewer", sections: [section("reviewer", () => REVIEWER_SYSTEM, { tag: false })], tools: [propose] });
-  }
-
-  private static change(args: { change: string; entry_id?: string; text?: string }): LessonChange {
-    Trace.line(import.meta.url, "Reviewer.change", { change: args.change });
-    const text = (args.text ?? "").trim();
-    if (args.change === "remove") return { kind: "memory_remove", entry_id: args.entry_id ?? "" };
-    if (!text) throw new RunError("a lesson that adds or changes memory needs its text");
-    return args.change === "change" ? { kind: "memory_change", entry_id: args.entry_id ?? "", text } : { kind: "memory_add", text };
+    return new ReviewerTools(this.store, this.lessons).extension();
   }
 }

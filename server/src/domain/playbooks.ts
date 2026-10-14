@@ -1,3 +1,4 @@
+import type { Scope } from "./accounts.js";
 import type { PrimitiveName } from "./task-contract.js";
 
 /** One section a draft must have, and what it must do. */
@@ -8,7 +9,7 @@ export interface PlaybookSection {
 }
 
 /** How to do a class of task (spec §5.1): what it is for, the owner's document it comes from, the sections a draft has, and what a critic checks. */
-export interface Playbook {
+export interface PlaybookBody {
   key: string;
   title: string;
   primitive: PrimitiveName;
@@ -18,8 +19,30 @@ export interface Playbook {
   criteria: string[];
 }
 
-/** The long-form static, from the owner's Long-Form Statics Playbook (uploaded to the library 2026-10-12): its Section 05, "The Complete Script Structure", names the five parts. */
-export const PLAYBOOKS: Readonly<Record<string, Playbook>> = {
+export type PlaybookStatus = "active" | "stale" | "archived";
+
+/** One version of a workspace's playbook (spec §5.4–5.6): nothing is overwritten, a change is a new version, and the newest is the one tasks read. Status is the curator's mark on the playbook, kept on its newest version. */
+export interface Playbook extends PlaybookBody {
+  workspace_id: string;
+  version: number;
+  by: "seed" | "lesson" | "owner" | "rollback";
+  lesson_id: string;
+  status: PlaybookStatus;
+  created_at: string;
+}
+
+export interface PlaybookBook {
+  current(scope: Scope, key: string): Promise<Playbook | null>;
+  at(scope: Scope, key: string, version: number): Promise<Playbook | null>;
+  /** The newest version of every playbook of a workspace. */
+  list(workspaceId: string): Promise<Playbook[]>;
+  history(workspaceId: string, key: string): Promise<Playbook[]>;
+  add(workspaceId: string, body: PlaybookBody, by: Playbook["by"], lessonId: string): Promise<Playbook>;
+  mark(workspaceId: string, key: string, status: PlaybookStatus): Promise<void>;
+}
+
+/** The playbooks every workspace starts with, as version 1 by `seed`. The long-form static is from the owner's Long-Form Statics Playbook (uploaded to the library 2026-10-12): its Section 05, "The Complete Script Structure", names the five parts. */
+export const SEED_PLAYBOOKS: Readonly<Record<string, PlaybookBody>> = {
   long_form_static: {
     key: "long_form_static",
     title: "Long-form static ad",

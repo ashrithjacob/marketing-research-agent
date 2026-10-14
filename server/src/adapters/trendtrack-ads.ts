@@ -29,7 +29,7 @@ export class TrendtrackAds implements AdLibrary {
       search: [...query.terms],
       searchType: TrendtrackAds.SEARCH_TYPE[query.searchIn],
       keywordMode: "any",
-      sortBy: "reach",
+      sortBy: query.sortBy ?? "reach",
       order: "desc",
       status: "all",
       platforms: ["facebook"],

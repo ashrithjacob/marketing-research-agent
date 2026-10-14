@@ -1050,6 +1050,47 @@ paragraph numbers: code copies the quote and its character range from the
 archived page (`ExcerptTool`, `domain/paragraphs.ts`). Stage 1 has no
 `record_excerpt`.
 
+### §2o — watchers (always-on parts 9–10)
+
+`AlwaysOnDesk.set` on starts one `mra.watcher` durable task per watch for the
+workspace (`Watchers`, index document `mra.watcher-index`), built in `WatchSet`:
+schedule, curator, ad results, competitor ads, reviews. Each task alternates
+`check` (skipped while Always on is off) and `sleep` until the time its watch
+returned; off aborts them. Every watch reports through `OperatorDesk.signal`.
+`AdResultsWatch` reads each `research_ad_accounts` row through `MetaInsights`
+(35 days, `level=ad`, `time_increment=1`, every page), replaces each ad-day row
+in `research_ad_results` with `settled` set when its date is before
+`AdSums.settledBefore` (28 days), and marks the account read or, on a refused
+token, `reconnect`. `AdOutcomes.link` then links each approved draft to ads whose
+name contains `AdSums.tag(draft.id)`, and `AdOutcomes.record` writes an `outcome`
+feedback on the draft for each link with at least 7 settled days, once
+(`outcome_at`). `CompetitorAdsWatch` searches Trendtrack for each watched brand
+not checked in a day, charges the credits to `research_workspace_charges`
+(`WorkspaceSpend.today` adds them), and signals hits first seen since the last
+check; it does nothing past the daily cap (`WorkspaceLimits.overCap`).
+`ReviewsWatch` reads the listings of the workspace's stage-1 runs and signals each
+whose newest `research_review_pulls` row is past `MRA_REVIEW_REUSE_DAYS`, once per
+pull (`research_watch_marks`). `CuratorWatch` runs at most daily when no task ran
+in the last hour, and marks playbooks stale at 30 days unread and archived at 90.
+
+### §2n — playbooks: versions, lessons, distil (always-on part 9)
+
+`PlaybookShelf` reads a workspace's playbooks from `research_playbooks`, writing
+`SEED_PLAYBOOKS` as version 1 first. `DraftFlow.write` pins the current version
+in the write contract (`complete.version`); `DraftWorks.playbook` loads that
+version for the writer's sections and checks and, for a critique, the draft's.
+`TaskIntake` passes the workspace's unarchived write playbooks to
+`ContractCheck`. The reviewer's case (`ReviewCase`) names the playbook and version
+a draft feedback was about and lists that playbook now; its
+`propose_playbook_change` stages a `playbook_change` lesson (`LessonChecks`: known
+feedback, current version). Approving a playbook lesson's card has
+`LessonDesk.apply` add a version marked `lesson`. **Make a playbook** on a library
+document starts an `analyse` task (`PlaybookDesk.distil`, `DistilWorks`) whose
+`propose_playbook` stages a `playbook_new` lesson and emits `playbook.proposed`,
+which its finish check looks for. `/playbooks` (`PlaybookDesk.list`) scores every
+version with `PlaybookScores`; **Roll back to this** adds the older body as a new
+version marked `rollback`.
+
 ### §2m — drafts: write, critique, the owner (always-on part 8)
 
 On an approved plan whose tasks found something, **Write a long-form static**

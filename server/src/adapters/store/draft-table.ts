@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS research_drafts (
     workspace_id TEXT NOT NULL,
     run_id       TEXT NOT NULL,
     playbook     TEXT NOT NULL,
+    playbook_version INTEGER NOT NULL DEFAULT 1,
     sections     TEXT NOT NULL,
     by           TEXT NOT NULL,
     status       TEXT NOT NULL,
@@ -27,11 +28,11 @@ CREATE INDEX IF NOT EXISTS research_drafts_run ON research_drafts(run_id);
 
   constructor(private readonly db: SqlDatabase) {}
 
-  async write(workspaceId: string, runId: string, playbook: string, section: DraftSection): Promise<Draft> {
+  async write(workspaceId: string, runId: string, playbook: { key: string; version: number }, section: DraftSection): Promise<Draft> {
     Trace.line(import.meta.url, "DraftTable.write", { runId, section: section.key });
     const current = await this.ofRun(runId);
     if (!current) {
-      const draft: Draft = { id: Ids.next(), version: 1, workspace_id: workspaceId, run_id: runId, playbook, sections: [section], by: "writer", status: "writing", verdicts: [], created_at: Clock.nowIso() };
+      const draft: Draft = { id: Ids.next(), version: 1, workspace_id: workspaceId, run_id: runId, playbook: playbook.key, playbook_version: playbook.version, sections: [section], by: "writer", status: "writing", verdicts: [], created_at: Clock.nowIso() };
       await this.insert(draft);
       return draft;
     }
@@ -78,8 +79,8 @@ CREATE INDEX IF NOT EXISTS research_drafts_run ON research_drafts(run_id);
   private async insert(draft: Draft): Promise<void> {
     Trace.line(import.meta.url, "DraftTable.insert", { id: draft.id, version: draft.version });
     await this.db.run(
-      "INSERT INTO research_drafts (id, version, workspace_id, run_id, playbook, sections, by, status, verdicts, created_at) VALUES (?,?,?,?,?,?,?,?,?,?)",
-      [draft.id, draft.version, draft.workspace_id, draft.run_id, draft.playbook, JSON.stringify(draft.sections), draft.by, draft.status, JSON.stringify(draft.verdicts), draft.created_at],
+      "INSERT INTO research_drafts (id, version, workspace_id, run_id, playbook, playbook_version, sections, by, status, verdicts, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+      [draft.id, draft.version, draft.workspace_id, draft.run_id, draft.playbook, draft.playbook_version, JSON.stringify(draft.sections), draft.by, draft.status, JSON.stringify(draft.verdicts), draft.created_at],
     );
   }
 

@@ -14,6 +14,9 @@ import { PlanTable } from "./plan-table.js";
 import { AlwaysOnTable } from "./always-on-table.js";
 import { CardTable } from "./card-table.js";
 import { DraftTable } from "./draft-table.js";
+import { PlaybookTable } from "./playbook-table.js";
+import { AdTable } from "./ad-table.js";
+import { WatchTable } from "./watch-table.js";
 import { FeedbackTable } from "./feedback-table.js";
 import { LessonTable } from "./lesson-table.js";
 import { MemoryTable } from "./memory-table.js";
@@ -53,6 +56,9 @@ export class StoreTables {
   readonly lessons: LessonTable;
   readonly alwaysOn: AlwaysOnTable;
   readonly drafts: DraftTable;
+  readonly playbooks: PlaybookTable;
+  readonly ads: AdTable;
+  readonly watch: WatchTable;
 
   private constructor(readonly db: SqlDatabase) {
     Trace.line(import.meta.url, "StoreTables.constructor");
@@ -78,6 +84,9 @@ export class StoreTables {
     this.lessons = new LessonTable(db);
     this.alwaysOn = new AlwaysOnTable(db);
     this.drafts = new DraftTable(db);
+    this.playbooks = new PlaybookTable(db);
+    this.ads = new AdTable(db);
+    this.watch = new WatchTable(db);
     this.catalog = new SqlProductCatalog(this.products, this.runs, this.packetRows);
   }
 

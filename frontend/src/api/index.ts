@@ -13,3 +13,4 @@ export * from './review-analysis';
 export * from './library';
 export * from './workspace';
 export * from './drafts';
+export * from './learning';

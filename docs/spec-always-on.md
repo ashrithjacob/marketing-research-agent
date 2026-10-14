@@ -442,6 +442,26 @@ outcome metrics of the ads. A version that does worse than the one before it,
 over enough tasks to say so, is flagged on the dashboard with the numbers and a
 one-click rollback. No version is rolled back automatically.
 
+*Built 2026-10-14, part 9* (`agent/learning/playbook-scores.ts`, `research_playbooks`).
+Playbooks are rows, one per version per workspace; the code's `SEED_PLAYBOOKS` is
+written as version 1 (`seed`) the first time a workspace's playbooks are read
+(`PlaybookShelf`). A write task's contract pins the version it starts on, and its
+draft records it (`playbook_version`). Per version, `PlaybookScores` counts the
+drafts written with it, those whose write task passed its check on the first
+`finish` (completed with no refused check), those the owner decided, accepted
+unchanged (approved, no owner edit) or corrected (rejected or edited), and the
+settled spend and return on ad spend of the ads linked to them (part 10). The
+newest version is flagged against the one before it when, with at least 5 decided
+drafts each, the share accepted unchanged falls by 0.2 or more, or, with at least
+3 ads each, return on ad spend falls by a quarter or more. The thresholds are
+chosen, not measured. The `/playbooks` page shows the numbers, the flag, and
+**Roll back to this** on every older version, which writes that version again as
+the newest (`rollback`); nothing is overwritten. Where it differs from the above:
+"tasks that met their contract on the first try" is counted for write tasks only,
+because only they read a playbook; the reviewer may now propose a playbook change
+(`propose_playbook_change`), as a lesson through the gate, from draft edits and
+rejections. Tested against the faux model; not seen live.
+
 ### 5.6 The curator
 
 Runs when the workspace has had no task for an hour and at most once a day.
@@ -450,6 +470,14 @@ archived (never deleted). Then optionally one LLM pass that proposes merges of
 overlapping playbooks, **as lessons through the same gate**. Before any change,
 the current versions are already kept, because nothing is overwritten (§5.4),
 so rollback needs no separate snapshot.
+
+*Built 2026-10-14, part 9* (`agent/watch/curator-watch.ts`): the deterministic part
+only, as a watcher (§7.3) that runs with Always on. "Unread" is measured from the
+newest draft written with the playbook, or from its newest version when none was.
+Statuses only move forward until the owner presses **Restore** on an archived
+playbook; a write on a stale playbook marks it active again; an archived one
+refuses new writes. The optional LLM merge pass is not built. Tested against the
+faux model.
 
 ### 5.7 Evals: the engineering loop
 
@@ -483,6 +511,19 @@ An uploaded PDF is read as it is (§10). The next step, borrowed from hermes's
 playbook (a short `SKILL.md` plus one reference section per chapter) as a
 lesson, through the gate. The PDF stays the source; the playbook cites its
 sections. Not built.
+
+*Built 2026-10-14, part 9* (`agent/learning/distil-works.ts`), as a new primitive
+`analyse` with one shape, `{ shape: "playbook", document_id }`. **Make a playbook**
+on a ready library document starts it. The worker reads the document with the
+library tools and calls `propose_playbook` once: a `write` playbook with sections,
+criteria and the sections to read first, staged as a `playbook_new` lesson card.
+Done is a proposal made. Where it differs: a distilled playbook is one checkable
+structure (sections and criteria), not Agent Skills `SKILL.md` plus reference
+files, because that is what the writer and critic read; and the lesson needs no
+feedback behind it, since it traces to the owner's document instead (code checks
+the document exists and the key is new). A distil task is a run, and every run
+belongs to a product, so the document appears on the products page as
+"<title> (library)". Tested against the faux model; not seen live.
 
 ## 6. The harness: pi
 
@@ -921,6 +962,27 @@ idle watcher does not wake the operator to invent work.
 | ad results | the owner's ad account, once connected | none |
 | compaction | the operator conversation: idle a few minutes and past half its window (§7.2) | one summary request, at the cached price |
 
+*Built 2026-10-14, parts 9–10* (`agent/watch/`), all but compaction. One durable
+task per workspace and watcher (`mra.watcher`, `Watchers`), started when Always on
+is switched on and stopped when it is off; a `Watch` looks and returns when to look
+next, and a check that throws is tried again in an hour. **schedule** as part 7.
+**curator** (§5.6). **ad results**: every six hours, the last 35 days of each
+connected Meta ad account through the Insights API (`MetaInsights`, v25.0,
+`META_ACCESS_TOKEN`), one row per ad per day, settled 28 days after its date; a
+refused token marks the account `reconnect` and signals once. An approved draft
+is linked to its ad when the owner pastes the ad id on the draft's page or the
+ad's name carries the draft's tag `mra-<first 8 of its id>` (both, deciding the
+Meta plan's open question 1); once a linked ad has 7 settled days its totals are
+recorded once as `outcome` feedback on the draft. **competitor ads**: daily, each
+watched brand's newest Meta ads through Trendtrack (`sortBy: "newest"`), the first
+check only setting the baseline; credits are charged to the workspace
+(`research_workspace_charges`, counted in the day's spend) and no search runs past
+the daily cap. **reviews**: daily, each Amazon listing the workspace's stage-1 runs
+matched whose newest stored pull is older than `MRA_REVIEW_REUSE_DAYS`, signalled
+once per pull; it never pulls, since a pull spends Apify money. All report through
+the operator's `[Signal]` follow-ups. Tested against fakes of Meta and Trendtrack;
+neither service has been called.
+
 Hermes refuses to let a cron job create cron jobs, to stop runaway scheduling.
 The same rule holds here: workers cannot create tasks or watchers; only the
 operator and the owner can.
@@ -1210,8 +1272,8 @@ dashboard; a button starts it. Decided with the owner:
 | 6 | **Learning from corrections built 2026-10-14** (§5.4, built); evals, the replay suite and playbook versions are not. Reviewer as a fork, lessons, the gate, playbook versions, the editable brand-memory list (§5.3–5.4, §6.6); eval cases from invalid tasks and corrections, and the replay suite (§5.7) | a correction given once produces a lesson; approved, the next task reads it |
 | 7 | **Work nobody clicked built 2026-10-14** (§7.4, built); the work log, warm-cache compaction and cache-rate measurement are not. The Always on switch and daily cap, the operator's router for signals, stable sections, work log and warm-cache compaction (the operator conversation itself moved to part 3); `create_task`, `mra.money`, the schedule watcher | the system starts work nobody clicked, inside its limits; the operator's cache hit rate holds across a day |
 | 8 | **Built 2026-10-14** (§3.1, built; tested against the faux model only). `write` and `critique` primitives; the long-form statics playbook | an ad draft that cites its findings |
-| 9 | Measurement per playbook version (§5.5), curator watcher (§5.6), `distil` (§5.8) | a lesson that hurt is visible with numbers |
-| 10 | Ad-results feedback (`docs/plan-meta-integration.md` Phase D; its Phases A–B start alongside parts 1–2, because Meta's App Review needs a reader already running), competitor and review watchers | the loop closes on real ad performance |
+| 9 | **Built 2026-10-14** (§5.5, §5.6, §5.8, built; tested against the faux model only). Measurement per playbook version (§5.5), curator watcher (§5.6), `distil` (§5.8) | a lesson that hurt is visible with numbers |
+| 10 | **Code built 2026-10-14** (§7.3, built; tested against fakes; Meta never called: Phases A–C are outside the code). Ad-results feedback (`docs/plan-meta-integration.md` Phase D; its Phases A–B start alongside parts 1–2, because Meta's App Review needs a reader already running), competitor and review watchers | the loop closes on real ad performance |
 
 ### 12.1 Part 2 in detail
 

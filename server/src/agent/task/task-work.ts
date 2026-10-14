@@ -19,6 +19,7 @@ import { RunMeter } from "../run-meter.js";
 import { StageOneRunAssembly } from "../stage-one-run-assembly.js";
 import { ExcerptTool, LedgerToolset, LibraryTools, NumberedPage, type ToolRegistry } from "../tools/index.js";
 
+import { DistilWorks } from "../learning/distil-works.js";
 import { DraftWorks } from "../write/draft-works.js";
 
 import { ChampionRunAssembly } from "./champion-run-assembly.js";
@@ -56,10 +57,12 @@ export interface TaskWorkDeps {
 export class TaskWorks {
   private readonly built = new Map<string, Promise<TaskWork>>();
   private readonly drafts: DraftWorks;
+  private readonly distil: DistilWorks;
 
   constructor(private readonly deps: TaskWorkDeps) {
     Trace.line(import.meta.url, "TaskWorks.constructor");
     this.drafts = new DraftWorks(deps);
+    this.distil = new DistilWorks(deps);
   }
 
   of(runId: string): Promise<TaskWork> {
@@ -84,6 +87,7 @@ export class TaskWorks {
     if (!run?.contract) throw new RunError(`run ${runId} is not a task`);
     const contract = taskContractSchema.parse(run.contract);
     const brief = briefSchema.parse(run.brief);
+    if (contract.primitive === "analyse") return this.distil.build(run, contract, brief);
     if (contract.primitive !== "research") return this.drafts.build(run, contract, brief);
     const role = Primitives.role(contract);
     const node = Contracts.node(contract) ?? "competitors";
@@ -134,6 +138,7 @@ export class TaskWorks {
   /** How a task's run is assembled when it ends: a draft's on its findings, a champion's reference on its own, any other task as a stage-1 run of its one node and its one role. */
   static assembly(store: ResearchStore, run: ResearchRun, contract: TaskContract, brief: Brief): RunAssembly {
     Trace.line(import.meta.url, "TaskWorks.assembly", { runId: run.id, method: contract.method });
+    if (contract.primitive === "analyse") return DistilWorks.assembly(store, run, brief);
     if (contract.primitive !== "research") return DraftWorks.assembly(store, run, contract, brief);
     if (contract.method === "champion") return new ChampionRunAssembly(store.findings, run.id, brief);
     return new StageOneRunAssembly(store.findings, run.id, { brief, nodes: Primitives.nodes(contract), roles: [Primitives.role(contract)] });

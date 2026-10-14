@@ -50,3 +50,4 @@ export * from "./learning/index.js";
 export * from "./always/index.js";
 export * from "./write/draft-desk.js";
 export * from "./write/draft-flow.js";
+export * from "./watch/index.js";

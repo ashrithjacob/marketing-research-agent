@@ -13,13 +13,7 @@ import type { FetchedPage, SearchPage, SearchScope } from "./web.js";
 import type { DiscoveryQuestion, DiscoveryReport } from "./competitor-discovery.js";
 import type { AdPage, AdQuery } from "./ad-library.js";
 import type { DocumentLibrary } from "./library.js";
-import type { PlanBook } from "./plans.js";
-import type { CardBook } from "./cards.js";
-import type { FeedbackBook } from "./feedback.js";
-import type { LessonBook } from "./lessons.js";
-import type { MemoryBook } from "./memory.js";
-import type { AlwaysOnBook, ScheduleBook } from "./always-on.js";
-import type { DraftBook } from "./drafts.js";
+import type { WorkspaceBooks } from "./workspace-books.js";
 
 /** Products and what their runs found, counted only over the runs a scope admits. */
 export interface ProductCatalog {
@@ -89,7 +83,7 @@ export interface CompetitorDiscovery {
   discover(question: DiscoveryQuestion, signal?: AbortSignal): Promise<DiscoveryReport>;
 }
 
-export interface ResearchStore {
+export interface ResearchStore extends WorkspaceBooks {
   readonly products: ProductCatalog;
   readonly listings: TargetListings;
   readonly findings: FindingLedger;
@@ -97,14 +91,6 @@ export interface ResearchStore {
   readonly pulls: ReviewPullStore;
   readonly accounts: AccountDirectory;
   readonly library: DocumentLibrary;
-  readonly plans: PlanBook;
-  readonly cards: CardBook;
-  readonly feedback: FeedbackBook;
-  readonly memory: MemoryBook;
-  readonly lessons: LessonBook;
-  readonly alwaysOn: AlwaysOnBook;
-  readonly schedules: ScheduleBook;
-  readonly drafts: DraftBook;
   createRun(input: RunDraft): Promise<ResearchRun>;
   getRun(runId: string): Promise<ResearchRun | null>;
   listRuns(scope: Scope, limit?: number): Promise<ResearchRun[]>;
@@ -144,5 +130,7 @@ export interface FetchGate {
 /** Earlier pulls of a listing's star band, from any run in any workspace: reviews are public pages, so one paid pull serves everyone until it is too old. */
 export interface ReviewPullStore {
   latest(platform: ReviewPlatform, listing: string, band: number | null, since: string): Promise<StoredPull | null>;
+  /** When any star band of a listing was last pulled; empty when never. */
+  newest(platform: ReviewPlatform, listing: string): Promise<string>;
   save(platform: ReviewPlatform, listing: string, band: number | null, requested: number, result: ReviewResult): Promise<void>;
 }

@@ -85,6 +85,7 @@ services:
       # Meta ad search for the product, competitors and category agents
       # (ad_library_search). Blank: the tool is not offered.
       - TRENDTRACK_API_KEY=${TRENDTRACK_API_KEY:-}
+      - META_ACCESS_TOKEN=${META_ACCESS_TOKEN:-}
       # Cheap pre-read gate: every fetched page passes a small model before it
       # reaches the researcher's context. Empty disables the gate (tools then
       # behave as before). :free models cost nothing but can rate-limit; the

@@ -33,6 +33,8 @@ export interface Settings {
   trendtrackApiKey: string;
   trendtrackBaseUrl: string;
   trendtrackConcurrency: number;
+  metaAccessToken: string;
+  metaBaseUrl: string;
   webTimeoutSeconds: number;
   fetchCharLimit: number;
   firecrawlConcurrency: number;

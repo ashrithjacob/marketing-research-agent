@@ -1,4 +1,4 @@
-import { Contracts, Deliverables, PLAYBOOKS, PRIMITIVES, Primitives, type FindingKind, type TaskContract, type ToolName } from "../domain/index.js";
+import { Contracts, Deliverables, PRIMITIVES, Primitives, type FindingKind, type TaskContract, type ToolName } from "../domain/index.js";
 import { Trace } from "../trace/index.js";
 
 /** What a contract is checked against that the contract itself does not hold. */
@@ -6,6 +6,7 @@ export interface ContractGrounds {
   recordable: ReadonlySet<FindingKind>;
   findings: ReadonlySet<string>;
   documents: ReadonlySet<string>;
+  writePlaybooks: ReadonlySet<string>;
   maxUsd: number;
 }
 
@@ -16,7 +17,7 @@ export class ContractCheck {
   static problems(contract: TaskContract, grounds: ContractGrounds): string[] {
     Trace.line(import.meta.url, "ContractCheck.problems", { primitive: contract.primitive });
     return [
-      ...ContractCheck.shape(contract),
+      ...ContractCheck.shape(contract, grounds.writePlaybooks, grounds.documents),
       ...ContractCheck.reachable(contract, grounds.recordable),
       ...ContractCheck.inputs(contract, grounds),
       ...ContractCheck.budget(contract, grounds.maxUsd),
@@ -24,14 +25,19 @@ export class ContractCheck {
     ];
   }
 
-  private static shape(contract: TaskContract): string[] {
+  private static shape(contract: TaskContract, writePlaybooks: ReadonlySet<string>, documents: ReadonlySet<string>): string[] {
     Trace.line(import.meta.url, "ContractCheck.shape");
     const primitive = PRIMITIVES[contract.primitive];
     if (contract.primitive === "write") {
       const draft = Contracts.draft(contract);
       if (!draft) return ["a write task's `complete` is { shape: \"draft\", playbook }"];
-      if (PLAYBOOKS[draft.playbook]?.primitive !== "write") return [`no writing playbook '${draft.playbook}'; the playbooks are ${Object.keys(PLAYBOOKS).join(", ")}`];
+      if (!writePlaybooks.has(draft.playbook)) return [`no writing playbook '${draft.playbook}'; the playbooks are ${[...writePlaybooks].join(", ")}`];
       return contract.inputs.finding_ids.length > 0 ? [] : ["a write task needs findings to draw on: inputs.finding_ids"];
+    }
+    if (contract.primitive === "analyse") {
+      const playbook = Contracts.playbook(contract);
+      if (!playbook) return ["an analyse task's `complete` is { shape: \"playbook\", document_id }"];
+      return documents.has(playbook.document_id) ? [] : [`no library document ${playbook.document_id}`];
     }
     if (contract.primitive === "critique") return Contracts.verdict(contract) ? [] : ["a critique task's `complete` is { shape: \"verdict\", draft_id, criteria }"];
     const deliverable = Contracts.deliverable(contract);

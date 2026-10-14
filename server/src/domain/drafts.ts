@@ -22,6 +22,7 @@ export interface Draft {
   workspace_id: string;
   run_id: string;
   playbook: string;
+  playbook_version: number;
   sections: DraftSection[];
   by: "writer" | "owner";
   status: DraftStatus;
@@ -31,7 +32,7 @@ export interface Draft {
 
 export interface DraftBook {
   /** The writer's working copy: created on its first section, changed in place while it writes. */
-  write(workspaceId: string, runId: string, playbook: string, section: DraftSection): Promise<Draft>;
+  write(workspaceId: string, runId: string, playbook: { key: string; version: number }, section: DraftSection): Promise<Draft>;
   ofRun(runId: string): Promise<Draft | null>;
   get(scope: Scope, draftId: string): Promise<Draft | null>;
   list(scope: Scope, limit: number): Promise<Draft[]>;

@@ -17,3 +17,4 @@ export * from "./trustpilot-profiles.js";
 export * from "./metered.js";
 export * from "./markdown-layout.js";
 export * from "./pdf-markdown.js";
+export * from "./meta-insights.js";

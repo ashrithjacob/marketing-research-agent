@@ -8,6 +8,7 @@ import {
   type RunSummary,
   type Session,
 } from './api';
+import HeaderNav from './HeaderNav';
 import Login from './Login';
 import LibraryPage from './LibraryPage';
 import LogsPage from './LogsPage';
@@ -20,6 +21,7 @@ import StartPlan from './StartPlan';
 import PlanPage from './PlanPage';
 import InboxPage from './InboxPage';
 import DraftPage from './DraftPage';
+import PlaybooksPage from './PlaybooksPage';
 import ProductTruthStart from './ProductTruthStart';
 import ReviewMiningPlan from './ReviewMiningPlan';
 import { stageOfNode } from './stages';
@@ -112,12 +114,7 @@ export default function App() {
         <Link to={paths.products()} className="brand">
           research cockpit
         </Link>
-        <Link to={paths.library()} className="chip">
-          Library
-        </Link>
-        <Link to={paths.inbox()} className="chip">
-          Inbox
-        </Link>
+        <HeaderNav />
         <div className="subject">
           {activeRun && (
             <>
@@ -178,6 +175,7 @@ export default function App() {
       {route.page === 'plan' && <PlanPage planId={route.planId} onError={setError} />}
       {route.page === 'inbox' && <InboxPage onError={setError} />}
       {route.page === 'draft' && <DraftPage draftId={route.draftId} onError={setError} />}
+      {route.page === 'playbooks' && <PlaybooksPage onError={setError} />}
       {(route.page === 'missing' || missing) && (
         <div className="empty">
           No page here. <Link to={paths.products()}>All products</Link>

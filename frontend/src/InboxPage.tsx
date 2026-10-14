@@ -2,6 +2,7 @@ import type { Feedback } from './api';
 import AlwaysOnPanel from './AlwaysOnPanel';
 import Cards from './Cards';
 import MemoryList from './MemoryList';
+import WatchPanel from './WatchPanel';
 import { Link, paths } from './route';
 import { useWorkspace } from './use-workspace';
 
@@ -19,7 +20,7 @@ function about(feedback: Feedback): string {
   if (target.kind === 'source') return `a source of run ${target.run_id.slice(0, 8)}`;
   if (target.kind === 'contract') return target.id === target.plan_id ? 'a plan' : `the ${target.id.replace(/_/g, ' ')} task`;
   if (target.kind === 'card') return 'a card';
-  if (target.kind === 'draft') return 'a draft';
+  if (target.kind === 'draft') return feedback.verdict === 'outcome' ? 'the ad a draft became' : 'a draft';
   return `task ${target.run_id.slice(0, 8)}`;
 }
 
@@ -35,6 +36,7 @@ export default function InboxPage({ onError }: { onError: (message: string) => v
   return (
     <div className="inbox">
       <AlwaysOnPanel status={board.always_on} schedules={board.schedules} onError={onError} />
+      <WatchPanel onError={onError} />
       <Cards cards={board.cards} today={board.cards_today} onError={onError} />
       {board.cards.length === 0 && <div className="empty">Nothing is waiting for you.</div>}
       {board.drafts.length > 0 && (

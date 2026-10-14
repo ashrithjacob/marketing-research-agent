@@ -1,7 +1,8 @@
-import { DraftText, FeedbackStrengths, Findings, PLAYBOOKS, Scope, type Draft, type DraftView, type Playbook, type DraftSection, type FeedbackVerdict, type ResearchStore } from "../../domain/index.js";
+import { DraftText, FeedbackStrengths, Findings, Scope, type Draft, type DraftView, type Playbook, type DraftSection, type FeedbackVerdict, type ResearchStore } from "../../domain/index.js";
 import { Trace } from "../../trace/index.js";
 
 import { RunError } from "../errors.js";
+import { PlaybookShelf } from "../learning/playbook-shelf.js";
 
 /** The owner's hand on a draft: an edit is a new version, recorded with what it changed; approve and reject settle it, and its card with it. Each is feedback on the draft (spec §5.2). */
 export class DraftDesk {
@@ -12,7 +13,7 @@ export class DraftDesk {
     Trace.line(import.meta.url, "DraftDesk.view", { draftId });
     const draft = await this.store.drafts.get(scope, draftId);
     if (!draft) throw new RunError(`no draft ${draftId}`);
-    const playbook = PLAYBOOKS[draft.playbook] ?? null;
+    const playbook = await new PlaybookShelf(this.store).at(draft.workspace_id, draft.playbook, draft.playbook_version);
     const rows = Findings.live(await this.store.findings.list(draft.run_id));
     const view = DraftText.view(draft, rows, new Map((playbook?.sections ?? []).map((s) => [s.key, s.title])));
     return { draft, view, playbook };

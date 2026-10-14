@@ -104,7 +104,7 @@ const CLIENT_ONLY_FIELDS = new Set([
   // parsed from a server response. Add a name here only after checking the
   // server genuinely does not send it.
   "handlers", "onEnd", "onError", "onEvent", "onReconnecting", "onConnected",
-  "startRun", "stopRun", "startPlan", "editTask", "answerCard", "approveCard", "rejectCard", "markSourceWrong", "addMemory", "editMemory", "deleteMemory", "setAlwaysOn", "addSchedule", "removeSchedule", "getDraft", "writeDraft", "editDraft", "approveDraft", "rejectDraft",
+  "startRun", "stopRun", "startPlan", "editTask", "answerCard", "approveCard", "rejectCard", "markSourceWrong", "addMemory", "editMemory", "deleteMemory", "setAlwaysOn", "addSchedule", "removeSchedule", "getDraft", "writeDraft", "editDraft", "approveDraft", "rejectDraft", "rollbackPlaybook", "restorePlaybook", "watchedBrands", "addWatchedBrand", "removeWatchedBrand", "adAccounts", "connectAdAccount", "disconnectAdAccount", "linkAd",
   "logsUrl", "traceUrl", "sourceUrl", "arguments", "toolCallId", "reviewMiningPlan", "productRuns",
   "reviewAnalysis", "startReviewAnalysis", "reviewMiningListings",
 ]);

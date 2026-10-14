@@ -4,7 +4,7 @@ import { workspaceApi, type Card } from './api';
 import { Link, paths } from './route';
 
 function OpenCard({ card, onError }: { card: Card; onError: (message: string) => void }) {
-  const lesson = card.action.kind === 'lesson';
+  const lesson = card.action.kind === 'lesson' && card.action.editable !== false;
   const [answer, setAnswer] = useState(lesson ? card.body.split('\n\nWhy:')[0] ?? '' : '');
   const [busy, setBusy] = useState(false);
 

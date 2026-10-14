@@ -1,6 +1,6 @@
 import type { AgentTool } from "@earendil-works/pi-agent-core";
 
-import { DraftText, Findings, PLAYBOOKS, Scope, type DraftBook, type FindingLedger, type Verdict } from "../../domain/index.js";
+import { DraftText, Findings, Scope, type DraftBook, type FindingLedger, type Verdict } from "../../domain/index.js";
 import { Trace } from "../../trace/index.js";
 
 import type { LiveRuns } from "../live-runs.js";
@@ -12,7 +12,7 @@ export class CriticTools {
     private readonly drafts: DraftBook,
     private readonly ledger: FindingLedger,
     private readonly runs: LiveRuns,
-    private readonly run: { runId: string; workspaceId: string; draftId: string; criteria: readonly string[] },
+    private readonly run: { runId: string; workspaceId: string; draftId: string; criteria: readonly string[]; titles: ReadonlyMap<string, string> },
   ) {}
 
   readDraft(): AgentTool<typeof readDraftParameters> {
@@ -64,7 +64,7 @@ export class CriticTools {
     const draft = await this.drafts.get(Scope.of(this.run.workspaceId), this.run.draftId);
     if (!draft) return "The draft is missing.";
     const rows = Findings.live(await this.ledger.list(draft.run_id));
-    const view = DraftText.view(draft, rows, new Map((PLAYBOOKS[draft.playbook]?.sections ?? []).map((s) => [s.key, s.title])));
+    const view = DraftText.view(draft, rows, this.run.titles);
     const body = view.sections.map((s) => `## ${s.title}\n\n${s.text}`).join("\n\n");
     const footnotes = view.notes.map((note, i) => `[${i + 1}] ${note.kind}: ${note.value}`).join("\n");
     return `${body}\n\n## Footnotes\n\n${footnotes}`;

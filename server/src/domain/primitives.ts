@@ -16,6 +16,7 @@ export const PRIMITIVES: Readonly<Record<PrimitiveName, PrimitiveSpec>> = {
   research: { name: "research", tools: ["web_search", "web_fetch"], nodes: STAGE_NODES[1], stepCeiling: 30 },
   write: { name: "write", tools: ["library_index", "library_read"], nodes: [], stepCeiling: 20 },
   critique: { name: "critique", tools: [], nodes: [], stepCeiling: 12 },
+  analyse: { name: "analyse", tools: ["library_index", "library_read"], nodes: [], stepCeiling: 15 },
 };
 
 /** A task's contract as the role spec today's checks, records and closing already read: the primitive's tools and ceiling, the contract's deliverable. A contract with a `method` works as that stage-1 role does (its tools, checks, prompt and turn limit), except that it never waits on another agent: a plan orders tasks instead. */

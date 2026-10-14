@@ -1,7 +1,7 @@
 import type { AgentTool } from "@earendil-works/pi-agent-core";
 
 import type { OpenRouterPrices } from "../../adapters/index.js";
-import { Contracts, PLAYBOOKS, Primitives, Scope, type Brief, type ResearchRun, type ResearchStore, type TaskContract } from "../../domain/index.js";
+import { Contracts, Primitives, Scope, type Brief, type Playbook, type ResearchRun, type ResearchStore, type TaskContract } from "../../domain/index.js";
 import { Trace } from "../../trace/index.js";
 
 import type { DoneCheck } from "../done-check.js";
@@ -13,6 +13,9 @@ import { FinishTool, LibraryTools } from "../tools/index.js";
 import { CountedTally } from "../task/counted-tally.js";
 import { TaskCallLog } from "../task/task-call-log.js";
 import type { TaskWork } from "../task/task-work.js";
+
+import { RunError } from "../errors.js";
+import { PlaybookShelf } from "../learning/playbook-shelf.js";
 
 import { CriticTools } from "./critic-tools.js";
 import { DraftDone, VerdictDone } from "./draft-done.js";
@@ -60,8 +63,9 @@ export class DraftWorks {
     const { store, runs } = this.deps;
     const draft = Contracts.draft(contract);
     if (draft) {
-      const playbook = PLAYBOOKS[draft.playbook]!;
-      const writer = new WriterTools(store.drafts, store.findings, runs, { runId: run.id, workspaceId: run.workspace_id, playbook: playbook.key });
+      const playbook = await DraftWorks.playbook(store, run, contract);
+      if (!playbook) throw new RunError(`no playbook ${draft.playbook} in this workspace`);
+      const writer = new WriterTools(store.drafts, store.findings, runs, { runId: run.id, workspaceId: run.workspace_id, playbook });
       const library = await LibraryTools.forWorkspace(store.library, run.workspace_id);
       const sections = playbook.sections.map((s) => `- \`${s.key}\` — ${s.title}: ${s.describe}`).join("\n");
       const readFirst = library ? `First read, in the library's "${playbook.document_title}": ${playbook.read_first.join(", ")}.\n\n` : "";
@@ -75,7 +79,8 @@ export class DraftWorks {
       };
     }
     const verdict = Contracts.verdict(contract)!;
-    const critic = new CriticTools(store.drafts, store.findings, runs, { runId: run.id, workspaceId: run.workspace_id, draftId: verdict.draft_id, criteria: verdict.criteria });
+    const titles = new Map(((await DraftWorks.playbook(store, run, contract))?.sections ?? []).map((s) => [s.key, s.title]));
+    const critic = new CriticTools(store.drafts, store.findings, runs, { runId: run.id, workspaceId: run.workspace_id, draftId: verdict.draft_id, criteria: verdict.criteria, titles });
     return {
       tools: [critic.readDraft(), critic.recordVerdict()],
       system: CRITIC_SYSTEM,
@@ -86,7 +91,7 @@ export class DraftWorks {
   static check(store: ResearchStore, run: ResearchRun, contract: TaskContract): DoneCheck {
     Trace.line(import.meta.url, "DraftWorks.check", { runId: run.id });
     const draft = Contracts.draft(contract);
-    if (draft) return new DraftDone(store.drafts, store.findings, { runId: run.id, playbook: draft.playbook });
+    if (draft) return new DraftDone(store.drafts, store.findings, { runId: run.id, playbook: () => DraftWorks.playbook(store, run, contract) });
     const verdict = Contracts.verdict(contract)!;
     return new VerdictDone(store.drafts, { workspaceId: run.workspace_id, draftId: verdict.draft_id, criteria: verdict.criteria });
   }
@@ -96,6 +101,16 @@ export class DraftWorks {
     Trace.line(import.meta.url, "DraftWorks.assembly", { runId: run.id });
     const source = () => DraftWorks.source(store, run, contract);
     return new DraftRunAssembly(store.findings, run.id, { source, brief, check: DraftWorks.check(store, run, contract) });
+  }
+
+  /** The playbook version a write task was started on, or the one the critiqued draft was written with. */
+  static async playbook(store: ResearchStore, run: ResearchRun, contract: TaskContract): Promise<Playbook | null> {
+    Trace.line(import.meta.url, "DraftWorks.playbook", { runId: run.id });
+    const shelf = new PlaybookShelf(store);
+    const draft = Contracts.draft(contract);
+    if (draft) return draft.version ? shelf.at(run.workspace_id, draft.playbook, draft.version) : shelf.current(run.workspace_id, draft.playbook);
+    const written = await store.drafts.get(Scope.of(run.workspace_id), Contracts.verdict(contract)!.draft_id);
+    return written ? shelf.at(run.workspace_id, written.playbook, written.playbook_version) : null;
   }
 
   private static async source(store: ResearchStore, run: ResearchRun, contract: TaskContract): Promise<string> {

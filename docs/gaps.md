@@ -1,6 +1,6 @@
 # Gaps in what is built
 
-Known gaps in the always-on work on the `ubiquitous` branch (parts 1–8, the
+Known gaps in the always-on work on the `ubiquitous` branch (parts 1–10, the
 `stop_when` judge and cards, `docs/spec-always-on.md`). Each was checked against the code
 or the local store on 2026-10-14. When one is closed, strike it through with the
 commit that closed it; do not delete it.
@@ -60,7 +60,9 @@ commit that closed it; do not delete it.
     rejecting a finding itself. Nothing reads feedback yet (part 6).
 
 12. **Part 6 left out the evals and replay suite (spec §5.7) and playbook
-    versions.** Lessons change brand memory only; there are no playbooks yet.
+    versions.** ~~Playbook versions~~ closed by part 9 (lessons change playbooks
+    too, each approval a new version). The evals and replay suite are still not
+    built.
 13. **The reviewer's and the operator's model calls are not in the call log or
     billed.** They run on the harness outside any research run, so no
     `research_llm_calls` row or `/generation` lookup records them. The house rule
@@ -75,8 +77,10 @@ commit that closed it; do not delete it.
     the only one); the cache hit rate cannot be measured until the operator's
     calls are logged (gap 13). Spec §12's proof for part 7, "the operator's
     cache hit rate holds across a day", is not met.
-16. **Only the schedule watcher exists.** The competitor-ads, reviews and
-    ad-results watchers of §7.3 are later parts (10).
+16. ~~**Only the schedule watcher exists.**~~ Closed by part 10: the curator,
+    ad-results, competitor-ads and reviews watchers run beside it. Compaction is
+    still gap 15. A watcher's Trendtrack spend is now a workspace charge, so
+    gap 13 is down to the model calls.
 17. **The money gate reads today's spend on every paid tool call.** Each paid
     call scans the day's runs, charges and calls; fine at today's volume, slow
     for a busy workspace. Needs: a running total, or a short cache.
@@ -84,11 +88,14 @@ commit that closed it; do not delete it.
     waits on the champion or reaches Apify always becomes a draft plan, even
     with Always on; a whole stage-1 plan cannot be started unattended.
 
-19. **A playbook is code, written by hand from the library document.** Spec §5.1
+19. ~~**A playbook is code, written by hand from the library document.**~~
+    Closed by part 9: playbooks are versioned rows, the code entry only the seed,
+    and **Make a playbook** distils one from a library document. Spec §5.1
     has playbooks distilled from the owner's documents and versioned (§5.5);
     `long_form_static` is one entry in `domain/playbooks.ts`, and the writer
     reads the document itself through the library tools only when the library
     has it. No other playbook exists, and the route accepts only write playbooks.
+
 20. **A draft does not know its plan.** `research_drafts` has the write run, not
     the plan; the plan card's "The writer started" is page state and is gone on
     reload. Drafts are found through the inbox list and the approval card.
@@ -101,6 +108,31 @@ commit that closed it; do not delete it.
     `create_task` knows the saved research tasks only.
 24. **The writer's inputs are not chosen.** Every citable row of the plan's
     delivered runs, in plan order, cut at 80; nothing ranks them by use to an ad.
+
+25. **A distil task shows up as a product.** Every run belongs to a product, so
+    distilling "Short Statics" adds a product "Short Statics (library)" to the
+    products page. Needs: runs that belong to the workspace, not a product.
+26. **The curator has no LLM pass.** Spec §5.6's optional merge of overlapping
+    playbooks, as lessons, is not built; only stale and archived marks are.
+27. **Meta has never been called.** `MetaInsights` is tested against a stubbed
+    `fetch`; the field names and purchase action types are from Meta's docs, not
+    a real response. There is no token: `META_ACCESS_TOKEN` is forwarded by the
+    local compose file only, not by `deploy/vps/docker-compose.yaml`, and one
+    token for all accounts is Phase B's design; per-customer tokens and Connect
+    Meta (Phase C) are not built.
+28. **Trendtrack's `sortBy: "newest"` on Meta ads is unverified.** Its docs show
+    `newest` on the Google ads query; the competitor-ads watcher sends it to
+    `/v1/ads/query`. If refused, the watcher's check fails and is retried hourly.
+29. **The flag's thresholds are chosen, not measured.** 5 decided drafts and a
+    0.2 fall in acceptance, or 3 ads and a quarter fall in return on ad spend
+    (`PlaybookScores`). No workspace has enough drafts to tune them.
+30. **Watchers run only with Always on.** Reading ad results is free, but with
+    Always on off no account is read.
+31. **An ad's outcome is recorded once.** At 7 settled days the totals become one
+    `outcome` feedback; days that settle later change the playbook's numbers
+    (read from `research_ad_results`) but not that feedback.
+32. **Only write playbooks exist.** Distil proposes a `write` playbook; research
+    tasks read no playbook, so §5.5's per-version numbers cover writing only.
 
 ## Built but not seen live
 
@@ -130,9 +162,15 @@ against the faux model only.
   local stack the draft routes answer (`/drafts` lists none) but no draft has
   been written.
 
+- **Playbooks and watchers.** A draft edit becoming a playbook version, distil,
+  rollback, the curator and the flag; and the ad-results, competitor-ads and
+  reviews watchers. Tested against the faux model and fakes of Meta and
+  Trendtrack; on the local stack `/playbooks`, `/watch/brands` and
+  `/ad-accounts` answer, and the seed was written on first read.
+
 ## Outside the code
 
-- **Nothing is deployed.** Parts 1–8 are only on the `ubiquitous` branch and the
+- **Nothing is deployed.** Parts 1–10 are only on the `ubiquitous` branch and the
   local stack; marketing.vanis.ai runs the old code. The harness backup step in
   `deploy/vps/mra-snapshot.sh` has not run on the VPS.
 - **`../setup.md` is not in any commit.** It sits outside this repository.

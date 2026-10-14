@@ -103,6 +103,8 @@ export class Env {
       trendtrackApiKey: Env.text("TRENDTRACK_API_KEY", ""),
       trendtrackBaseUrl: Env.text("TRENDTRACK_BASE_URL", "https://api.trendtrack.io"),
       trendtrackConcurrency: Env.number("MRA_TRENDTRACK_CONCURRENCY", 2),
+      metaAccessToken: Env.text("META_ACCESS_TOKEN", ""),
+      metaBaseUrl: Env.text("META_BASE_URL", "https://graph.facebook.com"),
       webTimeoutSeconds: Env.number("MRA_WEB_TIMEOUT_SECONDS", 90),
       fetchCharLimit: Env.number("MRA_FETCH_CHAR_LIMIT", 25000),
       firecrawlConcurrency: Env.number("MRA_FIRECRAWL_CONCURRENCY", 2),

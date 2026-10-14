@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 
 import { draftApi, type DraftPage as Page } from './api';
+import DraftAds from './DraftAds';
 import { Link, paths } from './route';
 
 const STATUS: Record<Page['draft']['status'], string> = {
@@ -131,6 +132,7 @@ export default function DraftPage({ draftId, onError }: { draftId: string; onErr
           </ul>
         </section>
       )}
+      {draft.status === 'approved' && <DraftAds draftId={draft.id} tag={`mra-${draft.id.slice(0, 8)}`} onError={onError} />}
       {review && (
         <div className="plan-approve">
           <button className="ghost" disabled={busy} onClick={() => act(() => draftApi.rejectDraft(draft.id, ''))}>

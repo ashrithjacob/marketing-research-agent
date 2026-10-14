@@ -23,6 +23,8 @@ import { AlwaysOnRoutes } from "./always-on-routes.js";
 import { CardRoutes } from "./card-routes.js";
 import { MemoryRoutes } from "./memory-routes.js";
 import { DraftRoutes } from "./draft-routes.js";
+import { PlaybookRoutes } from "./playbook-routes.js";
+import { WatchRoutes } from "./watch-routes.js";
 import { TaskRoutes } from "./task-routes.js";
 import { WorkspaceRoutes } from "./workspace-routes.js";
 import { WorkspaceStream } from "./workspace-stream.js";
@@ -58,6 +60,8 @@ export class ResearchApi {
       new CardRoutes(workspace.cards).register(api);
       new MemoryRoutes(workspace.memory).register(api);
       new DraftRoutes(workspace.drafts, workspace.draftDesk, store.drafts).register(api);
+      new PlaybookRoutes(workspace.playbooks).register(api);
+      new WatchRoutes(workspace.watch, store).register(api);
       new AlwaysOnRoutes(workspace.alwaysOn, workspace.schedules).register(api);
     }
     new CostRoute(store).register(api);

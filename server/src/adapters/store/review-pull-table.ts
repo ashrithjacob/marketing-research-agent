@@ -31,6 +31,12 @@ CREATE INDEX IF NOT EXISTS research_review_pulls_listing ON research_review_pull
     return row ? { pulled_at: row.pulled_at, requested: row.requested, result: Rows.json(row.result, null) as ReviewResult } : null;
   }
 
+  async newest(platform: ReviewPlatform, listing: string): Promise<string> {
+    Trace.line(import.meta.url, "ReviewPullTable.newest", { platform, listing });
+    const row = await this.db.get<{ pulled_at: string | null }>("SELECT MAX(pulled_at) AS pulled_at FROM research_review_pulls WHERE platform = ? AND listing = ?", [platform, listing]);
+    return row?.pulled_at ?? "";
+  }
+
   async save(platform: ReviewPlatform, listing: string, band: number | null, requested: number, result: ReviewResult): Promise<void> {
     Trace.line(import.meta.url, "ReviewPullTable.save", { platform, listing, band, requested, reviews: result.excerpts.length });
     await this.db.run(

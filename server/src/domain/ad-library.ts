@@ -6,6 +6,8 @@ export interface AdQuery {
   searchIn: AdSearchField;
   countries: readonly string[];
   limit: number;
+  /** `newest` for a watcher looking for ads it has not seen; reach otherwise. */
+  sortBy?: "reach" | "newest";
 }
 
 /** One Meta ad as an ad library indexed it: who ran it, where it sends people, when it ran, what it says. */

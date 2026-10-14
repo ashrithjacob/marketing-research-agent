@@ -1,6 +1,13 @@
 # Meta ad results — integration plan
 
-**Status:** plan, 2026-10-14. Nothing built. **Parent:** `docs/spec-always-on.md`
+**Status:** plan, 2026-10-14. **Phase D's code and Phase B's reader built
+2026-10-14** (always-on part 10, `spec-always-on.md` §7.3 built note): `MetaInsights`,
+`research_ad_accounts`, `research_ad_results`, `research_ad_links`, the ad-results
+watcher, outcome feedback, and a version's return on ad spend on `/playbooks`. Open
+question 1 decided: both, the owner's pasted ad id and the draft's tag in the ad's
+name. Not done: Phase A's paperwork, a token, a pilot account, the 500-call history,
+App Review, and "Connect Meta"; tokens live in `.env` only (Phase B's design). Meta
+has never been called: tested against a stubbed `fetch`. **Parent:** `docs/spec-always-on.md`
 (§5.2 ad results as feedback, §7.3 the ad-results watcher, §12 part 10).
 **North star:** `docs/goal.md`, "Ads produced by the system beat the owner's
 previous ads on their own numbers."

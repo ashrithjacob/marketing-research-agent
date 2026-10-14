@@ -1,6 +1,6 @@
 import type { AgentTool } from "@earendil-works/pi-agent-core";
 
-import { DraftText, Findings, PLAYBOOKS, type DraftBook, type Finding, type FindingLedger } from "../../domain/index.js";
+import { DraftText, Findings, type DraftBook, type Finding, type FindingLedger, type Playbook } from "../../domain/index.js";
 import { DraftCheck } from "../../extract/index.js";
 import { Trace } from "../../trace/index.js";
 
@@ -13,7 +13,7 @@ export class WriterTools {
     private readonly drafts: DraftBook,
     private readonly ledger: FindingLedger,
     private readonly runs: LiveRuns,
-    private readonly run: { runId: string; workspaceId: string; playbook: string },
+    private readonly run: { runId: string; workspaceId: string; playbook: Playbook },
   ) {}
 
   readInputs(): AgentTool<typeof readInputsParameters> {
@@ -51,11 +51,10 @@ export class WriterTools {
 
   private async write(key: string, text: string): Promise<{ content: { type: "text"; text: string }[]; details: Record<string, unknown> }> {
     Trace.line(import.meta.url, "WriterTools.write", { key });
-    const { runId, workspaceId, playbook: name } = this.run;
-    const playbook = PLAYBOOKS[name]!;
+    const { runId, workspaceId, playbook } = this.run;
     const known = playbook.sections.map((section) => section.key);
     if (!known.includes(key)) return { content: [{ type: "text", text: `REFUSED — no section \`${key}\`; the sections are ${known.join(", ")}.` }], details: { refused: true } };
-    const draft = await this.drafts.write(workspaceId, runId, name, { key, text });
+    const draft = await this.drafts.write(workspaceId, runId, playbook, { key, text });
     this.runs.emit(runId, "draft.section", { draft_id: draft.id, section: key, cites: DraftText.cites(text).length });
     await this.runs.written(runId);
     const single = { ...playbook, sections: playbook.sections.filter((section) => section.key === key) };

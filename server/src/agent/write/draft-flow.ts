@@ -1,7 +1,8 @@
-import { Findings, PLAYBOOKS, RunStatuses, Scope, type FindingKind, type Plan, type ResearchRun, type ResearchStore, type TaskContract } from "../../domain/index.js";
+import { Findings, RunStatuses, Scope, type FindingKind, type Plan, type ResearchRun, type ResearchStore, type TaskContract } from "../../domain/index.js";
 import { Trace } from "../../trace/index.js";
 
 import { RunError } from "../errors.js";
+import { PlaybookShelf } from "../learning/playbook-shelf.js";
 import type { TaskEvents } from "../task/task-events.js";
 import type { TaskSupervisor } from "../task/task-supervisor.js";
 
@@ -10,6 +11,8 @@ export class DraftFlow {
   static readonly CITABLE: ReadonlySet<FindingKind> = new Set(["excerpt", "measurement", "attribute", "competitor", "competitor_reference"]);
   static readonly MAX_INPUTS = 80;
 
+  private readonly shelf: PlaybookShelf;
+
   constructor(
     private readonly store: ResearchStore,
     private readonly tasks: TaskSupervisor,
@@ -17,6 +20,7 @@ export class DraftFlow {
     events: TaskEvents,
   ) {
     Trace.line(import.meta.url, "DraftFlow.constructor");
+    this.shelf = new PlaybookShelf(store);
     events.on((runId, status) => this.ended(runId, status));
   }
 
@@ -25,14 +29,16 @@ export class DraftFlow {
     Trace.line(import.meta.url, "DraftFlow.write", { planId, playbookKey });
     const plan = await this.store.plans.get(scope, planId);
     if (!plan) throw new RunError(`no plan ${planId}`);
-    const playbook = PLAYBOOKS[playbookKey];
+    const playbook = await this.shelf.current(plan.workspace_id, playbookKey);
     if (!playbook || playbook.primitive !== "write") throw new RunError(`no write playbook ${playbookKey}`);
+    if (playbook.status === "archived") throw new RunError(`the playbook ${playbookKey} is archived; restore it first`);
+    if (playbook.status === "stale") await this.store.playbooks.mark(plan.workspace_id, playbook.key, "active");
     const inputs = await this.inputs(plan);
     if (inputs.length === 0) throw new RunError("the plan's tasks have found nothing yet to write from");
     const contract: TaskContract = {
       objective: `Write a ${playbook.title.toLowerCase()} for ${plan.brief.product || plan.brief.url}, from what the research found.`,
       primitive: "write",
-      complete: { shape: "draft", playbook: playbook.key },
+      complete: { shape: "draft", playbook: playbook.key, version: playbook.version },
       inputs: { finding_ids: inputs, document_ids: [] },
       budget: { max_usd: this.budget.maxUsd, max_minutes: 20 },
       verify: "critique",
@@ -68,7 +74,8 @@ export class DraftFlow {
     const draft = await this.store.drafts.ofRun(run.id);
     if (!draft) return;
     if (status !== "completed") return this.review(run.workspace_id, draft.id, `The writer ended ${status}, before its draft passed its check, so it was not critiqued.`);
-    const playbook = PLAYBOOKS[draft.playbook]!;
+    const playbook = await this.shelf.at(run.workspace_id, draft.playbook, draft.playbook_version);
+    if (!playbook) return this.review(run.workspace_id, draft.id, "Its playbook version is missing, so it was not critiqued.");
     const contract: TaskContract = {
       objective: `Check the draft of a ${playbook.title.toLowerCase()} against each criterion.`,
       primitive: "critique",

@@ -1,10 +1,10 @@
-import type { CheckProblem, Draft, Finding, Playbook } from "../domain/index.js";
+import type { CheckProblem, Draft, Finding, PlaybookBody } from "../domain/index.js";
 import { DraftText } from "../domain/index.js";
 import { Trace } from "../trace/index.js";
 
 /** A draft is done when every section its playbook names is written, each cites at least one finding, every id it names is one of its task's findings, and no figure is typed in by hand (spec §3.1, `write`). */
 export class DraftCheck {
-  static problems(playbook: Playbook, draft: Draft | null, rows: readonly Finding[]): CheckProblem[] {
+  static problems(playbook: PlaybookBody, draft: Draft | null, rows: readonly Finding[]): CheckProblem[] {
     Trace.line(import.meta.url, "DraftCheck.problems", { playbook: playbook.key, sections: draft?.sections.length ?? 0 });
     const ids = new Set(rows.map((row) => row.id));
     const problem = (text: string): CheckProblem => ({ text, row: null });

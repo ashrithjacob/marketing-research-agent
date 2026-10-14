@@ -1,6 +1,6 @@
 import type { OpenRouterPrices } from "../../adapters/index.js";
 import type { Settings } from "../../config/index.js";
-import { Scope, type ResearchStore, type Schedule } from "../../domain/index.js";
+import { Scope, type AdInsights, type AdLibrary, type ResearchStore } from "../../domain/index.js";
 import { Trace } from "../../trace/index.js";
 
 import type { LiveRuns } from "../live-runs.js";
@@ -12,7 +12,9 @@ import type { ToolRegistry } from "../tools/index.js";
 import { AlwaysOnDesk } from "../always/always-on-desk.js";
 import { AlwaysOnTools } from "../always/always-on-tools.js";
 import { ScheduleDesk } from "../always/schedule-desk.js";
-import { ScheduleWatchers } from "../always/schedule-watchers.js";
+import { WatchDesk } from "../watch/watch-desk.js";
+import { WatchSet } from "../watch/watch-set.js";
+import { PlaybookDesk } from "../learning/playbook-desk.js";
 import { TaskCreation } from "../always/task-creation.js";
 import { WorkspaceSpend } from "../always/workspace-spend.js";
 import { LessonDesk } from "../learning/lesson-desk.js";
@@ -44,8 +46,10 @@ export class WorkspaceServices {
   readonly schedules: ScheduleDesk;
   readonly drafts: DraftFlow;
   readonly draftDesk: DraftDesk;
+  readonly playbooks: PlaybookDesk;
+  readonly watch: WatchDesk;
 
-  constructor(deps: { store: ResearchStore; runs: LiveRuns; settings: Settings; harness: PiHarness; tools: ToolRegistry; costs: OpenRouterPrices }) {
+  constructor(deps: { store: ResearchStore; runs: LiveRuns; settings: Settings; harness: PiHarness; tools: ToolRegistry; costs: OpenRouterPrices; ads: AdLibrary | null; insights: AdInsights | null }) {
     Trace.line(import.meta.url, "WorkspaceServices.constructor");
     const events = new TaskEvents();
     this.memory = new MemoryDesk(deps.store);
@@ -56,7 +60,7 @@ export class WorkspaceServices {
     const settle = async (draftId: string, approved: boolean) => void (await (approved ? this.draftDesk.approve(draftId, Scope.everything) : this.draftDesk.reject(draftId, Scope.everything)));
     this.cards = new CardDesk(deps.store, deps.store.plans, this.tasks, reply, decide, settle, events);
     this.drafts = new DraftFlow(deps.store, this.tasks, { maxUsd: deps.settings.taskMaxUsd }, events);
-    this.lessons = new LessonDesk(deps.store, this.cards);
+    this.lessons = new LessonDesk(deps.store);
     this.reviewer = new Reviewer(deps.store, deps.harness, this.lessons, deps.settings.model);
     const plans = new PlanDesk(deps.store.plans, this.tasks, this.cards, deps.store.feedback);
     this.release = new PlanRelease(deps.store, deps.store.plans, plans, events);
@@ -66,8 +70,9 @@ export class WorkspaceServices {
     this.operator = new OperatorDesk(deps.harness, deps.store, tools.extension(), deps.settings.model, this.tasks, events);
     this.owner = new OwnerDesk(plans, this.operator);
     this.board = new WorkspaceBoard(deps.store, this.tasks, () => this.alwaysOn);
-    const due = (workspaceId: string, schedule: Schedule, dueAt: string) =>
-      this.operator.signal(workspaceId, `Scheduled: ${schedule.task_key} for ${schedule.brief.product || schedule.brief.url} is due (every ${schedule.every_days} days).`, `schedule:${schedule.id}:${dueAt.slice(0, 10)}`);
-    this.alwaysOn = new AlwaysOnDesk(deps.store, new ScheduleWatchers(deps.store, deps.harness, due), new WorkspaceSpend(deps.store));
+    const signal = (workspaceId: string, text: string, key: string) => this.operator.signal(workspaceId, text, key);
+    this.alwaysOn = new AlwaysOnDesk(deps.store, WatchSet.build({ ...deps, limits: this.tasks.limits }, signal), new WorkspaceSpend(deps.store));
+    this.playbooks = new PlaybookDesk(deps.store, this.tasks, { maxUsd: deps.settings.taskMaxUsd });
+    this.watch = new WatchDesk(deps.store);
   }
 }
