@@ -1193,7 +1193,7 @@ classDiagram
     }
     class OwnerDesk {
       start()
-      toggle()
+      edit()
       approve()
       say()
     }
@@ -1474,7 +1474,6 @@ classDiagram
       <<interface>>
     }
     class ResearchTasks {
-      install()
     }
     class TaskCallLog {
       sent()
@@ -1488,24 +1487,47 @@ classDiagram
     }
     class TaskEvents {
       on()
+      onAsked()
+      asked()
       ended()
     }
     class TaskExtensions {
+      install()
+      uninstall()
       nameOf()
-      build()
     }
     class TaskIntake {
       admit()
     }
+    class Verdict {
+      <<interface>>
+    }
+    class TaskJudge {
+      verdict()
+      lastStep()
+      parse()
+    }
+    class TaskPause {
+      ask()
+      give()
+      answer()
+      question()
+      answered()
+    }
     class TaskReadings {
       read()
+      waitedMs()
       trip()
     }
     class TaskSignals {
       trip()
+      ask()
       tripped()
+      halted()
       wait()
-      forget()
+      resume()
+      answered()
+      answer()
     }
     class TaskSupervisorDeps {
       <<interface>>
@@ -1513,6 +1535,9 @@ classDiagram
     class TaskSupervisor {
       start()
       recover()
+      answer()
+      question()
+      waiting()
       stop()
       guide()
     }
@@ -1804,6 +1829,7 @@ classDiagram
   LiveRuns --> ResearchStore
   OperatorDesk --> PiHarness
   OperatorDesk --> ResearchStore
+  OperatorDesk --> TaskSupervisor
   OperatorDesk --> TaskEvents
   OperatorTools --> ResearchStore
   OperatorTools --> PlanDesk
@@ -1813,6 +1839,7 @@ classDiagram
   PlanDesk --> PlanBook
   PlanDesk --> TaskSupervisor
   WorkspaceBoard --> ResearchStore
+  WorkspaceBoard --> TaskSupervisor
   WorkspaceServices --> OpenRouterPrices
   OperatorInputs --> FindingLedger
   PartClose --> RunFindings
@@ -1883,8 +1910,15 @@ classDiagram
   TaskExtensions --> TaskWorks
   TaskExtensions --> TaskSignals
   TaskExtensions --> TaskReadings
+  TaskExtensions --> TaskJudge
+  TaskExtensions --> TaskPause
   TaskIntake --> ResearchStore
   TaskIntake --> Settings
+  TaskJudge --> PiHarness
+  TaskPause --> ResearchStore
+  TaskPause --> LiveRuns
+  TaskPause --> TaskSignals
+  TaskPause --> TaskEvents
   TaskReadings --> ResearchStore
   TaskReadings --> Corpus
   TaskSupervisor --> TaskSupervisorDeps
@@ -2119,6 +2153,8 @@ classDiagram
 | `agent` | `agent/task/task-events.ts` | TaskEvents |
 | `agent` | `agent/task/task-extensions.ts` | TaskExtensions |
 | `agent` | `agent/task/task-intake.ts` | TaskIntake |
+| `agent` | `agent/task/task-judge.ts` | Verdict, TaskJudge |
+| `agent` | `agent/task/task-pause.ts` | TaskPause |
 | `agent` | `agent/task/task-readings.ts` | TaskReadings |
 | `agent` | `agent/task/task-signals.ts` | TaskSignals |
 | `agent` | `agent/task/task-supervisor.ts` | TaskSupervisorDeps, TaskSupervisor |

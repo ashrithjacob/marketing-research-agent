@@ -421,6 +421,12 @@ older stage-1 modal (`StartRun.tsx`).
   calls `POST /plans/:id/approve`; nothing runs before that. Once approved,
   each task shows its run's status chip, sources, facts, gaps, model calls and
   billed cost, live, and **Open what it found →** goes to its run view.
+- **Stop and ask me when** (`StopWhen.tsx`): under each kept task of a draft
+  plan, a text box with the saved task's default; leaving it saves it
+  (`POST /plans/:id/tasks/:key` with `stop_when`). Once approved it reads
+  *Stops and asks you when: …*. A task the judge paused shows the amber
+  `waiting` chip and *Waiting for your answer, in the chat: …*; the question is
+  also a note in the chat, and the reply goes there.
 - **Right: the chat** with the workspace's operator (`POST /api/research/chat`,
   with the plan's id). The owner's lines are blue, the operator's grey, what
   the operator did (a tool it called) in small monospace, and notes the code

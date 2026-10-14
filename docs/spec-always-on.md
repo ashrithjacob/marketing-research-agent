@@ -581,6 +581,18 @@ context. Question cards replace the chat line when `send_owner` is built. The
 judge uses its own model setting, `MRA_JUDGE_MODEL`, defaulting to `MRA_MODEL`.
 It still never decides done.
 
+*Built 2026-10-14* (`agent/task/task-judge.ts`, `task-pause.ts`). Measured on
+the local stack, plan for thedropletco.co.uk (UK, product facts) with the
+saved task's default `stop_when`: after the worker's first step the judge
+asked "The homepage shows Droplet sells more than one product (diffusers,
+incense & more, plus a Houseplant Scent Burner) and the brief doesn't name one
+— should the fact sheet cover the whole brand or a specific product?"; the
+task waited with no calls; the owner's chat reply went through the operator's
+`answer_task`; the worker received it in its third call and the task ended
+`completed`, recording the product as "Scented Drops". 24 calls (12 worker, 12
+judge), $0.0652 billed. A judge call after every tool round roughly doubles the
+call count; on this model it added about a third of the cost.
+
 `max_usd` is checked in the `afterResponse` hook against the task's billed
 charges so far, and `max_minutes` against the task's start time. Decided 2026-10-14: billed, accepting a small overshoot. OpenRouter's
 billed cost for a turn is readable only about 4 s after the turn ends

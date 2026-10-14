@@ -1016,6 +1016,19 @@ Since 2026-10-14 there is a second way to run research besides the stages: a
    that one node would. Every call is then looked up at OpenRouter once more, so
    the billed total holds even when a restart lost a pending lookup.
 
+**Stop and ask** (`stop_when`, since 2026-10-14). When the contract has a
+`stop_when` sentence, `afterTools` also asks the judge (`TaskJudge`, model
+`MRA_JUDGE_MODEL`, default `MRA_MODEL`): it reads the worker's last answer and
+the tool results after it against the sentence, with the owner's earlier
+answers, and replies JSON `{stop, question}`. Anything but `stop: true` means
+go on. A stop aborts the worker's run, emits `run.asked`, sets the run
+`waiting`, and moves the task to its `asking` phase, which waits for a
+`run.answered` event (`TaskPause`; given by the operator's `answer_task` or
+`POST /api/research/tasks/:runId/answer`). The answer is then submitted to the
+same worker conversation as the next round. Judge calls are call-log rows with
+agent `judge`: billed, but not counted as the worker's turns; waiting time is
+left out of the time cap.
+
 **Across a restart.** The harness file keeps the task at its last checkpoint.
 At startup `recoverRunsKilledByRestart` skips every run with a contract;
 `TaskSupervisor.recover` installs each live task's extension again (its tools
@@ -1051,7 +1064,10 @@ plan page (`/plans/:id`). Spec: `docs/spec-always-on.md` §11.
    The message is submitted with `whenBusy: "steer"`. The operator's tools
    (`operator/operator-tools.ts`) act only inside its own workspace, read from
    its `mra.workspace` document: `list_work`, `revise_plan`, `stop_task`,
-   `guide_task`. None starts work.
+   `guide_task`, `answer_task`. None starts work. Each saved task comes with a
+   default `stop_when`, editable on the plan card or by chat (`revise_plan`).
+   A waiting task's question is added to each owner message sent to the
+   operator, so it knows a reply answers it.
 3. **Approve** (`POST /plans/:id/approve`, a button only). Each kept task is
    started through `TaskSupervisor.start` (§2g), so its contract is checked; a
    refused one stays on the plan with why. The plan becomes `approved`, and the
