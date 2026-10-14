@@ -121,6 +121,35 @@ Rules:
   `StageOneRun` and `ProductTruthRun` keep working until the plans replace them,
   and each is replaced only when a run of the plan matches a run of the stage.
 
+### 3.1 What "complete" means, per primitive
+
+Decided 2026-10-14: **a task has no turn limit.** It is complete when its
+primitive's definition of complete is met, and that definition is code, one per
+primitive. The contract (§4) only fills in the definition's parameters: which
+fields, which inputs, which criteria. The operator cannot write a new kind of
+"done"; it can only choose a primitive and say what that primitive must cover.
+
+| Primitive | Complete when | Checked by | The contract supplies |
+|---|---|---|---|
+| `research` | every required field or item of its deliverable is recorded, each citing a source in the run's ledger; a `list` deliverable's search has saturated (its `stop.quietRun` sources in a row added nothing new) | `DeliverableChecks` (`FieldsCheck`, `ListCheck`, `PerItemCheck`), `CitationCheck` — all exist | a `Deliverable` |
+| `evidence` | as `research`, and every finding cites a source recorded in the ledger, so it can be re-read from the archived page | `DeliverableChecks`, `TruthCitations` — exist | a `Deliverable` |
+| `ad_scan` | its advertiser list has saturated: the given number of searches in a row found no advertiser not already listed; every ad listed is archived as an `ad_library` source | `ListCheck` with an `ad` item — to build | the search terms, markets, and the quiet-run length |
+| `review_mine` | every target × star band in its plan was pulled, or recorded as unavailable with the reason | the pipeline's own end, as `ReviewMiningJob` today | the targets and bands |
+| `analyse` | every input finding is covered by at least one derived finding, and every derived finding cites ledger rows that exist | new check — to build | the input finding ids |
+| `write` | a draft exists with every section its playbook names, and every claim in it cites a finding | new check — to build | the playbook and the finding ids it may draw on |
+| `critique` | a verdict (pass or fail, and why) exists for every criterion named | new check — to build | the criteria and the task it reviews |
+| `ask_owner` | the owner answered | the answer's arrival | the question |
+
+What stops a task that never gets there, now that no turn count does:
+
+- **No progress.** Each time the model stops, the hook (§6.4) compares the
+  run's findings with the last stop. Two stops in a row that added nothing end
+  the task `invalid`, and `LimitClose` names what is missing. This measures
+  progress toward the definition, not how many turns were taken: a task that
+  keeps recording useful findings is never cut off by this rule.
+- **Money.** `budget.max_usd` (§4, §7.4).
+- **The owner.** `stop_when` (§6.4) and Stop on the dashboard.
+
 ## 4. Contracts: completion rules written for the task
 
 The operator writes a **contract** for each task. It is the definition of done,
@@ -130,19 +159,21 @@ written at the moment the task is created, for that task.
 interface TaskContract {
   objective: string;                 // one sentence, shown to the owner
   primitive: PrimitiveName;          // from the closed set in §3
-  deliverable: Deliverable;          // the existing type, domain/deliverable.ts
+  complete: CompleteParams;          // that primitive's parameters (§3.1); a Deliverable for research and evidence
   inputs: { finding_ids: string[]; document_ids: string[] };
-  budget: { max_turns: number; max_usd: number };
+  budget: { max_usd: number };       // no turn limit (§3.1)
   verify: "code" | "critique" | "owner";
   stop_when?: string;                // prose: when to stop and ask instead
 }
 ```
 
-The whole idea rests on one fact about the code as it is: **`Deliverable` is
-already data.** Its three shapes (`fields`, `list`, `per_item`) say which
+The contract does not define what complete means; the primitive does (§3.1).
+The contract says what this task must cover. For `research` and `evidence` that
+is a `Deliverable`, and this part rests on one fact about the code as it is:
+**`Deliverable` is already data.** Its three shapes (`fields`, `list`, `per_item`) say which
 finding kinds must exist, which fields are compulsory, and when a search is
 saturated. `DeliverableCheck` already reads one and refuses `finish` until it is
-met; `LimitClose` already reads one to say what is missing at the turn limit;
+met; `LimitClose` already reads one to say what is missing when a run is cut short;
 `DeliverableTable` already renders one into the prompt. A contract is a
 `Deliverable` the operator writes as JSON instead of one a developer writes as
 a constant.
@@ -166,6 +197,7 @@ contract that cannot be met or should not run without a human:
 | Check | Refuses | Why |
 |---|---|---|
 | vocabulary | a finding kind, rule or primitive not in `domain/` | the model cannot invent a check code does not have |
+| shape | `complete` parameters that are not the shape its primitive takes | each primitive's definition of complete is fixed (§3.1) |
 | reachable | a field whose finding kind the primitive cannot record | a task that can never finish |
 | inputs exist | a `finding_id` or `document_id` not in this workspace | a task built on nothing |
 | budget | `max_usd` over the workspace's per-task cap | spend stays bounded |
@@ -365,14 +397,14 @@ Extensions, each a `defineExtension({ name, tools, sections, hooks })`:
 |---|---|---|---|
 | `mra.operator` | `create_task`, `cancel_task`, `ask_owner`, `note` | goals, open and recent tasks, ledger summary | — |
 | `mra.web`, `mra.evidence`, `mra.ads`, `mra.ledger` | today's research tools, rewritten as `defineTool` (§9.2) | the tool lines | — |
-| `mra.contract` | `finish` | the deliverable table, rendered from the contract | `onYield` checks the contract (§6.4) |
+| `mra.contract` | `finish` | what the task must cover, rendered from the contract | `onYield` runs the primitive's completion check (§3.1, §6.4) |
 | `mra.money` | — | — | `beforeTool` blocks a paid tool without an approval |
 | `mra.memory` | — | brand memory | — |
 | `mra.playbooks` | `playbook_read`, `library_read` | the playbook and document index | — |
 | `mra.reviewer` | `propose_lesson` | the lesson rules | — |
 
-A primitive (§3) is a row in a table: its extensions, its model, its turn
-limit. `create_task` resolves the row and calls `configure()` on the new worker
+A primitive (§3) is a row in a table: its extensions, its model, and its
+definition of complete (§3.1). `create_task` resolves the row and calls `configure()` on the new worker
 conversation. The contract goes into that conversation's `instructions` and
 into its `mra.contract` document, where the hook reads it.
 
@@ -381,13 +413,13 @@ into its `mra.contract` document, where the hook reads it.
 Every time a worker's model stops without calling a tool, pi-durable calls the
 `onYield` hooks of the extensions that conversation selects:
 
-1. `mra.contract`'s hook runs `DeliverableCheck` over the task's findings in the
-   research store. Missing fields come back as
+1. `mra.contract`'s hook runs the primitive's completion check (§3.1) over the
+   task's findings in the research store. What is missing comes back as
    `{ continue: "Still missing: …" }`, and the run goes on. This is hermes's
    goal loop with code as the judge.
-2. The task's turn count, in the `mra.contract` document, rises by one per
-   continuation. At `budget.max_turns`, the hook stops continuing, and the task
-   ends through `RunEnd` with what `LimitClose` says is missing.
+2. The hook also applies the no-progress rule (§3.1): two stops in a row that
+   added no finding end the task through `RunEnd` as `invalid`, with what
+   `LimitClose` says is missing. There is no turn count.
 3. When the check passes, or `finish` succeeds, the task ends through `RunEnd`
    as `completed`, or as `invalid` with the problems.
 4. Only if the contract has `stop_when` does a cheap judge model read the last
@@ -571,8 +603,9 @@ pi-durable is experimental, so its version is pinned exactly (no `^`).
 |---|---|
 | `AgentDriver` over pi-agent-core's `Agent` | the harness's generation and tool tasks |
 | `AgentTool` objects from `ToolRegistry` | `defineTool` in extensions; same TypeBox schemas from `pi-ai` |
-| `RoleDone` refusing `finish` | `mra.contract`'s `onYield` and `finish` (§6.4) |
-| `TurnBudget`, `LimitClose` | the turn count in `mra.contract`; `LimitClose` unchanged |
+| `RoleDone`'s deliverable check | the primitive's completion check (§3.1) |
+| `TurnBudget` | not used by tasks: no turn limit; the no-progress rule and the spend cap stop a stuck task (§3.1). Stays for today's stages until they are replaced |
+| `LimitClose` | unchanged; runs when a task is cut short |
 | `LiveRuns`, `EventStream` | watches (§8) |
 | `RunEnd` | unchanged; every task still ends through it |
 | `recoverRunsKilledByRestart` | `harness.resume()` for new work; kept for old runs until they are gone |
