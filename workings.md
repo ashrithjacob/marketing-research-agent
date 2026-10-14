@@ -1077,8 +1077,10 @@ plan page (`/plans/:id`). Spec: `docs/spec-always-on.md` §11.
    written) whenever the operator conversation changes, and a `board` frame
    (newest plans, newest task runs with their counts) when the store's copy
    differs, read every 2 s. When a task ends, `TaskEvents` tells `OperatorDesk`,
-   which writes a note. Notes cost no model call; the operator reads them the
-   next time the owner writes.
+   which writes a note. Notes cost no model call and are a record in the
+   operator's transcript; the chat shows only the owner's messages and the
+   operator's replies, plus a paused task's question as an `mra.ask` entry
+   shown as an operator line.
 
 ### Step 7 — the screen fills in
 

@@ -428,9 +428,11 @@ older stage-1 modal (`StartRun.tsx`).
   `waiting` chip and *Waiting for your answer, in the chat: …*; the question is
   also a note in the chat, and the reply goes there.
 - **Right: the chat** with the workspace's operator (`POST /api/research/chat`,
-  with the plan's id). The owner's lines are blue, the operator's grey, what
-  the operator did (a tool it called) in small monospace, and notes the code
-  wrote (plan started, approved, a task ended) centred. The dot in the header is
-  green while the stream is connected.
+  with the plan's id). Only the conversation is shown: the owner's lines blue,
+  the operator's grey, and a paused task's question as an operator line ("A task
+  is paused and asks: …"). Since 2026-10-14 the notes code writes (plan started,
+  approved, a task ended) and the operator's tool calls stay in its transcript
+  but are not shown: the plan card already says the same. The dot in the header
+  is green while the stream is connected.
 - Both come from one stream, `GET /api/research/workspace/stream`
   (`use-workspace.ts`), which sends whole snapshots: `chat` and `board`.

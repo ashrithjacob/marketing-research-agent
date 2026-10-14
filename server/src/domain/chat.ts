@@ -3,7 +3,7 @@ import type { Plan } from "./plans.js";
 /** One line of the owner's chat with the operator, as the cockpit shows it. */
 export interface ChatMessage {
   id: string;
-  role: "owner" | "operator" | "action" | "note";
+  role: "owner" | "operator";
   text: string;
   partial: boolean;
 }

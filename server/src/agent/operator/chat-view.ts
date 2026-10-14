@@ -4,7 +4,7 @@ import type { ConversationView, EntryRecord } from "@earendil-works/pi-durable";
 import type { ChatMessage } from "../../domain/index.js";
 import { Trace } from "../../trace/index.js";
 
-/** The owner's chat, read off the operator conversation: the owner's messages, the operator's answers and what it did, the notes code wrote, and the answer still being written. */
+/** The owner's chat, read off the operator conversation: only what the owner wrote and what the operator wrote back, including a paused task's question, and the answer still being written. Notes and tool calls stay in the transcript and are not shown. */
 export class ChatView {
   static of(view: ConversationView): ChatMessage[] {
     Trace.line(import.meta.url, "ChatView.of", { entries: view.entries.length });
@@ -19,25 +19,15 @@ export class ChatView {
     const data = (entry.data ?? {}) as { text?: string };
     const id = String(entry.id);
     if (entry.kind === "mra.owner") return [{ id, role: "owner", text: data.text ?? "", partial: false }];
-    if (entry.kind === "mra.note") return [{ id, role: "note", text: data.text ?? "", partial: false }];
+    if (entry.kind === "mra.ask") return [{ id, role: "operator", text: data.text ?? "", partial: false }];
     if (entry.kind !== "pi.assistant") return [];
     const message = entry.model?.[0] as AssistantMessage | undefined;
-    if (!message) return [];
-    const actions = message.content.flatMap((part, i) =>
-      part.type === "toolCall" ? [{ id: `${id}.${i}`, role: "action" as const, text: ChatView.action(part.name, part.arguments), partial: false }] : [],
-    );
-    const text = ChatView.text(message);
-    return [...(text ? [{ id, role: "operator" as const, text, partial: false }] : []), ...actions];
+    const text = message ? ChatView.text(message) : "";
+    return text ? [{ id, role: "operator", text, partial: false }] : [];
   }
 
   private static text(message: AssistantMessage): string {
     Trace.tick(import.meta.url, "ChatView.text");
     return message.content.flatMap((part) => (part.type === "text" ? [part.text] : [])).join("").trim();
-  }
-
-  private static action(name: string, args: Record<string, unknown>): string {
-    Trace.tick(import.meta.url, "ChatView.action", { name });
-    const shown = Object.entries(args).filter(([key]) => key !== "text").map(([key, value]) => `${key}: ${JSON.stringify(value)}`);
-    return `${name}${shown.length > 0 ? ` (${shown.join(", ")})` : ""}`;
   }
 }

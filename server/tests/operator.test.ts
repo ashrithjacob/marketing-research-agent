@@ -84,8 +84,10 @@ describe("start, review, chat", () => {
     ]);
     expect((await call("POST", "/chat", { text: "Skip the category numbers, UK only", plan_id: plan.id })).status).toBe(202);
     const lines = await until(chat, (seen) => seen.some((line) => line.role === "operator" && !line.partial));
-    expect(lines.map((line) => line.role)).toEqual(["note", "owner", "action", "operator"]);
-    expect(lines[2]!.text).toContain("revise_plan");
+    expect(lines.map((line) => [line.role, line.text])).toEqual([
+      ["owner", "Skip the category numbers, UK only"],
+      ["operator", "Done: only the product facts, for the UK. Approve it when you are ready."],
+    ]);
     const revised = (await (await call("GET", `/plans/${plan.id}`)).json()) as Plan;
     expect(revised.brief.market).toBe("UK");
     expect(revised.tasks.map((t) => [t.key, t.selected])).toEqual([["product_facts", true], ["category_numbers", false]]);
@@ -104,12 +106,7 @@ describe("start, review, chat", () => {
     const ended = await until(() => store.getRun(runId), (run) => !!run && TERMINAL_STATUSES.has(run.status));
     expect(ended!.status).toBe("completed");
     expect(ended!.brief).toMatchObject({ market: "UK" });
-    const notes = await until(chat, (seen) => seen.some((line) => line.text.includes(`Task ${runId} ended completed`)));
-    expect(notes.filter((line) => line.role === "note").map((line) => line.text.split(":")[0])).toEqual([
-      `The owner started plan ${plan.id} for https`,
-      `The owner approved plan ${plan.id}. Started`,
-      `Task ${runId} ended completed`,
-    ]);
+    expect((await chat()).map((line) => line.role)).toEqual(["owner", "operator"]);
     expect((await call("POST", `/plans/${plan.id}/approve`)).status).toBe(400);
   });
 
@@ -153,12 +150,15 @@ describe("a task that stops and asks", () => {
     await until(() => store.getRun(runId), (run) => run?.status === "waiting");
     const board = (await until(() => app.workspace!.board.snapshot("admin"), (b) => b.tasks.some((t) => t.question !== ""))).tasks[0]!;
     expect(board).toMatchObject({ status: "waiting", question: "Drops or the diffuser?" });
-    await until(chat, (seen) => seen.some((line) => line.text.includes("is paused and asks: Drops or the diffuser?")));
+    const asked = await until(chat, (seen) => seen.some((line) => line.text.includes("is paused and asks: Drops or the diffuser?")));
+    expect(asked.map((line) => [line.role, line.text])).toEqual([["operator", "A task is paused and asks: Drops or the diffuser?\nAnswer here and it goes on."]]);
 
     expect((await call("POST", "/chat", { text: "The drops.", plan_id: plan.id })).status).toBe(202);
     const ended = await until(() => store.getRun(runId), (run) => !!run && TERMINAL_STATUSES.has(run.status));
     expect(ended!.status).toBe("completed");
-    const lines = await chat();
-    expect(lines.some((line) => line.role === "action" && line.text.startsWith("answer_task"))).toBe(true);
+    expect((await chat()).map((line) => [line.role, line.text]).slice(-2)).toEqual([
+      ["owner", "The drops."],
+      ["operator", "Passed on."],
+    ]);
   });
 });

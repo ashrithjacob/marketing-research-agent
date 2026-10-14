@@ -28,7 +28,7 @@ export interface Plan {
 
 export interface ChatMessage {
   id: string;
-  role: 'owner' | 'operator' | 'action' | 'note';
+  role: 'owner' | 'operator';
   text: string;
   partial: boolean;
 }

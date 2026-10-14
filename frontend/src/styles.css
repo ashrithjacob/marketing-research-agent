@@ -969,8 +969,6 @@ details[open].tile-gap > summary.tile-gap-missing { white-space: normal; }
 .chat .line.owner { align-self: flex-end; background: var(--accent); color: #fff; padding: 7px 11px; border-radius: 12px 12px 2px 12px; }
 .chat .line.operator { align-self: flex-start; background: var(--panel-2); padding: 7px 11px; border-radius: 12px 12px 12px 2px; }
 .chat .line.operator.partial { opacity: 0.75; }
-.chat .line.action { align-self: flex-start; color: var(--faint); font-family: var(--font-mono); font-size: 11px; }
-.chat .line.note { align-self: center; color: var(--dim); font-size: 11.5px; text-align: center; max-width: 100%; }
 .chat-say { display: flex; gap: 8px; padding: 10px; border-top: 1px solid var(--line); }
 .chat-say input { flex: 1; }
 .plan-tasks .d.stop-when { color: var(--infer); }
