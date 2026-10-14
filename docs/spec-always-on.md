@@ -570,6 +570,17 @@ worker conversation from the task, so one more request can start before the
 abort lands. The `stop_when` judge (4.) is not built; a contract may carry
 `stop_when`, and nothing reads it yet.
 
+*Decided 2026-10-14 with the owner, superseding item 4:* the `stop_when` judge
+is a free-form LLM judge, kept because code cannot read prose. It runs **after
+every tool round** of a task whose contract has `stop_when`, not only when the
+model stops: measured workers end by calling `finish`, so a judge at the stop
+would almost never run. A "stop" verdict **pauses** the task (it spends nothing
+while it waits) and puts the judge's question to the owner **in the operator
+chat**; the owner's answer resumes the same task, with its findings and
+context. Question cards replace the chat line when `send_owner` is built. The
+judge uses its own model setting, `MRA_JUDGE_MODEL`, defaulting to `MRA_MODEL`.
+It still never decides done.
+
 `max_usd` is checked in the `afterResponse` hook against the task's billed
 charges so far, and `max_minutes` against the task's start time. Decided 2026-10-14: billed, accepting a small overshoot. OpenRouter's
 billed cost for a turn is readable only about 4 s after the turn ends
