@@ -1,4 +1,25 @@
-import { api, type Source } from '../api';
+import { useState } from 'react';
+
+import { api, workspaceApi, type Source } from '../api';
+
+function MarkWrong({ runId, sourceId }: { runId: string; sourceId: string }) {
+  const [marked, setMarked] = useState(false);
+  if (marked) return <span className="wrong marked"> · marked wrong</span>;
+  return (
+    <button
+      className="wrong"
+      title="Mark this source wrong; it is recorded as your correction"
+      onClick={async () => {
+        const why = window.prompt('What is wrong with this source?');
+        if (why === null) return;
+        await workspaceApi.markSourceWrong(runId, sourceId, why);
+        setMarked(true);
+      }}
+    >
+      {' '}wrong?
+    </button>
+  );
+}
 
 function label(source: Source): string {
   if (source.publisher) return source.publisher;
@@ -31,6 +52,7 @@ export function Cite({ runId, id, sources }: { runId: string; id: string; source
           {' '}read
         </a>
       )}
+      <MarkWrong runId={runId} sourceId={source.id} />
     </span>
   );
 }

@@ -15,6 +15,7 @@ import type { AdPage, AdQuery } from "./ad-library.js";
 import type { DocumentLibrary } from "./library.js";
 import type { PlanBook } from "./plans.js";
 import type { CardBook } from "./cards.js";
+import type { FeedbackBook } from "./feedback.js";
 
 /** Products and what their runs found, counted only over the runs a scope admits. */
 export interface ProductCatalog {
@@ -94,6 +95,7 @@ export interface ResearchStore {
   readonly library: DocumentLibrary;
   readonly plans: PlanBook;
   readonly cards: CardBook;
+  readonly feedback: FeedbackBook;
   createRun(input: RunDraft): Promise<ResearchRun>;
   getRun(runId: string): Promise<ResearchRun | null>;
   listRuns(scope: Scope, limit?: number): Promise<ResearchRun[]>;

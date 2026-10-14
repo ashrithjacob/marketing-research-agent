@@ -6,12 +6,14 @@ export type Route =
   | { page: 'logs'; runId: string }
   | { page: 'library' }
   | { page: 'plan'; planId: string }
+  | { page: 'inbox' }
   | { page: 'missing' };
 
 export const paths = {
   products: () => '/',
   library: () => '/library',
   plan: (planId: string) => `/plans/${planId}`,
+  inbox: () => '/inbox',
   product: (productId: string) => `/products/${productId}`,
   run: (productId: string, runId: string) => `/products/${productId}/runs/${runId}`,
 };
@@ -22,6 +24,7 @@ export function parseRoute(pathname: string): Route {
   const path = pathname.replace(/\/+$/, '') || '/';
   if (path === '/') return { page: 'products' };
   if (path === '/library') return { page: 'library' };
+  if (path === '/inbox') return { page: 'inbox' };
   const plan = path.match(/^\/plans\/([0-9a-f]+)$/);
   if (plan) return { page: 'plan', planId: plan[1] };
   const logs = path.match(/^\/runs\/([0-9a-f]+)\/logs$/);

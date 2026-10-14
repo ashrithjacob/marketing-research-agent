@@ -31,7 +31,7 @@ export class WorkspaceServices {
     const events = new TaskEvents();
     this.tasks = new TaskSupervisor({ ...deps, events });
     this.cards = new CardDesk(deps.store, deps.store.plans, this.tasks, (workspaceId, text) => this.operator.say(workspaceId, text, ""), events);
-    const plans = new PlanDesk(deps.store.plans, this.tasks, this.cards);
+    const plans = new PlanDesk(deps.store.plans, this.tasks, this.cards, deps.store.feedback);
     this.release = new PlanRelease(deps.store, deps.store.plans, plans, events);
     const tools = new OperatorTools(deps.store, plans, this.tasks, this.cards);
     this.operator = new OperatorDesk(deps.harness, deps.store, tools.extension(), deps.settings.model, this.tasks, events);

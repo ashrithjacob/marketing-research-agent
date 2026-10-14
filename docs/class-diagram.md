@@ -194,6 +194,24 @@ classDiagram
     class Deliverables {
       kinds()
     }
+    class FeedbackTarget {
+      <<interface>>
+    }
+    class Feedback {
+      <<interface>>
+    }
+    class FeedbackDraft {
+      <<interface>>
+    }
+    class FeedbackBook {
+      <<interface>>
+      record()
+      list()
+    }
+    class FeedbackStrengths {
+      of()
+      target()
+    }
     class FindingDraft {
       <<interface>>
     }
@@ -905,6 +923,10 @@ classDiagram
     class EventLog {
       add()
       lastId()
+      list()
+    }
+    class FeedbackTable {
+      record()
       list()
     }
     class FindingTable {
@@ -1716,6 +1738,9 @@ classDiagram
     class EventStream {
       register()
     }
+    class FeedbackRoutes {
+      register()
+    }
     class Frontend {
       mount()
     }
@@ -1822,6 +1847,7 @@ classDiagram
   CompetitorKinds --> SqlDatabase
   DocumentTable --> SqlDatabase
   EventLog --> SqlDatabase
+  FeedbackTable --> SqlDatabase
   FindingTable --> SqlDatabase
   JudgementTable --> SqlDatabase
   PacketRowTable --> SqlDatabase
@@ -1891,6 +1917,7 @@ classDiagram
   PlanDesk --> PlanBook
   PlanDesk --> TaskSupervisor
   PlanDesk --> CardDesk
+  PlanDesk --> FeedbackBook
   PlanRelease --> ResearchStore
   PlanRelease --> PlanBook
   PlanRelease --> PlanDesk
@@ -2032,6 +2059,7 @@ classDiagram
   CostRoute --> ResearchStore
   EventStream --> ResearchStore
   EventStream --> RunSupervisor
+  FeedbackRoutes --> ResearchStore
   JudgementRoutes --> ResearchStore
   LibraryRoutes --> DocumentLibrary
   LibraryRoutes --> LibraryIntake
@@ -2103,6 +2131,7 @@ classDiagram
 | `adapters` | `adapters/store/competitor-kinds.ts` | CompetitorKinds |
 | `adapters` | `adapters/store/document-table.ts` | DocumentTable |
 | `adapters` | `adapters/store/event-log.ts` | EventLog |
+| `adapters` | `adapters/store/feedback-table.ts` | FeedbackTable |
 | `adapters` | `adapters/store/finding-table.ts` | FindingTable |
 | `adapters` | `adapters/store/judgement-table.ts` | JudgementTable |
 | `adapters` | `adapters/store/migrations.ts` | StoreMigrations |
@@ -2256,6 +2285,7 @@ classDiagram
 | `domain` | `domain/competitor-discovery.ts` | CompetitorCandidate, DiscoveryQuestion, DiscoveryReport, DiscoveryQuestions |
 | `domain` | `domain/cost-report.ts` | CostCell, CostRow, CostReport |
 | `domain` | `domain/deliverable.ts` | FieldSpec, ItemPart, ItemNeed, FieldsDeliverable, ListDeliverable, OneMarked, PerItemDeliverable, Deliverables |
+| `domain` | `domain/feedback.ts` | FeedbackTarget, Feedback, FeedbackDraft, FeedbackBook, FeedbackStrengths |
 | `domain` | `domain/findings.ts` | FindingDraft, Finding, Findings |
 | `domain` | `domain/harness.ts` | DurableHarness |
 | `domain` | `domain/library.ts` | LibraryDocument, ConvertedDocument, DocumentSection, DocumentLibrary, DocumentConverter, DocumentSections |
@@ -2320,6 +2350,7 @@ classDiagram
 | `http` | `http/corpus-route.ts` | CorpusRoute |
 | `http` | `http/cost-route.ts` | CostRoute |
 | `http` | `http/event-stream.ts` | EventStream |
+| `http` | `http/feedback-routes.ts` | FeedbackRoutes |
 | `http` | `http/frontend.ts` | Frontend |
 | `http` | `http/judgement-routes.ts` | JudgementRoutes |
 | `http` | `http/library-routes.ts` | LibraryRoutes |

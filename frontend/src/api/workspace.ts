@@ -62,11 +62,22 @@ export interface Card {
   resolved_at: string;
 }
 
+export interface Feedback {
+  id: string;
+  verdict: 'reject' | 'edited' | 'accept' | 'answer' | 'steer' | 'outcome';
+  strength: 'correction' | 'confirmation' | 'instruction' | 'outcome';
+  target: { kind: string; id: string; run_id: string; plan_id: string };
+  text: string;
+  diff: Record<string, unknown> | null;
+  created_at: string;
+}
+
 export interface Board {
   plans: Plan[];
   tasks: TaskCard[];
   cards: Card[];
   cards_today: number;
+  feedback: Feedback[];
 }
 
 export const workspaceApi = {
@@ -79,6 +90,8 @@ export const workspaceApi = {
     request<Card>(`/api/research/cards/${id}/answer`, { method: 'POST', body: JSON.stringify({ answer }) }),
   approveCard: (id: string) => request<Card>(`/api/research/cards/${id}/approve`, { method: 'POST' }),
   rejectCard: (id: string) => request<Card>(`/api/research/cards/${id}/reject`, { method: 'POST' }),
+  markSourceWrong: (runId: string, sourceId: string, why: string) =>
+    request<Feedback>(`/api/research/runs/${runId}/sources/${encodeURIComponent(sourceId)}/wrong`, { method: 'POST', body: JSON.stringify({ why }) }),
   say: (text: string, planId: string) =>
     request<{ ok: boolean }>('/api/research/chat', { method: 'POST', body: JSON.stringify({ text, plan_id: planId }) }),
 };

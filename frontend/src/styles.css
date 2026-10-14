@@ -989,3 +989,16 @@ details[open].tile-gap > summary.tile-gap-missing { white-space: normal; }
 .card-answer { display: flex; gap: 8px; margin-top: 8px; justify-content: flex-end; }
 .card-answer input { flex: 1; background: var(--bg); border: 1px solid var(--line); color: var(--ink); border-radius: 10px; padding: 8px 10px; font-size: 13px; }
 .card-answer input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(0, 82, 255, 0.12); }
+.inbox { max-width: 860px; margin: 0 auto; padding: 16px; display: flex; flex-direction: column; gap: 16px; }
+.feedback-log { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 16px 18px; }
+.feedback-log h2 { margin: 0; font-family: var(--font-display); font-weight: 400; font-size: 18px; }
+.feedback-log ul { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.feedback-log li { display: flex; flex-wrap: wrap; gap: 4px 10px; font-size: 13px; border-left: 3px solid var(--line); padding: 4px 10px; }
+.feedback-log li.correction { border-left-color: var(--warn); }
+.feedback-log li.confirmation { border-left-color: var(--ok); }
+.feedback-log li.instruction { border-left-color: var(--accent); }
+.feedback-log .when { color: var(--faint); font-family: var(--font-mono); font-size: 11px; }
+.feedback-log .d { color: var(--dim); width: 100%; }
+.cite .wrong { background: none; border: 0; padding: 0; color: var(--faint); font-size: 11px; cursor: pointer; }
+.cite .wrong:hover { color: var(--bad); }
+.cite .wrong.marked { color: var(--bad); }

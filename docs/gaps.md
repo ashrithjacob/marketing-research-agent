@@ -39,9 +39,8 @@ commit that closed it; do not delete it.
    2 gaps, $0.0723 billed. It ran out of turns rather than finishing; whether 15
    is enough for a task (the stage role's limit) is open.
 
-8. **Cards cannot be muted, and show only on a plan page.** Spec §7.2 lets the
-   owner mute a kind; not built. The cards list sits on the plan page, so a card
-   raised while no plan page is open is seen the next time one is.
+8. **Cards cannot be muted.** Spec §7.2 lets the owner mute a kind; not built.
+   (Cards showing only on a plan page was closed by part 5's inbox, `/inbox`.)
 
 9. **Part 4 built stage 1 as a plan, not the other primitives.** `evidence`,
    `ad_scan`, `review_mine`, `analyse` (spec §3) are not tasks yet: product truth
@@ -51,6 +50,10 @@ commit that closed it; do not delete it.
     and `CardDesk` (an approval pressed) each read a plan, change one task and
     save it whole; if both happen together, the later save drops the other's
     change. Needs: saving one task of a plan, not the whole plan.
+
+11. **Feedback covers sources, not single findings.** A finding can be rejected
+    only through its source ("wrong?" beside a citation); spec §5.2 also lists
+    rejecting a finding itself. Nothing reads feedback yet (part 6).
 
 ## Built but not seen live
 
@@ -63,6 +66,8 @@ against the faux model only.
   result matches a `StageOneRun`'s on the same brief (spec §12, part 4).
 - **The judge reading the brief** (`TaskJudge.brief`), added after a live task
   asked which product although its brief was that product's page.
+- **Feedback and the inbox.** Recorded and listed in tests; the routes answer on
+  the local stack, but no action has been taken there to record one.
 - **A category-numbers task finishing.** Its one run hit the stage role's
   15-turn limit (gap 7); whether tasks need a higher ceiling is open.
 

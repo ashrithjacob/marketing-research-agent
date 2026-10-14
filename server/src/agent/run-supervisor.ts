@@ -5,6 +5,7 @@ import { Corpus } from "../adapters/corpus.js";
 import { OpenRouterPrices, ServiceClients } from "../adapters/index.js";
 import type { Settings } from "../config/index.js";
 import {
+  FeedbackStrengths,
   type Judgement,
   type ResearchStore,
   type RunRequest,
@@ -108,6 +109,8 @@ export class RunSupervisor {
     if (!live.control.steer) throw new RunError(`run ${runId} is the review-mining pipeline: there is no agent to steer`);
     live.control.steer(AgentMessages.steer(judgement));
     this.runs.emit(runId, "run.steered", { judgement_id: judgement.id, text: judgement.text });
+    const run = await this.store.getRun(runId);
+    if (run) await this.store.feedback.record(run.workspace_id, { verdict: "steer", target: FeedbackStrengths.target("task", runId, { run_id: runId }), text: judgement.text });
   }
 
   async stop(runId: string): Promise<void> {

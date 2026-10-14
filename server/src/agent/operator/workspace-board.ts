@@ -22,6 +22,7 @@ export class WorkspaceBoard {
       tasks: await Promise.all(runs.map((run) => this.card(run))),
       cards: cards.filter((card) => card.status === "open" || card.resolved_at.slice(0, 10) === today),
       cards_today: cards.filter((card) => card.created_at.slice(0, 10) === today).length,
+      feedback: await this.store.feedback.list(scope, 30),
     };
   }
 

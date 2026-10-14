@@ -10,6 +10,7 @@ import type { ApiEnv } from "./api-env.js";
 import { ConfigRoute } from "./config-route.js";
 import { CorpusRoute } from "./corpus-route.js";
 import { CostRoute } from "./cost-route.js";
+import { FeedbackRoutes } from "./feedback-routes.js";
 import { EventStream } from "./event-stream.js";
 import { JudgementRoutes } from "./judgement-routes.js";
 import { LibraryRoutes } from "./library-routes.js";
@@ -54,6 +55,7 @@ export class ResearchApi {
       new CardRoutes(workspace.cards).register(api);
     }
     new CostRoute(store).register(api);
+    new FeedbackRoutes(store).register(api);
     new ReviewMiningRoutes(handoff, settings, listings).register(api);
     new ReviewAnalysisRoutes(store, supervisor, new ReviewAnalyst(store, settings, supervisor.models, supervisor.costs)).register(api);
     new ProductRoutes(store).register(api);

@@ -287,3 +287,45 @@ describe("stage 1 as a plan", () => {
     expect(open).toEqual(["Approve Competitors?"]);
   });
 });
+
+describe("feedback", () => {
+  it("records each of the owner's actions against what it was about", async () => {
+    let release: () => void = () => {};
+    const held = new Promise<void>((resolve) => (release = resolve));
+    faux.setResponses([async () => (await held, recordAll()), finish()]);
+    const plan = (await (await call("POST", "/plans", { brief: BRIEF })).json()) as Plan;
+    for (const key of ["category_numbers", "competitors"]) await call("POST", `/plans/${plan.id}/tasks/${key}`, { selected: false });
+    const approved = (await (await call("POST", `/plans/${plan.id}/approve`)).json()) as Plan;
+    const runId = approved.tasks.find((t) => t.key === "product_facts")!.run_id;
+    await until(() => store.getRun(runId), (run) => run?.status === "running");
+    expect(await app.workspace!.tasks.guide(runId, "Prefer the UK site.")).toBe(true);
+    release();
+    await until(() => store.getRun(runId), (run) => !!run && TERMINAL_STATUSES.has(run.status));
+
+    const wrong = await call("POST", `/runs/${runId}/sources/${encodeURIComponent("sha256:aaa")}/wrong`, { why: "an affiliate page, not the brand's" });
+    expect(wrong.status).toBe(201);
+    expect((await call("POST", `/runs/${runId}/sources/${encodeURIComponent("sha256:nope")}/wrong`, { why: "x" })).status).toBe(404);
+    const card = await app.workspace!.cards.open("admin", {
+      kind: "approval",
+      title: "Approve Competitors?",
+      body: "It would spend Apify money.",
+      action: { kind: "start_task", brief: plan.brief, contract: plan.tasks[2]!.contract, plan_id: plan.id, task_key: "competitors" },
+    });
+    await call("POST", `/cards/${card.id}/reject`);
+
+    const log = ((await (await call("GET", "/feedback")).json()) as { data: { verdict: string; strength: string; target: Record<string, string>; text: string; diff: unknown }[] }).data.reverse();
+    expect(log.map((f) => [f.verdict, f.strength, f.target.kind])).toEqual([
+      ["edited", "correction", "contract"],
+      ["edited", "correction", "contract"],
+      ["accept", "confirmation", "contract"],
+      ["steer", "correction", "task"],
+      ["reject", "correction", "source"],
+      ["reject", "correction", "card"],
+    ]);
+    expect(log[0]!.diff).toEqual({ drop: ["category_numbers"] });
+    expect(log[2]!.target).toMatchObject({ id: "product_facts", plan_id: plan.id, run_id: runId });
+    expect(log[3]).toMatchObject({ text: "Prefer the UK site.", target: { run_id: runId } });
+    expect(log[4]).toMatchObject({ text: "an affiliate page, not the brand's", target: { id: "sha256:aaa", run_id: runId } });
+    expect(log[5]!.target).toMatchObject({ kind: "card", id: card.id, plan_id: plan.id });
+  });
+});

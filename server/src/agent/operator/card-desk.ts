@@ -1,4 +1,4 @@
-import { Scope, type Card, type CardDraft, type PlanBook, type ResearchStore } from "../../domain/index.js";
+import { FeedbackStrengths, Scope, type Card, type CardDraft, type FeedbackVerdict, type PlanBook, type ResearchStore } from "../../domain/index.js";
 import { Trace } from "../../trace/index.js";
 
 import { RunError } from "../errors.js";
@@ -29,6 +29,7 @@ export class CardDesk {
     const card = await this.unresolved(cardId, scope, "question");
     if (card.action.kind === "answer_task") await this.tasks.answer(card.action.run_id, text);
     if (card.action.kind === "reply_operator") await this.reply(card.workspace_id, `My answer to your question "${card.body}": ${text}`);
+    await this.feedback(card, "answer", text);
     return (await this.store.cards.resolve(card.id, "answered", text)) ?? { ...card, status: "answered", answer: text };
   }
 
@@ -40,6 +41,7 @@ export class CardDesk {
     const { brief, contract, plan_id, task_key } = card.action;
     const run = await this.tasks.start({ brief, contract }, card.workspace_id, { approved: true });
     await this.onPlan(plan_id, task_key, { run_id: run.id, error: "" });
+    await this.feedback(card, "accept", "", run.id);
     return (await this.store.cards.resolve(card.id, "approved", run.id))!;
   }
 
@@ -47,7 +49,15 @@ export class CardDesk {
     Trace.line(import.meta.url, "CardDesk.reject", { cardId });
     const card = await this.unresolved(cardId, scope, "approval");
     if (card.action.kind === "start_task") await this.onPlan(card.action.plan_id, card.action.task_key, { error: "rejected by the owner" });
+    await this.feedback(card, "reject", "");
     return (await this.store.cards.resolve(card.id, "rejected", ""))!;
+  }
+
+  private async feedback(card: Card, verdict: FeedbackVerdict, text: string, startedRun = ""): Promise<void> {
+    Trace.line(import.meta.url, "CardDesk.feedback", { cardId: card.id, verdict });
+    const action = card.action;
+    const at = { run_id: action.kind === "answer_task" ? action.run_id : startedRun, plan_id: action.kind === "start_task" ? action.plan_id : "" };
+    await this.store.feedback.record(card.workspace_id, { verdict, target: FeedbackStrengths.target("card", card.id, at), text });
   }
 
   private async taskAsked(runId: string, question: string): Promise<void> {

@@ -4,7 +4,7 @@ import { defineExtension } from "@earendil-works/pi-durable";
 import { Corpus } from "../../adapters/corpus.js";
 import type { OpenRouterPrices } from "../../adapters/index.js";
 import type { Settings } from "../../config/index.js";
-import { Scope, TERMINAL_STATUSES, type ResearchRun, type ResearchStore } from "../../domain/index.js";
+import { FeedbackStrengths, Scope, TERMINAL_STATUSES, type ResearchRun, type ResearchStore } from "../../domain/index.js";
 import { Trace } from "../../trace/index.js";
 
 import type { LiveRuns } from "../live-runs.js";
@@ -108,6 +108,8 @@ export class TaskSupervisor {
     const worker = conversationId === undefined ? undefined : await this.deps.harness.session.conversation(conversationId, BACKGROUND_CONTEXT);
     if (!worker) return false;
     await worker.submit({ type: "input", content: `Guidance from the owner: ${text}`, whenBusy: "steer" }, BACKGROUND_CONTEXT);
+    const run = await this.deps.store.getRun(runId);
+    if (run) await this.deps.store.feedback.record(run.workspace_id, { verdict: "steer", target: FeedbackStrengths.target("task", runId, { run_id: runId }), text });
     return true;
   }
 

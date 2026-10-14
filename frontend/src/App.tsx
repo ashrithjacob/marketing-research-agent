@@ -18,6 +18,7 @@ import RunView from './RunView';
 import StartRun from './StartRun';
 import StartPlan from './StartPlan';
 import PlanPage from './PlanPage';
+import InboxPage from './InboxPage';
 import ProductTruthStart from './ProductTruthStart';
 import ReviewMiningPlan from './ReviewMiningPlan';
 import { stageOfNode } from './stages';
@@ -113,6 +114,9 @@ export default function App() {
         <Link to={paths.library()} className="chip">
           Library
         </Link>
+        <Link to={paths.inbox()} className="chip">
+          Inbox
+        </Link>
         <div className="subject">
           {activeRun && (
             <>
@@ -171,6 +175,7 @@ export default function App() {
       {route.page === 'products' && <ProductsPage products={products} />}
       {route.page === 'library' && <LibraryPage onError={setError} />}
       {route.page === 'plan' && <PlanPage planId={route.planId} onError={setError} />}
+      {route.page === 'inbox' && <InboxPage onError={setError} />}
       {(route.page === 'missing' || missing) && (
         <div className="empty">
           No page here. <Link to={paths.products()}>All products</Link>

@@ -336,6 +336,18 @@ Feedback is an event, stored and attached to what it was about:
 | Steers a live task | `feedback{verdict: steer, text}` | correction |
 | Ad results arrive (spend, CPA, ROAS) for an ad the system wrote | `feedback{target: draft, verdict: outcome, metrics}` | outcome: the strongest, and the slowest |
 
+*Built 2026-10-14, part 5* (`research_feedback`, `FeedbackBook`). Recorded as
+the action happens: **edited** for each change to a draft plan, with the change
+as its diff (spec: "edits a draft before approving it"; a plan's contracts are
+the drafts there are so far); **accept** for each task approved, with the run it
+became, and for an approval card pressed; **answer** for a card answered;
+**reject** for an approval card rejected and for a source marked wrong on a run's
+page ("wrong?" beside its citation, asking why); **steer** for guidance passed
+to a running task and for Step in on a live stage run. Not recorded yet: a
+finding (as opposed to its source) rejected, a draft edited (no drafts until
+part 8), and ad outcomes (part 10). The inbox (`/inbox`) shows every open card
+and the feedback log. Tested against the faux model; not seen live.
+
 Confirmations matter as much as corrections. Hermes's review counts only
 corrections, which drifts a library toward caution. Here an accepted contract or
 draft raises the use count of the playbooks it read.
@@ -1131,7 +1143,7 @@ dashboard; a button starts it. Decided with the owner:
 | 2 | One worker primitive (`research`) as extensions; a run row per task with its three new columns (§6.7); a durable worker task running a hand-written contract through `onYield` (§6.4); `RunEnd` at its end; the four breakers and the `partial` status, for tasks and today's stage runs (§3.2); startup recovery skipping tasks (§6.7); external text labelled as data (§7.5); backup models (§9.3); `record_excerpt` by reference (§6.8); details in §12.1 | **done 2026-10-14** (§12.2) |
 | 3 | **done 2026-10-14** (§12.3). **Start, review, chat** (§11, decided 2026-10-14): Start shows a saved plan as task contracts with costs; toggles and Approve queue them; the operator conversation (§7.2) with `create_task`, `cancel_task`, steering a task, and `send_owner` questions, behind a chat panel; the workspace stream (§8) so the board and the chat update live. Until part 4 the saved plan holds what `research` can do: product facts and category numbers | the owner starts a brief, approves a plan, changes it by chat, and watches it run to its end |
 | 4 | **Stage 1 as a plan built 2026-10-14** (§12.4); the other primitives are not. The other primitives; stage 1 as a saved plan of four tasks with child-task waiting | a stage-1 plan's result matches a `StageOneRun`'s on the same brief |
-| 5 | Feedback events (§5.2) and the inbox cards | the owner's actions are recorded against what they were about |
+| 5 | **done 2026-10-14** (§5.2, built). Feedback events (§5.2) and the inbox cards | the owner's actions are recorded against what they were about |
 | 6 | Reviewer as a fork, lessons, the gate, playbook versions, the editable brand-memory list (§5.3–5.4, §6.6); eval cases from invalid tasks and corrections, and the replay suite (§5.7) | a correction given once produces a lesson; approved, the next task reads it |
 | 7 | The Always on switch and daily cap, the operator's router for signals, stable sections, work log and warm-cache compaction (the operator conversation itself moved to part 3); `create_task`, `mra.money`, the schedule watcher | the system starts work nobody clicked, inside its limits; the operator's cache hit rate holds across a day |
 | 8 | `write` and `critique` primitives; the long-form statics playbook | an ad draft that cites its findings |

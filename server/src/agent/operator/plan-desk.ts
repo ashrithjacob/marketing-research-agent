@@ -1,4 +1,4 @@
-import { Briefs, SAVED_TASKS, SavedPlans, Scope, briefSchema, type Plan, type PlanBook, type PlanTask } from "../../domain/index.js";
+import { Briefs, FeedbackStrengths, SAVED_TASKS, SavedPlans, Scope, briefSchema, type FeedbackBook, type Plan, type PlanBook, type PlanTask } from "../../domain/index.js";
 import { ContractCheck } from "../../extract/index.js";
 import { Trace } from "../../trace/index.js";
 
@@ -22,6 +22,7 @@ export class PlanDesk {
     private readonly plans: PlanBook,
     private readonly tasks: TaskSupervisor,
     private readonly cards: CardDesk,
+    private readonly feedback: FeedbackBook,
   ) {}
 
   async draft(body: unknown, workspaceId: string): Promise<Plan> {
@@ -51,7 +52,9 @@ export class PlanDesk {
         selected: change.drop?.includes(task.key) ? false : change.keep?.includes(task.key) || change.add?.includes(task.key) ? true : task.selected,
       };
     });
-    return this.plans.save({ ...plan, brief, tasks: SavedPlans.arrange(brief, tasks) });
+    const saved = await this.plans.save({ ...plan, brief, tasks: SavedPlans.arrange(brief, tasks) });
+    await this.feedback.record(plan.workspace_id, { verdict: "edited", target: FeedbackStrengths.target("contract", plan.id, { plan_id: plan.id }), text: "", diff: { ...change } });
+    return saved;
   }
 
   /** The owner's approval: each kept task with nothing to wait for is started; a task that waits on another starts when that one ends (PlanRelease). */
@@ -61,6 +64,9 @@ export class PlanDesk {
     if (!plan.tasks.some((task) => task.selected && !task.auto)) throw new RunError("the plan keeps no task; keep at least one before approving");
     const tasks = [];
     for (const task of plan.tasks) tasks.push(task.selected && task.after.length === 0 ? await this.startTask(plan, task) : task);
+    for (const task of tasks.filter((t) => t.selected && !t.auto)) {
+      await this.feedback.record(plan.workspace_id, { verdict: "accept", target: FeedbackStrengths.target("contract", task.key, { plan_id: plan.id, run_id: task.run_id }), text: task.title });
+    }
     return this.plans.save({ ...plan, tasks, status: "approved" });
   }
 

@@ -1050,6 +1050,18 @@ paragraph numbers: code copies the quote and its character range from the
 archived page (`ExcerptTool`, `domain/paragraphs.ts`). Stage 1 has no
 `record_excerpt`.
 
+### §2j — feedback (always-on part 5)
+
+Each owner action is a `research_feedback` row (`domain/feedback.ts`): verdict,
+strength (spec §5.2's table: reject, edited, steer → correction; accept →
+confirmation; answer → instruction), what it was about (`target`: a source, a
+plan's contract, a card, a task, with the run and plan it belongs to), the
+owner's words and any diff. Written by `PlanDesk.revise` (edited, the change as
+the diff), `PlanDesk.approve` (accept per task), `CardDesk` (answer, accept,
+reject), `TaskSupervisor.guide` and `RunSupervisor.steer` (steer), and
+`FeedbackRoutes` (a source marked wrong). Nothing reads it yet: the reviewer
+and lessons of part 6 will.
+
 ### §2i — stage 1 as a plan (always-on part 4)
 
 Start's plan is stage 1's four roles (`domain/saved-plans.ts`): Champion

@@ -427,6 +427,11 @@ older stage-1 modal (`StartRun.tsx`).
   it reads *Starts when Champion product finishes* once approved. Champion and
   Competitors would spend Apify money, so approving opens an approval card for
   each instead of starting it.
+- **Inbox** (`InboxPage.tsx`, `/inbox`, linked in the header): every open card
+  of the workspace, and the feedback log: each correction, approval, answer and
+  steer, newest first, with what it was about and its words or diff. On a run's
+  page, **wrong?** beside a cited source asks why and records it
+  (`POST /api/research/runs/:id/sources/:sourceId/wrong`).
 - **Stop and ask me when** (`StopWhen.tsx`): under each kept task of a draft
   plan, a text box with the saved task's default; leaving it saves it
   (`POST /plans/:id/tasks/:key` with `stop_when`). Once approved it reads
