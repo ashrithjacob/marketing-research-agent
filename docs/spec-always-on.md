@@ -615,6 +615,44 @@ and failing them first would end work that is about to continue. Runs without a
 the packet from the run's findings and sets the final status, as for every run
 today. The reporter task (§6.3) reads that status to tell the operator.
 
+### 6.8 Copying is done by code, by reference
+
+Decided 2026-10-14: **a model never copies content by writing it out token by
+token.** When text or data moves from one place to another (a quote into a
+finding, a finding into a draft, a gap into a follow-up task, a worker's result
+to the operator), the model names it by id and code copies it. Writing it out
+again costs output tokens, the most expensive kind, and a model re-typing a
+quote can change it without anyone noticing: a dropped "not", a softened claim,
+a number off by a digit.
+
+The app already does this in two places: a finding cites a `source_id` (the
+sha256 of the archived page) instead of quoting the page, and the review
+analysis names quotes by `ref` while code fills in each review's text from the
+review ledger (`IssueQuote`, `domain/review-analysis.ts`; `workings.md` §2d, "a
+review ledger no model copies from"). The rule extends that to everything:
+
+| What moves | The model writes | Code copies |
+|---|---|---|
+| a quote from a fetched page into an excerpt | the `source_id` and the numbered paragraphs it quotes, as `web_fetch` returns them (`[p12]`…`[p13]`) | the exact text of those paragraphs from the archived body |
+| a review into an analysis or a draft | the review's `ref` | the review's text, star and source from the ledger |
+| a finding into a draft (`write`) | a placeholder naming the finding id, for a verbatim quote or a figure | the quote or figure, at render time |
+| the gaps of a `partial` task into a follow-up task | the gap ids, as the contract's inputs | the gap descriptions, into the new contract |
+| a worker's result to the operator | nothing: the reporter task sends the run id and status | the outcome summary, from the run row |
+| feedback into a lesson | the feedback ids | the quoted feedback, onto the lesson card |
+| a document into a playbook (`distil`) | the document id and section numbers it cites | nothing: the section stays the source, read on demand |
+| a draft for approval (`send_owner`) | the draft id | the draft, onto the card |
+
+Writing new text is still the model's work: a summary, an analysis, a lesson's
+rule, an ad's own copy. The rule is only that what already exists is pointed
+at, not retyped.
+
+**The one place today that breaks it:** a stage-1 `excerpt` carries a `text`
+the agent types (`excerptSchema`, `domain/evidence.ts`), and no check compares
+it with the archived page. Part 2 ports the record tools to pi-durable, and the
+ported `record_excerpt` takes a `source_id` and paragraph numbers instead of
+`text`; `web_fetch` numbers the paragraphs it returns. The stored excerpt keeps
+its `text` field, filled by code, so nothing that reads excerpts changes.
+
 ## 7. The runtime
 
 ### 7.1 One process, one harness
@@ -821,6 +859,30 @@ pi-durable is experimental, so its version is pinned exactly (no `^`).
 | `recoverRunsKilledByRestart` | skips runs with a `task_id`, which `harness.resume()` continues (§6.7); recovers today's stage runs as before |
 | `StageOneRun`, `ProductTruthRun` | kept on pi-agent-core 1.2.0 until each stage is a saved plan whose run matches the stage's |
 
+### 9.3 Backup models
+
+Today `ModelChain` (`agent/model-chain.ts`, `spec_backup_llm.md`) adds
+OpenRouter's own fallback list (`models` in the request body) through pi-ai's
+`onPayload` hook, and retries a failure mid-answer on the next model. pi-durable
+does not pass `onPayload` through: its generation calls
+`runtime.models.streamSimple(model, { messages }, options)` with only its own
+stream options (`packages/durable/src/harness/generation.ts:431`), and its
+retries repeat the same model. Without a replacement, a rate-limited model
+stalls a task until a breaker trips (§3.2).
+
+The way in is the `models` object, which this app supplies to the harness. A
+small provider registered in it wraps pi-ai's OpenRouter provider: it adds the
+fallback list to every request body, and on pi-durable's retry of a failed
+attempt it moves to the next model in the chain. Built and tested in part 2
+with the faux provider failing on cue; the chain itself (`MRA_MODEL`,
+`MRA_BACKUP_MODELS`) is unchanged.
+
+Billing carries over without such a step: pi-durable's `afterResponse` hook
+receives pi-ai's `AssistantMessage`, which carries `responseId`
+(`packages/ai/src/types.ts:572`), so the same hook that counts toward the
+breakers writes the call-log row and queues the OpenRouter `/generation`
+lookup, as `LlmCallLog` and `BilledCosts` do today.
+
 Tests keep pi-ai's faux provider; pi-durable adds `MemoryStorage`, so a test
 of a durable task needs no file and no network.
 
@@ -902,7 +964,7 @@ as the main surface.
 |---|---|---|
 | 0 | Document library (§10) | **done** |
 | 1 | `pi-agent-core` and `pi-ai` to 1.2.0 (§9.1); pi-durable installed, pinned; a harness opened in `main.ts` on `/data/harness.sqlite`, resumed at start, closed on stop; nothing runs on it yet | today's stages still pass `mra check` and one url brief on 1.2.0; the harness survives `mra down` / `mra up` |
-| 2 | One worker primitive (`research`) as extensions; a run row per task with its three new columns (§6.7); a durable worker task running a hand-written contract through `onYield` (§6.4); `RunEnd` at its end; the four breakers and the `partial` status, for tasks and today's stage runs (§3.2); startup recovery skipping tasks (§6.7); external text labelled as data (§7.5) | a task given by hand meets its contract or ends `invalid`, and a restart mid-task resumes it |
+| 2 | One worker primitive (`research`) as extensions; a run row per task with its three new columns (§6.7); a durable worker task running a hand-written contract through `onYield` (§6.4); `RunEnd` at its end; the four breakers and the `partial` status, for tasks and today's stage runs (§3.2); startup recovery skipping tasks (§6.7); external text labelled as data (§7.5); backup models (§9.3); `record_excerpt` by reference (§6.8); details in §12.1 | a task given by hand meets its contract or ends `invalid`, and a restart mid-task resumes it |
 | 3 | The workspace stream (§8): task graph and conversation watches over SSE; library tools move into `mra.playbooks` | a browser sees a task from start to end, and reconnects to a snapshot |
 | 4 | The other primitives; stage 1 as a saved plan of four tasks with child-task waiting | a stage-1 plan's result matches a `StageOneRun`'s on the same brief |
 | 5 | Feedback events (§5.2) and the inbox cards | the owner's actions are recorded against what they were about |
@@ -911,6 +973,27 @@ as the main surface.
 | 8 | `write` and `critique` primitives; the long-form statics playbook | an ad draft that cites its findings |
 | 9 | Measurement per playbook version (§5.5), curator watcher (§5.6), `distil` (§5.8) | a lesson that hurt is visible with numbers |
 | 10 | Ad-results feedback (`docs/plan-meta-integration.md` Phase D; its Phases A–B start alongside parts 1–2, because Meta's App Review needs a reader already running), competitor and review watchers | the loop closes on real ad performance |
+
+### 12.1 Part 2 in detail
+
+Decided 2026-10-14.
+
+- **Starting a task:** `POST /api/research/tasks` takes a contract, writes the
+  run, creates the task, and answers `202` with the run id. `mra task
+  contract.json` starts one and follows it to its end.
+- **The contract check:** vocabulary, shape, inputs exist, and budget (§4).
+  The money check waits for a primitive that can reach Apify; `research`
+  cannot.
+- **Watching it:** findings, gaps and costs on today's run view once the task
+  ends, and progress through `mra`. Live tool lanes for a task come with part
+  3: today's live view reads events that pi-agent-core's agent emits, and a
+  pi-durable task does not emit them.
+- **Backup models and billing:** §9.3.
+- **Copy by reference:** the ported `record_excerpt` takes paragraph numbers,
+  and `web_fetch` numbers its paragraphs (§6.8).
+- **The restart test:** a test opens the harness on a temporary SQLite file,
+  closes it mid-task, reopens it, and checks the task ends with its earlier
+  findings intact; on the real app, `mra down` and `mra up` during the one run.
 
 ## 13. Risks and open questions
 
