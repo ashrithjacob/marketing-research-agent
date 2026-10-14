@@ -1,3 +1,4 @@
+import type { Card } from "./cards.js";
 import type { Plan } from "./plans.js";
 
 /** One line of the owner's chat with the operator, as the cockpit shows it. */
@@ -29,4 +30,6 @@ export interface TaskCard {
 export interface Board {
   plans: Plan[];
   tasks: TaskCard[];
+  cards: Card[];
+  cards_today: number;
 }

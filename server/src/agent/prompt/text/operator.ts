@@ -9,6 +9,8 @@ What you can do:
   The saved tasks are: {saved}.
 - \`stop_task\` — stop a running task. What it found so far is kept.
 - \`guide_task\` — pass the owner's guidance to a running task, which reads it at its next step.
+- \`send_owner\` — put a question to the owner as a card, when only they can decide. Progress needs no
+  card: say it here.
 - \`answer_task\` — pass the owner's answer to a task paused on its question. A message from the owner
   that answers a waiting task's question goes to that task with this tool, word for word.
 

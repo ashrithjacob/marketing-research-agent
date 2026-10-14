@@ -24,7 +24,6 @@ export class OperatorDesk {
     Trace.line(import.meta.url, "OperatorDesk.constructor", { model });
     harness.registry.install(extension);
     events.on((runId, status) => this.taskEnded(runId, status));
-    events.onAsked((runId, question) => this.taskAsked(runId, question));
   }
 
   async say(workspaceId: string, text: string, planId: string): Promise<void> {
@@ -60,15 +59,6 @@ export class OperatorDesk {
     const { counts, error } = Runs.summary(run);
     const objective = String(run.contract?.objective ?? runId);
     await this.note(run.workspace_id, `Task ${runId} ended ${status}: ${objective} — ${counts.sources} sources, ${counts.gaps} gaps${error ? `; ${error}` : ""}.`);
-  }
-
-  private async taskAsked(runId: string, question: string): Promise<void> {
-    Trace.line(import.meta.url, "OperatorDesk.taskAsked", { runId });
-    const run = await this.store.getRun(runId);
-    if (!run) return;
-    const text = `A task is paused and asks: ${question}\nAnswer here and it goes on.`;
-    const entry = { kind: "mra.ask", data: { text, run_id: runId } };
-    await (await this.conversation(run.workspace_id)).submit({ type: "write", entry }, BACKGROUND_CONTEXT);
   }
 
   private async conversation(workspaceId: string): Promise<Conversation> {

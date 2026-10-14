@@ -3,7 +3,7 @@ import { Briefs, Scope, taskRequestSchema, type FindingKind, type ResearchRun, t
 import { ContractCheck, ZodProblems } from "../../extract/index.js";
 import { Trace } from "../../trace/index.js";
 
-import { RunError } from "../errors.js";
+import { ApprovalNeeded, RunError } from "../errors.js";
 import { EXCERPT_RECORD } from "../prompt/text/excerpt-tool.js";
 import { RECORD_TOOLS } from "../prompt/text/record-tools.js";
 
@@ -14,7 +14,8 @@ export class TaskIntake {
     private readonly settings: Settings,
   ) {}
 
-  async admit(body: unknown, workspaceId: string): Promise<ResearchRun> {
+  /** `approved` is the owner's approval card having been pressed; without it, a task with Apify in reach throws ApprovalNeeded and nothing is written. */
+  async admit(body: unknown, workspaceId: string, approved = false): Promise<ResearchRun> {
     Trace.line(import.meta.url, "TaskIntake.admit", { workspaceId });
     const parsed = taskRequestSchema.safeParse(body);
     if (!parsed.success) throw new RunError(`task refused: ${ZodProblems.list(parsed.error).join("; ")}`);
@@ -28,6 +29,8 @@ export class TaskIntake {
       maxUsd: this.settings.taskMaxUsd,
     });
     if (problems.length > 0) throw new RunError(`task refused: ${problems.join("; ")}`);
+    const asks = ContractCheck.asksFirst(contract);
+    if (asks.length > 0 && !approved) throw new ApprovalNeeded(`needs the owner's approval: ${asks.join("; ")}`);
     return this.store.createRun({
       workspaceId,
       brief: brief as unknown as Record<string, unknown>,

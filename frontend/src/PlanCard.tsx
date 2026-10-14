@@ -56,7 +56,7 @@ export default function PlanCard({ plan, tasks, onError }: { plan: Plan; tasks: 
                 {card && ` · ${card.sources} sources, ${card.attributes + card.measurements} facts, ${card.gaps} gaps, ${card.calls} model calls`}
                 {card?.billed_usd != null && ` · billed $${card.billed_usd.toFixed(4)}`}
               </div>
-              {card?.question && <div className="d ask">Waiting for your answer, in the chat: {card.question}</div>}
+              {card?.question && <div className="d ask">Waiting for your answer, on its card above: {card.question}</div>}
               {card?.error && <div className="d warn">{card.error}</div>}
               {task.error && <div className="d error">{task.error}</div>}
               {card && card.product_id && (

@@ -49,9 +49,22 @@ export interface TaskCard {
   created_at: string;
 }
 
+export interface Card {
+  id: string;
+  kind: 'question' | 'approval';
+  status: 'open' | 'answered' | 'approved' | 'rejected';
+  title: string;
+  body: string;
+  answer: string;
+  created_at: string;
+  resolved_at: string;
+}
+
 export interface Board {
   plans: Plan[];
   tasks: TaskCard[];
+  cards: Card[];
+  cards_today: number;
 }
 
 export const workspaceApi = {
@@ -60,6 +73,10 @@ export const workspaceApi = {
   editTask: (id: string, key: string, change: { selected?: boolean; stop_when?: string }) =>
     request<Plan>(`/api/research/plans/${id}/tasks/${key}`, { method: 'POST', body: JSON.stringify(change) }),
   approve: (id: string) => request<Plan>(`/api/research/plans/${id}/approve`, { method: 'POST' }),
+  answerCard: (id: string, answer: string) =>
+    request<Card>(`/api/research/cards/${id}/answer`, { method: 'POST', body: JSON.stringify({ answer }) }),
+  approveCard: (id: string) => request<Card>(`/api/research/cards/${id}/approve`, { method: 'POST' }),
+  rejectCard: (id: string) => request<Card>(`/api/research/cards/${id}/reject`, { method: 'POST' }),
   say: (text: string, planId: string) =>
     request<{ ok: boolean }>('/api/research/chat', { method: 'POST', body: JSON.stringify({ text, plan_id: planId }) }),
 };

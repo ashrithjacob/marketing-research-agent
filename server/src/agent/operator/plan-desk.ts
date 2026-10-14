@@ -1,8 +1,11 @@
 import { Briefs, SAVED_TASKS, SavedPlans, Scope, briefSchema, type Plan, type PlanBook } from "../../domain/index.js";
+import { ContractCheck } from "../../extract/index.js";
 import { Trace } from "../../trace/index.js";
 
-import { RunError } from "../errors.js";
+import { ApprovalNeeded, RunError } from "../errors.js";
 import type { TaskSupervisor } from "../task/task-supervisor.js";
+
+import type { CardDesk } from "./card-desk.js";
 
 /** What may change in a plan before it is approved: its market, which tasks it keeps, and saved tasks it adds. */
 export interface PlanChange {
@@ -18,6 +21,7 @@ export class PlanDesk {
   constructor(
     private readonly plans: PlanBook,
     private readonly tasks: TaskSupervisor,
+    private readonly cards: CardDesk,
   ) {}
 
   async draft(body: unknown, workspaceId: string): Promise<Plan> {
@@ -64,10 +68,19 @@ export class PlanDesk {
         tasks.push({ ...task, run_id: run.id });
       } catch (error) {
         if (!(error instanceof RunError)) throw error;
-        tasks.push({ ...task, error: error.message });
+        if (error instanceof ApprovalNeeded) await this.askApproval(plan, task.key);
+        tasks.push({ ...task, error: error instanceof ApprovalNeeded ? "waiting for your approval: it would spend Apify money" : error.message });
       }
     }
     return this.plans.save({ ...plan, tasks, status: "approved" });
+  }
+
+  private async askApproval(plan: Plan, key: string): Promise<void> {
+    Trace.line(import.meta.url, "PlanDesk.askApproval", { planId: plan.id, key });
+    const task = plan.tasks.find((t) => t.key === key)!;
+    const body = `${task.contract.objective}. ${ContractCheck.asksFirst(task.contract).join("; ")}; at most $${task.contract.budget.max_usd.toFixed(2)}.`;
+    const action = { kind: "start_task" as const, brief: plan.brief, contract: task.contract, plan_id: plan.id, task_key: key };
+    await this.cards.open(plan.workspace_id, { kind: "approval", title: `Approve ${task.title}?`, body, action });
   }
 
   private async open(planId: string, scope: Scope): Promise<Plan> {

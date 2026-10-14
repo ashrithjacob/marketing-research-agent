@@ -11,7 +11,7 @@ export interface ContractGrounds {
 
 const ASKS_FIRST: ReadonlySet<ToolName> = new Set(["amazon_find_product"]);
 
-/** Refuses a contract that cannot be met or should not run without a human, before anything is queued; the schema has already refused names outside the vocabulary. */
+/** Refuses a contract that cannot be met, before anything is queued; the schema has already refused names outside the vocabulary. What needs the owner's approval first is `asksFirst`, not a refusal. */
 export class ContractCheck {
   static problems(contract: TaskContract, grounds: ContractGrounds): string[] {
     Trace.line(import.meta.url, "ContractCheck.problems", { primitive: contract.primitive });
@@ -20,7 +20,6 @@ export class ContractCheck {
       ...ContractCheck.reachable(contract, grounds.recordable),
       ...ContractCheck.inputs(contract, grounds),
       ...ContractCheck.budget(contract, grounds.maxUsd),
-      ...ContractCheck.money(contract),
       ...ContractCheck.verify(contract),
     ];
   }
@@ -52,10 +51,11 @@ export class ContractCheck {
     return contract.budget.max_usd > maxUsd ? [`budget.max_usd ${contract.budget.max_usd} is over the per-task cap of ${maxUsd}`] : [];
   }
 
-  private static money(contract: TaskContract): string[] {
-    Trace.line(import.meta.url, "ContractCheck.money");
+  /** Why a contract may not run before the owner approves it with a button: a tool in reach that spends Apify money. Not a refusal; the task waits on an approval card. */
+  static asksFirst(contract: TaskContract): string[] {
+    Trace.line(import.meta.url, "ContractCheck.asksFirst");
     const paid = PRIMITIVES[contract.primitive].tools.filter((tool) => ASKS_FIRST.has(tool));
-    return paid.length > 0 ? [`a ${contract.primitive} task can reach ${paid.join(", ")}, which spends Apify money and needs the owner's approval first`] : [];
+    return paid.length > 0 ? [`a ${contract.primitive} task can reach ${paid.join(", ")}, which spends Apify money`] : [];
   }
 
   private static verify(contract: TaskContract): string[] {

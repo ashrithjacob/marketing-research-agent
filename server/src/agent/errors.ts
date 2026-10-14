@@ -2,3 +2,6 @@
 export class RunError extends Error {
   override readonly name = "RunError";
 }
+
+/** A task that may run only once the owner approves it with a button; the message says what it would spend. */
+export class ApprovalNeeded extends RunError {}

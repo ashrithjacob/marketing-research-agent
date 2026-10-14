@@ -4,7 +4,7 @@ import type { ConversationView, EntryRecord } from "@earendil-works/pi-durable";
 import type { ChatMessage } from "../../domain/index.js";
 import { Trace } from "../../trace/index.js";
 
-/** The owner's chat, read off the operator conversation: only what the owner wrote and what the operator wrote back, including a paused task's question, and the answer still being written. Notes and tool calls stay in the transcript and are not shown. */
+/** The owner's chat, read off the operator conversation: only what the owner wrote and what the operator wrote back, and the answer still being written. Code's notes and tool calls stay in the transcript and are not shown; questions are cards. */
 export class ChatView {
   static of(view: ConversationView): ChatMessage[] {
     Trace.line(import.meta.url, "ChatView.of", { entries: view.entries.length });
@@ -19,7 +19,6 @@ export class ChatView {
     const data = (entry.data ?? {}) as { text?: string };
     const id = String(entry.id);
     if (entry.kind === "mra.owner") return [{ id, role: "owner", text: data.text ?? "", partial: false }];
-    if (entry.kind === "mra.ask") return [{ id, role: "operator", text: data.text ?? "", partial: false }];
     if (entry.kind !== "pi.assistant") return [];
     const message = entry.model?.[0] as AssistantMessage | undefined;
     const text = message ? ChatView.text(message) : "";

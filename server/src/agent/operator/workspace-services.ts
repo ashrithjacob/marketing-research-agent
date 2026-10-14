@@ -9,6 +9,7 @@ import { TaskEvents } from "../task/task-events.js";
 import { TaskSupervisor } from "../task/task-supervisor.js";
 import type { ToolRegistry } from "../tools/index.js";
 
+import { CardDesk } from "./card-desk.js";
 import { OperatorDesk } from "./operator-desk.js";
 import { OperatorTools } from "./operator-tools.js";
 import { OwnerDesk } from "./owner-desk.js";
@@ -21,13 +22,15 @@ export class WorkspaceServices {
   readonly operator: OperatorDesk;
   readonly owner: OwnerDesk;
   readonly board: WorkspaceBoard;
+  readonly cards: CardDesk;
 
   constructor(deps: { store: ResearchStore; runs: LiveRuns; settings: Settings; harness: PiHarness; tools: ToolRegistry; costs: OpenRouterPrices }) {
     Trace.line(import.meta.url, "WorkspaceServices.constructor");
     const events = new TaskEvents();
     this.tasks = new TaskSupervisor({ ...deps, events });
-    const plans = new PlanDesk(deps.store.plans, this.tasks);
-    const tools = new OperatorTools(deps.store, plans, this.tasks);
+    this.cards = new CardDesk(deps.store, deps.store.plans, this.tasks, (workspaceId, text) => this.operator.say(workspaceId, text, ""), events);
+    const plans = new PlanDesk(deps.store.plans, this.tasks, this.cards);
+    const tools = new OperatorTools(deps.store, plans, this.tasks, this.cards);
     this.operator = new OperatorDesk(deps.harness, deps.store, tools.extension(), deps.settings.model, this.tasks, events);
     this.owner = new OwnerDesk(plans, this.operator);
     this.board = new WorkspaceBoard(deps.store, this.tasks);

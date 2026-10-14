@@ -35,6 +35,7 @@ export class TaskPause {
     await this.runs.written(runId);
     await this.store.updateRun(runId, { status: "running" });
     this.signals.answered(runId);
+    await this.events.answered(runId, answer);
   }
 
   /** Waits for the answer to the run's open question: at once if a restart left it already given, else when it is given, re-reading the store every few seconds in case the wake-up was missed. */

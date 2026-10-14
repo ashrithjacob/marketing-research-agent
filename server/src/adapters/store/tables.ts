@@ -11,6 +11,7 @@ import { FindingTable } from "./finding-table.js";
 import { JudgementTable } from "./judgement-table.js";
 import { PacketRowTable } from "./packet-row-table.js";
 import { PlanTable } from "./plan-table.js";
+import { CardTable } from "./card-table.js";
 import { ProductBackfill } from "./product-backfill.js";
 import { SqlProductCatalog } from "./product-catalog.js";
 import { ProductTable } from "./product-table.js";
@@ -41,6 +42,7 @@ export class StoreTables {
   readonly pulls: ReviewPullStore;
   readonly library: DocumentLibrary;
   readonly plans: PlanTable;
+  readonly cards: CardTable;
 
   private constructor(readonly db: SqlDatabase) {
     Trace.line(import.meta.url, "StoreTables.constructor");
@@ -60,6 +62,7 @@ export class StoreTables {
     this.pulls = new ReviewPullTable(db);
     this.library = new DocumentTable(db);
     this.plans = new PlanTable(db);
+    this.cards = new CardTable(db);
     this.catalog = new SqlProductCatalog(this.products, this.runs, this.packetRows);
   }
 

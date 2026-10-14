@@ -13,7 +13,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { SqlResearchStore } from "../src/adapters/index.js";
 import { PiHarness } from "../src/agent/index.js";
 import { Env, type Settings } from "../src/config/index.js";
-import { TERMINAL_STATUSES, type ChatMessage, type Plan } from "../src/domain/index.js";
+import { Scope, TERMINAL_STATUSES, type ChatMessage, type Plan } from "../src/domain/index.js";
 import { App } from "../src/http/index.js";
 import { productPacket, recordCalls } from "./fixtures.js";
 import { SqliteStores } from "./sqlite-stores.js";
@@ -124,7 +124,7 @@ describe("start, review, chat", () => {
 });
 
 describe("a task that stops and asks", () => {
-  it("puts its question in the chat, and the owner's reply reaches it through the operator", async () => {
+  it("puts its question on a card, and the owner's reply in the chat reaches it through the operator and closes the card", async () => {
     await harness.close();
     harness = await PiHarness.open(join(dir, "harness-2.sqlite"), models);
     app = new App({ settings: { ...settings, judgeModel: MODEL_ID }, store, harness });
@@ -150,8 +150,9 @@ describe("a task that stops and asks", () => {
     await until(() => store.getRun(runId), (run) => run?.status === "waiting");
     const board = (await until(() => app.workspace!.board.snapshot("admin"), (b) => b.tasks.some((t) => t.question !== ""))).tasks[0]!;
     expect(board).toMatchObject({ status: "waiting", question: "Drops or the diffuser?" });
-    const asked = await until(chat, (seen) => seen.some((line) => line.text.includes("is paused and asks: Drops or the diffuser?")));
-    expect(asked.map((line) => [line.role, line.text])).toEqual([["operator", "A task is paused and asks: Drops or the diffuser?\nAnswer here and it goes on."]]);
+    const card = (await until(() => store.cards.list(Scope.of("admin"), 10), (cards) => cards.length > 0))[0]!;
+    expect(card).toMatchObject({ kind: "question", status: "open", body: "Drops or the diffuser?", action: { kind: "answer_task", run_id: runId } });
+    expect(await chat()).toEqual([]);
 
     expect((await call("POST", "/chat", { text: "The drops.", plan_id: plan.id })).status).toBe(202);
     const ended = await until(() => store.getRun(runId), (run) => !!run && TERMINAL_STATUSES.has(run.status));
@@ -160,5 +161,69 @@ describe("a task that stops and asks", () => {
       ["owner", "The drops."],
       ["operator", "Passed on."],
     ]);
+    expect(await store.cards.get(Scope.of("admin"), card.id)).toMatchObject({ status: "answered", answer: "The drops." });
+  });
+});
+
+describe("cards", () => {
+  it("answering a paused task's card resumes it; a card is settled once", async () => {
+    await harness.close();
+    harness = await PiHarness.open(join(dir, "harness-3.sqlite"), models);
+    app = new App({ settings: { ...settings, judgeModel: MODEL_ID }, store, harness });
+    await app.workspace!.tasks.recover();
+    harness.resume();
+    const text = (content: unknown) => (typeof content === "string" ? content : JSON.stringify(content));
+    const route: FauxResponseStep = (context) => {
+      const last = text(context.messages[context.messages.length - 1]!.content);
+      if (last.startsWith("Condition:")) return fauxAssistantMessage(last.includes("nothing yet") ? '{"stop": true, "question": "Which one?"}' : '{"stop": false}');
+      if (last.includes("The owner answered your question")) return finish();
+      return context.messages.some((m) => m.role === "toolResult") ? finish() : recordAll();
+    };
+    faux.setResponses(Array.from({ length: 30 }, () => route));
+    const plan = (await (await call("POST", "/plans", { brief: BRIEF })).json()) as Plan;
+    await call("POST", `/plans/${plan.id}/tasks/category_numbers`, { selected: false });
+    const runId = ((await (await call("POST", `/plans/${plan.id}/approve`)).json()) as Plan).tasks[0]!.run_id;
+    const card = (await until(() => store.cards.list(Scope.of("admin"), 10), (cards) => cards.length > 0))[0]!;
+    const answered = await call("POST", `/cards/${card.id}/answer`, { answer: "The drops." });
+    expect(answered.status).toBe(202);
+    expect(await answered.json()).toMatchObject({ status: "answered", answer: "The drops." });
+    expect((await until(() => store.getRun(runId), (run) => !!run && TERMINAL_STATUSES.has(run.status)))!.status).toBe("completed");
+    expect((await call("POST", `/cards/${card.id}/answer`, { answer: "again" })).status).toBe(409);
+  });
+
+  it("an approval card starts its task only when approved, and a rejection is kept on the plan", async () => {
+    faux.setResponses([recordAll(), finish()]);
+    const plan = (await (await call("POST", "/plans", { brief: BRIEF })).json()) as Plan;
+    const contract = { ...plan.tasks[0]!.contract, stop_when: undefined };
+    const approval = await app.workspace!.cards.open("admin", {
+      kind: "approval",
+      title: "Approve Product facts?",
+      body: "It would spend Apify money.",
+      action: { kind: "start_task", brief: plan.brief, contract, plan_id: plan.id, task_key: "product_facts" },
+    });
+    expect((await store.listRuns(Scope.of("admin"), 10)).length).toBe(0);
+    const approved = (await (await call("POST", `/cards/${approval.id}/approve`)).json()) as { answer: string };
+    const run = await until(() => store.getRun(approved.answer), (r) => !!r && TERMINAL_STATUSES.has(r.status));
+    expect(run!.status).toBe("completed");
+    expect(((await (await call("GET", `/plans/${plan.id}`)).json()) as Plan).tasks[0]!.run_id).toBe(approved.answer);
+
+    const action = { kind: "start_task" as const, brief: plan.brief, contract, plan_id: plan.id, task_key: "category_numbers" };
+    const second = await app.workspace!.cards.open("admin", { kind: "approval", title: approval.title, body: approval.body, action });
+    expect((await call("POST", `/cards/${second.id}/reject`)).status).toBe(202);
+    expect(((await (await call("GET", `/plans/${plan.id}`)).json()) as Plan).tasks[1]!.error).toBe("rejected by the owner");
+  });
+
+  it("the operator's question becomes a card, and the answer comes back to it", async () => {
+    faux.setResponses([
+      fauxAssistantMessage(fauxToolCall("send_owner", { question: "UK only, or Ireland too?" }), { stopReason: "toolUse" }),
+      fauxAssistantMessage("I've asked."),
+      fauxAssistantMessage("Thanks: UK only."),
+    ]);
+    await call("POST", "/chat", { text: "Set the market for me." });
+    const card = (await until(() => store.cards.list(Scope.of("admin"), 10), (cards) => cards.length > 0))[0]!;
+    expect(card).toMatchObject({ kind: "question", body: "UK only, or Ireland too?", action: { kind: "reply_operator" } });
+    await call("POST", `/cards/${card.id}/answer`, { answer: "UK only." });
+    const lines = await until(chat, (seen) => seen.some((line) => line.text === "Thanks: UK only."));
+    expect(lines.map((line) => line.text)).toContain('My answer to your question "UK only, or Ireland too?": UK only.');
   });
 });

@@ -10,6 +10,7 @@ import { OPERATOR_SYSTEM } from "../prompt/text/operator.js";
 import type { TaskSupervisor } from "../task/task-supervisor.js";
 
 import { WorkspaceDoc } from "./operator-docs.js";
+import type { CardDesk } from "./card-desk.js";
 import type { PlanDesk } from "./plan-desk.js";
 
 const list = Type.Array(Type.String());
@@ -20,6 +21,7 @@ export class OperatorTools {
     private readonly store: ResearchStore,
     private readonly plans: PlanDesk,
     private readonly tasks: TaskSupervisor,
+    private readonly cards: CardDesk,
   ) {}
 
   extension(): Extension {
@@ -58,6 +60,16 @@ export class OperatorTools {
           description: "Stop a running task by its run id. What it found so far is kept.",
           parameters: Type.Object({ run_id: Type.String() }),
           execute: (args, api, context) => this.act(api, context, async (workspace) => (await this.running(args.run_id, workspace), await this.tasks.stop(args.run_id), `Stopping ${args.run_id}.`)),
+        }),
+        defineTool({
+          name: "send_owner",
+          description: "Put a question to the owner as a card they answer; their answer comes back to you as a message. For a decision only they can make; progress needs no card.",
+          parameters: Type.Object({ question: Type.String() }),
+          execute: (args, api, context) =>
+            this.act(api, context, async (workspace) => {
+              await this.cards.open(workspace, { kind: "question", title: "The operator asks", body: args.question, action: { kind: "reply_operator" } });
+              return "Asked; the owner answers on a card, and their answer comes back to you.";
+            }),
         }),
         defineTool({
           name: "answer_task",

@@ -57,9 +57,9 @@ export class TaskSupervisor {
   }
 
   /** A task request checked against its contract, written as a queued run, and handed to the harness; a refused contract throws before anything is written. */
-  async start(body: unknown, workspaceId: string): Promise<ResearchRun> {
-    Trace.line(import.meta.url, "TaskSupervisor.start", { workspaceId });
-    const run = await this.intake.admit(body, workspaceId);
+  async start(body: unknown, workspaceId: string, options: { approved?: boolean } = {}): Promise<ResearchRun> {
+    Trace.line(import.meta.url, "TaskSupervisor.start", { workspaceId, approved: options.approved === true });
+    const run = await this.intake.admit(body, workspaceId, options.approved === true);
     await this.queue(run.id);
     return run;
   }

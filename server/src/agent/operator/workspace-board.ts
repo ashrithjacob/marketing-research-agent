@@ -15,7 +15,14 @@ export class WorkspaceBoard {
     const scope = Scope.of(workspaceId);
     const plans = await this.store.plans.list(scope, 5);
     const runs = (await this.store.listRuns(scope, 50)).filter((run) => run.contract).slice(0, 20);
-    return { plans, tasks: await Promise.all(runs.map((run) => this.card(run))) };
+    const cards = await this.store.cards.list(scope, 50);
+    const today = new Date().toISOString().slice(0, 10);
+    return {
+      plans,
+      tasks: await Promise.all(runs.map((run) => this.card(run))),
+      cards: cards.filter((card) => card.status === "open" || card.resolved_at.slice(0, 10) === today),
+      cards_today: cards.filter((card) => card.created_at.slice(0, 10) === today).length,
+    };
   }
 
   private async card(run: ResearchRun): Promise<TaskCard> {

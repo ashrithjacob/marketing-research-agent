@@ -4,6 +4,7 @@ import { Trace } from "../../trace/index.js";
 export class TaskEvents {
   private readonly listeners = new Set<(runId: string, status: string) => Promise<void>>();
   private readonly askers = new Set<(runId: string, question: string) => Promise<void>>();
+  private readonly answerers = new Set<(runId: string, answer: string) => Promise<void>>();
 
   on(listener: (runId: string, status: string) => Promise<void>): void {
     Trace.line(import.meta.url, "TaskEvents.on");
@@ -19,6 +20,18 @@ export class TaskEvents {
     Trace.line(import.meta.url, "TaskEvents.asked", { runId });
     for (const listener of this.askers) {
       await listener(runId, question).catch((error: unknown) => console.error(`research task ${runId}: an ask listener failed`, error));
+    }
+  }
+
+  onAnswered(listener: (runId: string, answer: string) => Promise<void>): void {
+    Trace.line(import.meta.url, "TaskEvents.onAnswered");
+    this.answerers.add(listener);
+  }
+
+  async answered(runId: string, answer: string): Promise<void> {
+    Trace.line(import.meta.url, "TaskEvents.answered", { runId });
+    for (const listener of this.answerers) {
+      await listener(runId, answer).catch((error: unknown) => console.error(`research task ${runId}: an answer listener failed`, error));
     }
   }
 
