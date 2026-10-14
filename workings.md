@@ -1262,7 +1262,7 @@ What the start modal needs to warn you before you pay for a run.
 ### Library — `http/library-routes.ts`, behind the session check
 
 Scoped like runs: the caller's workspace, or every workspace for the admin.
-Design and conversion details: `spec-always-on.md` §9.
+Design and conversion details: `docs/spec-always-on.md` §9.
 
 #### `GET /api/research/library`
 

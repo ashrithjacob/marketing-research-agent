@@ -19,6 +19,8 @@ deploy steps are about **agentchat**, a different app. Use the ones below.
   stage 1 is four agents (champion, then product/competitors/category side by
   side): `workings_stage1.md`.
   What is on the screen and what it calls: `FEATURE_MAP.md`.
+- The north star every change answers to: `docs/goal.md`. The always-on
+  refactor being built on the `ubiquitous` branch: `docs/spec-always-on.md`.
 - Older specs (`spec.md`, `cockpit-spec.md`) still describe hermes as the engine.
   That is superseded by `pi-agent-core`. Trust `setup.md`.
 

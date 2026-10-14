@@ -1,7 +1,7 @@
 # Always on — spec
 
 **Status:** plan, 2026-10-12. Part 0, the document library, is built (§9). Nothing
-else here is built. **Parents:** `goal.md` (the north star), `workings.md` (how a
+else here is built. **Parents:** `docs/goal.md` (the north star), `workings.md` (how a
 run works today), `spec-research-agent-factory.md` (roles as data, which this
 generalises). **Borrowed from:** hermes-agent's learning loop,
 `../hermes-agent/agent/background_review.py`, `agent/curator.py`, and the docs

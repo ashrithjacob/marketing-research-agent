@@ -43,7 +43,7 @@ the map of 1–4. The playbooks uploaded to the library are the method for 5.
 
 - **Always on.** Not a button that runs a stage and stops. A standing operator
   per brand that watches for change, plans work, runs it, and comes to the owner
-  only for decisions. `spec-always-on.md`.
+  only for decisions. `docs/spec-always-on.md`.
 - **Evidence, never opinion.** Code checks what agents claim. A finding without
   a source is not a finding. `invalid` is information, not noise.
 - **The owner steers; the system learns.** Every correction, rejection and
