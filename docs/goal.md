@@ -55,8 +55,13 @@ the map of 1–4. The playbooks uploaded to the library are the method for 5.
   every unit of work reports progress live to the dashboard.
 - **Cost is billed, shown and bounded.** Every dollar spent is a measured
   charge, visible per agent, and money-spending work asks first.
-- **A dashboard, not a chat.** The owner watches the work and its outcome, and
-  intervenes where judgement is needed.
+- **Start, review, then chat.** The owner starts with one button; the system
+  answers with a plan of tasks to approve, and runs nothing before that. After
+  that the owner guides the work by chatting with one operator, beside a
+  dashboard of the work and its outcome. *Changed 2026-10-14:* this was "a
+  dashboard, not a chat"; chat became the native way to steer, but a button,
+  not a conversation, still starts the work, and nothing is hidden in the chat
+  that the dashboard does not show.
 
 ## How we know it is working
 

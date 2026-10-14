@@ -1042,6 +1042,23 @@ place and the owner follows and steers them, not a chat. Five areas:
 A message box exists, as one way to put something in the operator's inbox, not
 as the main surface.
 
+*Superseded 2026-10-14:* chat is the way the owner guides the work, beside the
+dashboard; a button starts it. Decided with the owner:
+
+1. **Start proposes, it does not run.** Start on a brief shows a **saved plan**
+   for that brief: a list of task contracts, each with its objective, what done
+   means, an estimated cost, and a flag on any that would spend Apify money. No
+   model writes it, so it is free and the same every time. Nothing runs until
+   **Approve**.
+2. **The plan is edited with toggles and chat.** Each task has a checkbox to
+   drop it. Anything else (scope, market, a task the plan lacks) is said in chat,
+   and the operator rewrites the plan, which is shown again for approval.
+3. **Chat talks to the operator only.** One voice and one memory: the owner's
+   message goes to the operator with `whenBusy: "steer"` (§7.2); the operator
+   steers, cancels or adds tasks and reports back. A new task the operator adds
+   comes back as a plan to approve when it spends money. The operator's
+   questions (`send_owner`, kind `question`) and approvals appear in the chat.
+
 ## 12. Plan, in parts that each ship on their own
 
 | Part | Builds | Proves |
@@ -1049,11 +1066,11 @@ as the main surface.
 | 0 | Document library (§10) | **done** |
 | 1 | `pi-agent-core` and `pi-ai` to 1.2.0 (§9.1); pi-durable installed, pinned; a harness opened in `main.ts` on `/data/harness.sqlite`, resumed at start, closed on stop; nothing runs on it yet | today's stages still pass `mra check` and one url brief on 1.2.0; the harness survives `mra down` / `mra up` |
 | 2 | One worker primitive (`research`) as extensions; a run row per task with its three new columns (§6.7); a durable worker task running a hand-written contract through `onYield` (§6.4); `RunEnd` at its end; the four breakers and the `partial` status, for tasks and today's stage runs (§3.2); startup recovery skipping tasks (§6.7); external text labelled as data (§7.5); backup models (§9.3); `record_excerpt` by reference (§6.8); details in §12.1 | **done 2026-10-14** (§12.2) |
-| 3 | The workspace stream (§8): task graph and conversation watches over SSE; library tools move into `mra.playbooks` | a browser sees a task from start to end, and reconnects to a snapshot |
+| 3 | **Start, review, chat** (§11, decided 2026-10-14): Start shows a saved plan as task contracts with costs; toggles and Approve queue them; the operator conversation (§7.2) with `create_task`, `cancel_task`, steering a task, and `send_owner` questions, behind a chat panel; the workspace stream (§8) so the board and the chat update live. Until part 4 the saved plan holds what `research` can do: product facts and category numbers | the owner starts a brief, approves a plan, changes it by chat, and watches it run to its end |
 | 4 | The other primitives; stage 1 as a saved plan of four tasks with child-task waiting | a stage-1 plan's result matches a `StageOneRun`'s on the same brief |
 | 5 | Feedback events (§5.2) and the inbox cards | the owner's actions are recorded against what they were about |
 | 6 | Reviewer as a fork, lessons, the gate, playbook versions, the editable brand-memory list (§5.3–5.4, §6.6); eval cases from invalid tasks and corrections, and the replay suite (§5.7) | a correction given once produces a lesson; approved, the next task reads it |
-| 7 | The Always on switch and daily cap, the operator conversation (§7.2) with its router, `send_owner`, stable sections, work log and warm-cache compaction; `create_task`, `mra.money`, the schedule watcher | the system starts work nobody clicked, inside its limits; the operator's cache hit rate holds across a day |
+| 7 | The Always on switch and daily cap, the operator's router for signals, stable sections, work log and warm-cache compaction (the operator conversation itself moved to part 3); `create_task`, `mra.money`, the schedule watcher | the system starts work nobody clicked, inside its limits; the operator's cache hit rate holds across a day |
 | 8 | `write` and `critique` primitives; the long-form statics playbook | an ad draft that cites its findings |
 | 9 | Measurement per playbook version (§5.5), curator watcher (§5.6), `distil` (§5.8) | a lesson that hurt is visible with numbers |
 | 10 | Ad-results feedback (`docs/plan-meta-integration.md` Phase D; its Phases A–B start alongside parts 1–2, because Meta's App Review needs a reader already running), competitor and review watchers | the loop closes on real ad performance |
