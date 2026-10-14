@@ -176,6 +176,13 @@ real tasks use, which the call log records. At 80% of the ceiling the model is
 told, once, "record what you have, then call `finish`", as hermes's task board
 warns its workers at 90% of their iteration budget.
 
+*Corrected 2026-10-14, part 3:* "added no finding and no source" counts a page
+archived for the first time as a source. Part 2 counted only ledger rows, and
+the first real plan run (`f3c22148…`) ended `partial` after five calls that each
+fetched new pages of the site before recording anything. `Corpus.write` no
+longer rewrites a page it has, so a file's time is when the run first saw it,
+and a page fetched again adds nothing.
+
 *Built 2026-10-14, part 2:* the refused-finish breaker trips at the end of the
 turn whose `finish` was refused the third time, so the "next call" is never
 made; if one is already in flight, `finish` answers it NOT CHECKED and ends the
@@ -1058,6 +1065,27 @@ dashboard; a button starts it. Decided with the owner:
    steers, cancels or adds tasks and reports back. A new task the operator adds
    comes back as a plan to approve when it spends money. The operator's
    questions (`send_owner`, kind `question`) and approvals appear in the chat.
+4. **Apify spend is approved by a button, always.** Decided 2026-10-14 with the
+   owner. No chat message, operator tool or saved plan starts anything that
+   spends Apify money; it reaches the owner as something to approve with a
+   button. Until that approval exists for tasks, `ContractCheck` refuses any
+   task with Apify in reach, so none can be queued.
+
+*Built 2026-10-14, part 3.* Where it differs from the above:
+- Plans are research-store records (`research_plans`), not harness state:
+  they are what the owner sees and approves, and §6.2 keeps the harness to its
+  own state.
+- A plan shows each task's **spend cap**, not an estimate: there is no cost
+  model yet, and a cap is the one figure that holds.
+- The operator answers in the chat itself; there is no separate `send_owner`
+  tool yet. Its tools are `list_work`, `revise_plan` (market, drop, keep, add a
+  saved task), `stop_task` and `guide_task`; none starts work. Approvals and
+  finished tasks are written into its transcript as notes, with no model call.
+- The stream is `GET /api/research/workspace/stream`, not
+  `/api/workspace/stream`. Its chat frame comes from the operator
+  conversation's watch; its board frame is read from the research store every
+  2 s, because a task's progress (its rows, its calls, its status) is written
+  there, not to the task graph.
 
 ## 12. Plan, in parts that each ship on their own
 
@@ -1066,7 +1094,7 @@ dashboard; a button starts it. Decided with the owner:
 | 0 | Document library (§10) | **done** |
 | 1 | `pi-agent-core` and `pi-ai` to 1.2.0 (§9.1); pi-durable installed, pinned; a harness opened in `main.ts` on `/data/harness.sqlite`, resumed at start, closed on stop; nothing runs on it yet | today's stages still pass `mra check` and one url brief on 1.2.0; the harness survives `mra down` / `mra up` |
 | 2 | One worker primitive (`research`) as extensions; a run row per task with its three new columns (§6.7); a durable worker task running a hand-written contract through `onYield` (§6.4); `RunEnd` at its end; the four breakers and the `partial` status, for tasks and today's stage runs (§3.2); startup recovery skipping tasks (§6.7); external text labelled as data (§7.5); backup models (§9.3); `record_excerpt` by reference (§6.8); details in §12.1 | **done 2026-10-14** (§12.2) |
-| 3 | **Start, review, chat** (§11, decided 2026-10-14): Start shows a saved plan as task contracts with costs; toggles and Approve queue them; the operator conversation (§7.2) with `create_task`, `cancel_task`, steering a task, and `send_owner` questions, behind a chat panel; the workspace stream (§8) so the board and the chat update live. Until part 4 the saved plan holds what `research` can do: product facts and category numbers | the owner starts a brief, approves a plan, changes it by chat, and watches it run to its end |
+| 3 | **done 2026-10-14** (§12.3). **Start, review, chat** (§11, decided 2026-10-14): Start shows a saved plan as task contracts with costs; toggles and Approve queue them; the operator conversation (§7.2) with `create_task`, `cancel_task`, steering a task, and `send_owner` questions, behind a chat panel; the workspace stream (§8) so the board and the chat update live. Until part 4 the saved plan holds what `research` can do: product facts and category numbers | the owner starts a brief, approves a plan, changes it by chat, and watches it run to its end |
 | 4 | The other primitives; stage 1 as a saved plan of four tasks with child-task waiting | a stage-1 plan's result matches a `StageOneRun`'s on the same brief |
 | 5 | Feedback events (§5.2) and the inbox cards | the owner's actions are recorded against what they were about |
 | 6 | Reviewer as a fork, lessons, the gate, playbook versions, the editable brand-memory list (§5.3–5.4, §6.6); eval cases from invalid tasks and corrections, and the replay suite (§5.7) | a correction given once produces a lesson; approved, the next task reads it |
@@ -1120,6 +1148,24 @@ Measured 2026-10-14 on the local stack, `docs/tasks/droplet-product-data.json`
 - **Today's stages on part 2.** A url brief on `product_data` (`60109d85…`)
   ended `completed` in 9 calls, its pages shown to the model labelled as data;
   $0.0453 billed.
+
+### 12.3 Part 3, built
+
+Measured 2026-10-14 on the local stack, through the routes the page calls (the
+browser could not be driven from here, so the page itself was built and
+typechecked, not watched):
+
+- `POST /plans` for thedropletco.co.uk returned a draft with both saved tasks
+  kept; no run was created.
+- Chat "Just the product facts for now please, and keep it to the UK." reached
+  the operator, which called `revise_plan` (drop `category_numbers`, market
+  `UK`) and answered "Done — the plan is now UK-only with just product facts;
+  category numbers are dropped." The plan changed; it stayed a draft.
+- Approve (`202`) started one task, which ended `partial` on the no-progress
+  breaker (see §3.2, corrected). After the fix, a second plan, toggled to
+  product facts and approved, ended `completed`: 12 calls, 7 sources, 10 facts,
+  3 gaps, UK, $0.0409 billed. The operator's transcript holds a note for the
+  plan, its approval, and each task's end.
 
 ## 13. Risks and open questions
 

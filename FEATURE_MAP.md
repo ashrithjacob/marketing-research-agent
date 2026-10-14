@@ -407,3 +407,24 @@ In order, because this order has been wrong before:
    `deploy/vps/deploy.sh` puts it there, and the frontend ships as
    `frontend/dist` — a source change without a rebuilt `dist` deploys the old
    UI while the diff says otherwise.
+
+
+## Start, review, chat (`StartPlan.tsx`, `PlanPage.tsx`, `PlanCard.tsx`, `ChatPanel.tsx`)
+
+Since 2026-10-14 the header's **Start** opens a small form (product or site,
+market) and then the plan page, `/plans/:id`. **Stage run** beside it opens the
+older stage-1 modal (`StartRun.tsx`).
+
+- **Left: the plan card.** Each task with a checkbox, its objective, and its
+  spend cap and time limit. While the plan is a draft, a checkbox calls
+  `POST /api/research/plans/:id/tasks/:key` and **Approve N tasks · up to $X**
+  calls `POST /plans/:id/approve`; nothing runs before that. Once approved,
+  each task shows its run's status chip, sources, facts, gaps, model calls and
+  billed cost, live, and **Open what it found →** goes to its run view.
+- **Right: the chat** with the workspace's operator (`POST /api/research/chat`,
+  with the plan's id). The owner's lines are blue, the operator's grey, what
+  the operator did (a tool it called) in small monospace, and notes the code
+  wrote (plan started, approved, a task ended) centred. The dot in the header is
+  green while the stream is connected.
+- Both come from one stream, `GET /api/research/workspace/stream`
+  (`use-workspace.ts`), which sends whole snapshots: `chat` and `board`.

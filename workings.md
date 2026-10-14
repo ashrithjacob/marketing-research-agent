@@ -1035,6 +1035,35 @@ paragraph numbers: code copies the quote and its character range from the
 archived page (`ExcerptTool`, `domain/paragraphs.ts`). Stage 1 has no
 `record_excerpt`.
 
+### §2h — Start, review, chat (always-on part 3)
+
+The header's **Start** asks for a product or site and a market, then opens the
+plan page (`/plans/:id`). Spec: `docs/spec-always-on.md` §11.
+
+1. **Start** (`POST /api/research/plans`, `OwnerDesk.start`). `PlanDesk.draft`
+   writes a `research_plans` row: the brief and the saved tasks
+   (`domain/saved-plans.ts`: product facts and category numbers), each a task
+   contract with its spend cap, all kept. Nothing runs. The operator gets a note.
+2. **Review.** A checkbox calls `POST /plans/:id/tasks/:key`. A chat message
+   (`POST /chat`, with the open plan's id) goes to the workspace's operator
+   (`OperatorDesk`), one ownerless harness conversation per workspace, created
+   on first use and found again through the session document `mra.operators`.
+   The message is submitted with `whenBusy: "steer"`. The operator's tools
+   (`operator/operator-tools.ts`) act only inside its own workspace, read from
+   its `mra.workspace` document: `list_work`, `revise_plan`, `stop_task`,
+   `guide_task`. None starts work.
+3. **Approve** (`POST /plans/:id/approve`, a button only). Each kept task is
+   started through `TaskSupervisor.start` (§2g), so its contract is checked; a
+   refused one stays on the plan with why. The plan becomes `approved`, and the
+   operator gets a note naming the runs.
+4. **While it runs.** `GET /api/research/workspace/stream` sends a `chat`
+   frame (the transcript read by `ChatView`, with the answer still being
+   written) whenever the operator conversation changes, and a `board` frame
+   (newest plans, newest task runs with their counts) when the store's copy
+   differs, read every 2 s. When a task ends, `TaskEvents` tells `OperatorDesk`,
+   which writes a note. Notes cost no model call; the operator reads them the
+   next time the owner writes.
+
 ### Step 7 — the screen fills in
 
 The `packet.ready` event triggers a re-fetch of `GET /runs/:id`, which now carries the

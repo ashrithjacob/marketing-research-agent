@@ -116,6 +116,15 @@ classDiagram
     class ServiceUse {
       <<interface>>
     }
+    class ChatMessage {
+      <<interface>>
+    }
+    class TaskCard {
+      <<interface>>
+    }
+    class Board {
+      <<interface>>
+    }
     class RowRef {
       <<interface>>
     }
@@ -256,6 +265,19 @@ classDiagram
     class Paragraphs {
       split()
       range()
+    }
+    class PlanTask {
+      <<interface>>
+    }
+    class Plan {
+      <<interface>>
+    }
+    class PlanBook {
+      <<interface>>
+      create()
+      get()
+      list()
+      save()
     }
     class ProductCatalog {
       <<interface>>
@@ -446,6 +468,13 @@ classDiagram
     }
     class RoleRecords {
       of()
+    }
+    class SavedTask {
+      <<interface>>
+    }
+    class SavedPlans {
+      tasks()
+      task()
     }
     class ServicePart {
       <<interface>>
@@ -691,6 +720,7 @@ classDiagram
     class Corpus {
       write()
       read()
+      pages()
     }
     class Crawl4aiPayload {
       <<interface>>
@@ -874,6 +904,12 @@ classDiagram
     class PacketRowTable {
       replace()
       list()
+    }
+    class PlanTable {
+      create()
+      get()
+      list()
+      save()
     }
     class PostgresStatements {
       all()
@@ -1144,6 +1180,36 @@ classDiagram
       failover()
       withFallbacks()
     }
+    class ChatView {
+      of()
+    }
+    class OperatorDesk {
+      say()
+      note()
+      watch()
+    }
+    class OperatorTools {
+      extension()
+    }
+    class OwnerDesk {
+      start()
+      toggle()
+      approve()
+      say()
+    }
+    class PlanChange {
+      <<interface>>
+    }
+    class PlanDesk {
+      draft()
+      revise()
+      approve()
+    }
+    class WorkspaceBoard {
+      snapshot()
+    }
+    class WorkspaceServices {
+    }
     class OperatorInputs {
       record()
     }
@@ -1385,6 +1451,7 @@ classDiagram
       lookUp()
     }
     class StageOneParts {
+      planned()
       problems()
       close()
     }
@@ -1419,6 +1486,10 @@ classDiagram
       finish()
       stop()
     }
+    class TaskEvents {
+      on()
+      ended()
+    }
     class TaskExtensions {
       nameOf()
       build()
@@ -1443,6 +1514,7 @@ classDiagram
       start()
       recover()
       stop()
+      guide()
     }
     class TaskWork {
       <<interface>>
@@ -1629,6 +1701,12 @@ classDiagram
     class TraceRoute {
       register()
     }
+    class WorkspaceRoutes {
+      register()
+    }
+    class WorkspaceStream {
+      register()
+    }
   }
   AmazonReviews --> ActorRunner
   AmazonListingLookup --> ActorRunner
@@ -1675,6 +1753,7 @@ classDiagram
   FindingTable --> SqlDatabase
   JudgementTable --> SqlDatabase
   PacketRowTable --> SqlDatabase
+  PlanTable --> SqlDatabase
   ProductBackfill --> SqlDatabase
   ProductBackfill --> ProductTable
   ProductBackfill --> PacketRowTable
@@ -1723,6 +1802,18 @@ classDiagram
   LimitClose --> DoneCheck
   LimitClose --> DeliverableCheck
   LiveRuns --> ResearchStore
+  OperatorDesk --> PiHarness
+  OperatorDesk --> ResearchStore
+  OperatorDesk --> TaskEvents
+  OperatorTools --> ResearchStore
+  OperatorTools --> PlanDesk
+  OperatorTools --> TaskSupervisor
+  OwnerDesk --> PlanDesk
+  OwnerDesk --> OperatorDesk
+  PlanDesk --> PlanBook
+  PlanDesk --> TaskSupervisor
+  WorkspaceBoard --> ResearchStore
+  WorkspaceServices --> OpenRouterPrices
   OperatorInputs --> FindingLedger
   PartClose --> RunFindings
   PartClose --> DeliverableCheck
@@ -1736,6 +1827,7 @@ classDiagram
   ProductTruthBriefing --> Judgement
   ResearchAgentFactory --> ResearchStore
   ResearchAgentFactory --> ToolRegistry
+  ResearchAgentFactory --> Corpus
   IssueSlices --> IssueTally
   NewIssueMerge --> StructuredAsk
   ReviewAnalysisJob --> StructuredAsk
@@ -1781,7 +1873,9 @@ classDiagram
   StageOneListings --> ActorRunner
   StageOneListings --> PageFetcher
   StageOneParts --> FindingLedger
+  StageOneParts --> RoleSpec
   StageOneRunAssembly --> FindingLedger
+  StageOneRunAssembly --> RoleSpec
   ResearchTasks --> ResearchTaskDeps
   TaskCallLog --> ResearchStore
   TaskCallLog --> OpenRouterPrices
@@ -1792,6 +1886,7 @@ classDiagram
   TaskIntake --> ResearchStore
   TaskIntake --> Settings
   TaskReadings --> ResearchStore
+  TaskReadings --> Corpus
   TaskSupervisor --> TaskSupervisorDeps
   TaskWorks --> TaskWorkDeps
   AdLibraryTool --> AdLibrary
@@ -1848,7 +1943,7 @@ classDiagram
   LibraryRoutes --> LibraryIntake
   ProductRoutes --> ResearchStore
   ResearchApi --> AmazonListingSource
-  ResearchApi --> TaskSupervisor
+  ResearchApi --> WorkspaceServices
   ReviewAnalysisRoutes --> ResearchStore
   ReviewAnalysisRoutes --> RunSupervisor
   ReviewAnalysisRoutes --> ReviewAnalyst
@@ -1865,6 +1960,10 @@ classDiagram
   TaskRoutes --> ResearchStore
   TaskRoutes --> TaskSupervisor
   TraceRoute --> TraceFile
+  WorkspaceRoutes --> OwnerDesk
+  WorkspaceRoutes --> PlanBook
+  WorkspaceStream --> OperatorDesk
+  WorkspaceStream --> WorkspaceBoard
   TraceFile --> TraceLimits
 ```
 
@@ -1913,6 +2012,7 @@ classDiagram
 | `adapters` | `adapters/store/judgement-table.ts` | JudgementTable |
 | `adapters` | `adapters/store/migrations.ts` | StoreMigrations |
 | `adapters` | `adapters/store/packet-row-table.ts` | PacketRowTable |
+| `adapters` | `adapters/store/plan-table.ts` | PlanTable |
 | `adapters` | `adapters/store/postgres-database.ts` | PostgresStatements, PostgresDatabase |
 | `adapters` | `adapters/store/postgres-dialect.ts` | PostgresDialect |
 | `adapters` | `adapters/store/product-backfill.ts` | ProductBackfill |
@@ -1954,6 +2054,13 @@ classDiagram
 | `agent` | `agent/live-runs.ts` | RunControl, Live, LiveRuns |
 | `agent` | `agent/llm-call-log.ts` | CallSequence, LlmCallLog |
 | `agent` | `agent/model-chain.ts` | ModelChain |
+| `agent` | `agent/operator/chat-view.ts` | ChatView |
+| `agent` | `agent/operator/operator-desk.ts` | OperatorDesk |
+| `agent` | `agent/operator/operator-tools.ts` | OperatorTools |
+| `agent` | `agent/operator/owner-desk.ts` | OwnerDesk |
+| `agent` | `agent/operator/plan-desk.ts` | PlanChange, PlanDesk |
+| `agent` | `agent/operator/workspace-board.ts` | WorkspaceBoard |
+| `agent` | `agent/operator/workspace-services.ts` | WorkspaceServices |
 | `agent` | `agent/operator-inputs.ts` | OperatorInputs |
 | `agent` | `agent/part-close.ts` | CloseReason, PartClose |
 | `agent` | `agent/pi-harness.ts` | PiHarness |
@@ -2009,6 +2116,7 @@ classDiagram
 | `agent` | `agent/task/research-task.ts` | ResearchTaskDeps, ResearchTasks |
 | `agent` | `agent/task/task-call-log.ts` | TaskCallLog |
 | `agent` | `agent/task/task-end.ts` | TaskEnd |
+| `agent` | `agent/task/task-events.ts` | TaskEvents |
 | `agent` | `agent/task/task-extensions.ts` | TaskExtensions |
 | `agent` | `agent/task/task-intake.ts` | TaskIntake |
 | `agent` | `agent/task/task-readings.ts` | TaskReadings |
@@ -2041,6 +2149,7 @@ classDiagram
 | `domain` | `domain/breakers.ts` | Trip, BreakerReadings, BreakerLimits, Breakers, RunStatuses |
 | `domain` | `domain/brief.ts` | Briefs |
 | `domain` | `domain/charges.ts` | ChargeDraft, Charge, ChargeMeter, ServiceUse |
+| `domain` | `domain/chat.ts` | ChatMessage, TaskCard, Board |
 | `domain` | `domain/check-problem.ts` | RowRef, CheckProblem, CheckProblems |
 | `domain` | `domain/competitor-discovery.ts` | CompetitorCandidate, DiscoveryQuestion, DiscoveryReport, DiscoveryQuestions |
 | `domain` | `domain/cost-report.ts` | CostCell, CostRow, CostReport |
@@ -2052,6 +2161,7 @@ classDiagram
 | `domain` | `domain/nodes.ts` | Stages |
 | `domain` | `domain/packet-rows.ts` | PacketRowSet, PacketRows |
 | `domain` | `domain/paragraphs.ts` | Paragraph, Paragraphs |
+| `domain` | `domain/plans.ts` | PlanTask, Plan, PlanBook |
 | `domain` | `domain/ports.ts` | ProductCatalog, AccountDirectory, AmazonListingSource, TargetListings, ChargeLedger, FindingLedger, PageFetcher, WebSearch, AdLibrary, CompetitorDiscovery, ResearchStore, GateVerdict, FetchGate, ReviewPullStore |
 | `domain` | `domain/primitives.ts` | PrimitiveSpec, Primitives |
 | `domain` | `domain/products.ts` | RunHead, Product, ProductSummary, ProductFolders |
@@ -2063,6 +2173,7 @@ classDiagram
 | `domain` | `domain/review-mining.ts` | BestsellerRank, AmazonListing, TrustpilotSummary, TargetListing |
 | `domain` | `domain/reviews.ts` | ReviewExcerpt, ReviewResult, LedgerPull, LedgerReview, ReviewLedgerSnapshot, StoredRunReview, StoredPull |
 | `domain` | `domain/role-records.ts` | RoleRecords |
+| `domain` | `domain/saved-plans.ts` | SavedTask, SavedPlans |
 | `domain` | `domain/service-report.ts` | ServicePart, ServiceReport, ServiceReports |
 | `domain` | `domain/stage-one-agents.ts` | StageOnePlan, StageOnePlans |
 | `domain` | `domain/web.ts` | SearchHit, SearchPage, SearchScope, FetchedPage, ServiceUnavailableError |
@@ -2122,6 +2233,8 @@ classDiagram
 | `http` | `http/task-routes.ts` | TaskRoutes |
 | `http` | `http/token-service.ts` | TokenService |
 | `http` | `http/trace-route.ts` | TraceRoute |
+| `http` | `http/workspace-routes.ts` | WorkspaceRoutes |
+| `http` | `http/workspace-stream.ts` | WorkspaceStream |
 | `trace` | `trace/trace-file.ts` | TraceLimits, TraceFile |
 | `trace` | `trace/trace-format.ts` | TraceFormat |
 | `trace` | `trace/trace.ts` | TraceSink, TraceStep, TraceScope, Trace |
