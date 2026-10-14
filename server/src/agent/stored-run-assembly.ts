@@ -1,4 +1,4 @@
-import { Briefs, Primitives, briefSchema, taskContractSchema, type Node, type ResearchRun, type ResearchStore } from "../domain/index.js";
+import { Briefs, briefSchema, taskContractSchema, type Node, type ResearchRun, type ResearchStore } from "../domain/index.js";
 import { Trace } from "../trace/index.js";
 
 import type { LiveRuns } from "./live-runs.js";
@@ -20,7 +20,7 @@ export class StoredRunAssembly {
     const nodes = run.nodes as Node[];
     if (run.contract) {
       const contract = taskContractSchema.parse(run.contract);
-      return TaskWorks.assembly(store, run.id, contract, brief, Primitives.role(contract));
+      return TaskWorks.assembly(store, run, contract, brief);
     }
     return new StageOneRunAssembly(store.findings, run.id, { brief, nodes, roles: StageOneParts.planned(brief, nodes) });
   }

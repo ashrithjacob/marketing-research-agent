@@ -150,9 +150,31 @@ fields, which inputs, which criteria. The operator cannot write a new kind of
 | `ad_scan` | its advertiser list has saturated: the given number of searches in a row found no advertiser not already listed; every ad listed is archived as an `ad_library` source | `ListCheck` with an `ad` item — to build | the search terms, markets, and the quiet-run length |
 | `review_mine` | every target × star band in its plan was pulled, or recorded as unavailable with the reason | the pipeline's own end, as `ReviewMiningJob` today | the targets and bands |
 | `analyse` | every input finding is covered by at least one derived finding, and every derived finding cites ledger rows that exist | new check — to build | the input finding ids |
-| `write` | a draft exists with every section its playbook names, and every claim in it cites a finding | new check — to build | the playbook and the finding ids it may draw on |
-| `critique` | a verdict (pass or fail, and why) exists for every criterion named | new check — to build | the criteria and the task it reviews |
+| `write` | a draft exists with every section its playbook names, and every claim in it cites a finding | `DraftCheck` — built in part 8 | the playbook and the finding ids it may draw on |
+| `critique` | a verdict (pass or fail, and why) exists for every criterion named | `VerdictDone` — built in part 8 | the criteria and the draft it reviews |
 | `ask_owner` | the owner answered | the answer's arrival | the question |
+
+*Built 2026-10-14, part 8* (`agent/write/`, `research_drafts`). A contract's
+`complete` is one of three shapes: a research deliverable, `{ shape: "draft",
+playbook }` for `write`, or `{ shape: "verdict", draft_id, criteria }` for
+`critique`. A playbook is a saved entry in code (`domain/playbooks.ts`); the one
+built is `long_form_static`, its five sections (hook, lead, mechanism, product
+intro, close) and six criteria taken from the owner's Long-Form Statics
+Playbook in the library, Section 05. The writer's tools are `read_inputs` (its
+findings, copied into its own ledger by `TaskInputs`, each with its id),
+`write_section`, the library tools when the library has a ready document, and
+`finish`. It cites a finding as `[[id]]` and puts a finding's own words or
+figure in as `{{id}}`, which code fills when the draft is shown (§6.8); a digit
+typed outside a placeholder is refused. `DraftCheck` refuses a missing section,
+a section citing nothing, an id not in its ledger, and a typed figure. The
+critic has `read_draft` (rendered, with footnotes), `record_verdict` and
+`finish`; done is a verdict per criterion. Where it differs from the above:
+`write` reads no ledger but its own copied inputs; `critique` reads the draft,
+not the ledger; neither records findings, so a section or verdict written
+counts as progress for the no-progress breaker. The step ceilings are 20
+(`write`) and 12 (`critique`). `verify: "critique"` is accepted for a `write`
+only; `owner` is still refused. Tested against the faux model; no draft has
+been written by a real model.
 
 ### 3.2 When to stop trying, and ending partly done
 
@@ -1187,7 +1209,7 @@ dashboard; a button starts it. Decided with the owner:
 | 5 | **done 2026-10-14** (§5.2, built). Feedback events (§5.2) and the inbox cards | the owner's actions are recorded against what they were about |
 | 6 | **Learning from corrections built 2026-10-14** (§5.4, built); evals, the replay suite and playbook versions are not. Reviewer as a fork, lessons, the gate, playbook versions, the editable brand-memory list (§5.3–5.4, §6.6); eval cases from invalid tasks and corrections, and the replay suite (§5.7) | a correction given once produces a lesson; approved, the next task reads it |
 | 7 | **Work nobody clicked built 2026-10-14** (§7.4, built); the work log, warm-cache compaction and cache-rate measurement are not. The Always on switch and daily cap, the operator's router for signals, stable sections, work log and warm-cache compaction (the operator conversation itself moved to part 3); `create_task`, `mra.money`, the schedule watcher | the system starts work nobody clicked, inside its limits; the operator's cache hit rate holds across a day |
-| 8 | `write` and `critique` primitives; the long-form statics playbook | an ad draft that cites its findings |
+| 8 | **Built 2026-10-14** (§3.1, built; tested against the faux model only). `write` and `critique` primitives; the long-form statics playbook | an ad draft that cites its findings |
 | 9 | Measurement per playbook version (§5.5), curator watcher (§5.6), `distil` (§5.8) | a lesson that hurt is visible with numbers |
 | 10 | Ad-results feedback (`docs/plan-meta-integration.md` Phase D; its Phases A–B start alongside parts 1–2, because Meta's App Review needs a reader already running), competitor and review watchers | the loop closes on real ad performance |
 

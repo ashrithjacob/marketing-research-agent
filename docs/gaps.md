@@ -1,6 +1,6 @@
 # Gaps in what is built
 
-Known gaps in the always-on work on the `ubiquitous` branch (parts 1–4, the
+Known gaps in the always-on work on the `ubiquitous` branch (parts 1–8, the
 `stop_when` judge and cards, `docs/spec-always-on.md`). Each was checked against the code
 or the local store on 2026-10-14. When one is closed, strike it through with the
 commit that closed it; do not delete it.
@@ -84,6 +84,24 @@ commit that closed it; do not delete it.
     waits on the champion or reaches Apify always becomes a draft plan, even
     with Always on; a whole stage-1 plan cannot be started unattended.
 
+19. **A playbook is code, written by hand from the library document.** Spec §5.1
+    has playbooks distilled from the owner's documents and versioned (§5.5);
+    `long_form_static` is one entry in `domain/playbooks.ts`, and the writer
+    reads the document itself through the library tools only when the library
+    has it. No other playbook exists, and the route accepts only write playbooks.
+20. **A draft does not know its plan.** `research_drafts` has the write run, not
+    the plan; the plan card's "The writer started" is page state and is gone on
+    reload. Drafts are found through the inbox list and the approval card.
+21. **The critic's verdicts do not reach the writer.** A criterion not met is
+    shown to the owner; nothing rewrites the draft with it.
+22. **The owner's edits are not checked.** `DraftDesk.edit` saves any text, so an
+    edit can type a figure or cite an id that is not a finding; and the edit box
+    shows the raw `[[id]]` and `{{id}}` markup.
+23. **The operator cannot start a write.** Only the plan card's button does;
+    `create_task` knows the saved research tasks only.
+24. **The writer's inputs are not chosen.** Every citable row of the plan's
+    delivered runs, in plan order, cut at 80; nothing ranks them by use to an ad.
+
 ## Built but not seen live
 
 The owner asked on 2026-10-14 for no more live runs; these are covered by tests
@@ -107,9 +125,14 @@ against the faux model only.
 - **A category-numbers task finishing.** Its one run hit the stage role's
   15-turn limit (gap 7); whether tasks need a higher ceiling is open.
 
+- **A draft written by a real model.** The write → critique → owner flow, the
+  typed-figure refusal and owner edits are tested against the faux model; on the
+  local stack the draft routes answer (`/drafts` lists none) but no draft has
+  been written.
+
 ## Outside the code
 
-- **Nothing is deployed.** Parts 1–4 are only on the `ubiquitous` branch and the
+- **Nothing is deployed.** Parts 1–8 are only on the `ubiquitous` branch and the
   local stack; marketing.vanis.ai runs the old code. The harness backup step in
   `deploy/vps/mra-snapshot.sh` has not run on the VPS.
 - **`../setup.md` is not in any commit.** It sits outside this repository.

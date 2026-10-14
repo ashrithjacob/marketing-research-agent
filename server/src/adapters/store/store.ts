@@ -1,4 +1,4 @@
-import { Briefs, type AccountDirectory, type ChargeLedger, type DocumentLibrary, type ReviewPullStore, type FindingLedger, type Generation, type Judgement, type LlmCall, type LlmCallRecord, type PacketCheck, type PlanBook, type CardBook, type FeedbackBook, type LessonBook, type MemoryBook, type AlwaysOnBook, type ScheduleBook, type ProductCatalog, type ResearchRun, type ResearchStore, type ReviewAnalysis, type ReviewLedgerSnapshot, type RunEvent, type RunUpdate, type Scope, type SourceKind, type StoredRunReview, type TargetListings } from "../../domain/index.js";
+import { Briefs, type AccountDirectory, type ChargeLedger, type DocumentLibrary, type ReviewPullStore, type FindingLedger, type Generation, type Judgement, type LlmCall, type LlmCallRecord, type PacketCheck, type PlanBook, type CardBook, type FeedbackBook, type LessonBook, type MemoryBook, type AlwaysOnBook, type ScheduleBook, type DraftBook, type ProductCatalog, type ResearchRun, type ResearchStore, type ReviewAnalysis, type ReviewLedgerSnapshot, type RunEvent, type RunUpdate, type Scope, type SourceKind, type StoredRunReview, type TargetListings } from "../../domain/index.js";
 import { Trace } from "../../trace/index.js";
 
 import type { SqlDatabase } from "./sql-database.js";
@@ -16,15 +16,14 @@ export class SqlResearchStore implements ResearchStore {
   readonly plans: PlanBook;
   readonly cards: CardBook;
   readonly feedback: FeedbackBook;
-  readonly memory: MemoryBook;
-  readonly lessons: LessonBook;
-  readonly alwaysOn: AlwaysOnBook;
-  readonly schedules: ScheduleBook;
+  readonly memory: MemoryBook; readonly lessons: LessonBook;
+  readonly alwaysOn: AlwaysOnBook; readonly schedules: ScheduleBook;
+  readonly drafts: DraftBook;
 
   private constructor(private readonly tables: StoreTables) {
     Trace.line(import.meta.url, "SqlResearchStore.constructor");
     ({ catalog: this.products, accounts: this.accounts, listings: this.listings, findings: this.findings } = tables);
-    ({ charges: this.charges, pulls: this.pulls, library: this.library, plans: this.plans, cards: this.cards, feedback: this.feedback, memory: this.memory, lessons: this.lessons, alwaysOn: this.alwaysOn } = tables);
+    ({ charges: this.charges, pulls: this.pulls, library: this.library, plans: this.plans, cards: this.cards, feedback: this.feedback, memory: this.memory, lessons: this.lessons, alwaysOn: this.alwaysOn, drafts: this.drafts } = tables);
     this.schedules = tables.alwaysOn;
   }
 

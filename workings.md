@@ -1050,6 +1050,30 @@ paragraph numbers: code copies the quote and its character range from the
 archived page (`ExcerptTool`, `domain/paragraphs.ts`). Stage 1 has no
 `record_excerpt`.
 
+### §2m — drafts: write, critique, the owner (always-on part 8)
+
+On an approved plan whose tasks found something, **Write a long-form static**
+calls `POST /plans/:id/write`. `DraftFlow.write` takes the live excerpt,
+measurement, attribute, competitor and champion rows of the plan's delivered
+runs (at most 80, by `<run>/<row>` reference) and starts a `write` task whose
+contract names the `long_form_static` playbook. `TaskIntake` copies those rows
+(and the sources they cite) into the task's own ledger, with new ids.
+`TaskWorks` hands a `write` or `critique` contract to `DraftWorks`. The writer
+calls `read_inputs`, then `write_section` per section; the first one creates
+the `research_drafts` row (version 1, `writing`), later ones change it in place.
+Each write answers with that section's own check, and `finish` runs
+`DraftCheck` on the whole draft. When the write run ends `completed`,
+`DraftFlow` marks the draft `critique` and starts a `critique` task with the
+playbook's criteria; any other ending sends the draft straight to the owner.
+The critic's `record_verdict` saves each verdict on the draft. When the critique
+ends, however it ends, the draft goes to `review` with an approval card (action
+`draft`). On `/drafts/:id` the owner reads it rendered (placeholders filled,
+citations as footnotes), edits a section (`DraftDesk.edit`: a new version by
+`owner`, and an `edited` feedback with the before and after), and approves or
+rejects it, from the page or the card; either way the card is resolved and an
+`accept` or `reject` feedback is written against the draft. Each run's packet is
+the findings the draft rests on (`DraftRunAssembly`), so its run page shows them.
+
 ### §2l — Always on: work nobody clicked (always-on part 7)
 
 `AlwaysOnDesk.set` stores the switch and daily cap on `research_workspaces` and

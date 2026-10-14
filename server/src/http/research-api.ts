@@ -22,6 +22,7 @@ import { ScopeGuard } from "./scope-guard.js";
 import { AlwaysOnRoutes } from "./always-on-routes.js";
 import { CardRoutes } from "./card-routes.js";
 import { MemoryRoutes } from "./memory-routes.js";
+import { DraftRoutes } from "./draft-routes.js";
 import { TaskRoutes } from "./task-routes.js";
 import { WorkspaceRoutes } from "./workspace-routes.js";
 import { WorkspaceStream } from "./workspace-stream.js";
@@ -56,6 +57,7 @@ export class ResearchApi {
       new WorkspaceStream(workspace.operator, workspace.board).register(api);
       new CardRoutes(workspace.cards).register(api);
       new MemoryRoutes(workspace.memory).register(api);
+      new DraftRoutes(workspace.drafts, workspace.draftDesk, store.drafts).register(api);
       new AlwaysOnRoutes(workspace.alwaysOn, workspace.schedules).register(api);
     }
     new CostRoute(store).register(api);

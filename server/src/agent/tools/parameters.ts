@@ -69,3 +69,18 @@ export const libraryReadParameters = Type.Object({
   document_id: Type.String({ description: "The document's id, from library_index." }),
   section: Type.Number({ description: "The section's number, from library_index." }),
 });
+
+export const readInputsParameters = Type.Object({});
+
+export const writeSectionParameters = Type.Object({
+  section: Type.String({ description: "The section's key, e.g. hook." }),
+  text: Type.String({ description: "The section's whole text, citing findings as [[id]] and putting a finding's quote or figure in as {{id}}." }),
+});
+
+export const readDraftParameters = Type.Object({});
+
+export const recordVerdictParameters = Type.Object({
+  criterion: Type.Number({ description: "The criterion's number in the list, from 1." }),
+  pass: Type.Boolean({ description: "Whether the draft meets it." }),
+  why: Type.String({ description: "One or two sentences pointing at the words that decide it." }),
+});

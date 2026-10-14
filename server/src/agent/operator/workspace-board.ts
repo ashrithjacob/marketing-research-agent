@@ -28,6 +28,7 @@ export class WorkspaceBoard {
       memory: await this.store.memory.current(scope),
       always_on: await this.alwaysOn().status(workspaceId),
       schedules: await this.store.schedules.list(workspaceId),
+      drafts: await this.store.drafts.list(scope, 10),
     };
   }
 

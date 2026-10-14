@@ -22,7 +22,7 @@ export class TaskEnd {
     if (!run || TERMINAL_STATUSES.has(run.status)) return run?.status ?? "missing";
     const work = await works.of(runId);
     const unmet = (await work.check.problems()).length > 0;
-    const trip = seen ?? signals.tripped(runId) ?? (unmet ? await readings.trip(runId, work.contract, work.role.maxTurns, Date.now()) : null);
+    const trip = seen ?? signals.tripped(runId) ?? (unmet ? await readings.trip(runId, work.contract, work.ceiling, Date.now()) : null);
     return this.end(work, await this.ending(work, trip, error));
   }
 
@@ -37,7 +37,7 @@ export class TaskEnd {
     Trace.line(import.meta.url, "TaskEnd.ending", { runId: work.runId, breaker: trip?.breaker ?? null });
     if (trip) {
       const { gapped, retracted } = await work.close(trip);
-      this.deps.runs.emit(work.runId, "agent.limit_reached", { agent_id: work.role.id, limit: work.role.maxTurns, breaker: trip.breaker, reason: trip.status, gapped, retracted });
+      this.deps.runs.emit(work.runId, "agent.limit_reached", { agent_id: work.agentId, limit: work.ceiling, breaker: trip.breaker, reason: trip.status, gapped, retracted });
       return { kind: "cut_short", trips: [trip] };
     }
     return error ? { kind: "crashed", error } : { kind: "settled" };

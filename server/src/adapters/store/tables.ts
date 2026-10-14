@@ -13,6 +13,7 @@ import { PacketRowTable } from "./packet-row-table.js";
 import { PlanTable } from "./plan-table.js";
 import { AlwaysOnTable } from "./always-on-table.js";
 import { CardTable } from "./card-table.js";
+import { DraftTable } from "./draft-table.js";
 import { FeedbackTable } from "./feedback-table.js";
 import { LessonTable } from "./lesson-table.js";
 import { MemoryTable } from "./memory-table.js";
@@ -51,6 +52,7 @@ export class StoreTables {
   readonly memory: MemoryTable;
   readonly lessons: LessonTable;
   readonly alwaysOn: AlwaysOnTable;
+  readonly drafts: DraftTable;
 
   private constructor(readonly db: SqlDatabase) {
     Trace.line(import.meta.url, "StoreTables.constructor");
@@ -75,6 +77,7 @@ export class StoreTables {
     this.memory = new MemoryTable(db);
     this.lessons = new LessonTable(db);
     this.alwaysOn = new AlwaysOnTable(db);
+    this.drafts = new DraftTable(db);
     this.catalog = new SqlProductCatalog(this.products, this.runs, this.packetRows);
   }
 

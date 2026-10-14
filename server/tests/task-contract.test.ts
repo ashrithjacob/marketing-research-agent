@@ -37,7 +37,7 @@ describe("a task contract", () => {
   });
 
   it("refuses a primitive, a finding kind or a field the vocabulary does not have", () => {
-    expect(taskContractSchema.safeParse({ ...productContract(), primitive: "write" }).success).toBe(false);
+    expect(taskContractSchema.safeParse({ ...productContract(), primitive: "ad_scan" }).success).toBe(false);
     const badKind = { ...PRODUCT_DELIVERABLE, fields: [{ key: "x", record: "opinion", required: true, describe: "x" }] };
     expect(taskContractSchema.safeParse({ ...productContract(), complete: badKind }).success).toBe(false);
     expect(taskContractSchema.safeParse({ ...productContract(), deadline: "tomorrow" }).success).toBe(false);
@@ -66,7 +66,7 @@ describe("a task contract", () => {
       "input finding 'run1/a3' is not in this workspace",
       "input document 'doc9' is not in this workspace",
       "budget.max_usd 5 is over the per-task cap of 2",
-      "verify 'owner' has nothing to run it yet; only 'code' is built",
+      "verify 'owner' has nothing to run it for a research task; 'code' is built, and 'critique' for a write",
     ]);
   });
 

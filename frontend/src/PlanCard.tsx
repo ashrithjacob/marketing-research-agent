@@ -1,11 +1,12 @@
 import { useState } from 'react';
 
-import { workspaceApi, type Plan, type TaskCard } from './api';
+import { draftApi, workspaceApi, type Plan, type TaskCard } from './api';
 import { Link, paths } from './route';
 import StopWhen from './StopWhen';
 
 export default function PlanCard({ plan, tasks, onError }: { plan: Plan; tasks: TaskCard[]; onError: (message: string) => void }) {
   const [busy, setBusy] = useState(false);
+  const [writing, setWriting] = useState(false);
   const draft = plan.status === 'draft';
   const subject = plan.brief.product || plan.brief.url;
 
@@ -23,6 +24,7 @@ export default function PlanCard({ plan, tasks, onError }: { plan: Plan; tasks: 
   const kept = plan.tasks.filter((task) => task.selected);
   const owned = kept.filter((task) => !task.auto);
   const cap = kept.reduce((sum, task) => sum + task.contract.budget.max_usd, 0);
+  const found = tasks.some((card) => plan.tasks.some((task) => task.run_id === card.run_id) && (card.status === 'completed' || card.status === 'partial'));
 
   return (
     <section className="plan">
@@ -77,6 +79,17 @@ export default function PlanCard({ plan, tasks, onError }: { plan: Plan; tasks: 
           );
         })}
       </ul>
+      {!draft && found && (
+        <div className="plan-approve">
+          {writing ? (
+            <p className="muted small">The writer started. When the critic has checked the draft, it waits for you in the inbox.</p>
+          ) : (
+            <button className="primary" disabled={busy} onClick={() => act(async () => { await draftApi.writeDraft(plan.id); setWriting(true); })}>
+              Write a long-form static from what was found
+            </button>
+          )}
+        </div>
+      )}
       {draft && (
         <div className="plan-approve">
           <p className="muted small">Nothing runs until you approve. Anything that would spend Apify money gets its own approval button.</p>

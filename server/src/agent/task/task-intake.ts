@@ -1,5 +1,5 @@
 import type { Settings } from "../../config/index.js";
-import { Briefs, Primitives, Scope, taskRequestSchema, type FindingKind, type ResearchRun, type ResearchStore, type TaskContract } from "../../domain/index.js";
+import { Briefs, Contracts, Primitives, Scope, taskRequestSchema, type FindingKind, type ResearchRun, type ResearchStore, type TaskContract } from "../../domain/index.js";
 import { ContractCheck, ZodProblems } from "../../extract/index.js";
 import { Trace } from "../../trace/index.js";
 
@@ -43,7 +43,7 @@ export class TaskIntake {
       stage: 1,
       contract: contract as unknown as Record<string, unknown>,
     });
-    await new TaskInputs(this.store.findings).copy(contract.inputs.finding_ids, run.id, contract.complete.node);
+    await new TaskInputs(this.store.findings).copy(contract.inputs.finding_ids, run.id, Contracts.node(contract));
     if (approved) await this.store.addEvent(run.id, "run.approved", { reasons: asks });
     return run;
   }

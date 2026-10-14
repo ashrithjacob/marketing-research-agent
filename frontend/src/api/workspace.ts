@@ -1,3 +1,4 @@
+import type { Draft } from './drafts';
 import { request } from './client';
 import type { Brief } from './runs';
 
@@ -54,7 +55,7 @@ export interface TaskCard {
 export interface Card {
   id: string;
   kind: 'question' | 'approval';
-  action: { kind: string };
+  action: { kind: string; draft_id?: string };
   status: 'open' | 'answered' | 'approved' | 'rejected';
   title: string;
   body: string;
@@ -106,6 +107,7 @@ export interface Board {
   memory: MemoryEntry[];
   always_on: AlwaysOnStatus;
   schedules: Schedule[];
+  drafts: Draft[];
 }
 
 export const workspaceApi = {

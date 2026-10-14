@@ -1,6 +1,7 @@
 import { useState } from 'react';
 
 import { workspaceApi, type Card } from './api';
+import { Link, paths } from './route';
 
 function OpenCard({ card, onError }: { card: Card; onError: (message: string) => void }) {
   const lesson = card.action.kind === 'lesson';
@@ -22,6 +23,11 @@ function OpenCard({ card, onError }: { card: Card; onError: (message: string) =>
     <li className={`card ${card.kind}`}>
       <div className="card-title">{card.kind === 'approval' ? 'Needs your approval' : 'Needs your answer'} · {card.title}</div>
       <div className="card-body">{card.body}</div>
+      {card.action.draft_id && (
+        <Link to={paths.draft(card.action.draft_id)} className="d">
+          Read the draft →
+        </Link>
+      )}
       {card.kind === 'question' ? (
         <form
           className="card-answer"

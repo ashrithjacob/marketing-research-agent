@@ -1,0 +1,45 @@
+import type { PrimitiveName } from "./task-contract.js";
+
+/** One section a draft must have, and what it must do. */
+export interface PlaybookSection {
+  key: string;
+  title: string;
+  describe: string;
+}
+
+/** How to do a class of task (spec §5.1): what it is for, the owner's document it comes from, the sections a draft has, and what a critic checks. */
+export interface Playbook {
+  key: string;
+  title: string;
+  primitive: PrimitiveName;
+  document_title: string;
+  read_first: string[];
+  sections: PlaybookSection[];
+  criteria: string[];
+}
+
+/** The long-form static, from the owner's Long-Form Statics Playbook (uploaded to the library 2026-10-12): its Section 05, "The Complete Script Structure", names the five parts. */
+export const PLAYBOOKS: Readonly<Record<string, Playbook>> = {
+  long_form_static: {
+    key: "long_form_static",
+    title: "Long-form static ad",
+    primitive: "write",
+    document_title: "Long Form Statics Playbook",
+    read_first: ["Section 05", "Section 06", "Section 07", "Section 08", "Section 09", "Section 10", "Section 12"],
+    sections: [
+      { key: "hook", title: "Hook / Headline", describe: "the first one or two lines before 'See more': emotional, with jeopardy; stops the scroll and filters the audience" },
+      { key: "lead", title: "Lead", describe: "the storyline before the mechanism: identification, symptoms, the fear, the solutions that failed, the real-life cost, the core emotion" },
+      { key: "mechanism", title: "Mechanism", describe: "why the problem exists, reframed, and why this product works differently; it must be novel" },
+      { key: "product_intro", title: "Product intro", describe: "the product enters as the story's resolution, a discovery, never announced" },
+      { key: "close", title: "Close", describe: "differentiation, a stack of proof, risk reversal, urgency, the call to action; a PS if it helps" },
+    ],
+    criteria: [
+      "The hook stops the scroll and filters for the customer, with emotion and jeopardy, in the first two lines.",
+      "The lead makes the customer recognise themselves: symptoms, fear, failed solutions, real cost.",
+      "The mechanism is novel: it explains the problem anew and why this product works differently.",
+      "The product enters as the resolution of the story, not as an announcement.",
+      "The close stacks proof, reverses risk and ends with one clear call to action.",
+      "Every claim about the product, the customer or the market cites a finding, and no figure is made up.",
+    ],
+  },
+};

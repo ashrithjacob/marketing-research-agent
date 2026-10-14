@@ -1,3 +1,4 @@
+import type { Draft } from "./drafts.js";
 import type { Card } from "./cards.js";
 import type { Feedback } from "./feedback.js";
 import type { MemoryEntry } from "./memory.js";
@@ -39,4 +40,5 @@ export interface Board {
   memory: MemoryEntry[];
   always_on: AlwaysOn & { spent_today: number; running: number };
   schedules: Schedule[];
+  drafts: Draft[];
 }

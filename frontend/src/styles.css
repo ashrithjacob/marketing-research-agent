@@ -1021,3 +1021,13 @@ details[open].tile-gap > summary.tile-gap-missing { white-space: normal; }
 .always-row input, .always-row select { background: var(--bg); border: 1px solid var(--line); color: var(--ink); border-radius: 10px; padding: 7px 9px; font-size: 13px; }
 .always-row input.days { width: 52px; margin: 0 4px; }
 .always-row label input { width: 70px; margin-left: 4px; }
+
+.draft { max-width: 760px; margin: 24px auto; padding: 0 16px; display: flex; flex-direction: column; gap: 14px; }
+.draft-section { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; }
+.draft-section-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.draft-section h3, .draft-notes h3, .draft-verdicts h3 { margin: 0 0 8px; font-size: 14px; }
+.draft-text { white-space: pre-wrap; line-height: 1.55; margin: 0; }
+.draft-edit textarea { width: 100%; box-sizing: border-box; font: inherit; }
+.draft-edit { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
+.draft-notes ol, .draft-verdicts ul { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; }
+.draft-verdicts ul { list-style: none; padding: 0; }

@@ -2,6 +2,7 @@ import type { Feedback } from './api';
 import AlwaysOnPanel from './AlwaysOnPanel';
 import Cards from './Cards';
 import MemoryList from './MemoryList';
+import { Link, paths } from './route';
 import { useWorkspace } from './use-workspace';
 
 const SAID: Record<Feedback['verdict'], string> = {
@@ -18,6 +19,7 @@ function about(feedback: Feedback): string {
   if (target.kind === 'source') return `a source of run ${target.run_id.slice(0, 8)}`;
   if (target.kind === 'contract') return target.id === target.plan_id ? 'a plan' : `the ${target.id.replace(/_/g, ' ')} task`;
   if (target.kind === 'card') return 'a card';
+  if (target.kind === 'draft') return 'a draft';
   return `task ${target.run_id.slice(0, 8)}`;
 }
 
@@ -35,6 +37,22 @@ export default function InboxPage({ onError }: { onError: (message: string) => v
       <AlwaysOnPanel status={board.always_on} schedules={board.schedules} onError={onError} />
       <Cards cards={board.cards} today={board.cards_today} onError={onError} />
       {board.cards.length === 0 && <div className="empty">Nothing is waiting for you.</div>}
+      {board.drafts.length > 0 && (
+        <section className="feedback-log">
+          <h2>Drafts</h2>
+          <ul>
+            {board.drafts.map((draft) => (
+              <li key={draft.id}>
+                <span className="when">{new Date(draft.created_at).toLocaleString()}</span>
+                <Link to={paths.draft(draft.id)} className="what">
+                  {draft.playbook.replace(/_/g, ' ')}, version {draft.version}
+                </Link>
+                <span className="d">{draft.status}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
       <MemoryList entries={board.memory} onError={onError} />
       <section className="feedback-log">
         <h2>What you have told the system</h2>

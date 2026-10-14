@@ -13,6 +13,7 @@ export class CardDesk {
     private readonly tasks: TaskSupervisor,
     private readonly reply: (workspaceId: string, text: string) => Promise<void>,
     private readonly lesson: (lessonId: string, approved: boolean, text: string) => Promise<void>,
+    private readonly draft: (draftId: string, approved: boolean) => Promise<void>,
     events: TaskEvents,
   ) {
     Trace.line(import.meta.url, "CardDesk.constructor");
@@ -42,6 +43,7 @@ export class CardDesk {
       await this.lesson(card.action.lesson_id, true, edit);
       return (await this.store.cards.resolve(card.id, "approved", edit))!;
     }
+    if (card.action.kind === "draft") return this.settleDraft(card, scope, true);
     if (card.action.kind !== "start_task") throw new RunError(`card ${cardId} has nothing to start`);
     const { brief, contract, plan_id, task_key } = card.action;
     const run = await this.tasks.start({ brief, contract }, card.workspace_id, { approved: true });
@@ -53,10 +55,18 @@ export class CardDesk {
   async reject(cardId: string, scope: Scope): Promise<Card> {
     Trace.line(import.meta.url, "CardDesk.reject", { cardId });
     const card = await this.unresolved(cardId, scope, "approval");
+    if (card.action.kind === "draft") return this.settleDraft(card, scope, false);
     if (card.action.kind === "start_task") await this.onPlan(card.action.plan_id, card.action.task_key, { error: "rejected by the owner" });
     if (card.action.kind === "lesson") await this.lesson(card.action.lesson_id, false, "");
     else await this.feedback(card, "reject", "");
     return (await this.store.cards.resolve(card.id, "rejected", ""))!;
+  }
+
+  /** The draft desk resolves the draft's card and records the feedback, against the draft. */
+  private async settleDraft(card: Card, scope: Scope, approved: boolean): Promise<Card> {
+    Trace.line(import.meta.url, "CardDesk.settleDraft", { cardId: card.id, approved });
+    if (card.action.kind === "draft") await this.draft(card.action.draft_id, approved);
+    return (await this.store.cards.get(scope, card.id))!;
   }
 
   private async feedback(card: Card, verdict: FeedbackVerdict, text: string, startedRun = ""): Promise<void> {

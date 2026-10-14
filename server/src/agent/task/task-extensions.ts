@@ -73,7 +73,7 @@ export class TaskExtensions {
     Trace.line(import.meta.url, "TaskExtensions.beforeRequest", { runId: work.runId });
     work.calls.sent(String(api.taskId), messages);
     const sent = (await work.calls.count()) + 1;
-    if (!Breakers.warnNow(sent, work.role.maxTurns)) return undefined;
+    if (!Breakers.warnNow(sent, work.ceiling)) return undefined;
     return { messages: [...messages, { role: "user", content: TASK_CEILING_WARNING, timestamp: Date.now() }] };
   }
 
@@ -95,7 +95,7 @@ export class TaskExtensions {
   private async watchBreakers(work: TaskWork): Promise<boolean> {
     Trace.line(import.meta.url, "TaskExtensions.watchBreakers", { runId: work.runId });
     if (this.signals.tripped(work.runId)) return true;
-    const trip = await this.readings.trip(work.runId, work.contract, work.role.maxTurns, Date.now());
+    const trip = await this.readings.trip(work.runId, work.contract, work.ceiling, Date.now());
     if (trip) this.signals.trip(work.runId, trip);
     return trip !== null;
   }

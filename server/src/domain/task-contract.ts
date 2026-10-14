@@ -6,7 +6,7 @@ import { FINDING_KINDS } from "./finding-kinds.js";
 import { nodeSchema } from "./nodes.js";
 import { STAGE_ONE_AGENTS } from "./stage-one-agents.js";
 
-export const PRIMITIVE_NAMES = ["research"] as const;
+export const PRIMITIVE_NAMES = ["research", "write", "critique"] as const;
 export type PrimitiveName = (typeof PRIMITIVE_NAMES)[number];
 
 export const VERIFIERS = ["code", "critique", "owner"] as const;
@@ -70,13 +70,21 @@ export const deliverableSchema: z.ZodType<Deliverable, z.ZodTypeDef, unknown> = 
     .strict(),
 ]);
 
+/** What a `write` task must leave: a draft with every section its playbook names (spec §3.1). */
+export const draftCompleteSchema = z.object({ shape: z.literal("draft"), playbook: z.string().min(1) }).strict();
+export type DraftComplete = z.infer<typeof draftCompleteSchema>;
+
+/** What a `critique` task must leave: a verdict, pass or fail and why, for every criterion, on one draft (spec §3.1). */
+export const verdictCompleteSchema = z.object({ shape: z.literal("verdict"), draft_id: z.string().min(1), criteria: z.array(z.string().min(1)).min(1) }).strict();
+export type VerdictComplete = z.infer<typeof verdictCompleteSchema>;
+
 /** The definition of done for one task, written for it: what its primitive must cover, what it may read, and what it may spend. */
 export const taskContractSchema = z
   .object({
     objective: z.string().min(1),
     primitive: z.enum(PRIMITIVE_NAMES),
     method: z.enum(STAGE_ONE_AGENTS).optional(),
-    complete: deliverableSchema,
+    complete: z.union([draftCompleteSchema, verdictCompleteSchema, deliverableSchema]),
     inputs: z
       .object({ finding_ids: z.array(z.string()).default([]), document_ids: z.array(z.string()).default([]) })
       .strict()

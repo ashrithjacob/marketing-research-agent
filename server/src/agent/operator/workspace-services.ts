@@ -1,6 +1,6 @@
 import type { OpenRouterPrices } from "../../adapters/index.js";
 import type { Settings } from "../../config/index.js";
-import type { ResearchStore, Schedule } from "../../domain/index.js";
+import { Scope, type ResearchStore, type Schedule } from "../../domain/index.js";
 import { Trace } from "../../trace/index.js";
 
 import type { LiveRuns } from "../live-runs.js";
@@ -18,6 +18,8 @@ import { WorkspaceSpend } from "../always/workspace-spend.js";
 import { LessonDesk } from "../learning/lesson-desk.js";
 import { MemoryDesk } from "../learning/memory-desk.js";
 import { Reviewer } from "../learning/reviewer.js";
+import { DraftDesk } from "../write/draft-desk.js";
+import { DraftFlow } from "../write/draft-flow.js";
 
 import { CardDesk } from "./card-desk.js";
 import { OperatorDesk } from "./operator-desk.js";
@@ -40,6 +42,8 @@ export class WorkspaceServices {
   readonly reviewer: Reviewer;
   readonly alwaysOn: AlwaysOnDesk;
   readonly schedules: ScheduleDesk;
+  readonly drafts: DraftFlow;
+  readonly draftDesk: DraftDesk;
 
   constructor(deps: { store: ResearchStore; runs: LiveRuns; settings: Settings; harness: PiHarness; tools: ToolRegistry; costs: OpenRouterPrices }) {
     Trace.line(import.meta.url, "WorkspaceServices.constructor");
@@ -48,7 +52,10 @@ export class WorkspaceServices {
     this.tasks = new TaskSupervisor({ ...deps, events, memory: this.memory });
     const reply = (workspaceId: string, text: string) => this.operator.say(workspaceId, text, "");
     const decide = (lessonId: string, approved: boolean, text: string) => this.lessons.decide(lessonId, approved, text);
-    this.cards = new CardDesk(deps.store, deps.store.plans, this.tasks, reply, decide, events);
+    this.draftDesk = new DraftDesk(deps.store);
+    const settle = async (draftId: string, approved: boolean) => void (await (approved ? this.draftDesk.approve(draftId, Scope.everything) : this.draftDesk.reject(draftId, Scope.everything)));
+    this.cards = new CardDesk(deps.store, deps.store.plans, this.tasks, reply, decide, settle, events);
+    this.drafts = new DraftFlow(deps.store, this.tasks, { maxUsd: deps.settings.taskMaxUsd }, events);
     this.lessons = new LessonDesk(deps.store, this.cards);
     this.reviewer = new Reviewer(deps.store, deps.harness, this.lessons, deps.settings.model);
     const plans = new PlanDesk(deps.store.plans, this.tasks, this.cards, deps.store.feedback);

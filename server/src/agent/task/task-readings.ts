@@ -2,8 +2,10 @@ import type { Corpus } from "../../adapters/corpus.js";
 import { Breakers, Primitives, type BreakerReadings, type ResearchStore, type TaskContract, type Trip } from "../../domain/index.js";
 import { Trace } from "../../trace/index.js";
 
-/** A task's breaker readings, from the research store and the corpus, so a restarted process reads what the last one counted. Progress is a new ledger row or a page archived for the first time. */
+/** A task's breaker readings, from the research store and the corpus, so a restarted process reads what the last one counted. Progress is a new ledger row, a page archived for the first time, an owner's answer, or a section or verdict written. */
 export class TaskReadings {
+  static readonly PROGRESS: ReadonlySet<string> = new Set(["run.answered", "draft.section", "draft.verdict"]);
+
   constructor(
     private readonly store: ResearchStore,
     private readonly corpus: Corpus,
@@ -21,7 +23,7 @@ export class TaskReadings {
       this.corpus.pages(runId),
       this.store.listEvents(runId),
     ]);
-    const answeredAt = events.filter((e) => e.kind === "run.answered").map((e) => e.created_at);
+    const answeredAt = events.filter((e) => TaskReadings.PROGRESS.has(e.kind)).map((e) => e.created_at);
     const lastProgress = [...rows.map((row) => row.created_at), pages.newest, ...answeredAt].reduce((latest, at) => (at > latest ? at : latest), "");
     const turns = calls.filter((call) => call.agent_id === worker);
     const billed = calls.reduce((sum, call) => sum + (call.generation?.cost ?? 0), 0);
@@ -53,6 +55,6 @@ export class TaskReadings {
   async trip(runId: string, contract: TaskContract, stepCeiling: number, now: number): Promise<Trip | null> {
     Trace.line(import.meta.url, "TaskReadings.trip", { runId, stepCeiling });
     const limits = { stepCeiling, maxUsd: contract.budget.max_usd, maxMinutes: contract.budget.max_minutes };
-    return Breakers.trip(await this.read(runId, now, Primitives.role(contract).id), limits);
+    return Breakers.trip(await this.read(runId, now, Primitives.agent(contract)), limits);
   }
 }

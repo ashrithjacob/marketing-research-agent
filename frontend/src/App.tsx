@@ -19,6 +19,7 @@ import StartRun from './StartRun';
 import StartPlan from './StartPlan';
 import PlanPage from './PlanPage';
 import InboxPage from './InboxPage';
+import DraftPage from './DraftPage';
 import ProductTruthStart from './ProductTruthStart';
 import ReviewMiningPlan from './ReviewMiningPlan';
 import { stageOfNode } from './stages';
@@ -176,6 +177,7 @@ export default function App() {
       {route.page === 'library' && <LibraryPage onError={setError} />}
       {route.page === 'plan' && <PlanPage planId={route.planId} onError={setError} />}
       {route.page === 'inbox' && <InboxPage onError={setError} />}
+      {route.page === 'draft' && <DraftPage draftId={route.draftId} onError={setError} />}
       {(route.page === 'missing' || missing) && (
         <div className="empty">
           No page here. <Link to={paths.products()}>All products</Link>

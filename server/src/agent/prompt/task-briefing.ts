@@ -1,4 +1,4 @@
-import { RoleRecords, type Brief, type Finding, type RoleSpec, type TaskContract } from "../../domain/index.js";
+import { Contracts, Primitives, RoleRecords, type Brief, type Finding, type RoleSpec, type TaskContract } from "../../domain/index.js";
 import { Trace } from "../../trace/index.js";
 
 import { PromptBlocks } from "./blocks.js";
@@ -28,8 +28,8 @@ export class TaskBriefing implements RoleBriefing {
     Trace.line(import.meta.url, "TaskBriefing.instructions");
     const { contract, brief } = this;
     const task = TASK_INSTRUCTIONS.replace("{objective}", contract.objective)
-      .replace("{deliverable}", ContractTable.render(contract.complete))
-      .replace("{node}", contract.complete.node ?? "");
+      .replace("{deliverable}", ContractTable.render(Primitives.role(contract).deliverable))
+      .replace("{node}", Contracts.node(contract) ?? "");
     return [task, PromptBlocks.sources([]), PromptBlocks.brief(brief)].join("\n\n");
   }
 }

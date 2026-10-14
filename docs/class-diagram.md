@@ -183,6 +183,12 @@ classDiagram
     class DiscoveryQuestions {
       of()
     }
+    class Contracts {
+      deliverable()
+      draft()
+      verdict()
+      node()
+    }
     class CostCell {
       <<interface>>
     }
@@ -215,6 +221,35 @@ classDiagram
     }
     class Deliverables {
       kinds()
+    }
+    class DraftSection {
+      <<interface>>
+    }
+    class Verdict {
+      <<interface>>
+    }
+    class Draft {
+      <<interface>>
+    }
+    class DraftBook {
+      <<interface>>
+      write()
+      ofRun()
+      get()
+      list()
+      edit()
+      mark()
+    }
+    class DraftView {
+      <<interface>>
+    }
+    class DraftText {
+      cites()
+      places()
+      typedFigures()
+      render()
+      view()
+      value()
     }
     class FeedbackTarget {
       <<interface>>
@@ -358,6 +393,12 @@ classDiagram
       list()
       save()
     }
+    class PlaybookSection {
+      <<interface>>
+    }
+    class Playbook {
+      <<interface>>
+    }
     class ProductCatalog {
       <<interface>>
       list()
@@ -442,6 +483,9 @@ classDiagram
     class Primitives {
       role()
       nodes()
+      agent()
+      tools()
+      ceiling()
     }
     class RunHead {
       <<interface>>
@@ -652,6 +696,9 @@ classDiagram
     class DoseBands {
       classOf()
       assess()
+    }
+    class DraftCheck {
+      problems()
     }
     class PacketDraft {
       coerce()
@@ -976,6 +1023,14 @@ classDiagram
       get()
       markdown()
       delete()
+    }
+    class DraftTable {
+      write()
+      ofRun()
+      get()
+      list()
+      edit()
+      mark()
     }
     class EventLog {
       add()
@@ -1835,6 +1890,38 @@ classDiagram
       tokens()
       add()
     }
+    class CriticTools {
+      readDraft()
+      recordVerdict()
+    }
+    class DraftDesk {
+      view()
+      edit()
+      approve()
+      reject()
+    }
+    class DraftDone {
+      problems()
+    }
+    class VerdictDone {
+      problems()
+    }
+    class DraftFlow {
+      write()
+    }
+    class DraftRunAssembly {
+      assemble()
+    }
+    class DraftWorks {
+      build()
+      check()
+      assembly()
+    }
+    class WriterTools {
+      readInputs()
+      writeSection()
+      line()
+    }
   }
   namespace http {
     class AccountCommands {
@@ -1864,6 +1951,9 @@ classDiagram
       register()
     }
     class CostRoute {
+      register()
+    }
+    class DraftRoutes {
       register()
     }
     class EventStream {
@@ -1981,6 +2071,7 @@ classDiagram
   PacketCheckLog --> SqlDatabase
   CompetitorKinds --> SqlDatabase
   DocumentTable --> SqlDatabase
+  DraftTable --> SqlDatabase
   EventLog --> SqlDatabase
   FeedbackTable --> SqlDatabase
   FindingTable --> SqlDatabase
@@ -2201,6 +2292,22 @@ classDiagram
   WebFetchTool --> PageView
   WebSearchTool --> WebSearch
   TurnBreakers --> BreakerLimits
+  CriticTools --> DraftBook
+  CriticTools --> FindingLedger
+  CriticTools --> LiveRuns
+  DraftDesk --> ResearchStore
+  DraftDone --> DraftBook
+  DraftDone --> FindingLedger
+  VerdictDone --> DraftBook
+  DraftFlow --> ResearchStore
+  DraftFlow --> TaskSupervisor
+  DraftFlow --> TaskEvents
+  DraftRunAssembly --> FindingLedger
+  DraftRunAssembly --> DoneCheck
+  DraftWorks --> OpenRouterPrices
+  WriterTools --> DraftBook
+  WriterTools --> FindingLedger
+  WriterTools --> LiveRuns
   PacketError --> CheckProblem
   FieldsCheck --> FieldsDeliverable
   ListCheck --> ListDeliverable
@@ -2223,6 +2330,8 @@ classDiagram
   CorpusRoute --> ResearchStore
   CorpusRoute --> Settings
   CostRoute --> ResearchStore
+  DraftRoutes --> DraftFlow
+  DraftRoutes --> DraftDesk
   EventStream --> ResearchStore
   EventStream --> RunSupervisor
   FeedbackRoutes --> ResearchStore
@@ -2298,6 +2407,7 @@ classDiagram
 | `adapters` | `adapters/store/check-log.ts` | PacketCheckLog |
 | `adapters` | `adapters/store/competitor-kinds.ts` | CompetitorKinds |
 | `adapters` | `adapters/store/document-table.ts` | DocumentTable |
+| `adapters` | `adapters/store/draft-table.ts` | DraftTable |
 | `adapters` | `adapters/store/event-log.ts` | EventLog |
 | `adapters` | `adapters/store/feedback-table.ts` | FeedbackTable |
 | `adapters` | `adapters/store/finding-table.ts` | FindingTable |
@@ -2456,6 +2566,13 @@ classDiagram
 | `agent` | `agent/tools/web-search-tool.ts` | WebSearchTool |
 | `agent` | `agent/turn-breakers.ts` | TurnBreakers |
 | `agent` | `agent/usage.ts` | UsageTotals |
+| `agent` | `agent/write/critic-tools.ts` | CriticTools |
+| `agent` | `agent/write/draft-desk.ts` | DraftDesk |
+| `agent` | `agent/write/draft-done.ts` | DraftDone, VerdictDone |
+| `agent` | `agent/write/draft-flow.ts` | DraftFlow |
+| `agent` | `agent/write/draft-run-assembly.ts` | DraftRunAssembly |
+| `agent` | `agent/write/draft-works.ts` | DraftWorks |
+| `agent` | `agent/write/writer-tools.ts` | WriterTools |
 | `config` | `config/settings-shape.ts` | ServicePrices, Settings |
 | `config` | `config/settings.ts` | Env |
 | `domain` | `domain/accounts.ts` | Workspace, Account, AccountListing, Principal, Scope |
@@ -2468,8 +2585,10 @@ classDiagram
 | `domain` | `domain/chat.ts` | ChatMessage, TaskCard, Board |
 | `domain` | `domain/check-problem.ts` | RowRef, CheckProblem, CheckProblems |
 | `domain` | `domain/competitor-discovery.ts` | CompetitorCandidate, DiscoveryQuestion, DiscoveryReport, DiscoveryQuestions |
+| `domain` | `domain/contracts.ts` | Contracts |
 | `domain` | `domain/cost-report.ts` | CostCell, CostRow, CostReport |
 | `domain` | `domain/deliverable.ts` | FieldSpec, ItemPart, ItemNeed, FieldsDeliverable, ListDeliverable, OneMarked, PerItemDeliverable, Deliverables |
+| `domain` | `domain/drafts.ts` | DraftSection, Verdict, Draft, DraftBook, DraftView, DraftText |
 | `domain` | `domain/feedback.ts` | FeedbackTarget, Feedback, FeedbackDraft, FeedbackBook, FeedbackStrengths |
 | `domain` | `domain/findings.ts` | FindingDraft, Finding, Findings |
 | `domain` | `domain/harness.ts` | DurableHarness |
@@ -2481,6 +2600,7 @@ classDiagram
 | `domain` | `domain/packet-rows.ts` | PacketRowSet, PacketRows |
 | `domain` | `domain/paragraphs.ts` | Paragraph, Paragraphs |
 | `domain` | `domain/plans.ts` | PlanTask, Plan, PlanBook |
+| `domain` | `domain/playbooks.ts` | PlaybookSection, Playbook |
 | `domain` | `domain/ports.ts` | ProductCatalog, AccountDirectory, AmazonListingSource, TargetListings, ChargeLedger, FindingLedger, PageFetcher, WebSearch, AdLibrary, CompetitorDiscovery, ResearchStore, GateVerdict, FetchGate, ReviewPullStore |
 | `domain` | `domain/primitives.ts` | PrimitiveSpec, Primitives |
 | `domain` | `domain/products.ts` | RunHead, Product, ProductSummary, ProductFolders |
@@ -2506,6 +2626,7 @@ classDiagram
 | `extract` | `extract/cost-reports.ts` | CostReports |
 | `extract` | `extract/deliverable-check.ts` | Missing, DeliverableCheck, DeliverableChecks |
 | `extract` | `extract/dose-bands.ts` | DoseBands |
+| `extract` | `extract/draft-check.ts` | DraftCheck |
 | `extract` | `extract/draft.ts` | PacketDraft |
 | `extract` | `extract/errors.ts` | PacketError |
 | `extract` | `extract/fields-check.ts` | FieldsCheck |
@@ -2537,6 +2658,7 @@ classDiagram
 | `http` | `http/config-route.ts` | ConfigRoute |
 | `http` | `http/corpus-route.ts` | CorpusRoute |
 | `http` | `http/cost-route.ts` | CostRoute |
+| `http` | `http/draft-routes.ts` | DraftRoutes |
 | `http` | `http/event-stream.ts` | EventStream |
 | `http` | `http/feedback-routes.ts` | FeedbackRoutes |
 | `http` | `http/frontend.ts` | Frontend |

@@ -7,7 +7,7 @@ export type FeedbackStrength = "correction" | "confirmation" | "instruction" | "
 
 /** What a piece of feedback is about: a source or finding of a run, a task of a plan, a card, or a running task. */
 export interface FeedbackTarget {
-  kind: "source" | "finding" | "contract" | "card" | "task" | "memory" | "lesson";
+  kind: "source" | "finding" | "contract" | "card" | "task" | "memory" | "lesson" | "draft";
   id: string;
   run_id: string;
   plan_id: string;

@@ -42,6 +42,9 @@ every URL survives a reload, a bookmark and the back button.
 | `/products/:productId/runs/:runId` | That product's dashboard, on that run |
 | `/runs/:runId/logs` | The activity log (below) |
 | `/library` | The document library (below) |
+| `/plans/:planId` | A plan, with the chat (below) |
+| `/inbox` | Cards, memory, drafts and feedback (below) |
+| `/drafts/:draftId` | One draft (below) |
 
 Anything else renders *No page here*; an unknown product id renders the same,
 under a `no such product` banner.
@@ -440,6 +443,17 @@ older stage-1 modal (`StartRun.tsx`).
   steer, newest first, with what it was about and its words or diff. On a run's
   page, **wrong?** beside a cited source asks why and records it
   (`POST /api/research/runs/:id/sources/:sourceId/wrong`).
+- **Drafts** (since part 8). Once a plan is approved and one of its tasks has
+  ended `completed` or `partial`, the plan card shows **Write a long-form static
+  from what was found** (`POST /api/research/plans/:id/write`). The draft's
+  approval card in the inbox has **Read the draft →**; the inbox also lists the
+  last ten drafts with their status. **`/drafts/:id`** (`DraftPage.tsx`) shows
+  the draft section by section as the owner reads it (quotes and figures filled
+  in, citations as `[n]`), **What it cites** (the footnotes), and the critic's
+  verdicts, met or not and why. While it waits for the owner each section has
+  **Edit** (the raw text with `[[id]]` and `{{id}}`; **Save as a new version**
+  calls `POST /drafts/:id/edit`), and the page has **Reject** and **Approve this
+  draft** (`/reject`, `/approve`). It reloads every 3 s.
 - **Stop and ask me when** (`StopWhen.tsx`): under each kept task of a draft
   plan, a text box with the saved task's default; leaving it saves it
   (`POST /plans/:id/tasks/:key` with `stop_when`). Once approved it reads

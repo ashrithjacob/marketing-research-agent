@@ -19,6 +19,7 @@ import type { FeedbackBook } from "./feedback.js";
 import type { LessonBook } from "./lessons.js";
 import type { MemoryBook } from "./memory.js";
 import type { AlwaysOnBook, ScheduleBook } from "./always-on.js";
+import type { DraftBook } from "./drafts.js";
 
 /** Products and what their runs found, counted only over the runs a scope admits. */
 export interface ProductCatalog {
@@ -103,6 +104,7 @@ export interface ResearchStore {
   readonly lessons: LessonBook;
   readonly alwaysOn: AlwaysOnBook;
   readonly schedules: ScheduleBook;
+  readonly drafts: DraftBook;
   createRun(input: RunDraft): Promise<ResearchRun>;
   getRun(runId: string): Promise<ResearchRun | null>;
   listRuns(scope: Scope, limit?: number): Promise<ResearchRun[]>;

@@ -1,6 +1,6 @@
 import type { Brief } from "./brief.js";
 import type { Deliverable } from "./deliverable.js";
-import type { Node } from "./nodes.js";
+import { Contracts } from "./contracts.js";
 import type { PlanTask } from "./plans.js";
 import { CATEGORY_DELIVERABLE, CHAMPION_DELIVERABLE, COMPETITORS_DELIVERABLE, PRODUCT_DELIVERABLE } from "./role-deliverables.js";
 import { StageOnePlans, type StageOneAgent } from "./stage-one-agents.js";
@@ -82,7 +82,7 @@ export class SavedPlans {
   /** The champion kept or dropped by what the other kept tasks need, and each other task after it while it is kept. */
   static arrange(brief: Brief, tasks: readonly PlanTask[]): PlanTask[] {
     Trace.line(import.meta.url, "SavedPlans.arrange", { tasks: tasks.length });
-    const nodes = tasks.filter((task) => !task.auto && task.selected && task.contract.complete.node).map((task) => task.contract.complete.node as Node);
+    const nodes = tasks.filter((task) => !task.auto && task.selected).flatMap((task) => Contracts.node(task.contract) ?? []);
     const champion = nodes.length > 0 && StageOnePlans.of(brief, nodes).champion;
     return tasks.map((task) => (task.auto ? { ...task, selected: champion } : { ...task, after: champion && task.selected ? ["champion"] : [] }));
   }

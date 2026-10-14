@@ -167,7 +167,7 @@ describe("POST /api/research/tasks", () => {
     expect(await settled(body.id)).toBe("completed");
     const refused = await post(app, { brief: BRIEF, contract: { ...CONTRACT, verify: "owner" } });
     expect(refused.status).toBe(400);
-    expect(((await refused.json()) as { detail: string }).detail).toBe("task refused: verify 'owner' has nothing to run it yet; only 'code' is built");
+    expect(((await refused.json()) as { detail: string }).detail).toBe("task refused: verify 'owner' has nothing to run it for a research task; 'code' is built, and 'critique' for a write");
   });
 });
 

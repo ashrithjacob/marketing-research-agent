@@ -80,7 +80,7 @@ export class ResearchTasks {
       runs.emit(runId, "run.started", { model: this.deps.model, nodes: run.nodes, task_id: taskId });
     }
     const conversation = (await runtime.conversation(conversationId, context))!;
-    const already = await readings.trip(runId, work.contract, work.role.maxTurns, Date.now());
+    const already = await readings.trip(runId, work.contract, work.ceiling, Date.now());
     if (already) signals.trip(runId, already);
     const requestId = round.round === 0 ? `task:${runId}` : `task:${runId}:answer:${round.round}`;
     const submission = await conversation.submit({ type: "input", content: round.input ?? work.instructions, requestId }, context);
