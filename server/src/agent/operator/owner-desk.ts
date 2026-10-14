@@ -19,9 +19,11 @@ export class OwnerDesk {
     return plan;
   }
 
-  toggle(planId: string, scope: Scope, key: string, selected: boolean): Promise<Plan> {
-    Trace.line(import.meta.url, "OwnerDesk.toggle", { planId, key, selected });
-    return this.plans.revise(planId, scope, selected ? { keep: [key] } : { drop: [key] });
+  /** A task of a draft plan kept or dropped, or its stop_when rewritten, from the plan card. */
+  edit(planId: string, scope: Scope, key: string, change: { selected?: boolean; stop_when?: string }): Promise<Plan> {
+    Trace.line(import.meta.url, "OwnerDesk.edit", { planId, key });
+    const kept = change.selected === undefined ? {} : change.selected ? { keep: [key] } : { drop: [key] };
+    return this.plans.revise(planId, scope, { ...kept, ...(change.stop_when === undefined ? {} : { stop_when: { [key]: change.stop_when } }) });
   }
 
   async approve(planId: string, scope: Scope): Promise<Plan> {

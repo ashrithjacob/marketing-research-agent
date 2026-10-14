@@ -37,8 +37,15 @@ export class OperatorTools {
         }),
         defineTool({
           name: "revise_plan",
-          description: "Change a plan the owner has not approved yet: set its market, drop or keep tasks by key, or add saved tasks by key.",
-          parameters: Type.Object({ plan_id: Type.String(), market: Type.Optional(Type.String()), drop: Type.Optional(list), keep: Type.Optional(list), add: Type.Optional(list) }),
+          description: "Change a plan the owner has not approved yet: set its market, drop or keep tasks by key, add saved tasks by key, or set when a task must stop and ask the owner (stop_when).",
+          parameters: Type.Object({
+            plan_id: Type.String(),
+            market: Type.Optional(Type.String()),
+            drop: Type.Optional(list),
+            keep: Type.Optional(list),
+            add: Type.Optional(list),
+            stop_when: Type.Optional(Type.Record(Type.String(), Type.String(), { description: "Per task key, when the task must stop and ask the owner; \"\" removes it." })),
+          }),
           execute: (args, api, context) =>
             this.act(api, context, async (workspace) => {
               const { plan_id, ...change } = args;
@@ -51,6 +58,17 @@ export class OperatorTools {
           description: "Stop a running task by its run id. What it found so far is kept.",
           parameters: Type.Object({ run_id: Type.String() }),
           execute: (args, api, context) => this.act(api, context, async (workspace) => (await this.running(args.run_id, workspace), await this.tasks.stop(args.run_id), `Stopping ${args.run_id}.`)),
+        }),
+        defineTool({
+          name: "answer_task",
+          description: "Pass the owner's answer to a task that is paused and waiting on its question; it goes on with the answer.",
+          parameters: Type.Object({ run_id: Type.String(), answer: Type.String() }),
+          execute: (args, api, context) =>
+            this.act(api, context, async (workspace) => {
+              await this.owned(args.run_id, workspace);
+              await this.tasks.answer(args.run_id, args.answer);
+              return `Passed the answer to ${args.run_id}; it goes on.`;
+            }),
         }),
         defineTool({
           name: "guide_task",
@@ -80,20 +98,27 @@ export class OperatorTools {
       plan_id: plan.id,
       status: plan.status,
       brief: plan.brief,
-      tasks: plan.tasks.map((task) => ({ key: task.key, title: task.title, kept: task.selected, run_id: task.run_id, error: task.error })),
+      tasks: plan.tasks.map((task) => ({ key: task.key, title: task.title, kept: task.selected, stop_when: task.contract.stop_when ?? "", run_id: task.run_id, error: task.error })),
     }));
     const tasks = (await this.store.listRuns(scope, 50)).filter((run) => run.contract).slice(0, 10).map((run) => {
       const { status, error, counts } = Runs.summary(run);
       return { run_id: run.id, objective: String(run.contract?.objective ?? ""), status, error, sources: counts.sources, gaps: counts.gaps };
     });
-    return JSON.stringify({ plans, tasks }, null, 1);
+    const waiting = await this.tasks.waiting(workspace);
+    return JSON.stringify({ plans, tasks, waiting }, null, 1);
+  }
+
+  private async owned(runId: string, workspace: string): Promise<string> {
+    Trace.line(import.meta.url, "OperatorTools.owned", { runId });
+    const run = await this.store.getRun(runId);
+    if (!run?.contract || !Scope.of(workspace).admits(run.workspace_id)) throw new RunError(`no task ${runId} in this brand's work`);
+    return run.status;
   }
 
   private async running(runId: string, workspace: string): Promise<void> {
     Trace.line(import.meta.url, "OperatorTools.running", { runId });
-    const run = await this.store.getRun(runId);
-    if (!run?.contract || !Scope.of(workspace).admits(run.workspace_id)) throw new RunError(`no task ${runId} in this brand's work`);
-    if (run.status !== "running") throw new RunError(`task ${runId} is ${run.status}, not running`);
+    const status = await this.owned(runId, workspace);
+    if (status !== "running") throw new RunError(`task ${runId} is ${status}, not running`);
   }
 
   private async guide(runId: string, text: string, workspace: string): Promise<string> {

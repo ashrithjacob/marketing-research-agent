@@ -130,6 +130,7 @@ h3 .n { color: var(--faint); text-transform: none; letter-spacing: 0.02em; font-
   color: var(--accent); border-color: rgba(0, 82, 255, 0.4); background: var(--accent-soft);
 }
 .status.completed { color: var(--ok); border-color: rgba(5, 150, 105, 0.35); background: rgba(5, 150, 105, 0.06); }
+.status.waiting { color: var(--warn); border-color: rgba(217, 119, 6, 0.5); background: rgba(217, 119, 6, 0.1); }
 .status.partial { color: var(--warn); border-color: rgba(217, 119, 6, 0.35); background: rgba(217, 119, 6, 0.06); }
 .status.invalid { color: var(--infer); border-color: rgba(124, 58, 237, 0.35); background: rgba(124, 58, 237, 0.06); }
 .status.failed, .status.cancelled { color: var(--bad); border-color: rgba(220, 38, 38, 0.35); background: rgba(220, 38, 38, 0.06); }
@@ -972,3 +973,9 @@ details[open].tile-gap > summary.tile-gap-missing { white-space: normal; }
 .chat .line.note { align-self: center; color: var(--dim); font-size: 11.5px; text-align: center; max-width: 100%; }
 .chat-say { display: flex; gap: 8px; padding: 10px; border-top: 1px solid var(--line); }
 .chat-say input { flex: 1; }
+.plan-tasks .d.stop-when { color: var(--infer); }
+.plan-tasks .d.ask { color: var(--warn); font-weight: 500; }
+.plan-tasks label.stop-when.edit { display: flex; flex-direction: column; align-items: stretch; gap: 4px; margin-top: 8px; cursor: text; }
+.plan-tasks label.stop-when.edit span { font-size: 11px; color: var(--faint); text-transform: uppercase; letter-spacing: .06em; font-family: var(--font-mono); }
+.plan-tasks label.stop-when.edit textarea { width: 100%; resize: vertical; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; font-size: 12.5px; color: var(--ink); }
+.plan-tasks label.stop-when.edit textarea:focus { outline: none; border-color: var(--accent); }

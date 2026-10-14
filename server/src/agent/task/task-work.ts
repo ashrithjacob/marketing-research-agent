@@ -32,6 +32,7 @@ export interface TaskWork {
   check: DoneCheck;
   close: (trip: Trip) => Promise<LimitClosed>;
   calls: TaskCallLog;
+  judgeCalls: TaskCallLog;
   system: string;
   instructions: string;
   assembly: RunAssembly;
@@ -107,6 +108,7 @@ export class TaskWorks {
       check,
       close,
       calls: new TaskCallLog(store, runId, role.id, costs),
+      judgeCalls: new TaskCallLog(store, runId, "judge", costs),
       system: briefing.system(role, research.map((built) => built.line).join("")),
       instructions: briefing.instructions(),
       assembly: new StageOneRunAssembly(store.findings, runId, { brief, nodes: [node], roles: [role] }),

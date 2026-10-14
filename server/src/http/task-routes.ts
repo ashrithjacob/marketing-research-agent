@@ -17,6 +17,7 @@ export class TaskRoutes {
     Trace.line(import.meta.url, "TaskRoutes.register");
     api.post("/tasks", (c) => this.start(c));
     api.post("/tasks/:runId/stop", (c) => this.stop(c, c.req.param("runId")));
+    api.post("/tasks/:runId/answer", (c) => this.answer(c, c.req.param("runId")));
   }
 
   private async start(c: Context<ApiEnv>) {
@@ -29,6 +30,22 @@ export class TaskRoutes {
       if (!(error instanceof RunError)) throw error;
       return c.json({ detail: error.message }, 400);
     }
+  }
+
+  private async answer(c: Context<ApiEnv>, runId: string) {
+    Trace.line(import.meta.url, "TaskRoutes.answer", { runId });
+    const run = await this.store.getRun(runId);
+    if (!run || !Scope.forViewer(c.get("principal")).admits(run.workspace_id)) return c.json({ detail: "no such run" }, 404);
+    const body = (await c.req.json().catch(() => null)) as { answer?: unknown } | null;
+    const answer = typeof body?.answer === "string" ? body.answer.trim() : "";
+    if (!answer) return c.json({ detail: "give the answer: { answer }" }, 400);
+    try {
+      await this.tasks.answer(runId, answer);
+    } catch (error) {
+      if (!(error instanceof RunError)) throw error;
+      return c.json({ detail: error.message }, 409);
+    }
+    return c.json({ ok: true }, 202);
   }
 
   private async stop(c: Context<ApiEnv>, runId: string) {

@@ -11,3 +11,5 @@ export * from "./research-task.js";
 export * from "./task-intake.js";
 export * from "./task-supervisor.js";
 export * from "./task-events.js";
+export * from "./task-judge.js";
+export * from "./task-pause.js";

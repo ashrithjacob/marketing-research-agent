@@ -28,8 +28,8 @@ export class WorkspaceServices {
     this.tasks = new TaskSupervisor({ ...deps, events });
     const plans = new PlanDesk(deps.store.plans, this.tasks);
     const tools = new OperatorTools(deps.store, plans, this.tasks);
-    this.operator = new OperatorDesk(deps.harness, deps.store, tools.extension(), deps.settings.model, events);
+    this.operator = new OperatorDesk(deps.harness, deps.store, tools.extension(), deps.settings.model, this.tasks, events);
     this.owner = new OwnerDesk(plans, this.operator);
-    this.board = new WorkspaceBoard(deps.store);
+    this.board = new WorkspaceBoard(deps.store, this.tasks);
   }
 }

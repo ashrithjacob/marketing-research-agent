@@ -25,6 +25,8 @@ function runState(status: RunStatus): { cls: string; label: string } {
       return { cls: 'active', label: 'running' };
     case 'stopping':
       return { cls: 'active', label: 'stopping' };
+    case 'waiting':
+      return { cls: 'active', label: 'needs your answer' };
     case 'completed':
       return { cls: 'done', label: 'complete' };
     case 'partial':

@@ -6,6 +6,8 @@ export type RunStatus =
   | 'queued'
   | 'running'
   | 'stopping'
+  /** A task paused on its stop_when: it waits for the owner's answer and spends nothing. */
+  | 'waiting'
   | 'completed'
   /** Stopped early by a breaker: what was found is kept, and every missing item is a gap saying why. */
   | 'partial'

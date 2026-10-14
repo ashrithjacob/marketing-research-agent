@@ -17,6 +17,8 @@ import { TaskEnd } from "./task-end.js";
 import type { TaskEvents } from "./task-events.js";
 import { TaskExtensions } from "./task-extensions.js";
 import { TaskIntake } from "./task-intake.js";
+import { TaskJudge } from "./task-judge.js";
+import { TaskPause } from "./task-pause.js";
 import { TaskReadings } from "./task-readings.js";
 import { TaskSignals } from "./task-signals.js";
 import { TaskWorks } from "./task-work.js";
@@ -34,6 +36,8 @@ export interface TaskSupervisorDeps {
 /** Durable tasks on the harness: a contract checked and queued as a run, a restart's tasks picked back up, a stop delivered as an abort. */
 export class TaskSupervisor {
   private readonly tasks: ResearchTasks;
+  private readonly extensions: TaskExtensions;
+  private readonly pause: TaskPause;
   private readonly intake: TaskIntake;
 
   constructor(private readonly deps: TaskSupervisorDeps) {
@@ -43,8 +47,11 @@ export class TaskSupervisor {
     const signals = new TaskSignals();
     const readings = new TaskReadings(store, new Corpus(settings.corpusPath));
     const ending = new TaskEnd({ store, runs, costs, works, signals, readings });
-    const extensions = new TaskExtensions(works, signals, readings);
-    this.tasks = new ResearchTasks({ store, runs, works, extensions, signals, readings, ending, events, registry: harness.registry, model: settings.model });
+    this.pause = new TaskPause(store, runs, signals, events);
+    const judge = new TaskJudge(harness, harness.models, settings.judgeModel);
+    const extensions = new TaskExtensions(works, signals, readings, harness.registry, judge, this.pause);
+    this.extensions = extensions;
+    this.tasks = new ResearchTasks({ store, runs, works, extensions, signals, readings, ending, events, pause: this.pause, model: settings.model });
     this.intake = new TaskIntake(store, settings);
     harness.registry.install(defineExtension({ name: "mra.worker", tasks: [this.tasks.definition] }));
   }
@@ -64,10 +71,28 @@ export class TaskSupervisor {
     for (const run of await this.deps.store.listRuns(Scope.everything, 200)) {
       if (!run.contract || TERMINAL_STATUSES.has(run.status)) continue;
       if (run.status === "queued") await this.queue(run.id);
-      else await this.tasks.install(run.id);
+      else await this.extensions.install(run.id);
       picked += 1;
     }
     return picked;
+  }
+
+  /** The owner's answer to a task paused on its stop_when; it goes on from where it stopped. */
+  answer(runId: string, answer: string): Promise<void> {
+    Trace.line(import.meta.url, "TaskSupervisor.answer", { runId });
+    return this.pause.give(runId, answer);
+  }
+
+  question(runId: string): Promise<string> {
+    Trace.line(import.meta.url, "TaskSupervisor.question", { runId });
+    return this.pause.question(runId);
+  }
+
+  /** A workspace's tasks waiting for the owner, each with its question. */
+  async waiting(workspaceId: string): Promise<{ runId: string; objective: string; question: string }[]> {
+    Trace.line(import.meta.url, "TaskSupervisor.waiting", { workspaceId });
+    const runs = (await this.deps.store.listRuns(Scope.of(workspaceId), 50)).filter((run) => run.contract && run.status === "waiting");
+    return Promise.all(runs.map(async (run) => ({ runId: run.id, objective: String(run.contract?.objective ?? ""), question: await this.pause.question(run.id) })));
   }
 
   async stop(runId: string): Promise<void> {

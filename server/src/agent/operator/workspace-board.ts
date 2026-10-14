@@ -1,9 +1,14 @@
 import { Runs, Scope, type Board, type ResearchRun, type ResearchStore, type TaskCard } from "../../domain/index.js";
 import { Trace } from "../../trace/index.js";
 
-/** The board, read from the research store, where a task's progress is written as it happens: its findings, its calls, its status. */
+import type { TaskSupervisor } from "../task/task-supervisor.js";
+
+/** The board, read from the research store, where a task's progress is written as it happens: its findings, its calls, its status, and the question it waits on. */
 export class WorkspaceBoard {
-  constructor(private readonly store: ResearchStore) {}
+  constructor(
+    private readonly store: ResearchStore,
+    private readonly tasks: TaskSupervisor,
+  ) {}
 
   async snapshot(workspaceId: string): Promise<Board> {
     Trace.line(import.meta.url, "WorkspaceBoard.snapshot", { workspaceId });
@@ -31,6 +36,7 @@ export class WorkspaceBoard {
       gaps: live("gap", counts.gaps),
       calls: (await this.store.listLlmCalls(run.id)).length,
       billed_usd: billed,
+      question: status === "waiting" ? await this.tasks.question(run.id) : "",
       created_at: run.created_at,
     };
   }

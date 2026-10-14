@@ -107,6 +107,7 @@ export class Env {
       fetchCharLimit: Env.number("MRA_FETCH_CHAR_LIMIT", 25000),
       firecrawlConcurrency: Env.number("MRA_FIRECRAWL_CONCURRENCY", 2),
       gateModel: Env.text("MRA_GATE_MODEL", ""),
+      judgeModel: Env.text("MRA_JUDGE_MODEL", "") || model,
       gateCharLimit: Env.number("MRA_GATE_CHAR_LIMIT", 4000),
       gateTimeoutSeconds: Env.number("MRA_GATE_TIMEOUT_SECONDS", 12),
       prices: {

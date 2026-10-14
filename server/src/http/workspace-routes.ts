@@ -22,8 +22,12 @@ export class WorkspaceRoutes {
     });
     api.post("/plans/:planId/tasks/:key", (c) =>
       this.answer(c, 200, async () => {
-        const body = (await c.req.json().catch(() => null)) as { selected?: unknown } | null;
-        return this.owner.toggle(c.req.param("planId"), Scope.forViewer(c.get("principal")), c.req.param("key"), body?.selected === true);
+        const body = (await c.req.json().catch(() => null)) as { selected?: unknown; stop_when?: unknown } | null;
+        const change = {
+          ...(typeof body?.selected === "boolean" ? { selected: body.selected } : {}),
+          ...(typeof body?.stop_when === "string" ? { stop_when: body.stop_when } : {}),
+        };
+        return this.owner.edit(c.req.param("planId"), Scope.forViewer(c.get("principal")), c.req.param("key"), change);
       }),
     );
     api.post("/plans/:planId/approve", (c) => this.answer(c, 202, () => this.owner.approve(c.req.param("planId"), Scope.forViewer(c.get("principal")))));

@@ -10,6 +10,7 @@ export interface PlanChange {
   drop?: readonly string[];
   keep?: readonly string[];
   add?: readonly string[];
+  stop_when?: Readonly<Record<string, string>>;
 }
 
 /** Plans from Start to approval: drafted from the saved tasks, changed by toggles or by the operator, and approved only by the owner's button, which starts each kept task. */
@@ -35,10 +36,15 @@ export class PlanDesk {
     const unknown = [...(change.add ?? [])].filter((key) => !SAVED_TASKS[key]);
     if (unknown.length > 0) throw new RunError(`no saved task ${unknown.join(", ")}; the saved tasks are ${Object.keys(SAVED_TASKS).join(", ")}`);
     const added = (change.add ?? []).filter((key) => !plan.tasks.some((task) => task.key === key)).map((key) => SavedPlans.task(key, brief));
-    const tasks = [...plan.tasks, ...added].map((task) => ({
-      ...SavedPlans.task(task.key, brief),
-      selected: change.drop?.includes(task.key) ? false : change.keep?.includes(task.key) || change.add?.includes(task.key) ? true : task.selected,
-    }));
+    const tasks = [...plan.tasks, ...added].map((task) => {
+      const fresh = SavedPlans.task(task.key, brief);
+      const stopWhen = (change.stop_when?.[task.key] ?? task.contract.stop_when ?? "").trim();
+      return {
+        ...fresh,
+        contract: { ...fresh.contract, stop_when: stopWhen || undefined },
+        selected: change.drop?.includes(task.key) ? false : change.keep?.includes(task.key) || change.add?.includes(task.key) ? true : task.selected,
+      };
+    });
     return this.plans.save({ ...plan, brief, tasks });
   }
 

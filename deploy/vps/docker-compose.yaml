@@ -58,6 +58,7 @@ services:
       - TRENDTRACK_API_KEY=${TRENDTRACK_API_KEY:-}
       # Cheap pre-read gate over every fetch; empty disables. Fails open.
       - MRA_GATE_MODEL=${MRA_GATE_MODEL:-}
+      - MRA_JUDGE_MODEL=${MRA_JUDGE_MODEL:-}
       - MRA_GATE_CHAR_LIMIT=${MRA_GATE_CHAR_LIMIT:-4000}
       - MRA_GATE_TIMEOUT_SECONDS=${MRA_GATE_TIMEOUT_SECONDS:-12}
       # Review mining only, and deliberately NOT `:?` like the two above. This

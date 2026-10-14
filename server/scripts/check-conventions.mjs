@@ -104,7 +104,7 @@ const CLIENT_ONLY_FIELDS = new Set([
   // parsed from a server response. Add a name here only after checking the
   // server genuinely does not send it.
   "handlers", "onEnd", "onError", "onEvent", "onReconnecting", "onConnected",
-  "startRun", "stopRun", "startPlan",
+  "startRun", "stopRun", "startPlan", "editTask",
   "logsUrl", "traceUrl", "sourceUrl", "arguments", "toolCallId", "reviewMiningPlan", "productRuns",
   "reviewAnalysis", "startReviewAnalysis", "reviewMiningListings",
 ]);

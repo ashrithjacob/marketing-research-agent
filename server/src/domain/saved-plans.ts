@@ -11,6 +11,7 @@ interface SavedTask {
   objective: string;
   complete: Deliverable;
   budget: TaskContract["budget"];
+  stopWhen: string;
 }
 
 export const SAVED_TASKS: Readonly<Record<string, SavedTask>> = {
@@ -19,12 +20,15 @@ export const SAVED_TASKS: Readonly<Record<string, SavedTask>> = {
     objective: "{subject}: its own fact sheet, read off its own pages",
     complete: PRODUCT_DELIVERABLE,
     budget: { max_usd: 0.5, max_minutes: 20 },
+    stopWhen:
+      "The site sells more than one product and the brief does not say which one to research, or the site is not a shop that sells this product.",
   },
   category_numbers: {
     title: "Category numbers",
     objective: "The category {subject} sells in: its search-volume trend, its size and its seasonality, each as a source states it",
     complete: CATEGORY_DELIVERABLE,
     budget: { max_usd: 0.5, max_minutes: 20 },
+    stopWhen: "The product fits more than one category and the sources disagree on which one it is sold in.",
   },
 };
 
@@ -49,6 +53,7 @@ export class SavedPlans {
       inputs: { finding_ids: [], document_ids: [] },
       budget: saved.budget,
       verify: "code",
+      stop_when: saved.stopWhen,
     };
     return { key, title: saved.title, contract, selected: true, run_id: "", error: "" };
   }

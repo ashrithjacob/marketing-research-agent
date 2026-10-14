@@ -7,7 +7,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { createModels, type AssistantMessage, type MutableModels } from "@earendil-works/pi-ai";
-import { fauxAssistantMessage, fauxProvider, fauxToolCall } from "@earendil-works/pi-ai/providers/faux";
+import { fauxAssistantMessage, fauxProvider, fauxToolCall, type FauxResponseStep } from "@earendil-works/pi-ai/providers/faux";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import type { SqlResearchStore } from "../src/adapters/index.js";
@@ -54,7 +54,7 @@ const finish = (): AssistantMessage => fauxAssistantMessage(fauxToolCall("finish
 beforeEach(async () => {
   dir = mkdtempSync(join(tmpdir(), "mra-operator-"));
   store = await SqliteStores.open(join(dir, "research.db"));
-  settings = { ...Env.settings(), model: MODEL_ID, corpusPath: join(dir, "corpus"), staticDir: join(dir, "static"), appPasswordHash: "", taskMaxUsd: 2 };
+  settings = { ...Env.settings(), model: MODEL_ID, judgeModel: "not-a-model", corpusPath: join(dir, "corpus"), staticDir: join(dir, "static"), appPasswordHash: "", taskMaxUsd: 2 };
   faux = fauxProvider({ provider: "openrouter", models: [{ id: MODEL_ID }] });
   models = createModels();
   models.setProvider(faux.provider);
@@ -123,5 +123,42 @@ describe("start, review, chat", () => {
     const board = JSON.parse(text.split("event: board\ndata: ")[1]!.split("\n")[0]!);
     expect(board.plans[0]).toMatchObject({ status: "draft" });
     expect(board.tasks).toEqual([]);
+  });
+});
+
+describe("a task that stops and asks", () => {
+  it("puts its question in the chat, and the owner's reply reaches it through the operator", async () => {
+    await harness.close();
+    harness = await PiHarness.open(join(dir, "harness-2.sqlite"), models);
+    app = new App({ settings: { ...settings, judgeModel: MODEL_ID }, store, harness });
+    await app.workspace!.tasks.recover();
+    harness.resume();
+    const text = (content: unknown) => (typeof content === "string" ? content : JSON.stringify(content));
+    let runId = "";
+    const route: FauxResponseStep = (context) => {
+      const last = text(context.messages[context.messages.length - 1]!.content);
+      if (last.startsWith("Condition:")) {
+        return fauxAssistantMessage(last.includes("nothing yet") ? '{"stop": true, "question": "Drops or the diffuser?"}' : '{"stop": false, "question": ""}');
+      }
+      if (last.includes("is waiting for the owner's answer")) return fauxAssistantMessage(fauxToolCall("answer_task", { run_id: runId, answer: "The drops." }), { stopReason: "toolUse" });
+      if (last.includes("Passed the answer")) return fauxAssistantMessage("Passed on.");
+      if (last.includes("The owner answered your question")) return finish();
+      return context.messages.some((m) => m.role === "toolResult") ? finish() : recordAll();
+    };
+    faux.setResponses(Array.from({ length: 30 }, () => route));
+    const plan = (await (await call("POST", "/plans", { brief: BRIEF })).json()) as Plan;
+    expect(plan.tasks[0]!.contract.stop_when).toContain("more than one product");
+    await call("POST", `/plans/${plan.id}/tasks/category_numbers`, { selected: false });
+    runId = ((await (await call("POST", `/plans/${plan.id}/approve`)).json()) as Plan).tasks[0]!.run_id;
+    await until(() => store.getRun(runId), (run) => run?.status === "waiting");
+    const board = (await until(() => app.workspace!.board.snapshot("admin"), (b) => b.tasks.some((t) => t.question !== ""))).tasks[0]!;
+    expect(board).toMatchObject({ status: "waiting", question: "Drops or the diffuser?" });
+    await until(chat, (seen) => seen.some((line) => line.text.includes("is paused and asks: Drops or the diffuser?")));
+
+    expect((await call("POST", "/chat", { text: "The drops.", plan_id: plan.id })).status).toBe(202);
+    const ended = await until(() => store.getRun(runId), (run) => !!run && TERMINAL_STATUSES.has(run.status));
+    expect(ended!.status).toBe("completed");
+    const lines = await chat();
+    expect(lines.some((line) => line.role === "action" && line.text.startsWith("answer_task"))).toBe(true);
   });
 });

@@ -90,6 +90,7 @@ services:
       # behave as before). :free models cost nothing but can rate-limit; the
       # gate fails open, so an outage degrades to no gate, never a dead run.
       - MRA_GATE_MODEL=${MRA_GATE_MODEL:-}
+      - MRA_JUDGE_MODEL=${MRA_JUDGE_MODEL:-}
       - MRA_GATE_CHAR_LIMIT=${MRA_GATE_CHAR_LIMIT:-4000}
       - MRA_GATE_TIMEOUT_SECONDS=${MRA_GATE_TIMEOUT_SECONDS:-12}
       # Review mining. Unset is fine and is the default: the three review tools

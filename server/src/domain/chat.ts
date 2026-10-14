@@ -21,6 +21,7 @@ export interface TaskCard {
   gaps: number;
   calls: number;
   billed_usd: number | null;
+  question: string;
   created_at: string;
 }
 

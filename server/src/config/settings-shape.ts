@@ -37,6 +37,7 @@ export interface Settings {
   fetchCharLimit: number;
   firecrawlConcurrency: number;
   gateModel: string;
+  judgeModel: string;
   gateCharLimit: number;
   gateTimeoutSeconds: number;
   prices: ServicePrices;

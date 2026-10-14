@@ -5,6 +5,7 @@ export const RUN_STATUSES = [
   "queued",
   "running",
   "stopping",
+  "waiting",
   "completed",
   "partial",
   "invalid",

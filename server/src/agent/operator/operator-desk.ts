@@ -6,6 +6,7 @@ import { Trace } from "../../trace/index.js";
 
 import type { PiHarness } from "../pi-harness.js";
 import type { TaskEvents } from "../task/task-events.js";
+import type { TaskSupervisor } from "../task/task-supervisor.js";
 
 import { ChatView } from "./chat-view.js";
 import { OperatorIndex, WorkspaceDoc } from "./operator-docs.js";
@@ -17,16 +18,20 @@ export class OperatorDesk {
     private readonly store: ResearchStore,
     private readonly extension: Extension,
     private readonly model: string,
+    private readonly tasks: TaskSupervisor,
     events: TaskEvents,
   ) {
     Trace.line(import.meta.url, "OperatorDesk.constructor", { model });
     harness.registry.install(extension);
     events.on((runId, status) => this.taskEnded(runId, status));
+    events.onAsked((runId, question) => this.taskAsked(runId, question));
   }
 
   async say(workspaceId: string, text: string, planId: string): Promise<void> {
     Trace.line(import.meta.url, "OperatorDesk.say", { workspaceId, planId });
-    const content = planId ? `[The owner has plan ${planId} open.]\n${text}` : text;
+    const waiting = (await this.tasks.waiting(workspaceId)).map((w) => `[Task ${w.runId} is waiting for the owner's answer to: "${w.question}". If this message answers it, pass it on with answer_task.]`);
+    const context = [...(planId ? [`[The owner has plan ${planId} open.]`] : []), ...waiting];
+    const content = [...context, text].join("\n");
     const entry = { kind: "mra.owner", data: { text, plan_id: planId } };
     await (await this.conversation(workspaceId)).submit({ type: "input", content, whenBusy: "steer", entry }, BACKGROUND_CONTEXT);
   }
@@ -55,6 +60,13 @@ export class OperatorDesk {
     const { counts, error } = Runs.summary(run);
     const objective = String(run.contract?.objective ?? runId);
     await this.note(run.workspace_id, `Task ${runId} ended ${status}: ${objective} — ${counts.sources} sources, ${counts.gaps} gaps${error ? `; ${error}` : ""}.`);
+  }
+
+  private async taskAsked(runId: string, question: string): Promise<void> {
+    Trace.line(import.meta.url, "OperatorDesk.taskAsked", { runId });
+    const run = await this.store.getRun(runId);
+    if (!run) return;
+    await this.note(run.workspace_id, `Task ${runId} is paused and asks: ${question} — answer here and it goes on.`);
   }
 
   private async conversation(workspaceId: string): Promise<Conversation> {

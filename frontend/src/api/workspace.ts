@@ -3,6 +3,7 @@ import type { Brief } from './runs';
 
 export interface TaskContract {
   objective: string;
+  stop_when?: string;
   budget: { max_usd: number; max_minutes: number };
 }
 
@@ -44,6 +45,7 @@ export interface TaskCard {
   gaps: number;
   calls: number;
   billed_usd: number | null;
+  question: string;
   created_at: string;
 }
 
@@ -55,8 +57,8 @@ export interface Board {
 export const workspaceApi = {
   startPlan: (brief: Brief) => request<Plan>('/api/research/plans', { method: 'POST', body: JSON.stringify({ brief }) }),
   plan: (id: string) => request<Plan>(`/api/research/plans/${id}`),
-  toggle: (id: string, key: string, selected: boolean) =>
-    request<Plan>(`/api/research/plans/${id}/tasks/${key}`, { method: 'POST', body: JSON.stringify({ selected }) }),
+  editTask: (id: string, key: string, change: { selected?: boolean; stop_when?: string }) =>
+    request<Plan>(`/api/research/plans/${id}/tasks/${key}`, { method: 'POST', body: JSON.stringify(change) }),
   approve: (id: string) => request<Plan>(`/api/research/plans/${id}/approve`, { method: 'POST' }),
   say: (text: string, planId: string) =>
     request<{ ok: boolean }>('/api/research/chat', { method: 'POST', body: JSON.stringify({ text, plan_id: planId }) }),

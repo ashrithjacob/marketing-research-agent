@@ -1,5 +1,5 @@
 import type { Context } from "@earendil-works/chord";
-import { configure, defineExtension, defineTask, type ConversationId, type Extension, type Registry, type SettledSubmissionRecord, type Task, type TaskRuntime } from "@earendil-works/pi-durable";
+import { configure, defineTask, type ConversationId, type SettledSubmissionRecord, type Task, type TaskRuntime } from "@earendil-works/pi-durable";
 
 import type { ResearchStore, Trip } from "../../domain/index.js";
 import { Trace } from "../../trace/index.js";
@@ -8,13 +8,15 @@ import type { LiveRuns } from "../live-runs.js";
 
 import { RunDoc, TaskIndex } from "./run-doc.js";
 import type { TaskEnd } from "./task-end.js";
+import type { TaskPause } from "./task-pause.js";
 import type { TaskEvents } from "./task-events.js";
-import { TaskExtensions } from "./task-extensions.js";
+import type { TaskExtensions } from "./task-extensions.js";
 import type { TaskReadings } from "./task-readings.js";
-import type { TaskSignals } from "./task-signals.js";
+import type { Halt, TaskSignals } from "./task-signals.js";
 import type { TaskWorks } from "./task-work.js";
 
-type Phase = { phase: "start" } | { phase: "work"; conversationId: ConversationId } | { phase: "end"; trip: Trip | null; error: string };
+type Round = { conversationId: ConversationId; round: number; input: string | null };
+type Phase = { phase: "start" } | ({ phase: "work" } & Round) | ({ phase: "asking"; question: string } & Round) | { phase: "end"; trip: Trip | null; error: string };
 type Input = { runId: string };
 type Runtime = TaskRuntime<Input, Phase, { status: string }, object>;
 
@@ -27,7 +29,7 @@ export interface ResearchTaskDeps {
   readings: TaskReadings;
   ending: TaskEnd;
   events: TaskEvents;
-  registry: Registry;
+  pause: TaskPause;
   model: string;
 }
 
@@ -43,7 +45,8 @@ export class ResearchTasks {
       initial: () => ({ phase: "start" }),
       phases: {
         start: (task, runtime, context) => Trace.within(task.input.runId, { phase: "start" }, () => this.start(task.input.runId, String(task.id), runtime, context)),
-        work: (task, runtime, context) => Trace.within(task.input.runId, { phase: "work" }, () => this.work(task.input.runId, String(task.id), task.state.checkpoint.conversationId, runtime, context)),
+        work: (task, runtime, context) => Trace.within(task.input.runId, { phase: "work" }, () => this.work(task.input.runId, String(task.id), task.state.checkpoint, runtime, context)),
+        asking: (task, runtime, context) => Trace.within(task.input.runId, { phase: "asking" }, () => this.asking(task.input.runId, task.state.checkpoint, runtime, context)),
         end: (task, runtime, context) =>
           Trace.within(task.input.runId, { phase: "end" }, () => this.end(task.input.runId, task.state.checkpoint.trip, task.state.checkpoint.error, runtime, context)),
       },
@@ -51,33 +54,25 @@ export class ResearchTasks {
     });
   }
 
-  /** The run's extension, built and installed if this process has not yet: before a task's first phase, and after a restart before resume. */
-  async install(runId: string): Promise<Extension> {
-    Trace.line(import.meta.url, "ResearchTasks.install", { runId });
-    const installed = this.deps.registry.snapshot().extension(TaskExtensions.nameOf(runId));
-    if (installed) return installed;
-    const extension = await this.deps.extensions.build(runId);
-    this.deps.registry.install(extension);
-    return extension;
-  }
-
   private async start(runId: string, taskId: string, runtime: Runtime, context: Context): Promise<void> {
     Trace.line(import.meta.url, "ResearchTasks.start", { runId, taskId });
-    const extension = await this.install(runId);
+    const extension = await this.deps.extensions.install(runId);
     const model = { provider: "openrouter", modelId: this.deps.model };
     await runtime.commit(async (tx) => {
       const conversation = await tx.createConversation({ ownership: { kind: "task", taskId: runtime.taskId } });
       await configure(tx, conversation.id, { model, extensions: [extension] });
       (await tx.doc(RunDoc, conversation.id)).run_id = runId;
       (await tx.doc(TaskIndex)).conversations[runId] = conversation.id;
-      return { status: "running", checkpoint: { phase: "work", conversationId: conversation.id } };
+      return { status: "running", checkpoint: { phase: "work", conversationId: conversation.id, round: 0, input: null } };
     }, context);
   }
 
-  private async work(runId: string, taskId: string, conversationId: ConversationId, runtime: Runtime, context: Context): Promise<void> {
-    Trace.line(import.meta.url, "ResearchTasks.work", { runId, taskId, conversationId });
+  /** One round: the instructions, or the owner's answer after a question, submitted once; then the answer, a tripped breaker, or a question to put to the owner, whichever comes first. */
+  private async work(runId: string, taskId: string, round: Round, runtime: Runtime, context: Context): Promise<void> {
+    Trace.line(import.meta.url, "ResearchTasks.work", { runId, taskId, round: round.round });
+    const { conversationId } = round;
     const { store, runs, works, readings, signals } = this.deps;
-    await this.install(runId);
+    await this.deps.extensions.install(runId);
     const work = await works.of(runId);
     const run = await store.getRun(runId);
     if (run?.status === "queued") {
@@ -87,12 +82,29 @@ export class ResearchTasks {
     const conversation = (await runtime.conversation(conversationId, context))!;
     const already = await readings.trip(runId, work.contract, work.role.maxTurns, Date.now());
     if (already) signals.trip(runId, already);
-    const submission = await conversation.submit({ type: "input", content: work.instructions, requestId: `task:${runId}` }, context);
+    const requestId = round.round === 0 ? `task:${runId}` : `task:${runId}:answer:${round.round}`;
+    const submission = await conversation.submit({ type: "input", content: round.input ?? work.instructions, requestId }, context);
     const ended = await ResearchTasks.race(submission.wait(context), signals.wait(runId));
-    if ("trip" in ended) await conversation.abort(context);
+    if (!("settled" in ended)) await conversation.abort(context);
+    if ("ask" in ended) {
+      await this.deps.pause.ask(runId, ended.ask);
+      const { round: number, input } = round;
+      await runtime.commit(() => ({ status: "running", checkpoint: { phase: "asking", conversationId, round: number, input, question: ended.ask } }), context);
+      return;
+    }
     const error = "settled" in ended ? ResearchTasks.unanswered(ended.settled) : "";
     const trip = "trip" in ended ? ended.trip : null;
     await runtime.commit(() => ({ status: "running", checkpoint: { phase: "end", trip, error } }), context);
+  }
+
+  /** Paused on its stop_when: waits, spending nothing, for the owner's answer, which starts the next round. */
+  private async asking(runId: string, paused: Round & { question: string }, runtime: Runtime, context: Context): Promise<void> {
+    Trace.line(import.meta.url, "ResearchTasks.asking", { runId, round: paused.round });
+    const answer = await this.deps.pause.answer(runId, runtime.signal);
+    this.deps.signals.resume(runId);
+    const input = `The owner answered your question ("${paused.question}"): ${answer}\nGo on with the task with this in mind.`;
+    const next = { conversationId: paused.conversationId, round: paused.round + 1, input };
+    await runtime.commit(() => ({ status: "running", checkpoint: { phase: "work", ...next } }), context);
   }
 
   private async end(runId: string, trip: Trip | null, error: string, runtime: Runtime, context: Context): Promise<void> {
@@ -113,16 +125,16 @@ export class ResearchTasks {
 
   private forget(runId: string): void {
     Trace.line(import.meta.url, "ResearchTasks.forget", { runId });
-    this.deps.registry.uninstall(defineExtension({ name: TaskExtensions.nameOf(runId) }));
+    this.deps.extensions.uninstall(runId);
     this.deps.works.forget(runId);
     this.deps.signals.forget(runId);
   }
 
-  private static race(settling: Promise<SettledSubmissionRecord>, tripping: Promise<Trip>): Promise<{ settled: SettledSubmissionRecord } | { trip: Trip }> {
+  private static race(settling: Promise<SettledSubmissionRecord>, halting: Promise<Halt>): Promise<{ settled: SettledSubmissionRecord } | Halt> {
     Trace.line(import.meta.url, "ResearchTasks.race");
     const settled = settling.then((record) => ({ settled: record }));
     void settled.catch(() => undefined);
-    return Promise.race([settled, tripping.then((trip) => ({ trip }))]);
+    return Promise.race([settled, halting]);
   }
 
   private static unanswered(record: SettledSubmissionRecord): string {

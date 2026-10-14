@@ -2,6 +2,7 @@ import { useState } from 'react';
 
 import { workspaceApi, type Plan, type TaskCard } from './api';
 import { Link, paths } from './route';
+import StopWhen from './StopWhen';
 
 export default function PlanCard({ plan, tasks, onError }: { plan: Plan; tasks: TaskCard[]; onError: (message: string) => void }) {
   const [busy, setBusy] = useState(false);
@@ -39,17 +40,23 @@ export default function PlanCard({ plan, tasks, onError }: { plan: Plan; tasks: 
                   type="checkbox"
                   checked={task.selected}
                   disabled={!draft || busy}
-                  onChange={() => act(() => workspaceApi.toggle(plan.id, task.key, !task.selected))}
+                  onChange={() => act(() => workspaceApi.editTask(plan.id, task.key, { selected: !task.selected }))}
                 />
                 <span className="t">{task.title}</span>
                 {card && <span className={`status ${card.status}`}>{card.status}</span>}
               </label>
               <div className="d">{task.contract.objective}</div>
+              <StopWhen
+                text={task.contract.stop_when ?? ''}
+                editable={draft && task.selected && !busy}
+                onSave={(text) => act(() => workspaceApi.editTask(plan.id, task.key, { stop_when: text }))}
+              />
               <div className="d muted">
                 Spend cap ${task.contract.budget.max_usd.toFixed(2)} · at most {task.contract.budget.max_minutes} min
                 {card && ` · ${card.sources} sources, ${card.attributes + card.measurements} facts, ${card.gaps} gaps, ${card.calls} model calls`}
                 {card?.billed_usd != null && ` · billed $${card.billed_usd.toFixed(4)}`}
               </div>
+              {card?.question && <div className="d ask">Waiting for your answer, in the chat: {card.question}</div>}
               {card?.error && <div className="d warn">{card.error}</div>}
               {task.error && <div className="d error">{task.error}</div>}
               {card && card.product_id && (

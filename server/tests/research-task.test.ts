@@ -16,6 +16,7 @@ import { LiveRuns, PiHarness, RunError, RunSupervisor, TaskEvents, TaskSuperviso
 import { App } from "../src/http/index.js";
 import { Env, type Settings } from "../src/config/index.js";
 import { PRODUCT_DELIVERABLE, TERMINAL_STATUSES } from "../src/domain/index.js";
+import { TaskJudge } from "../src/agent/index.js";
 import { productPacket, recordCalls, services } from "./fixtures.js";
 import { SqliteStores } from "./sqlite-stores.js";
 
@@ -60,7 +61,7 @@ const sent = async (runId: string): Promise<string> => JSON.stringify((await sto
 beforeEach(async () => {
   dir = mkdtempSync(join(tmpdir(), "mra-task-"));
   store = await SqliteStores.open(join(dir, "research.db"));
-  settings = { ...Env.settings(), model: MODEL_ID, corpusPath: join(dir, "corpus"), taskMaxUsd: 2 };
+  settings = { ...Env.settings(), model: MODEL_ID, judgeModel: MODEL_ID, corpusPath: join(dir, "corpus"), taskMaxUsd: 2 };
   faux = fauxProvider({ provider: "openrouter", models: [{ id: MODEL_ID }] });
   models = createModels();
   models.setProvider(faux.provider);
@@ -167,5 +168,51 @@ describe("POST /api/research/tasks", () => {
     const refused = await post(app, { brief: BRIEF, contract: { ...CONTRACT, verify: "owner" } });
     expect(refused.status).toBe(400);
     expect(((await refused.json()) as { detail: string }).detail).toBe("task refused: verify 'owner' has nothing to run it yet; only 'code' is built");
+  });
+});
+
+describe("the stop_when judge", () => {
+  it("pauses the task on its question, spends nothing while it waits, and goes on with the owner's answer", async () => {
+    const judged: string[] = [];
+    const route: FauxResponseStep = (context) => {
+      const last = context.messages[context.messages.length - 1]!;
+      const said = typeof last.content === "string" ? last.content : JSON.stringify(last.content);
+      if (said.startsWith("Condition:")) {
+        judged.push(said);
+        return fauxAssistantMessage(said.includes("nothing yet") ? '{"stop": true, "question": "The site sells drops and a diffuser: which one?"}' : '{"stop": false, "question": ""}');
+      }
+      if (said.includes("The owner answered your question")) return finish();
+      return context.messages.some((m) => m.role === "toolResult") ? finish() : recordAll();
+    };
+    faux.setResponses(Array.from({ length: 20 }, () => route));
+    const contract = { ...CONTRACT, stop_when: "The site sells more than one product and the brief does not say which." };
+    const run = await tasks.start({ brief: BRIEF, contract }, "admin");
+    const waiting = await (async () => {
+      for (let i = 0; i < 400; i++) {
+        const status = (await store.getRun(run.id))!.status;
+        if (status === "waiting" || TERMINAL_STATUSES.has(status)) return status;
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      }
+      return "timed out";
+    })();
+    expect(waiting).toBe("waiting");
+    expect(await tasks.question(run.id)).toBe("The site sells drops and a diffuser: which one?");
+    const callsWhileWaiting = (await store.listLlmCalls(run.id)).length;
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    expect((await store.listLlmCalls(run.id)).length).toBe(callsWhileWaiting);
+
+    await tasks.answer(run.id, "The drops.");
+    expect(await settled(run.id)).toBe("completed");
+    expect(await sent(run.id)).toContain("The owner answered your question (\\\"The site sells drops and a diffuser: which one?\\\"): The drops.");
+    expect((await store.listLlmCalls(run.id)).map((call) => call.agent_id)).toContain("judge");
+    expect(judged.some((text) => text.includes("The drops."))).toBe(true);
+    await expect(tasks.answer(run.id, "again")).rejects.toThrow(/not waiting for an answer/);
+  });
+
+  it("reads a verdict as stop only when the model says so in JSON", () => {
+    expect(TaskJudge.parse('Sure. {"stop": true, "question": "Which one?"}', "c")).toEqual({ stop: true, question: "Which one?" });
+    expect(TaskJudge.parse('{"stop": true}', "two products")).toEqual({ stop: true, question: "This task's stop condition was met (two products). How should it go on?" });
+    expect(TaskJudge.parse("I think it should stop.", "c")).toEqual({ stop: false, question: "" });
+    expect(TaskJudge.parse('{"stop": "yes"}', "c")).toEqual({ stop: false, question: "" });
   });
 });
