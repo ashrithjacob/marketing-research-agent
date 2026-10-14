@@ -26,6 +26,7 @@ import { EvidenceSearchTool } from "./evidence-search-tool.js";
 import { FindProductTool } from "./find-product-tool.js";
 import type { FetchRecord } from "./lanes.js";
 import type { LibraryTools } from "./library-tools.js";
+import type { PageView } from "./page-views.js";
 import { WebFetchTool } from "./web-fetch-tool.js";
 import { WebSearchTool } from "./web-search-tool.js";
 
@@ -44,6 +45,7 @@ export interface ToolContext {
   meter: ChargeMeter;
   onFetch?: (record: FetchRecord) => void;
   library?: LibraryTools | null;
+  view?: PageView;
 }
 
 /** Builds the research tools a role names, in its order, each charging what it spends to the agent's meter; a tool whose service is not configured, or whose input the run lacks (the library tools, with nothing in the library), is left out, not stubbed. `wait_for` is a ledger tool and is built with the ledger's. */
@@ -73,7 +75,7 @@ export class ToolRegistry {
       case "web_fetch": {
         const gate = settings.gateModel ? new OpenRouterGate(settings) : undefined;
         const pages = new MeteredPageFetcher(services.pages, prices, meter);
-        return { tool: new WebFetchTool(settings, pages, corpus, run.runId, run.onFetch, gate, run.subject, run.market).tool(), line: WEB_FETCH_LINE };
+        return { tool: new WebFetchTool(settings, pages, corpus, run.runId, run.onFetch, gate, run.subject, run.market, run.view).tool(), line: WEB_FETCH_LINE };
       }
       case "evidence_search":
         return { tool: new EvidenceSearchTool(new MeteredWebSearch(services.evidence.search, prices, meter), corpus, run.runId).tool(), line: EVIDENCE_SEARCH_LINE };
