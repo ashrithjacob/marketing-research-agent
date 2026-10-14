@@ -136,9 +136,10 @@ Rules:
 
 ### 3.1 What "complete" means, per primitive
 
-Decided 2026-10-14: **a task has no turn limit.** It is complete when its
-primitive's definition of complete is met, and that definition is code, one per
-primitive. The contract (§4) only fills in the definition's parameters: which
+Decided 2026-10-14: **what complete means and when to stop trying are two
+separate things.** A task is complete when its primitive's definition of
+complete is met, and that definition is code, one per primitive. When to stop
+trying is decided by circuit breakers (§3.2), never by the definition. The contract (§4) only fills in the definition's parameters: which
 fields, which inputs, which criteria. The operator cannot write a new kind of
 "done"; it can only choose a primitive and say what that primitive must cover.
 
@@ -153,15 +154,56 @@ fields, which inputs, which criteria. The operator cannot write a new kind of
 | `critique` | a verdict (pass or fail, and why) exists for every criterion named | new check — to build | the criteria and the task it reviews |
 | `ask_owner` | the owner answered | the answer's arrival | the question |
 
-What stops a task that never gets there, now that no turn count does:
+### 3.2 When to stop trying, and ending partly done
 
-- **No progress.** Each time the model stops, the hook (§6.4) compares the
-  run's findings with the last stop. Two stops in a row that added nothing end
-  the task `invalid`, and `LimitClose` names what is missing. This measures
-  progress toward the definition, not how many turns were taken: a task that
-  keeps recording useful findings is never cut off by this rule.
-- **Money.** `budget.max_usd` (§4, §7.4).
-- **The owner.** `stop_when` (§6.4) and Stop on the dashboard.
+Decided 2026-10-14. Only `finish` ends a task as complete, and `finish` refuses
+while the definition of complete is not met (§6.4). Refusing alone would loop:
+a refused `finish` is a tool call, so the model never stops, and a rule that
+only looks at stops never sees it. Four circuit breakers end a task that is not
+getting there; whichever trips first ends it, the same way:
+
+| Breaker | Trips when | Catches |
+|---|---|---|
+| refused `finish` | `finish` has been refused 3 times; the next call is accepted | a model that keeps asking to finish without doing the missing work |
+| no progress | 5 model responses in a row added no finding and no source | a model circling the same searches or pages |
+| step ceiling | the task's model responses reach its primitive's ceiling | anything the first two miss; a backstop, not a definition of done |
+| money and time | billed spend reaches `budget.max_usd`, or the task has run `budget.max_minutes` | a tool that hangs, a task that is expensive but busy |
+
+The step ceiling is set per primitive, generously: to start, twice today's role
+limits in `domain/research-roles.ts` (8 to 20 turns), so about 30 for
+`research` and 40 for `evidence`, then re-set in part 2 from the turn counts
+real tasks use, which the call log records. At 80% of the ceiling the model is
+told, once, "record what you have, then call `finish`", as hermes's task board
+warns its workers at 90% of their iteration budget.
+
+**A tripped breaker does not fail the task.** It ends through `RunEnd` like any
+other: `LimitClose` records each item still missing as a gap with the reason
+(refused finish, no progress, step ceiling, spend cap, time cap), the packet is
+assembled from everything recorded, and the task ends **`partial`**:
+
+| Status | Means |
+|---|---|
+| `completed` | every required item of the definition is met |
+| `partial` | some are met; each missing one is a gap with the reason it stopped |
+| `invalid` | the agent finished, but what it produced was refused by the checks |
+| `failed` | a crash |
+| `cancelled` | stopped by the owner |
+
+`partial` is not `invalid`, as `invalid` is not `failed`. The dashboard shows a
+partial task's findings as usual, with its gaps highlighted: what is missing,
+why it stopped, what the task cost. The operator receives the gap list and may
+start a follow-up task whose contract covers only the gaps, which costs less
+than rerunning the whole task.
+
+Today's stage runs get the same status: a run that hits its turn limit with
+gaps ends `completed` today, so "everything found" and "half found" look the
+same on screen. That changes `FinalStatus` in `agent/run-end.ts`, the terminal
+status list, and the frontend's status chips.
+
+**Superseded the same day:** the first version of §3.1 said "a task has no turn
+limit", with a no-progress rule counted per stop as the only backstop. A refused
+`finish` is not a stop, so that rule could not see the loop it was meant to
+stop; the ceiling came back, as a breaker only.
 
 ## 4. Contracts: completion rules written for the task
 
@@ -174,7 +216,7 @@ interface TaskContract {
   primitive: PrimitiveName;          // from the closed set in §3
   complete: CompleteParams;          // that primitive's parameters (§3.1); a Deliverable for research and evidence
   inputs: { finding_ids: string[]; document_ids: string[] };
-  budget: { max_usd: number };       // no turn limit (§3.1)
+  budget: { max_usd: number; max_minutes: number };  // breakers, not done (§3.2)
   verify: "code" | "critique" | "owner";
   stop_when?: string;                // prose: when to stop and ask instead
 }
@@ -222,9 +264,11 @@ it, with its own contract), or `owner` (an approval card). The operator picks;
 the workspace sets a floor (for example, anything written for publication is
 `owner`).
 
-A contract that fails is not retried blindly. The task ends `invalid` with the
-problems, as runs do today, and that lands in the operator's inbox. The
-operator may write a new contract. `invalid` stays distinct from `failed`.
+A contract that fails is not retried blindly. A task whose output the checks
+refuse ends `invalid` with the problems; one stopped by a breaker ends
+`partial` with its gaps (§3.2). Either lands in the operator's inbox, and the
+operator may write a new contract. `invalid` stays distinct from `failed`, and
+`partial` from both.
 
 ## 5. The learning loop
 
@@ -469,24 +513,30 @@ into its `mra.contract` document, where the hook reads it.
 
 ### 6.4 The contract, run by the harness
 
-Every time a worker's model stops without calling a tool, pi-durable calls the
-`onYield` hooks of the extensions that conversation selects:
+**One exit.** Only `finish` ends a task as complete. `finish` runs the
+primitive's completion check (§3.1) over the task's findings in the research
+store; met, the task ends through `RunEnd` as `completed`, or `invalid` if what
+it recorded is refused; not met, `finish` refuses with "Still missing: …", which
+counts toward the refused-`finish` breaker (§3.2).
 
-1. `mra.contract`'s hook runs the primitive's completion check (§3.1) over the
-   task's findings in the research store. What is missing comes back as
-   `{ continue: "Still missing: …" }`, and the run goes on. This is hermes's
-   goal loop with code as the judge.
-2. The hook also applies the no-progress rule (§3.1): two stops in a row that
-   added no finding end the task through `RunEnd` as `invalid`, with what
-   `LimitClose` says is missing. There is no turn count.
-3. When the check passes, or `finish` succeeds, the task ends through `RunEnd`
-   as `completed`, or as `invalid` with the problems.
+**Nudges, not exits.** pi-durable's generation hooks, from `mra.contract`:
+
+1. `onYield`, when the model stops without calling a tool: it runs the same
+   check and answers `{ continue: "Still missing: …, then call finish" }`. This
+   is hermes's goal loop with code as the judge. It never ends the task.
+2. `afterResponse`, after every model response: it counts responses toward the
+   step ceiling, and responses without a new finding or source toward the
+   no-progress breaker (§3.2). A tripped breaker ends the task through `RunEnd`
+   as `partial`.
+3. `beforeRequest`, once, at 80% of the ceiling: it adds "record what you
+   have, then call `finish`" to the next request.
 4. Only if the contract has `stop_when` does a cheap judge model read the last
    answer against it (hermes's `goal_judge` role). A `stop` verdict ends the task
-   and posts an `ask_owner` card. Code decides done; the judge only decides "ask".
+   `partial` and posts an `ask_owner` card. Code decides done; the judge only
+   decides "ask".
 
-`max_usd` is checked in the same hook against the task's billed charges so
-far. Decided 2026-10-14: billed, accepting a small overshoot. OpenRouter's
+`max_usd` is checked in the `afterResponse` hook against the task's billed
+charges so far, and `max_minutes` against the task's start time. Decided 2026-10-14: billed, accepting a small overshoot. OpenRouter's
 billed cost for a turn is readable only about 4 s after the turn ends
 (`/generation` 404s until then, `workings.md` §2a), so the check can miss the
 last turn or two and a task can end slightly over its cap. The alternative,
@@ -553,6 +603,13 @@ the run id, so creating it twice finds the same task. At startup, a `queued`
 run with an empty `task_id` (the process died between the two writes) gets its
 task created then. The task fills in `task_id` and `conversation_id` when it
 starts, and sets the run `running`.
+
+**Startup recovery skips tasks.** Decided 2026-10-14.
+`recoverRunsKilledByRestart` ends every unfinished run as `failed` at boot
+(`agent/run-supervisor.ts:84-91`). It must skip runs with a non-empty `task_id`:
+pi-durable resumes those from their last checkpoint after `harness.resume()`,
+and failing them first would end work that is about to continue. Runs without a
+`task_id` (today's stages) are recovered as before.
 
 **The end.** A task ends only through `RunEnd` with its run id, which assembles
 the packet from the run's findings and sets the final status, as for every run
@@ -757,11 +814,11 @@ pi-durable is experimental, so its version is pinned exactly (no `^`).
 | `AgentDriver` over pi-agent-core's `Agent` | the harness's generation and tool tasks |
 | `AgentTool` objects from `ToolRegistry` | `defineTool` in extensions; same TypeBox schemas from `pi-ai` |
 | `RoleDone`'s deliverable check | the primitive's completion check (§3.1) |
-| `TurnBudget` | not used by tasks: no turn limit; the no-progress rule and the spend cap stop a stuck task (§3.1). Stays for today's stages until they are replaced |
+| `TurnBudget` | not used by tasks: the step ceiling is one of four breakers (§3.2), counted in `afterResponse`. Stays for today's stages until they are replaced |
 | `LimitClose` | unchanged; runs when a task is cut short |
 | `LiveRuns`, `EventStream` | watches (§8) |
 | `RunEnd` | unchanged; every task still ends through it |
-| `recoverRunsKilledByRestart` | `harness.resume()` for new work; kept for old runs until they are gone |
+| `recoverRunsKilledByRestart` | skips runs with a `task_id`, which `harness.resume()` continues (§6.7); recovers today's stage runs as before |
 | `StageOneRun`, `ProductTruthRun` | kept on pi-agent-core 1.2.0 until each stage is a saved plan whose run matches the stage's |
 
 Tests keep pi-ai's faux provider; pi-durable adds `MemoryStorage`, so a test
@@ -826,7 +883,8 @@ place and the owner follows and steers them, not a chat. Five areas:
 1. **Inbox** — what needs the owner: approval cards (money, contracts marked
    `owner`), questions from `ask_owner`, lessons to approve.
 2. **Work** — the task graph as a board by status, each task opening into its
-   worker conversation: agent turns, tool lanes, costs.
+   worker conversation: agent turns, tool lanes, costs. A `partial` task shows
+   its findings with its gaps highlighted, each with why it stopped (§3.2).
 3. **Knowledge** — the ledger by node (today's tiles); brand memory as a list
    the owner can add to, edit and delete from, each change a version (§5.4); and
    the library: uploaded documents and playbooks, with versions and their
@@ -844,7 +902,7 @@ as the main surface.
 |---|---|---|
 | 0 | Document library (§10) | **done** |
 | 1 | `pi-agent-core` and `pi-ai` to 1.2.0 (§9.1); pi-durable installed, pinned; a harness opened in `main.ts` on `/data/harness.sqlite`, resumed at start, closed on stop; nothing runs on it yet | today's stages still pass `mra check` and one url brief on 1.2.0; the harness survives `mra down` / `mra up` |
-| 2 | One worker primitive (`research`) as extensions; a run row per task with its three new columns (§6.7); a durable worker task running a hand-written contract through `onYield` (§6.4); `RunEnd` at its end; external text labelled as data (§7.5) | a task given by hand meets its contract or ends `invalid`, and a restart mid-task resumes it |
+| 2 | One worker primitive (`research`) as extensions; a run row per task with its three new columns (§6.7); a durable worker task running a hand-written contract through `onYield` (§6.4); `RunEnd` at its end; the four breakers and the `partial` status, for tasks and today's stage runs (§3.2); startup recovery skipping tasks (§6.7); external text labelled as data (§7.5) | a task given by hand meets its contract or ends `invalid`, and a restart mid-task resumes it |
 | 3 | The workspace stream (§8): task graph and conversation watches over SSE; library tools move into `mra.playbooks` | a browser sees a task from start to end, and reconnects to a snapshot |
 | 4 | The other primitives; stage 1 as a saved plan of four tasks with child-task waiting | a stage-1 plan's result matches a `StageOneRun`'s on the same brief |
 | 5 | Feedback events (§5.2) and the inbox cards | the owner's actions are recorded against what they were about |
