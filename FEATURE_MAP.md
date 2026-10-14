@@ -428,7 +428,10 @@ older stage-1 modal (`StartRun.tsx`).
   Competitors would spend Apify money, so approving opens an approval card for
   each instead of starting it.
 - **Inbox** (`InboxPage.tsx`, `/inbox`, linked in the header): every open card
-  of the workspace, and the feedback log: each correction, approval, answer and
+  of the workspace (a lesson card has its text in an editable box; Approve saves
+  the edit), **What we know about this brand** (`MemoryList.tsx`: every memory
+  entry, marked *learned* or *yours* with its version, Edit and Delete each, and
+  an Add box), and the feedback log: each correction, approval, answer and
   steer, newest first, with what it was about and its words or diff. On a run's
   page, **wrong?** beside a cited source asks why and records it
   (`POST /api/research/runs/:id/sources/:sourceId/wrong`).

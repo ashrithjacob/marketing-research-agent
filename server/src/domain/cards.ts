@@ -9,6 +9,7 @@ export type CardStatus = "open" | "answered" | "approved" | "rejected";
 export type CardAction =
   | { kind: "answer_task"; run_id: string }
   | { kind: "reply_operator" }
+  | { kind: "lesson"; lesson_id: string }
   | { kind: "start_task"; brief: Brief; contract: TaskContract; plan_id: string; task_key: string };
 
 /** Something only the owner can settle, shown as a card until they do (spec §7.2). */

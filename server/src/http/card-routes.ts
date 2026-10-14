@@ -20,7 +20,12 @@ export class CardRoutes {
         return this.cards.answer(cardId, scope, answer);
       }),
     );
-    api.post("/cards/:cardId/approve", (c) => this.settle(c, (scope, cardId) => this.cards.approve(cardId, scope)));
+    api.post("/cards/:cardId/approve", (c) =>
+      this.settle(c, async (scope, cardId) => {
+        const body = (await c.req.json().catch(() => null)) as { text?: unknown } | null;
+        return this.cards.approve(cardId, scope, typeof body?.text === "string" ? body.text.trim() : "");
+      }),
+    );
     api.post("/cards/:cardId/reject", (c) => this.settle(c, (scope, cardId) => this.cards.reject(cardId, scope)));
   }
 

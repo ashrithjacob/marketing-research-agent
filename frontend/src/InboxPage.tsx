@@ -1,5 +1,6 @@
 import type { Feedback } from './api';
 import Cards from './Cards';
+import MemoryList from './MemoryList';
 import { useWorkspace } from './use-workspace';
 
 const SAID: Record<Feedback['verdict'], string> = {
@@ -32,6 +33,7 @@ export default function InboxPage({ onError }: { onError: (message: string) => v
     <div className="inbox">
       <Cards cards={board.cards} today={board.cards_today} onError={onError} />
       {board.cards.length === 0 && <div className="empty">Nothing is waiting for you.</div>}
+      <MemoryList entries={board.memory} onError={onError} />
       <section className="feedback-log">
         <h2>What you have told the system</h2>
         <p className="muted small">Every correction, approval, answer and steer, kept against what it was about. Later parts learn from these.</p>

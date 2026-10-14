@@ -1050,6 +1050,23 @@ paragraph numbers: code copies the quote and its character range from the
 archived page (`ExcerptTool`, `domain/paragraphs.ts`). Stage 1 has no
 `record_excerpt`.
 
+### §2k — learning from corrections (always-on part 6)
+
+`Reviewer` (`agent/learning/reviewer.ts`) sweeps every 15 s for feedback that is
+a correction, answer or steer, younger than a week, and named by no lesson.
+Per workspace it writes a case (`ReviewCase`: each feedback with what it was
+about, memory now, what the owner removed, lessons rejected) and submits it to
+that workspace's reviewer conversation (session document `mra.reviewers`), with
+a `requestId` from the feedback ids so a restart finds the same review. The
+reviewer's one tool, `propose_lesson`, goes through `LessonDesk.stage`, which
+refuses a lesson without known feedback or matching a rejected one, writes a
+`research_lessons` row and an approval card (action `lesson`). After the review
+settles, feedback no lesson named gets a `nothing` row. Approving the card
+(`CardDesk.approve`, with the owner's edit) has `LessonDesk.decide` write a new
+`research_memory` version marked `lesson`; rejecting records a `reject` on the
+lesson. `MemoryDesk.section` renders current memory as the `brand_memory`
+section of every task's extension and of the operator's.
+
 ### §2j — feedback (always-on part 5)
 
 Each owner action is a `research_feedback` row (`domain/feedback.ts`): verdict,

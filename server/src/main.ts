@@ -30,6 +30,7 @@ const picked = app.workspace ? await app.workspace.tasks.recover() : 0;
 const released = app.workspace ? await app.workspace.release.recover() : 0;
 if (released > 0) console.log(`started ${released} plan task(s) whose wait ended while the server was down`);
 harness.resume();
+app.workspace?.reviewer.start();
 console.log(`harness ${harness.reopened ? "reopened" : "created"} at ${harness.path}; ${picked} task(s) to pick back up`);
 app.supervisor.costs.start();
 
@@ -51,6 +52,7 @@ for (const signal of ["SIGINT", "SIGTERM"] as const) {
     shuttingDown = true;
     console.log(`${signal} — stopping`);
     server.close();
+    app.workspace?.reviewer.stop();
     void harness
       .close()
       .then(() => app.close())

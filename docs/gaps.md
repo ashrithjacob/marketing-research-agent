@@ -45,7 +45,11 @@ commit that closed it; do not delete it.
 9. **Part 4 built stage 1 as a plan, not the other primitives.** `evidence`,
    `ad_scan`, `review_mine`, `analyse` (spec §3) are not tasks yet: product truth
    and review mining still run only as stage runs. Stage 1's four roles are tasks
-   through a contract's `method`.
+   through a contract's `method`. **When `review_mine` becomes a task it must go
+   through `ReviewReuse` before any Apify pull**, as stage-3 runs do today: a
+   stored pull of the same listing and star band, younger than
+   `MRA_REVIEW_REUSE_DAYS`, answers it and nothing is paid (checked 2026-10-14:
+   no review-mining file changed since part 1, and its reuse tests pass).
 10. **Two writers can save one plan at once.** `PlanRelease` (a champion ended)
     and `CardDesk` (an approval pressed) each read a plan, change one task and
     save it whole; if both happen together, the later save drops the other's
@@ -54,6 +58,16 @@ commit that closed it; do not delete it.
 11. **Feedback covers sources, not single findings.** A finding can be rejected
     only through its source ("wrong?" beside a citation); spec §5.2 also lists
     rejecting a finding itself. Nothing reads feedback yet (part 6).
+
+12. **Part 6 left out the evals and replay suite (spec §5.7) and playbook
+    versions.** Lessons change brand memory only; there are no playbooks yet.
+13. **The reviewer's and the operator's model calls are not in the call log or
+    billed.** They run on the harness outside any research run, so no
+    `research_llm_calls` row or `/generation` lookup records them. The house rule
+    is that every dollar is billed and shown. Needs: a log for spend that belongs
+    to a workspace, not a run.
+14. **Today's stage runs do not read brand memory.** Only tasks and the operator
+    do (as a prompt section). A stage run's prompt has no memory block.
 
 ## Built but not seen live
 
@@ -66,6 +80,9 @@ against the faux model only.
   result matches a `StageOneRun`'s on the same brief (spec §12, part 4).
 - **The judge reading the brief** (`TaskJudge.brief`), added after a live task
   asked which product although its brief was that product's page.
+- **The learning loop.** A correction becoming a lesson, approved and read by
+  the next task, is tested against the faux model; the reviewer has not run on
+  a real model.
 - **Feedback and the inbox.** Recorded and listed in tests; the routes answer on
   the local stack, but no action has been taken there to record one.
 - **A category-numbers task finishing.** Its one run hit the stage role's

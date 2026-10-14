@@ -12,6 +12,7 @@ export class CardDesk {
     private readonly plans: PlanBook,
     private readonly tasks: TaskSupervisor,
     private readonly reply: (workspaceId: string, text: string) => Promise<void>,
+    private readonly lesson: (lessonId: string, approved: boolean, text: string) => Promise<void>,
     events: TaskEvents,
   ) {
     Trace.line(import.meta.url, "CardDesk.constructor");
@@ -33,10 +34,14 @@ export class CardDesk {
     return (await this.store.cards.resolve(card.id, "answered", text)) ?? { ...card, status: "answered", answer: text };
   }
 
-  /** The owner's approval: the task it holds is started, past the money check it was waiting on. */
-  async approve(cardId: string, scope: Scope): Promise<Card> {
+  /** The owner's approval: a lesson is applied, with their edit of it when they made one; a task is started, past the money check it was waiting on. */
+  async approve(cardId: string, scope: Scope, edit = ""): Promise<Card> {
     Trace.line(import.meta.url, "CardDesk.approve", { cardId });
     const card = await this.unresolved(cardId, scope, "approval");
+    if (card.action.kind === "lesson") {
+      await this.lesson(card.action.lesson_id, true, edit);
+      return (await this.store.cards.resolve(card.id, "approved", edit))!;
+    }
     if (card.action.kind !== "start_task") throw new RunError(`card ${cardId} has nothing to start`);
     const { brief, contract, plan_id, task_key } = card.action;
     const run = await this.tasks.start({ brief, contract }, card.workspace_id, { approved: true });
@@ -49,7 +54,8 @@ export class CardDesk {
     Trace.line(import.meta.url, "CardDesk.reject", { cardId });
     const card = await this.unresolved(cardId, scope, "approval");
     if (card.action.kind === "start_task") await this.onPlan(card.action.plan_id, card.action.task_key, { error: "rejected by the owner" });
-    await this.feedback(card, "reject", "");
+    if (card.action.kind === "lesson") await this.lesson(card.action.lesson_id, false, "");
+    else await this.feedback(card, "reject", "");
     return (await this.store.cards.resolve(card.id, "rejected", ""))!;
   }
 

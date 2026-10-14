@@ -9,6 +9,10 @@ import { TaskEvents } from "../task/task-events.js";
 import { TaskSupervisor } from "../task/task-supervisor.js";
 import type { ToolRegistry } from "../tools/index.js";
 
+import { LessonDesk } from "../learning/lesson-desk.js";
+import { MemoryDesk } from "../learning/memory-desk.js";
+import { Reviewer } from "../learning/reviewer.js";
+
 import { CardDesk } from "./card-desk.js";
 import { OperatorDesk } from "./operator-desk.js";
 import { OperatorTools } from "./operator-tools.js";
@@ -25,15 +29,23 @@ export class WorkspaceServices {
   readonly board: WorkspaceBoard;
   readonly cards: CardDesk;
   readonly release: PlanRelease;
+  readonly memory: MemoryDesk;
+  readonly lessons: LessonDesk;
+  readonly reviewer: Reviewer;
 
   constructor(deps: { store: ResearchStore; runs: LiveRuns; settings: Settings; harness: PiHarness; tools: ToolRegistry; costs: OpenRouterPrices }) {
     Trace.line(import.meta.url, "WorkspaceServices.constructor");
     const events = new TaskEvents();
-    this.tasks = new TaskSupervisor({ ...deps, events });
-    this.cards = new CardDesk(deps.store, deps.store.plans, this.tasks, (workspaceId, text) => this.operator.say(workspaceId, text, ""), events);
+    this.memory = new MemoryDesk(deps.store);
+    this.tasks = new TaskSupervisor({ ...deps, events, memory: this.memory });
+    const reply = (workspaceId: string, text: string) => this.operator.say(workspaceId, text, "");
+    const decide = (lessonId: string, approved: boolean, text: string) => this.lessons.decide(lessonId, approved, text);
+    this.cards = new CardDesk(deps.store, deps.store.plans, this.tasks, reply, decide, events);
+    this.lessons = new LessonDesk(deps.store, this.cards);
+    this.reviewer = new Reviewer(deps.store, deps.harness, this.lessons, deps.settings.model);
     const plans = new PlanDesk(deps.store.plans, this.tasks, this.cards, deps.store.feedback);
     this.release = new PlanRelease(deps.store, deps.store.plans, plans, events);
-    const tools = new OperatorTools(deps.store, plans, this.tasks, this.cards);
+    const tools = new OperatorTools(deps.store, plans, this.tasks, this.cards, this.memory);
     this.operator = new OperatorDesk(deps.harness, deps.store, tools.extension(), deps.settings.model, this.tasks, events);
     this.owner = new OwnerDesk(plans, this.operator);
     this.board = new WorkspaceBoard(deps.store, this.tasks);

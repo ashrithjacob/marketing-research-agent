@@ -1,5 +1,5 @@
 import { Briefs, type AccountDirectory, type ChargeLedger, type DocumentLibrary, type ReviewPullStore, type FindingLedger, type Generation, type Judgement,
-  type LlmCall, type LlmCallRecord, type PacketCheck, type PlanBook, type CardBook, type FeedbackBook, type ProductCatalog, type ResearchRun, type ResearchStore, type ReviewAnalysis,
+  type LlmCall, type LlmCallRecord, type PacketCheck, type PlanBook, type CardBook, type FeedbackBook, type LessonBook, type MemoryBook, type ProductCatalog, type ResearchRun, type ResearchStore, type ReviewAnalysis,
   type ReviewLedgerSnapshot, type RunEvent, type RunUpdate, type Scope, type SourceKind, type StoredRunReview, type TargetListings,
 } from "../../domain/index.js";
 import { Trace } from "../../trace/index.js";
@@ -19,11 +19,13 @@ export class SqlResearchStore implements ResearchStore {
   readonly plans: PlanBook;
   readonly cards: CardBook;
   readonly feedback: FeedbackBook;
+  readonly memory: MemoryBook;
+  readonly lessons: LessonBook;
 
   private constructor(private readonly tables: StoreTables) {
     Trace.line(import.meta.url, "SqlResearchStore.constructor");
     ({ catalog: this.products, accounts: this.accounts, listings: this.listings, findings: this.findings } = tables);
-    ({ charges: this.charges, pulls: this.pulls, library: this.library, plans: this.plans, cards: this.cards, feedback: this.feedback } = tables);
+    ({ charges: this.charges, pulls: this.pulls, library: this.library, plans: this.plans, cards: this.cards, feedback: this.feedback, memory: this.memory, lessons: this.lessons } = tables);
   }
 
   static async open(db: SqlDatabase): Promise<SqlResearchStore> {

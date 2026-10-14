@@ -54,6 +54,7 @@ export interface TaskCard {
 export interface Card {
   id: string;
   kind: 'question' | 'approval';
+  action: { kind: string };
   status: 'open' | 'answered' | 'approved' | 'rejected';
   title: string;
   body: string;
@@ -72,12 +73,21 @@ export interface Feedback {
   created_at: string;
 }
 
+export interface MemoryEntry {
+  entry_id: string;
+  version: number;
+  text: string;
+  by: 'owner' | 'lesson';
+  created_at: string;
+}
+
 export interface Board {
   plans: Plan[];
   tasks: TaskCard[];
   cards: Card[];
   cards_today: number;
   feedback: Feedback[];
+  memory: MemoryEntry[];
 }
 
 export const workspaceApi = {
@@ -88,7 +98,10 @@ export const workspaceApi = {
   approve: (id: string) => request<Plan>(`/api/research/plans/${id}/approve`, { method: 'POST' }),
   answerCard: (id: string, answer: string) =>
     request<Card>(`/api/research/cards/${id}/answer`, { method: 'POST', body: JSON.stringify({ answer }) }),
-  approveCard: (id: string) => request<Card>(`/api/research/cards/${id}/approve`, { method: 'POST' }),
+  approveCard: (id: string, text = '') => request<Card>(`/api/research/cards/${id}/approve`, { method: 'POST', body: JSON.stringify({ text }) }),
+  addMemory: (text: string) => request<MemoryEntry>('/api/research/memory', { method: 'POST', body: JSON.stringify({ text }) }),
+  editMemory: (id: string, text: string) => request<MemoryEntry>(`/api/research/memory/${id}`, { method: 'POST', body: JSON.stringify({ text }) }),
+  deleteMemory: (id: string) => request<MemoryEntry>(`/api/research/memory/${id}`, { method: 'DELETE' }),
   rejectCard: (id: string) => request<Card>(`/api/research/cards/${id}/reject`, { method: 'POST' }),
   markSourceWrong: (runId: string, sourceId: string, why: string) =>
     request<Feedback>(`/api/research/runs/${runId}/sources/${encodeURIComponent(sourceId)}/wrong`, { method: 'POST', body: JSON.stringify({ why }) }),

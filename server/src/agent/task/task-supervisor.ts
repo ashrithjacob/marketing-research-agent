@@ -7,6 +7,7 @@ import type { Settings } from "../../config/index.js";
 import { FeedbackStrengths, Scope, TERMINAL_STATUSES, type ResearchRun, type ResearchStore } from "../../domain/index.js";
 import { Trace } from "../../trace/index.js";
 
+import type { MemoryDesk } from "../learning/memory-desk.js";
 import type { LiveRuns } from "../live-runs.js";
 import type { PiHarness } from "../pi-harness.js";
 import type { ToolRegistry } from "../tools/index.js";
@@ -31,6 +32,7 @@ export interface TaskSupervisorDeps {
   tools: ToolRegistry;
   costs: OpenRouterPrices;
   events: TaskEvents;
+  memory: MemoryDesk;
 }
 
 /** Durable tasks on the harness: a contract checked and queued as a run, a restart's tasks picked back up, a stop delivered as an abort. */
@@ -49,7 +51,7 @@ export class TaskSupervisor {
     const ending = new TaskEnd({ store, runs, costs, works, signals, readings });
     this.pause = new TaskPause(store, runs, signals, events);
     const judge = new TaskJudge(harness, harness.models, settings.judgeModel);
-    const extensions = new TaskExtensions(works, signals, readings, harness.registry, judge, this.pause);
+    const extensions = new TaskExtensions(works, signals, readings, harness.registry, judge, this.pause, deps.memory);
     this.extensions = extensions;
     this.tasks = new ResearchTasks({ store, runs, works, extensions, signals, readings, ending, events, pause: this.pause, model: settings.model });
     this.intake = new TaskIntake(store, settings);

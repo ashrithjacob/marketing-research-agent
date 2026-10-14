@@ -12,7 +12,7 @@ import { fauxAssistantMessage, fauxProvider, fauxToolCall, type FauxResponseStep
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { OpenRouterPrices, type SqlResearchStore } from "../src/adapters/index.js";
-import { LiveRuns, PiHarness, RunError, RunSupervisor, TaskEvents, TaskSupervisor, ToolRegistry } from "../src/agent/index.js";
+import { LiveRuns, MemoryDesk, PiHarness, RunError, RunSupervisor, TaskEvents, TaskSupervisor, ToolRegistry } from "../src/agent/index.js";
 import { App } from "../src/http/index.js";
 import { Env, type Settings } from "../src/config/index.js";
 import { PRODUCT_DELIVERABLE, TERMINAL_STATUSES } from "../src/domain/index.js";
@@ -40,7 +40,7 @@ let tasks: TaskSupervisor;
 async function open(): Promise<void> {
   harness = await PiHarness.open(join(dir, "harness.sqlite"), models);
   const costs = new OpenRouterPrices({ apiKey: "" });
-  tasks = new TaskSupervisor({ store, runs: new LiveRuns(store), settings, harness, tools: new ToolRegistry(services(settings), settings), costs, events: new TaskEvents() });
+  tasks = new TaskSupervisor({ store, runs: new LiveRuns(store), settings, harness, tools: new ToolRegistry(services(settings), settings), costs, events: new TaskEvents(), memory: new MemoryDesk(store) });
   await tasks.recover();
   harness.resume();
 }

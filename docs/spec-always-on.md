@@ -389,6 +389,28 @@ overwritten in place even then: a direct edit or delete is a new version marked
 versions. An owner's edit also counts as feedback (§5.2, a correction), so the
 reviewer learns from it and does not propose the removed entry again.
 
+*Built 2026-10-14, part 6* (`agent/learning/`, `research_memory`,
+`research_lessons`). Brand memory is versioned and listed in the inbox, editable
+by the owner (each edit a new version marked `owner`, and a correction). The
+reviewer reads new corrections, answers and steers every 15 s, one review per
+workspace in its own conversation, and may only `propose_lesson`; code refuses a
+lesson with no feedback, with feedback not in the brand's record, or matching
+one the owner rejected; a review that proposes nothing is recorded as
+`nothing`, so feedback is reviewed once. A lesson is an approval card the owner
+can edit before approving; approval writes a memory version marked `lesson`,
+rejection is feedback. Brand memory is a prompt section of every task and of
+the operator, so an approved lesson reaches the next request. Where it differs:
+- **Not a fork.** The reviewer reads a case written by code (the feedback, what
+  each was about, memory now, what was removed or rejected), not the worker's
+  transcript: stage runs have no conversation to fork, and the case is a
+  fraction of the tokens.
+- **Memory only.** There are no playbooks yet, so lessons change brand memory;
+  playbook patches and versions wait for playbooks. The curator (§5.6) and
+  measurement (§5.5) are later parts.
+- **A timer, not a watcher task.** The sweep is an in-process interval until
+  the watchers of part 7.
+Tested against the faux model; not seen live.
+
 ### 5.5 Measuring whether a lesson helped
 
 Every task records which playbook versions it read. Per version the store
@@ -1144,7 +1166,7 @@ dashboard; a button starts it. Decided with the owner:
 | 3 | **done 2026-10-14** (§12.3). **Start, review, chat** (§11, decided 2026-10-14): Start shows a saved plan as task contracts with costs; toggles and Approve queue them; the operator conversation (§7.2) with `create_task`, `cancel_task`, steering a task, and `send_owner` questions, behind a chat panel; the workspace stream (§8) so the board and the chat update live. Until part 4 the saved plan holds what `research` can do: product facts and category numbers | the owner starts a brief, approves a plan, changes it by chat, and watches it run to its end |
 | 4 | **Stage 1 as a plan built 2026-10-14** (§12.4); the other primitives are not. The other primitives; stage 1 as a saved plan of four tasks with child-task waiting | a stage-1 plan's result matches a `StageOneRun`'s on the same brief |
 | 5 | **done 2026-10-14** (§5.2, built). Feedback events (§5.2) and the inbox cards | the owner's actions are recorded against what they were about |
-| 6 | Reviewer as a fork, lessons, the gate, playbook versions, the editable brand-memory list (§5.3–5.4, §6.6); eval cases from invalid tasks and corrections, and the replay suite (§5.7) | a correction given once produces a lesson; approved, the next task reads it |
+| 6 | **Learning from corrections built 2026-10-14** (§5.4, built); evals, the replay suite and playbook versions are not. Reviewer as a fork, lessons, the gate, playbook versions, the editable brand-memory list (§5.3–5.4, §6.6); eval cases from invalid tasks and corrections, and the replay suite (§5.7) | a correction given once produces a lesson; approved, the next task reads it |
 | 7 | The Always on switch and daily cap, the operator's router for signals, stable sections, work log and warm-cache compaction (the operator conversation itself moved to part 3); `create_task`, `mra.money`, the schedule watcher | the system starts work nobody clicked, inside its limits; the operator's cache hit rate holds across a day |
 | 8 | `write` and `critique` primitives; the long-form statics playbook | an ad draft that cites its findings |
 | 9 | Measurement per playbook version (§5.5), curator watcher (§5.6), `distil` (§5.8) | a lesson that hurt is visible with numbers |

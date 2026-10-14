@@ -43,3 +43,5 @@ export * from "./saved-plans.js";
 export * from "./chat.js";
 export * from "./cards.js";
 export * from "./feedback.js";
+export * from "./memory.js";
+export * from "./lessons.js";

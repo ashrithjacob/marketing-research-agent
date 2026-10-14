@@ -23,6 +23,7 @@ export class WorkspaceBoard {
       cards: cards.filter((card) => card.status === "open" || card.resolved_at.slice(0, 10) === today),
       cards_today: cards.filter((card) => card.created_at.slice(0, 10) === today).length,
       feedback: await this.store.feedback.list(scope, 30),
+      memory: await this.store.memory.current(scope),
     };
   }
 

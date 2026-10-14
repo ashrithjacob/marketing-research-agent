@@ -26,6 +26,7 @@ import { TaskCallLog } from "./task-call-log.js";
 /** Everything one task's run needs in this process, built from its run row: its tools, its finish check, how it closes when a breaker trips, its prompts and its call log. */
 export interface TaskWork {
   runId: string;
+  workspaceId: string;
   contract: TaskContract;
   role: RoleSpec;
   brief: Brief;
@@ -104,6 +105,7 @@ export class TaskWorks {
     const closer = RoleChecks.closer(role, findings, new RowRepair(store.findings, runId, [node]), check, scope);
     return {
       runId,
+      workspaceId: run.workspace_id,
       contract,
       role,
       brief,

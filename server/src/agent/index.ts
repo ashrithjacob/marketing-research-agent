@@ -46,3 +46,4 @@ export * from "./turn-breakers.js";
 export * from "./task/index.js";
 export * from "./fallback-models.js";
 export * from "./operator/index.js";
+export * from "./learning/index.js";

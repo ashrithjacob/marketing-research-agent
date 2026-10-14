@@ -10,6 +10,8 @@ import { OPERATOR_SYSTEM } from "../prompt/text/operator.js";
 import type { TaskSupervisor } from "../task/task-supervisor.js";
 
 import { WorkspaceDoc } from "./operator-docs.js";
+import type { MemoryDesk } from "../learning/memory-desk.js";
+
 import type { CardDesk } from "./card-desk.js";
 import type { PlanDesk } from "./plan-desk.js";
 
@@ -22,6 +24,7 @@ export class OperatorTools {
     private readonly plans: PlanDesk,
     private readonly tasks: TaskSupervisor,
     private readonly cards: CardDesk,
+    private readonly memory: MemoryDesk,
   ) {}
 
   extension(): Extension {
@@ -29,7 +32,10 @@ export class OperatorTools {
     const saved = Object.entries(SAVED_TASKS).map(([key, task]) => `\`${key}\` (${task.title})`).join(", ");
     return defineExtension({
       name: "mra.operator",
-      sections: [section("operator", () => OPERATOR_SYSTEM.replace("{saved}", saved), { tag: false })],
+      sections: [
+        section("operator", () => OPERATOR_SYSTEM.replace("{saved}", saved), { tag: false }),
+        section("brand_memory", async (input, context) => this.memory.section((await input.read.snapshot(WorkspaceDoc, input.conversationId, context))?.workspace_id ?? "")),
+      ],
       tools: [
         defineTool({
           name: "list_work",

@@ -3,7 +3,8 @@ import { useState } from 'react';
 import { workspaceApi, type Card } from './api';
 
 function OpenCard({ card, onError }: { card: Card; onError: (message: string) => void }) {
-  const [answer, setAnswer] = useState('');
+  const lesson = card.action.kind === 'lesson';
+  const [answer, setAnswer] = useState(lesson ? card.body.split('\n\nWhy:')[0] ?? '' : '');
   const [busy, setBusy] = useState(false);
 
   async function act(work: () => Promise<unknown>) {
@@ -36,10 +37,11 @@ function OpenCard({ card, onError }: { card: Card; onError: (message: string) =>
         </form>
       ) : (
         <div className="card-answer">
+          {lesson && <textarea className="lesson-text" rows={2} value={answer} onChange={(e) => setAnswer(e.target.value)} disabled={busy} />}
           <button className="ghost" disabled={busy} onClick={() => act(() => workspaceApi.rejectCard(card.id))}>
             Reject
           </button>
-          <button className="primary" disabled={busy} onClick={() => act(() => workspaceApi.approveCard(card.id))}>
+          <button className="primary" disabled={busy || (lesson && !answer.trim())} onClick={() => act(() => workspaceApi.approveCard(card.id, lesson ? answer.trim() : ''))}>
             Approve
           </button>
         </div>

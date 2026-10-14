@@ -8,6 +8,8 @@ import { TASK_CEILING_WARNING } from "../prompt/text/task.js";
 
 import { DurableTool } from "./durable-tool.js";
 import type { TaskJudge } from "./task-judge.js";
+import type { MemoryDesk } from "../learning/memory-desk.js";
+
 import type { TaskPause } from "./task-pause.js";
 import type { TaskReadings } from "./task-readings.js";
 import type { TaskSignals } from "./task-signals.js";
@@ -22,6 +24,7 @@ export class TaskExtensions {
     private readonly registry: Registry,
     private readonly judge: TaskJudge,
     private readonly pause: TaskPause,
+    private readonly memory: MemoryDesk,
   ) {}
 
   /** The run's extension, built and installed if this process has not yet: before a task's first phase, and after a restart before resume. */
@@ -50,7 +53,7 @@ export class TaskExtensions {
     return defineExtension({
       name: TaskExtensions.nameOf(runId),
       tools: work.tools.map((tool) => DurableTool.from(tool, runId)),
-      sections: [section("worker", () => work.system, { tag: false })],
+      sections: [section("worker", () => work.system, { tag: false }), section("brand_memory", () => this.memory.section(work.workspaceId))],
       hooks: [
         hook(GenerationTask, {
           beforeRequest: (request, api) => this.beforeRequest(work, request.messages, api),

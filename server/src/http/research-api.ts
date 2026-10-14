@@ -20,6 +20,7 @@ import { ReviewMiningRoutes } from "./review-mining-routes.js";
 import { ProductRoutes } from "./product-routes.js";
 import { ScopeGuard } from "./scope-guard.js";
 import { CardRoutes } from "./card-routes.js";
+import { MemoryRoutes } from "./memory-routes.js";
 import { TaskRoutes } from "./task-routes.js";
 import { WorkspaceRoutes } from "./workspace-routes.js";
 import { WorkspaceStream } from "./workspace-stream.js";
@@ -53,6 +54,7 @@ export class ResearchApi {
       new WorkspaceRoutes(workspace.owner, store.plans).register(api);
       new WorkspaceStream(workspace.operator, workspace.board).register(api);
       new CardRoutes(workspace.cards).register(api);
+      new MemoryRoutes(workspace.memory).register(api);
     }
     new CostRoute(store).register(api);
     new FeedbackRoutes(store).register(api);

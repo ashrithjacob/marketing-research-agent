@@ -230,6 +230,20 @@ classDiagram
       resume()
       close()
     }
+    class Lesson {
+      <<interface>>
+    }
+    class LessonDraft {
+      <<interface>>
+    }
+    class LessonBook {
+      <<interface>>
+      stage()
+      get()
+      list()
+      attach()
+      resolve()
+    }
     class LibraryDocument {
       <<interface>>
     }
@@ -277,6 +291,18 @@ classDiagram
     }
     class LlmCall {
       <<interface>>
+    }
+    class MemoryEntry {
+      <<interface>>
+    }
+    class MemoryWrite {
+      <<interface>>
+    }
+    class MemoryBook {
+      <<interface>>
+      current()
+      history()
+      write()
     }
     class Stages {
       of()
@@ -940,6 +966,18 @@ classDiagram
       delete()
       bump()
     }
+    class LessonTable {
+      stage()
+      get()
+      list()
+      attach()
+      resolve()
+    }
+    class MemoryTable {
+      current()
+      history()
+      write()
+    }
     class StoreMigrations {
       apply()
       once()
@@ -1172,6 +1210,24 @@ classDiagram
     }
     class InvalidRunResettle {
       resettleAll()
+    }
+    class LessonDesk {
+      stage()
+      nothing()
+      decide()
+    }
+    class MemoryDesk {
+      list()
+      section()
+      write()
+    }
+    class ReviewCase {
+      write()
+    }
+    class Reviewer {
+      start()
+      stop()
+      sweep()
     }
     class LiveConversion {
       <<interface>>
@@ -1756,6 +1812,9 @@ classDiagram
       clear()
       clientOf()
     }
+    class MemoryRoutes {
+      register()
+    }
     class Passwords {
       hash()
       verify()
@@ -1850,6 +1909,8 @@ classDiagram
   FeedbackTable --> SqlDatabase
   FindingTable --> SqlDatabase
   JudgementTable --> SqlDatabase
+  LessonTable --> SqlDatabase
+  MemoryTable --> SqlDatabase
   PacketRowTable --> SqlDatabase
   PlanTable --> SqlDatabase
   ProductBackfill --> SqlDatabase
@@ -1893,6 +1954,13 @@ classDiagram
   AgentEventRecorder --> ToolSteps
   InvalidRunResettle --> ResearchStore
   InvalidRunResettle --> LiveRuns
+  LessonDesk --> ResearchStore
+  LessonDesk --> CardDesk
+  MemoryDesk --> ResearchStore
+  ReviewCase --> ResearchStore
+  Reviewer --> ResearchStore
+  Reviewer --> PiHarness
+  Reviewer --> LessonDesk
   LibraryIntake --> DocumentLibrary
   LibraryIntake --> DocumentConverter
   LimitClose --> RunFindings
@@ -1912,6 +1980,7 @@ classDiagram
   OperatorTools --> PlanDesk
   OperatorTools --> TaskSupervisor
   OperatorTools --> CardDesk
+  OperatorTools --> MemoryDesk
   OwnerDesk --> PlanDesk
   OwnerDesk --> OperatorDesk
   PlanDesk --> PlanBook
@@ -1997,6 +2066,7 @@ classDiagram
   TaskExtensions --> TaskReadings
   TaskExtensions --> TaskJudge
   TaskExtensions --> TaskPause
+  TaskExtensions --> MemoryDesk
   TaskInputs --> FindingLedger
   TaskIntake --> ResearchStore
   TaskIntake --> Settings
@@ -2063,6 +2133,7 @@ classDiagram
   JudgementRoutes --> ResearchStore
   LibraryRoutes --> DocumentLibrary
   LibraryRoutes --> LibraryIntake
+  MemoryRoutes --> MemoryDesk
   ProductRoutes --> ResearchStore
   ResearchApi --> AmazonListingSource
   ResearchApi --> WorkspaceServices
@@ -2134,6 +2205,8 @@ classDiagram
 | `adapters` | `adapters/store/feedback-table.ts` | FeedbackTable |
 | `adapters` | `adapters/store/finding-table.ts` | FindingTable |
 | `adapters` | `adapters/store/judgement-table.ts` | JudgementTable |
+| `adapters` | `adapters/store/lesson-table.ts` | LessonTable |
+| `adapters` | `adapters/store/memory-table.ts` | MemoryTable |
 | `adapters` | `adapters/store/migrations.ts` | StoreMigrations |
 | `adapters` | `adapters/store/packet-row-table.ts` | PacketRowTable |
 | `adapters` | `adapters/store/plan-table.ts` | PlanTable |
@@ -2172,6 +2245,10 @@ classDiagram
 | `agent` | `agent/fallback-models.ts` | FallbackModels |
 | `agent` | `agent/frames.ts` | EventFrame, Frames |
 | `agent` | `agent/invalid-run-resettle.ts` | InvalidRunResettle |
+| `agent` | `agent/learning/lesson-desk.ts` | LessonDesk |
+| `agent` | `agent/learning/memory-desk.ts` | MemoryDesk |
+| `agent` | `agent/learning/review-case.ts` | ReviewCase |
+| `agent` | `agent/learning/reviewer.ts` | Reviewer |
 | `agent` | `agent/library/library-intake.ts` | LiveConversion, LibraryIntake |
 | `agent` | `agent/limit-close.ts` | LimitClosed, LimitClose |
 | `agent` | `agent/listing-match.ts` | ListingMatch |
@@ -2288,8 +2365,10 @@ classDiagram
 | `domain` | `domain/feedback.ts` | FeedbackTarget, Feedback, FeedbackDraft, FeedbackBook, FeedbackStrengths |
 | `domain` | `domain/findings.ts` | FindingDraft, Finding, Findings |
 | `domain` | `domain/harness.ts` | DurableHarness |
+| `domain` | `domain/lessons.ts` | Lesson, LessonDraft, LessonBook |
 | `domain` | `domain/library.ts` | LibraryDocument, ConvertedDocument, DocumentSection, DocumentLibrary, DocumentConverter, DocumentSections |
 | `domain` | `domain/logs.ts` | RunEvent, Judgement, PacketCheck, RunUpdate, LlmCallRecord, Generation, LlmCall |
+| `domain` | `domain/memory.ts` | MemoryEntry, MemoryWrite, MemoryBook |
 | `domain` | `domain/nodes.ts` | Stages |
 | `domain` | `domain/packet-rows.ts` | PacketRowSet, PacketRows |
 | `domain` | `domain/paragraphs.ts` | Paragraph, Paragraphs |
@@ -2355,6 +2434,7 @@ classDiagram
 | `http` | `http/judgement-routes.ts` | JudgementRoutes |
 | `http` | `http/library-routes.ts` | LibraryRoutes |
 | `http` | `http/login-throttle.ts` | LoginThrottle |
+| `http` | `http/memory-routes.ts` | MemoryRoutes |
 | `http` | `http/passwords.ts` | Passwords |
 | `http` | `http/product-routes.ts` | ProductRoutes |
 | `http` | `http/research-api.ts` | ResearchApi |
