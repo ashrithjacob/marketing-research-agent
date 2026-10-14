@@ -375,7 +375,7 @@ classDiagram
     }
     class Primitives {
       role()
-      node()
+      nodes()
     }
     class RunHead {
       <<interface>>
@@ -488,6 +488,7 @@ classDiagram
     class SavedPlans {
       tasks()
       task()
+      arrange()
     }
     class ServicePart {
       <<interface>>
@@ -1232,6 +1233,10 @@ classDiagram
       draft()
       revise()
       approve()
+      startTask()
+    }
+    class PlanRelease {
+      recover()
     }
     class WorkspaceBoard {
       snapshot()
@@ -1492,6 +1497,9 @@ classDiagram
     class StoredRunAssembly {
       of()
     }
+    class ChampionRunAssembly {
+      assemble()
+    }
     class CountedTally {
       refuse()
     }
@@ -1526,6 +1534,9 @@ classDiagram
       uninstall()
       nameOf()
     }
+    class TaskInputs {
+      copy()
+    }
     class TaskIntake {
       admit()
     }
@@ -1534,6 +1545,7 @@ classDiagram
     }
     class TaskJudge {
       verdict()
+      brief()
       lastStep()
       parse()
     }
@@ -1580,6 +1592,7 @@ classDiagram
     class TaskWorks {
       of()
       forget()
+      assembly()
     }
     class ToolSteps {
       start()
@@ -1878,6 +1891,10 @@ classDiagram
   PlanDesk --> PlanBook
   PlanDesk --> TaskSupervisor
   PlanDesk --> CardDesk
+  PlanRelease --> ResearchStore
+  PlanRelease --> PlanBook
+  PlanRelease --> PlanDesk
+  PlanRelease --> TaskEvents
   WorkspaceBoard --> ResearchStore
   WorkspaceBoard --> TaskSupervisor
   WorkspaceServices --> OpenRouterPrices
@@ -1943,6 +1960,7 @@ classDiagram
   StageOneParts --> RoleSpec
   StageOneRunAssembly --> FindingLedger
   StageOneRunAssembly --> RoleSpec
+  ChampionRunAssembly --> FindingLedger
   ResearchTasks --> ResearchTaskDeps
   TaskCallLog --> ResearchStore
   TaskCallLog --> OpenRouterPrices
@@ -1952,6 +1970,7 @@ classDiagram
   TaskExtensions --> TaskReadings
   TaskExtensions --> TaskJudge
   TaskExtensions --> TaskPause
+  TaskInputs --> FindingLedger
   TaskIntake --> ResearchStore
   TaskIntake --> Settings
   TaskJudge --> PiHarness
@@ -2136,6 +2155,7 @@ classDiagram
 | `agent` | `agent/operator/operator-tools.ts` | OperatorTools |
 | `agent` | `agent/operator/owner-desk.ts` | OwnerDesk |
 | `agent` | `agent/operator/plan-desk.ts` | PlanChange, PlanDesk |
+| `agent` | `agent/operator/plan-release.ts` | PlanRelease |
 | `agent` | `agent/operator/workspace-board.ts` | WorkspaceBoard |
 | `agent` | `agent/operator/workspace-services.ts` | WorkspaceServices |
 | `agent` | `agent/operator-inputs.ts` | OperatorInputs |
@@ -2188,6 +2208,7 @@ classDiagram
 | `agent` | `agent/stage-one-run-assembly.ts` | StageOneRunAssembly |
 | `agent` | `agent/stage-one-run.ts` | StageOneRun |
 | `agent` | `agent/stored-run-assembly.ts` | StoredRunAssembly |
+| `agent` | `agent/task/champion-run-assembly.ts` | ChampionRunAssembly |
 | `agent` | `agent/task/counted-tally.ts` | CountedTally |
 | `agent` | `agent/task/durable-tool.ts` | DurableTool |
 | `agent` | `agent/task/research-task.ts` | ResearchTaskDeps, ResearchTasks |
@@ -2195,6 +2216,7 @@ classDiagram
 | `agent` | `agent/task/task-end.ts` | TaskEnd |
 | `agent` | `agent/task/task-events.ts` | TaskEvents |
 | `agent` | `agent/task/task-extensions.ts` | TaskExtensions |
+| `agent` | `agent/task/task-inputs.ts` | TaskInputs |
 | `agent` | `agent/task/task-intake.ts` | TaskIntake |
 | `agent` | `agent/task/task-judge.ts` | Verdict, TaskJudge |
 | `agent` | `agent/task/task-pause.ts` | TaskPause |

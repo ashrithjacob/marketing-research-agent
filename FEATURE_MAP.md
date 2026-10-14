@@ -421,6 +421,12 @@ older stage-1 modal (`StartRun.tsx`).
   calls `POST /plans/:id/approve`; nothing runs before that. Once approved,
   each task shows its run's status chip, sources, facts, gaps, model calls and
   billed cost, live, and **Open what it found →** goes to its run view.
+- **Since part 4** the plan has four tasks: Champion product, Product facts,
+  Competitors, Category numbers. The champion's checkbox is locked; it reads
+  *Needed first…* or *Not needed for the tasks kept*. A kept task that waits on
+  it reads *Starts when Champion product finishes* once approved. Champion and
+  Competitors would spend Apify money, so approving opens an approval card for
+  each instead of starting it.
 - **Stop and ask me when** (`StopWhen.tsx`): under each kept task of a draft
   plan, a text box with the saved task's default; leaving it saves it
   (`POST /plans/:id/tasks/:key` with `stop_when`). Once approved it reads

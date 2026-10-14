@@ -33,9 +33,11 @@ commit that closed it; do not delete it.
 6. **"Approve … · up to $1.00" reads as a price.** It is the kept tasks' spend
    caps added together (`frontend/src/PlanCard.tsx`); measured product-facts
    tasks cost $0.04–0.07. Needs: a label that says it is a cap.
-7. **The category-numbers task has never run for real.** No run in the local
-   store has a `category_data` contract. Needs: one real run before it is shown
-   to anyone.
+7. ~~**The category-numbers task has never run for real.**~~ Closed 2026-10-14:
+   run `ff505816…` (stage-1 `category` role, as part 4's plan task) ended
+   `partial` at its 15-turn limit with 12 sources, 10 facts, 11 measurements and
+   2 gaps, $0.0723 billed. It ran out of turns rather than finishing; whether 15
+   is enough for a task (the stage role's limit) is open.
 
 8. **Cards cannot be muted, and show only on a plan page.** Spec §7.2 lets the
    owner mute a kind; not built. The cards list sits on the plan page, so a card

@@ -12,6 +12,8 @@ export const JUDGE_INPUT = `Condition: {condition}
 
 The worker's task: {objective}
 
+The brief the owner gave: {brief}
+
 The owner has already answered:
 {answers}
 

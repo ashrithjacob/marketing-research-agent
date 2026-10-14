@@ -1130,7 +1130,7 @@ dashboard; a button starts it. Decided with the owner:
 | 1 | `pi-agent-core` and `pi-ai` to 1.2.0 (§9.1); pi-durable installed, pinned; a harness opened in `main.ts` on `/data/harness.sqlite`, resumed at start, closed on stop; nothing runs on it yet | today's stages still pass `mra check` and one url brief on 1.2.0; the harness survives `mra down` / `mra up` |
 | 2 | One worker primitive (`research`) as extensions; a run row per task with its three new columns (§6.7); a durable worker task running a hand-written contract through `onYield` (§6.4); `RunEnd` at its end; the four breakers and the `partial` status, for tasks and today's stage runs (§3.2); startup recovery skipping tasks (§6.7); external text labelled as data (§7.5); backup models (§9.3); `record_excerpt` by reference (§6.8); details in §12.1 | **done 2026-10-14** (§12.2) |
 | 3 | **done 2026-10-14** (§12.3). **Start, review, chat** (§11, decided 2026-10-14): Start shows a saved plan as task contracts with costs; toggles and Approve queue them; the operator conversation (§7.2) with `create_task`, `cancel_task`, steering a task, and `send_owner` questions, behind a chat panel; the workspace stream (§8) so the board and the chat update live. Until part 4 the saved plan holds what `research` can do: product facts and category numbers | the owner starts a brief, approves a plan, changes it by chat, and watches it run to its end |
-| 4 | The other primitives; stage 1 as a saved plan of four tasks with child-task waiting | a stage-1 plan's result matches a `StageOneRun`'s on the same brief |
+| 4 | **Stage 1 as a plan built 2026-10-14** (§12.4); the other primitives are not. The other primitives; stage 1 as a saved plan of four tasks with child-task waiting | a stage-1 plan's result matches a `StageOneRun`'s on the same brief |
 | 5 | Feedback events (§5.2) and the inbox cards | the owner's actions are recorded against what they were about |
 | 6 | Reviewer as a fork, lessons, the gate, playbook versions, the editable brand-memory list (§5.3–5.4, §6.6); eval cases from invalid tasks and corrections, and the replay suite (§5.7) | a correction given once produces a lesson; approved, the next task reads it |
 | 7 | The Always on switch and daily cap, the operator's router for signals, stable sections, work log and warm-cache compaction (the operator conversation itself moved to part 3); `create_task`, `mra.money`, the schedule watcher | the system starts work nobody clicked, inside its limits; the operator's cache hit rate holds across a day |
@@ -1201,6 +1201,34 @@ typechecked, not watched):
   product facts and approved, ended `completed`: 12 calls, 7 sources, 10 facts,
   3 gaps, UK, $0.0409 billed. The operator's transcript holds a note for the
   plan, its approval, and each task's end.
+
+### 12.4 Part 4, stage 1 as a plan, built
+
+Start proposes stage 1's four roles as plan tasks; a contract's `method` (a
+stage-1 role) makes a task work as that role does. Where it differs from the
+plan above:
+- **No child tasks.** The plan orders its tasks in code: approving starts the
+  ones with nothing to wait for, and `PlanRelease` starts the rest when the
+  champion's run ends (and, at startup, any it missed). pi-durable's
+  `waiting`/`on` would hold the order inside the harness, but the tasks are
+  separate runs that also wait on approval cards, which the harness does not
+  see.
+- **Separate ledgers, copied inputs.** Each task is its own run, so the
+  champion's reference, its gaps and the page it cites are copied into each
+  task that needs them (`TaskInputs`), by reference (§6.8).
+- **The champion is the plan's, not the owner's.** It is kept exactly when
+  `StageOnePlans` would run one, and has no node of its own
+  (`ChampionRunAssembly`).
+- **Not measured against a `StageOneRun`.** The proof row above is not met: no
+  stage-1 plan with a champion has run live, because the champion and
+  competitors spend Apify money and need the owner's go-ahead. Measured live
+  without Apify: product facts (`e2bfccd0…`, `completed`, 10 sources, 11 facts)
+  and category numbers (`ff505816…`, `partial` at its 15-turn limit) as stage
+  roles. The product task's judge asked which product although the brief was
+  the product's own page: the judge was not shown the brief. It is now
+  (`TaskJudge.brief`), not yet seen live.
+- The other primitives (`evidence`, `ad_scan`, `review_mine`, `analyse`) are not
+  built (`gaps.md`).
 
 ## 13. Risks and open questions
 

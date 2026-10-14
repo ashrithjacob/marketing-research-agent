@@ -33,6 +33,7 @@ export class TaskJudge {
     const messages = conversation ? (await conversation.context(BACKGROUND_CONTEXT)).messages : [];
     const input = JUDGE_INPUT.replace("{condition}", condition)
       .replace("{objective}", work.contract.objective)
+      .replace("{brief}", TaskJudge.brief(work.brief))
       .replace("{answers}", answers.length > 0 ? answers.map((a) => `- ${a}`).join("\n") : "nothing yet")
       .replace("{step}", TaskJudge.lastStep(messages));
     const request: Message[] = [{ role: "user", content: input, timestamp: Date.now() }];
@@ -41,6 +42,13 @@ export class TaskJudge {
     const answer = await this.models.completeSimple(model, { systemPrompt: JUDGE_SYSTEM, messages: request });
     await work.judgeCalls.answered(key, answer);
     return TaskJudge.parse(answer.content.flatMap((part) => (part.type === "text" ? [part.text] : [])).join(""), condition);
+  }
+
+  /** The brief as the owner gave it, so a condition about the brief ("the brief does not say which product") is judged against the brief, not guessed. */
+  static brief(brief: TaskWork["brief"]): string {
+    Trace.line(import.meta.url, "TaskJudge.brief");
+    const parts = [brief.product && `product "${brief.product}"`, brief.url && `site or page ${brief.url}`, brief.market && `market ${brief.market}`, brief.notes && `notes: ${brief.notes}`];
+    return parts.filter(Boolean).join("; ") || "nothing beyond the task";
   }
 
   /** The worker's last answer and the tool results that followed it, as text, cut to a size a cheap model reads quickly. */

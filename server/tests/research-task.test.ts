@@ -209,6 +209,10 @@ describe("the stop_when judge", () => {
     await expect(tasks.answer(run.id, "again")).rejects.toThrow(/not waiting for an answer/);
   });
 
+  it("tells the judge the brief, so a condition about the brief is judged against it", () => {
+    expect(TaskJudge.brief({ product: "", url: "https://brand.example/products/drops", market: "UK", notes: "" })).toBe("site or page https://brand.example/products/drops; market UK");
+  });
+
   it("reads a verdict as stop only when the model says so in JSON", () => {
     expect(TaskJudge.parse('Sure. {"stop": true, "question": "Which one?"}', "c")).toEqual({ stop: true, question: "Which one?" });
     expect(TaskJudge.parse('{"stop": true}', "two products")).toEqual({ stop: true, question: "This task's stop condition was met (two products). How should it go on?" });

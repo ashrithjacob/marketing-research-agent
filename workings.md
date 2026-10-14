@@ -1050,6 +1050,21 @@ paragraph numbers: code copies the quote and its character range from the
 archived page (`ExcerptTool`, `domain/paragraphs.ts`). Stage 1 has no
 `record_excerpt`.
 
+### §2i — stage 1 as a plan (always-on part 4)
+
+Start's plan is stage 1's four roles (`domain/saved-plans.ts`): Champion
+product, Product facts, Competitors, Category numbers, each a contract with a
+`method` naming the stage-1 role it works as (`Primitives.role`: that role's
+tools without `wait_for`, its checks, its turn limit; `StageOneBriefing` for its
+prompt). The champion is kept by the plan when `StageOnePlans` would run one,
+and the other kept tasks then start after it. On approval, `PlanDesk.startTask`
+starts what has nothing to wait for; a task with `amazon_find_product` in reach
+(champion, competitors) becomes an approval card instead. When the champion's
+run ends, `PlanRelease` starts the waiting tasks with its reference row and gaps
+as inputs, which `TaskInputs` copies (with the page the reference cites) into
+each new run's ledger under agent `champion`, refiled under that task's node.
+The champion's own run is assembled by `ChampionRunAssembly`.
+
 ### §2h — Start, review, chat (always-on part 3)
 
 The header's **Start** asks for a product or site and a market, then opens the
