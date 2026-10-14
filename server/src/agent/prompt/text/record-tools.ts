@@ -97,8 +97,8 @@ export const RETRACT_DESCRIPTION =
 export const FINISH_DESCRIPTION =
   "Check your part of the ledger against the contract. Call it alone, once your task is " +
   "recorded with its status and its gaps. It answers FINISHED, which ends your work, or the " +
-  "numbered problems to fix with record_* or retract before calling it again. Five checks; " +
-  "after the fifth you end with what the ledger holds.";
+  "numbered problems to fix with record_* or retract before calling it again. After three " +
+  "refusals you end with what the ledger holds, and what is missing is recorded as gaps.";
 
 export const READ_LEDGER_DESCRIPTION =
   "Read the run's shared ledger: every agent's live rows, or only one agent's (`agent`) or one " +
