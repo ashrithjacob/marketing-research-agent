@@ -1,7 +1,7 @@
 # Gaps in what is built
 
-Known gaps in the always-on work on the `ubiquitous` branch (parts 1–3 and the
-`stop_when` judge, `docs/spec-always-on.md`). Each was checked against the code
+Known gaps in the always-on work on the `ubiquitous` branch (parts 1–4, the
+`stop_when` judge and cards, `docs/spec-always-on.md`). Each was checked against the code
 or the local store on 2026-10-14. When one is closed, strike it through with the
 commit that closed it; do not delete it.
 
@@ -52,9 +52,23 @@ commit that closed it; do not delete it.
     save it whole; if both happen together, the later save drops the other's
     change. Needs: saving one task of a plan, not the whole plan.
 
+## Built but not seen live
+
+The owner asked on 2026-10-14 for no more live runs; these are covered by tests
+against the faux model only.
+
+- **A stage-1 plan with the champion.** The champion and competitors spend
+  Apify money, so none has run: not the approval cards' Approve, not
+  `PlanRelease` handing the champion's rows on, and not the check that a plan's
+  result matches a `StageOneRun`'s on the same brief (spec §12, part 4).
+- **The judge reading the brief** (`TaskJudge.brief`), added after a live task
+  asked which product although its brief was that product's page.
+- **A category-numbers task finishing.** Its one run hit the stage role's
+  15-turn limit (gap 7); whether tasks need a higher ceiling is open.
+
 ## Outside the code
 
-- **Nothing is deployed.** Parts 1–3 are only on the `ubiquitous` branch and the
+- **Nothing is deployed.** Parts 1–4 are only on the `ubiquitous` branch and the
   local stack; marketing.vanis.ai runs the old code. The harness backup step in
   `deploy/vps/mra-snapshot.sh` has not run on the VPS.
 - **`../setup.md` is not in any commit.** It sits outside this repository.
