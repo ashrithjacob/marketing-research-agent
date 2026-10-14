@@ -177,7 +177,8 @@ as a saved image over the same connection.
 
 - Never build on the VPS. It has no swap, and the OOM killer may pick agentchat.
   A hook refuses a build issued remotely.
-- A deploy ends any research run in progress. Deploy between runs.
+- A deploy ends any stage run in progress. Deploy between runs. A durable task
+  (`mra task`) is the exception: it resumes after the restart.
 
 ## Things that will bite you
 
@@ -216,9 +217,10 @@ Still only written down, because no rule catches them:
 - **In tests, a text-only faux reply ends the agent loop after one turn.** For a
   multi-turn run, give the earlier turns a `fauxToolCall(...)` with
   `stopReason: "toolUse"`.
-- **A server restart kills live runs.** `recoverRunsKilledByRestart()` ends them
+- **A server restart kills live stage runs.** `recoverRunsKilledByRestart()` ends them
   `failed` through `RunEnd`, which still shows the packet their rows make; any
-  billed-cost lookups still pending are lost.
+  billed-cost lookups still pending are lost. A run with a `contract` is a durable
+  task and is skipped: the harness resumes it (`workings.md` §2g).
 - **A URL in the brief belongs in `brief.url`, never `brief.product`.** An agent
   handed `https://…` as a product name searches for that literal string and
   comes back confidently wrong. This is the bug behind "why does it always go

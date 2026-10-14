@@ -1048,7 +1048,7 @@ as the main surface.
 |---|---|---|
 | 0 | Document library (§10) | **done** |
 | 1 | `pi-agent-core` and `pi-ai` to 1.2.0 (§9.1); pi-durable installed, pinned; a harness opened in `main.ts` on `/data/harness.sqlite`, resumed at start, closed on stop; nothing runs on it yet | today's stages still pass `mra check` and one url brief on 1.2.0; the harness survives `mra down` / `mra up` |
-| 2 | One worker primitive (`research`) as extensions; a run row per task with its three new columns (§6.7); a durable worker task running a hand-written contract through `onYield` (§6.4); `RunEnd` at its end; the four breakers and the `partial` status, for tasks and today's stage runs (§3.2); startup recovery skipping tasks (§6.7); external text labelled as data (§7.5); backup models (§9.3); `record_excerpt` by reference (§6.8); details in §12.1 | a task given by hand meets its contract or ends `invalid`, and a restart mid-task resumes it |
+| 2 | One worker primitive (`research`) as extensions; a run row per task with its three new columns (§6.7); a durable worker task running a hand-written contract through `onYield` (§6.4); `RunEnd` at its end; the four breakers and the `partial` status, for tasks and today's stage runs (§3.2); startup recovery skipping tasks (§6.7); external text labelled as data (§7.5); backup models (§9.3); `record_excerpt` by reference (§6.8); details in §12.1 | **done 2026-10-14** (§12.2) |
 | 3 | The workspace stream (§8): task graph and conversation watches over SSE; library tools move into `mra.playbooks` | a browser sees a task from start to end, and reconnects to a snapshot |
 | 4 | The other primitives; stage 1 as a saved plan of four tasks with child-task waiting | a stage-1 plan's result matches a `StageOneRun`'s on the same brief |
 | 5 | Feedback events (§5.2) and the inbox cards | the owner's actions are recorded against what they were about |
@@ -1078,6 +1078,31 @@ Decided 2026-10-14.
 - **The restart test:** a test opens the harness on a temporary SQLite file,
   closes it mid-task, reopens it, and checks the task ends with its earlier
   findings intact; on the real app, `mra down` and `mra up` during the one run.
+
+### 12.2 Part 2, built
+
+Measured 2026-10-14 on the local stack, `docs/tasks/droplet-product-data.json`
+(the product deliverable as a contract, url brief, budget $0.50 / 20 min):
+
+- **A restart mid-task resumes it.** Run `ab1535f0…`: calls 1–4 ran, three
+  sources were recorded, then `mra down` / `mra up` at 11:05:39 UTC. The new
+  process logged `harness reopened at /data/harness.sqlite; 1 task(s) to pick
+  back up`, the run stayed `running`, call 5 started at 11:05:41, and the run
+  ended `completed` after 14 calls with its first three sources still rows 1–3;
+  $0.0753 billed, 14 of 14 calls read back. The first call after the restart
+  logs the whole conversation as its input again: `TaskCallLog` counts what it
+  has logged in memory.
+- **The same contract, no restart.** Run `963a7c7d…`: `completed`, 13 calls,
+  every row written by `research`, $0.0512 billed.
+- **Found by the first run and fixed:** settlement closed a phantom `product`
+  part on a task's run (the stage plan's agent, not the task's), writing a
+  `product` gap and an `incomplete` node status. Settlement now takes the run's
+  own roles (`StageOneParts`).
+- **Step ceiling.** Both runs used 13–14 of the `research` primitive's 30
+  responses; the ceiling stays at 30 until more tasks have run.
+- **Today's stages on part 2.** A url brief on `product_data` (`60109d85…`)
+  ended `completed` in 9 calls, its pages shown to the model labelled as data;
+  $0.0453 billed.
 
 ## 13. Risks and open questions
 
