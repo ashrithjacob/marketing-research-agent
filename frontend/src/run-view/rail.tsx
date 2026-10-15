@@ -1,9 +1,7 @@
 import type { ReactNode } from 'react';
 import { api, DELIVERED_STATUSES, type Judgement, type RunDetail, type RunSummary } from '../api';
 import { scopeLabel } from '../stages';
-import { CostTable } from './CostTable';
 import { runStage } from './now';
-import { useCosts } from './use-costs';
 
 /** On a product-truth or review-mining run: a delivered stage-1 run newer than the one it built on, so what it found is out of date. */
 export function newerStageOne(runs: RunSummary[], run: RunSummary): RunSummary | undefined {
@@ -17,15 +15,12 @@ export function newerStageOne(runs: RunSummary[], run: RunSummary): RunSummary |
 export function RailColumn({
   run,
   nav,
-  live,
   judgements,
 }: {
   run: RunDetail;
   nav: ReactNode;
-  live: boolean;
   judgements: Judgement[];
 }) {
-  const costs = useCosts(run.id, live);
   return (
   <div className="rail-col">
     <h3>
@@ -48,21 +43,9 @@ export function RailColumn({
         Markets <span>{run.brief?.market || 'anywhere'}</span>
       </div>
       <div>
-        Model <span>{run.model || 'unrecorded'}</span>
-      </div>
-      <div>
         Started <span>{new Date(run.created_at).toLocaleString()}</span>
       </div>
-      <div>
-        Tokens{' '}
-        <span>
-          {run.usage?.totalTokens
-            ? `${(run.usage.totalTokens / 1000).toFixed(0)}k`
-            : '—'}
-        </span>
-      </div>
     </div>
-    {costs && costs.rows.length > 0 && <CostTable report={costs} />}
 
     <h3 style={{ marginTop: 18 }}>
       Standing judgements <span className="n">{judgements.length}</span>

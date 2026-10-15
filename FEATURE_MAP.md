@@ -96,7 +96,8 @@ If a run's packet names a product that is not yours, check `brief` first.
 nodes, *ready* and *not built*) and the Now panel's *Next: Stage N* strip are
 deleted. Owner's decision: the product page shows information, not steps; stages
 are started and followed on a plan in the inbox. The left column now shows the
-run (**Activity ↗**, scope, markets, model, started, tokens, its cost table), the
+run (**Activity ↗**, scope, markets, started; since 2026-10-15 no model, tokens or
+cost, which are in the activity log), the
 standing judgements, and the product's runs (`ProductRuns.tsx`), where every run
 of the product is picked. A product-truth or review-mining run whose stage 1 has
 since been rerun still says so above its tiles (`newerStageOne`).

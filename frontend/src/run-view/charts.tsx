@@ -26,45 +26,21 @@ export interface BarItem {
   display: string;
 }
 
-/** Horizontal bars, longest = full width. Numbers stay honest: no invented axes. */
+/** Horizontal bars, longest = full width. Numbers stay honest: no invented axes. Drawn in HTML, so its text is the page's size at any width. */
 export function BarList({ items, unit }: { items: BarItem[]; unit?: string }) {
   const max = Math.max(...items.map((i) => i.value), 0);
-  const rowH = 22;
-  const labelW = 150;
-  const valueW = 64;
-  const barW = 360;
-  const height = items.length * rowH;
   return (
-    <svg
-      className="barlist"
-      viewBox={`0 0 ${labelW + barW + valueW} ${height}`}
-      role="img"
-      aria-label="bar chart"
-    >
-      {items.map((item, index) => {
-        const y = index * rowH;
-        const w = max > 0 ? Math.max((item.value / max) * barW, 2) : 2;
-        return (
-          <g key={index}>
-            <text x={labelW - 8} y={y + 15} textAnchor="end" className="barlist-label">
-              {item.label}
-            </text>
-            <rect
-              x={labelW}
-              y={y + 5}
-              width={barW}
-              height={12}
-              rx={6}
-              className="barlist-track"
-            />
-            <rect x={labelW} y={y + 5} width={w} height={12} rx={6} className="barlist-fill" />
-            <text x={labelW + barW + 8} y={y + 15} className="barlist-value">
-              {item.display || formatNumber(item.value, unit)}
-            </text>
-          </g>
-        );
-      })}
-    </svg>
+    <div className="barlist" role="img" aria-label="bar chart">
+      {items.map((item, index) => (
+        <div key={index} className="barlist-row">
+          <span className="barlist-label">{item.label}</span>
+          <span className="barlist-track">
+            <span className="barlist-fill" style={{ width: `${max > 0 ? Math.max((item.value / max) * 100, 1) : 1}%` }} />
+          </span>
+          <span className="barlist-value">{item.display || formatNumber(item.value, unit)}</span>
+        </div>
+      ))}
+    </div>
   );
 }
 

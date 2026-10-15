@@ -81,7 +81,7 @@ export default function RunView({
 
   return (
     <div className="cols two">
-      <RailColumn run={run} nav={nav} live={live} judgements={judgements} />
+      <RailColumn run={run} nav={nav} judgements={judgements} />
 
       <div className="mid">
         {error && <div className="error">{error}</div>}

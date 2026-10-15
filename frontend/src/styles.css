@@ -608,11 +608,12 @@ button.tile-chip.active {
 .tile-excerpts { display: block; }
 
 /* SVG bars */
-.barlist { width: 100%; height: auto; display: block; margin: 4px 0 8px; }
-.barlist-label { font: 11px var(--font-ui); fill: var(--dim); }
-.barlist-track { fill: var(--panel-2); }
-.barlist-fill { fill: var(--accent); opacity: 0.85; }
-.barlist-value { font: 11px var(--font-ui); fill: var(--ink); font-weight: 600; }
+.barlist { display: flex; flex-direction: column; gap: 6px; margin: 4px 0 8px; font-size: 13px; }
+.barlist-row { display: grid; grid-template-columns: minmax(60px, 140px) 1fr minmax(80px, max-content); gap: 10px; align-items: center; }
+.barlist-label { color: var(--dim); text-align: right; overflow-wrap: anywhere; }
+.barlist-track { display: block; height: 10px; border-radius: 5px; background: var(--panel-2); }
+.barlist-fill { display: block; height: 100%; border-radius: 5px; background: var(--accent); opacity: 0.85; }
+.barlist-value { color: var(--ink); font-weight: 600; }
 .chart-group { display: grid; gap: 10px; margin: 8px 0 4px; }
 .chart-title { font-size: 11.5px; color: var(--faint); margin-bottom: 2px; }
 
