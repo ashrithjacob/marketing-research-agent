@@ -1,65 +1,34 @@
 import type { ReactNode } from 'react';
-import { api, DELIVERED_STATUSES, TERMINAL_STATUSES, type Judgement, type ProductTruthPacket, type RunDetail, type RunSummary, type StagePacket } from '../api';
-import StageRail, { type StageProgress } from '../StageRail';
-import { scopeLabel, type CollectingStage } from '../stages';
+import { api, DELIVERED_STATUSES, type Judgement, type RunDetail, type RunSummary } from '../api';
+import { scopeLabel } from '../stages';
 import { CostTable } from './CostTable';
 import { runStage } from './now';
 import { useCosts } from './use-costs';
 
-/** Where `run` stands: everything is counted on one stage-1 run — the run itself, or the one it built on — never on another stage-1 run's later stages. */
-export function subjectProgress(runs: RunSummary[], run: RunSummary): StageProgress {
-  const anchor = runStage(run) === 1 ? run.id : run.source_run_id;
-  const stageOneRun = runStage(run) === 1 ? run : runs.find((r) => r.id === run.source_run_id);
-  const on = (stage: CollectingStage) =>
-    runs
-      .filter((r) => runStage(r) === stage && (runStage(run) === stage ? r.id === run.id : r.source_run_id === anchor))
-      .sort((a, b) => b.created_at.localeCompare(a.created_at));
-  const pick = (list: RunSummary[]) =>
-    list.find((r) => !TERMINAL_STATUSES.has(r.status)) ?? list.find((r) => DELIVERED_STATUSES.has(r.status)) ?? list[0];
-  const truth = on(2);
-  const mining = on(3);
-  const newestStageOne = runs
-    .filter((r) => runStage(r) === 1 && DELIVERED_STATUSES.has(r.status))
+/** On a product-truth or review-mining run: a delivered stage-1 run newer than the one it built on, so what it found is out of date. */
+export function newerStageOne(runs: RunSummary[], run: RunSummary): RunSummary | undefined {
+  if (runStage(run) === 1) return undefined;
+  const newest = runs
+    .filter((r) => runStage(r) === 1 && !r.is_task && DELIVERED_STATUSES.has(r.status))
     .sort((a, b) => b.created_at.localeCompare(a.created_at))[0];
-  const superseded = runStage(run) !== 1 && !!newestStageOne && newestStageOne.id !== run.source_run_id;
-  return {
-    done: { 1: (!!stageOneRun && DELIVERED_STATUSES.has(stageOneRun.status)), 2: truth.some((r) => DELIVERED_STATUSES.has(r.status)), 3: mining.some((r) => DELIVERED_STATUSES.has(r.status)) },
-    live: { 1: false, 2: truth.some((r) => !TERMINAL_STATUSES.has(r.status)), 3: mining.some((r) => !TERMINAL_STATUSES.has(r.status)) },
-    runIds: { 1: stageOneRun?.id, 2: pick(truth)?.id, 3: pick(mining)?.id },
-    ...(superseded ? { newerStageOne: newestStageOne } : {}),
-  };
+  return newest && newest.id !== run.source_run_id ? newest : undefined;
 }
 
 export function RailColumn({
   run,
-  runs,
   nav,
   live,
-  packet,
   judgements,
-  onSelectRun,
 }: {
   run: RunDetail;
-  runs: RunSummary[];
   nav: ReactNode;
   live: boolean;
-  packet: StagePacket | ProductTruthPacket | null;
   judgements: Judgement[];
-  onSelectRun: (id: string) => void;
 }) {
   const costs = useCosts(run.id, live);
   return (
   <div className="rail-col">
-    <StageRail
-      status={run.status}
-      nodes={packet?.nodes ?? []}
-      saturation={packet && 'saturation' in packet ? packet.saturation : []}
-      scope={run.nodes ?? []}
-      progress={subjectProgress(runs, run)}
-      onSelectRun={onSelectRun}
-    />
-
-    <h3 style={{ marginTop: 18 }}>
+    <h3>
       Run{' '}
       <a
         className="logs-link"

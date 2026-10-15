@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import {
   api,
-  DELIVERED_STATUSES,
   TERMINAL_STATUSES,
   type Judgement,
   type RunDetail,
@@ -10,25 +9,14 @@ import {
   type StagePacket,
 } from './api';
 import { ChatText } from './FileBox';
-import { Link, paths } from './route';
 import { nowPanel, runStage } from './run-view/now';
-import { RailColumn, subjectProgress } from './run-view/rail';
+import { newerStageOne, RailColumn } from './run-view/rail';
 import { StageOneTiles } from './run-view/stage-one-tiles';
 import { ProductTruthTiles } from './run-view/truth/ProductTruthTiles';
 import { useRunStream } from './run-view/use-run-stream';
 import { OutdatedVoice } from './run-view/outdated-voice';
 import { VoiceAnalysis } from './run-view/voice/VoiceAnalysis';
 
-const NEXT_STAGE: Record<2 | 3, { name: string; sub: string }> = {
-  2: {
-    name: 'Product truth',
-    sub: 'Stage 1 is in. Product truth assesses the product in isolation: its formula, doses, claim limits and economics. Tick it on a plan in the inbox.',
-  },
-  3: {
-    name: 'Review mining',
-    sub: 'Product truth is in. Review mining collects customer language from the reviews of the products stage 1 found. Tick it on a plan in the inbox; you approve its cost on a card before anything runs.',
-  },
-};
 
 export default function RunView({
   runId,
@@ -36,7 +24,6 @@ export default function RunView({
   nav,
   judgementsRev,
   requiredFields,
-  onSelectRun,
   onChanged,
 }: {
   runId: string;
@@ -44,7 +31,6 @@ export default function RunView({
   nav: ReactNode;
   judgementsRev: number;
   requiredFields: Record<string, string[]>;
-  onSelectRun: (id: string) => void;
   onChanged: () => void;
 }) {
   const [loaded, setLoaded] = useState<RunDetail | null>(null);
@@ -87,25 +73,15 @@ export default function RunView({
   if (!run) return <div className="empty">Loading run…</div>;
 
   const now = nowPanel(run, live, lastTool);
-  const progress = subjectProgress(runs, run);
+  const newer = newerStageOne(runs, run);
   const stage = runStage(run);
-  const next = stage < 3 && DELIVERED_STATUSES.has(run.status) ? ((stage + 1) as 2 | 3) : null;
-  const nextStage = next && !progress.done[next] && !progress.live[next] ? NEXT_STAGE[next] : null;
   const nodesInRun = new Set((run.nodes ?? packet?.nodes.map((n) => n.node) ?? []) as string[]);
   const stagePacket = packet && packet.stage !== 2 ? (packet as StagePacket) : null;
   const truthPacket = packet && packet.stage === 2 ? (packet as ProductTruthPacket) : null;
 
   return (
     <div className="cols two">
-      <RailColumn
-        run={run}
-        runs={runs}
-        nav={nav}
-        live={live}
-        packet={packet}
-        judgements={judgements}
-        onSelectRun={onSelectRun}
-      />
+      <RailColumn run={run} nav={nav} live={live} judgements={judgements} />
 
       <div className="mid">
         {error && <div className="error">{error}</div>}
@@ -137,17 +113,6 @@ export default function RunView({
               Activity log ↗
             </a>
           </div>
-          {nextStage && (
-            <div className="next-stage">
-              <div className="txt">
-                <b>Next: Stage {next} · {nextStage.name}</b>
-                <div className="sub">{nextStage.sub}</div>
-              </div>
-              <Link to={paths.inbox()} className="primary">
-                Go to the inbox →
-              </Link>
-            </div>
-          )}
         </section>
 
         {unarchived > 0 && (
@@ -164,19 +129,19 @@ export default function RunView({
         )}
         {truthPacket && (
           <div className="tiles">
-            {progress.newerStageOne && (
-              <div className="warn">Stage 1 was rerun on {new Date(progress.newerStageOne.created_at).toLocaleString()}; this assessment is of the earlier run.</div>
+            {newer && (
+              <div className="warn">Stage 1 was rerun on {new Date(newer.created_at).toLocaleString()}; this assessment is of the earlier run.</div>
             )}
             <ProductTruthTiles runId={runId} packet={truthPacket} />
           </div>
         )}
         {nodesInRun.has('review_mining') &&
-          (progress.newerStageOne ? (
+          (newer ? (
             <OutdatedVoice
               runId={runId}
               finished={!live}
               minedAt={runs.find((r) => r.id === run.source_run_id)?.created_at ?? ''}
-              newerAt={progress.newerStageOne.created_at}
+              newerAt={newer.created_at}
             />
           ) : (
             <div className="voice-tile">

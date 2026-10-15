@@ -90,50 +90,16 @@ the agent search the web for the literal string `https://...` and come back with
 confidently wrong product (the bug behind "why does it always go for magnesium").
 If a run's packet names a product that is not yours, check `brief` first.
 
-### The stage rail — left column (`StageRail.tsx`)
+### The left column (`run-view/rail.tsx`)
 
-`Stages`, then one block per stage, each listing its nodes with a dot, a label
-and a sparkline (`Curve`). Since 2026-10-15 it starts nothing (no **▶**, no
-**Start stage N →**); the headers only navigate.
-
-| Node | Label | Stage |
-|---|---|---|
-| `product_data` | Product data | 1 |
-| `competitors` | Competitors | 1 |
-| `category_data` | Category data | 1 |
-| `mechanism` | Mechanism | 2 |
-| `dose_vs_study` | Dose vs study | 2 |
-| `claim_limits` | Claim limits | 2 |
-| `cogs_refills` | COGS & refills | 2 |
-| `review_mining` | Review mining | 3 |
-
-The labels, node lists and `scopeLabel` live in `stages.ts`; the rail is
-`StageRail.tsx`.
-
-A stage header (**Stage 1 · Raw material**, **Stage 2 · Product truth**,
-**Stage 3 · Review mining**) opens
-that stage's run for the same subject, via `onSelectRun`. The header of the
-stage the shown run collects is not clickable. **Stages 2 and 3 belong to one
-stage-1 run** (`subjectProgress` in `run-view/rail.tsx`): on a stage-1 run, their
-state and headers count only runs whose `source_run_id` is that run —
-the live one, else the newest completed, else the newest — so a new stage 1 shows
-stage 2 as *ready* even when an older stage 1 was
-assessed and mined. Stage 3 shows *ready* only once stage 2 is complete on that
-same stage-1 run. On a stage-2 or stage-3 run, the stage-1 header opens its
-`source_run_id`. **A stage-2 or stage-3 run whose stage 1 has since been rerun**
-(a completed stage-1 run newer than its `source_run_id`) shows its own stage as
-*ready — stage 1 was rerun*. A product-truth run adds a warning above its tiles;
-a review-mining run adds a banner naming both stage-1 dates, saying to tick product
-truth and review mining on a new plan (`run-view/outdated-voice.tsx`), and folds its customer voice behind **Show the
-older customer voice**: it mined competitors the current stage 1 no longer names.
-*Superseded 2026-10-01:* any completed review-mining run of the product counted,
-and its stage 1 was guessed by date (`stageOneRunFor`), so a new stage-1 run
-showed another run's mining as its own. The Now panel's next-stage strip says
-what the next stage would do and links **Go to the inbox →**.
-
-A node greyed with the tooltip `not in this run` was simply not in the run's
-`nodes`. `—` where a sparkline should be means no curve data, which is normal
-for a node that has not run.
+*Superseded 2026-10-15:* the stage rail (`StageRail.tsx`: Stage 1 to 6 with their
+nodes, *ready* and *not built*) and the Now panel's *Next: Stage N* strip are
+deleted. Owner's decision: the product page shows information, not steps; stages
+are started and followed on a plan in the inbox. The left column now shows the
+run (**Activity ↗**, scope, markets, model, started, tokens, its cost table), the
+standing judgements, and the product's runs (`ProductRuns.tsx`), where every run
+of the product is picked. A product-truth or review-mining run whose stage 1 has
+since been rerun still says so above its tiles (`newerStageOne`).
 
 ### Products — `/` (`ProductsPage.tsx`) and the run list (`ProductRuns.tsx`)
 
