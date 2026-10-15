@@ -1243,6 +1243,23 @@ dashboard; a button starts it. Decided with the owner:
    button. Until that approval exists for tasks, `ContractCheck` refuses any
    task with Apify in reach, so none can be queued.
 
+*Decided 2026-10-15 with the owner: the inbox is the one place work starts and is
+followed.* Start, the newest plans, the chat and a panel per product (its newest
+stage 1, product truth and customer voice, with their tiles) are all in the inbox.
+The product page stays as the full view of one run, results only: its stage
+rail and **Stage run** no longer start anything. Stages 2 and 3 are steps a plan
+holds after its stage-1 tasks (`PlanStage`, ticked by the owner): when every kept
+stage-1 task has ended, code combines them into one stage-1 run (`PlanStageOne`:
+their live rows copied, each source once, assembled over the nodes they covered,
+ended through `RunEnd`); product truth then starts on it as today's stage run;
+review mining, once product truth has delivered, waits on an approval card that
+states the most it can cost before stored pulls are reused, and starts as today's
+pipeline, which reuses stored pulls first. Later stages read only stage runs and
+combined runs, never a task's own run (`StageOneHandoff`). Where it differs from
+§3: product truth and review mining are not primitives here, they are the stage
+runs they were, started by the plan; a restart still ends them `failed` as it
+ends any stage run. Tested against a fake `start`; no plan stage has run live.
+
 *Built 2026-10-14, part 3.* Where it differs from the above:
 - Plans are research-store records (`research_plans`), not harness state:
   they are what the owner sees and approves, and §6.2 keeps the harness to its

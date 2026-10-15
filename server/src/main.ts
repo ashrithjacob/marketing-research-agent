@@ -29,6 +29,7 @@ if (resettled.length > 0) console.log(`re-settled ${resettled.length} invalid ru
 const picked = app.workspace ? await app.workspace.tasks.recover() : 0;
 const released = app.workspace ? await app.workspace.release.recover() : 0;
 if (released > 0) console.log(`started ${released} plan task(s) whose wait ended while the server was down`);
+if (app.workspace) await app.workspace.stages.recover();
 harness.resume();
 app.workspace?.reviewer.start();
 const alwaysOn = app.workspace ? await app.workspace.alwaysOn.recover() : 0;

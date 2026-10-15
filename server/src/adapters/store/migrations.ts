@@ -32,6 +32,8 @@ const MIGRATIONS: ReadonlyArray<readonly [string, string, string]> = [
   ["research_runs", "contract", "ALTER TABLE research_runs ADD COLUMN contract TEXT NOT NULL DEFAULT ''"],
   ["research_workspaces", "always_on", "ALTER TABLE research_workspaces ADD COLUMN always_on INTEGER NOT NULL DEFAULT 0"],
   ["research_workspaces", "daily_cap_usd", "ALTER TABLE research_workspaces ADD COLUMN daily_cap_usd REAL"],
+  ["research_plans", "stages", "ALTER TABLE research_plans ADD COLUMN stages TEXT NOT NULL DEFAULT '[]'"],
+  ["research_plans", "stage_one_run_id", "ALTER TABLE research_plans ADD COLUMN stage_one_run_id TEXT NOT NULL DEFAULT ''"],
   ["research_drafts", "playbook_version", "ALTER TABLE research_drafts ADD COLUMN playbook_version INTEGER NOT NULL DEFAULT 1"],
 ];
 

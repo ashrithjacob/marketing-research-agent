@@ -2,10 +2,8 @@ import type { CallsResponse } from './calls';
 import type { CostReport } from './costs';
 import type { Config } from './config';
 import type { Judgement } from './judgements';
-import type { Brief, ProductSummary, ResearchNode, RunDetail, RunSummary } from './runs';
+import type { ProductSummary, RunDetail, RunSummary } from './runs';
 import type { ReviewAnalysisResponse } from './review-analysis';
-import type { ProductTruthInputs } from './product-truth';
-import type { ReviewMiningPlanResponse, TargetListing } from './review-mining';
 
 export async function request<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, {
@@ -46,21 +44,6 @@ export const api = {
   productRuns: (id: string) =>
     request<{ data: RunSummary[] }>(`/api/research/products/${id}/runs`),
   run: (id: string) => request<RunDetail>(`/api/research/runs/${id}`),
-  startRun: (brief: Brief, nodes: ResearchNode[] = [], targets: string[] = [], inputs?: ProductTruthInputs, reviews_per_band?: number) =>
-    request<RunSummary>('/api/research/runs', {
-      method: 'POST',
-      body: JSON.stringify({ brief, nodes, targets, ...(inputs ? { inputs } : {}), ...(reviews_per_band ? { reviews_per_band } : {}) }),
-    }),
-  reviewMiningPlan: (brief: Brief, targets: string[] = [], reviews_per_band?: number) =>
-    request<ReviewMiningPlanResponse>('/api/research/review-mining/plan', {
-      method: 'POST',
-      body: JSON.stringify({ brief, targets, ...(reviews_per_band ? { reviews_per_band } : {}) }),
-    }),
-  reviewMiningListings: (brief: Brief) =>
-    request<{ listings: TargetListing[] }>('/api/research/review-mining/listings', {
-      method: 'POST',
-      body: JSON.stringify({ brief }),
-    }),
   reviewAnalysis: (id: string) =>
     request<ReviewAnalysisResponse>(`/api/research/runs/${id}/review-analysis`),
   startReviewAnalysis: (id: string) =>

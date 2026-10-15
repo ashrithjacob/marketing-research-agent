@@ -40,7 +40,7 @@ export class App {
       overrides.supervisor ?? new RunSupervisor({ store: this.store, settings: this.settings, services, ...(overrides.harness ? { models: overrides.harness.models } : {}) });
     const { supervisor, store, settings } = this;
     this.workspace = overrides.harness
-      ? new WorkspaceServices({ store, runs: supervisor.live, settings, harness: overrides.harness, tools: new ToolRegistry(services, settings), costs: supervisor.costs, ads: services.ads, insights: services.insights })
+      ? new WorkspaceServices({ store, runs: supervisor.live, settings, harness: overrides.harness, tools: new ToolRegistry(services, settings), costs: supervisor.costs, ads: services.ads, insights: services.insights, start: (request, workspaceId) => supervisor.start(request, workspaceId) })
       : null;
 
     this.intake = new LibraryIntake(this.store.library, new PdfMarkdown(new MarkdownLayout()));

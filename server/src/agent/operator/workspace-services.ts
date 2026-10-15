@@ -1,6 +1,6 @@
 import type { OpenRouterPrices } from "../../adapters/index.js";
 import type { Settings } from "../../config/index.js";
-import { Scope, type AdInsights, type AdLibrary, type ResearchStore } from "../../domain/index.js";
+import { Scope, type AdInsights, type AdLibrary, type ResearchStore, type RunRequest } from "../../domain/index.js";
 import { Trace } from "../../trace/index.js";
 
 import type { LiveRuns } from "../live-runs.js";
@@ -29,6 +29,7 @@ import { OperatorTools } from "./operator-tools.js";
 import { OwnerDesk } from "./owner-desk.js";
 import { PlanDesk } from "./plan-desk.js";
 import { PlanRelease } from "./plan-release.js";
+import { PlanStages } from "./plan-stages.js";
 import { WorkspaceBoard } from "./workspace-board.js";
 
 /** Everything that runs on the harness, built together: durable tasks, plans, each workspace's operator, and the board. */
@@ -48,8 +49,9 @@ export class WorkspaceServices {
   readonly draftDesk: DraftDesk;
   readonly playbooks: PlaybookDesk;
   readonly watch: WatchDesk;
+  readonly stages: PlanStages;
 
-  constructor(deps: { store: ResearchStore; runs: LiveRuns; settings: Settings; harness: PiHarness; tools: ToolRegistry; costs: OpenRouterPrices; ads: AdLibrary | null; insights: AdInsights | null }) {
+  constructor(deps: { store: ResearchStore; runs: LiveRuns; settings: Settings; harness: PiHarness; tools: ToolRegistry; costs: OpenRouterPrices; ads: AdLibrary | null; insights: AdInsights | null; start: (request: RunRequest, workspaceId: string) => Promise<string> }) {
     Trace.line(import.meta.url, "WorkspaceServices.constructor");
     const events = new TaskEvents();
     this.memory = new MemoryDesk(deps.store);
@@ -58,7 +60,10 @@ export class WorkspaceServices {
     const decide = (lessonId: string, approved: boolean, text: string) => this.lessons.decide(lessonId, approved, text);
     this.draftDesk = new DraftDesk(deps.store);
     const settle = async (draftId: string, approved: boolean) => void (await (approved ? this.draftDesk.approve(draftId, Scope.everything) : this.draftDesk.reject(draftId, Scope.everything)));
-    this.cards = new CardDesk(deps.store, deps.store.plans, this.tasks, reply, decide, settle, events);
+    const stage = (planId: string, approved: boolean) => this.stages.decide(planId, approved);
+    this.cards = new CardDesk(deps.store, deps.store.plans, this.tasks, { reply, lesson: decide, draft: settle, stage }, events);
+    const { apifyMaxReviews: reviewsPerBand, reviewReuseDays: reuseDays } = deps.settings;
+    this.stages = new PlanStages({ store: deps.store, runs: deps.runs, start: deps.start, reviewsPerBand, reuseDays }, events);
     this.drafts = new DraftFlow(deps.store, this.tasks, { maxUsd: deps.settings.taskMaxUsd }, events);
     this.lessons = new LessonDesk(deps.store);
     this.reviewer = new Reviewer(deps.store, deps.harness, this.lessons, deps.settings.model);

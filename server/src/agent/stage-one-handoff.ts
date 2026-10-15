@@ -2,7 +2,7 @@ import { Briefs, ProductFolders, RunStatuses, stagePacketSchema, type Brief, typ
 import { PacketDraft } from "../extract/index.js";
 import { Trace } from "../trace/index.js";
 
-/** Finds the stage-1 run a later stage builds on: the newest completed one for a brief when that stage starts, and afterwards the one it was started from. */
+/** Finds the stage-1 run a later stage builds on: the newest completed one for a brief when that stage starts, and afterwards the one it was started from. A task's run is never one: it holds one part of stage 1, or a draft; a plan's tasks are combined into a stage-1 run of their own (PlanStageOne). */
 export class StageOneHandoff {
   constructor(private readonly store: ResearchStore) {}
 
@@ -13,7 +13,7 @@ export class StageOneHandoff {
     const heads = (await this.store.products.runHeads(scope)).filter((head) => head.stage === 1 && RunStatuses.delivered(head.status));
     for (const id of ProductFolders.runIds(heads, product.id)) {
       const run = await this.store.getRun(id);
-      if (!run) continue;
+      if (!run || run.contract) continue;
       const packet = StageOneHandoff.packetOf(run);
       if (packet) return { run, packet };
     }

@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { api, DELIVERED_STATUSES, TERMINAL_STATUSES, type Judgement, type ProductTruthPacket, type ResearchNode, type RunDetail, type RunSummary, type StagePacket } from '../api';
+import { api, DELIVERED_STATUSES, TERMINAL_STATUSES, type Judgement, type ProductTruthPacket, type RunDetail, type RunSummary, type StagePacket } from '../api';
 import StageRail, { type StageProgress } from '../StageRail';
 import { scopeLabel, type CollectingStage } from '../stages';
 import { CostTable } from './CostTable';
@@ -38,7 +38,6 @@ export function RailColumn({
   packet,
   judgements,
   onSelectRun,
-  onRunNode,
 }: {
   run: RunDetail;
   runs: RunSummary[];
@@ -47,7 +46,6 @@ export function RailColumn({
   packet: StagePacket | ProductTruthPacket | null;
   judgements: Judgement[];
   onSelectRun: (id: string) => void;
-  onRunNode: (node: ResearchNode) => void;
 }) {
   const costs = useCosts(run.id, live);
   return (
@@ -57,7 +55,6 @@ export function RailColumn({
       nodes={packet?.nodes ?? []}
       saturation={packet && 'saturation' in packet ? packet.saturation : []}
       scope={run.nodes ?? []}
-      onRunNode={onRunNode}
       progress={subjectProgress(runs, run)}
       onSelectRun={onSelectRun}
     />

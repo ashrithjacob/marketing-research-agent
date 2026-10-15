@@ -52,15 +52,16 @@ under a `no such product` banner.
 
 ## The cockpit shell (`App.tsx`)
 
-**Header.** `research cockpit` (a link to `/`), a **Library** chip (a link to `/library`), then the active run's brief as a chip and a
+**Header.** `research cockpit` (a link to `/`), the **Library**, **Inbox** and
+**Playbooks** chips (`HeaderNav.tsx`), then the active run's brief as a chip and a
 clock chip, then the buttons: **Step in** (ghost), **Stop** (ghost, only while a
-run is live), **Start run** (primary), a `user · workspace` chip (only when login
-is on), **Sign out** (ghost). Signed in as the admin, each run row in a product
+run is live), **Start** (primary: a brief, then a plan in the inbox), a
+`user · workspace` chip (only when login is on), **Sign out** (ghost). Signed in as the admin, each run row in a product
 folder also names its workspace.
 
 | Control | Calls | Broken looks like |
 |---|---|---|
-| Start run | opens the modal; no request yet | — |
+| Start | opens Start's form; `POST /api/research/plans` on submit, then `/inbox` | — |
 | Stop | `POST /api/research/runs/:id/stop` | button does nothing, run stays `running` |
 | Sign out | `POST /api/auth/logout` | stays logged in, or bounces to login and back |
 | `user · workspace` chip | `GET /api/auth/session` | missing while logged in: the session answer lacks `workspace` |
@@ -70,58 +71,30 @@ folder also names its workspace.
 `Loading…` in a bare `.boot` div means `GET /api/auth/session` has not
 answered — the server is down or the cookie is being rejected, not a UI bug.
 
-### The start-run modal (`StartRun.tsx`)
+### Starting work: the inbox (since 2026-10-15)
 
-Opened by **Start run**. Fields: a product box (`Product name, or the site's
-URL`), a **Markets** fieldset of checkboxes, a free-text market box
-(`Also / instead (e.g. Ireland, Germany)`), then **Cancel** / **Start run**.
+*Superseded 2026-10-15:* the start-run modal (`StartRun.tsx`), product truth's
+start (`ProductTruthStart.tsx`) and the review-mining go-ahead
+(`ReviewMiningPlan.tsx`) are deleted, with the header's **Stage run**, the rail's
+**▶** and **Start stage N →** buttons. All work starts from **Start** and a plan
+in the inbox (below, "The inbox"): stage 1 as tasks, then **Stage 2 · Product
+truth** (with its landed cost) and **Stage 3 · Review mining** ticked on the plan.
+Review mining's itemised go-ahead (targets to pick, reviews per band) is replaced
+by an approval card with the most it can cost. A stage run can still be started
+with `mra run` or `POST /api/research/runs`. Owner's decision: one place to start
+and follow work; the product page shows results only.
 
-Submitting calls `POST /api/research/runs` with `{brief, nodes}`.
-
-> **A URL typed here is a URL.** The client detects it and fills `brief.url`,
-> leaving `brief.product` for the agent to discover from the page. A URL that
-> ends up in `brief.product` makes the agent search the web for the literal
-> string `https://...`, and it comes back with a confidently wrong product —
-> this is the bug behind "why does it always go for magnesium". If a run's
-> packet names a product that is not yours, check `brief` first, before the
-> prompt.
-
-### Product truth's start (`ProductTruthStart.tsx`)
-
-Opened by **Start stage 2 →** (rail or the Now panel's next-stage strip) or any
-stage-2 ▶ — product truth always runs all four of its nodes. Fields: landed cost
-per unit and its currency, MOQ, lead time in days, and **Add a price** rows
-(label, amount, currency, units, subscription). Every field may stay blank: a
-blank cost is written to the ledger as a gap (`agent/operator-inputs.ts`), and
-the margins it would feed show `—` with "no landed unit cost was entered", never
-an estimate. Submitting sends `POST /api/research/runs` with
-`{brief, nodes: [the four], inputs}`. A 409 here means no completed stage 1 for
-this brief.
-
-### The review-mining go-ahead (`ReviewMiningPlan.tsx`)
-
-Opened by **Start stage 3 →** or the review-mining ▶. It says *not ready* until
-product truth has completed on the same stage-1 run. Lists what review mining can
-mine (`plan.offered`, from `POST /review-mining/plan`) with checkboxes, a
-**Reviews per star band** number (1–100, starting at `MRA_APIFY_MAX_REVIEWS`; each
-change re-prices the plan, and it is sent as `reviews_per_band` with the run) and the
-Apify estimate. Each target shows its brand-site link and, under it
-(`review-mining/ListingLine.tsx`), either its matched Amazon listing — stars, review
-count, share of 3★, "bought in past month", best-seller rank, price, Amazon's
-Choice, a link — or, for a target mined on Trustpilot, its Trustpilot score and
-review count ("★ 4.4 · 12 Trustpilot reviews", "no Trustpilot reviews yet", or
-why it could not be read) with a link to the page. A target
-two others collided on shows why it is not mined on Amazon. **A target with no
-matched listing and no domain of its own is not listed at all** (since 2026-09-30,
-`spec-stage-2-pipeline.md` §3a). The listings are normally looked up when stage 1
-completes; if they were not (an older run, or no token then), the first open runs
-`POST /review-mining/listings`, about $0.01 per target. Approving starts the
-review-mining pipeline, which calls no model.
+**A URL is a URL.** Start's form puts a pasted page in `brief.url`, leaving
+`brief.product` for the agent to read off the page. A URL in `brief.product` makes
+the agent search the web for the literal string `https://...` and come back with a
+confidently wrong product (the bug behind "why does it always go for magnesium").
+If a run's packet names a product that is not yours, check `brief` first.
 
 ### The stage rail — left column (`StageRail.tsx`)
 
-`Stages`, then one block per stage, each listing its nodes with a dot, a label,
-a sparkline (`Curve`), and a **▶** button.
+`Stages`, then one block per stage, each listing its nodes with a dot, a label
+and a sparkline (`Curve`). Since 2026-10-15 it starts nothing (no **▶**, no
+**Start stage N →**); the headers only navigate.
 
 | Node | Label | Stage |
 |---|---|---|
@@ -134,12 +107,8 @@ a sparkline (`Curve`), and a **▶** button.
 | `cogs_refills` | COGS & refills | 2 |
 | `review_mining` | Review mining | 3 |
 
-**▶** runs that node on its own — `POST /api/research/runs` with a one-element
-`nodes` array — except in stage 2, where any ▶ opens product truth's start and
-runs all four. A stage's ▶ is disabled until the stage before it is complete on
-the same stage-1 run, with the tooltip *"Stage N builds on stage N−1 — complete
-that first"*; that is the intended state, not a broken button. The labels, node
-lists and `scopeLabel` live in `stages.ts`; the rail is `StageRail.tsx`.
+The labels, node lists and `scopeLabel` live in `stages.ts`; the rail is
+`StageRail.tsx`.
 
 A stage header (**Stage 1 · Raw material**, **Stage 2 · Product truth**,
 **Stage 3 · Review mining**) opens
@@ -148,20 +117,19 @@ stage the shown run collects is not clickable. **Stages 2 and 3 belong to one
 stage-1 run** (`subjectProgress` in `run-view/rail.tsx`): on a stage-1 run, their
 state and headers count only runs whose `source_run_id` is that run —
 the live one, else the newest completed, else the newest — so a new stage 1 shows
-stage 2 as *ready*, with **Start stage 2 →**, even when an older stage 1 was
+stage 2 as *ready* even when an older stage 1 was
 assessed and mined. Stage 3 shows *ready* only once stage 2 is complete on that
 same stage-1 run. On a stage-2 or stage-3 run, the stage-1 header opens its
 `source_run_id`. **A stage-2 or stage-3 run whose stage 1 has since been rerun**
 (a completed stage-1 run newer than its `source_run_id`) shows its own stage as
 *ready — stage 1 was rerun*. A product-truth run adds a warning above its tiles;
-a review-mining run adds a banner naming both stage-1 dates with **Start stage
-2 →** (product truth on the new stage 1 comes first;
-`run-view/outdated-voice.tsx`), and folds its customer voice behind **Show the
+a review-mining run adds a banner naming both stage-1 dates, saying to tick product
+truth and review mining on a new plan (`run-view/outdated-voice.tsx`), and folds its customer voice behind **Show the
 older customer voice**: it mined competitors the current stage 1 no longer names.
 *Superseded 2026-10-01:* any completed review-mining run of the product counted,
 and its stage 1 was guessed by date (`stageOneRunFor`), so a new stage-1 run
-showed another run's mining as its own. The ▶ buttons start runs; the headers
-only navigate.
+showed another run's mining as its own. The Now panel's next-stage strip says
+what the next stage would do and links **Go to the inbox →**.
 
 A node greyed with the tooltip `not in this run` was simply not in the run's
 `nodes`. `—` where a sparkline should be means no curve data, which is normal
@@ -416,8 +384,8 @@ In order, because this order has been wrong before:
 ## Start, review, chat (`StartPlan.tsx`, `PlanPage.tsx`, `PlanCard.tsx`, `ChatPanel.tsx`)
 
 Since 2026-10-14 the header's **Start** opens a small form (product or site,
-market) and then the plan page, `/plans/:id`. **Stage run** beside it opens the
-older stage-1 modal (`StartRun.tsx`).
+market) and lands in the inbox, where the new plan is first. The plan page,
+`/plans/:id`, still shows one plan with the chat.
 
 - **Left: the plan card.** Each task with a checkbox, its objective, and its
   spend cap and time limit. While the plan is a draft, a checkbox calls
@@ -436,7 +404,22 @@ older stage-1 modal (`StartRun.tsx`).
   tasks are running, and the schedules, each a saved task for a product or site
   every so many days, with Add and Remove (`/api/research/always-on`,
   `/api/research/schedules`).
-- **Inbox** (`InboxPage.tsx`, `/inbox`, linked in the header): every open card
+- **The inbox** (`InboxPage.tsx`, `/inbox`; since 2026-10-15 the main page): the
+  chat with the operator on the right (about the newest plan); on the left, the
+  cards waiting for you, the three newest **Plans** (each a plan card, below),
+  **Products** (`ProductPanels.tsx`: one row per product; opening one shows, from
+  `ProductResults.tsx`, the newest delivered stage 1, product truth and customer
+  voice that are stage runs or a plan's combined stage 1, each with its tiles and
+  **Full page →** to the product page), the drafts, then Always on, Watching,
+  brand memory and the feedback log (`FeedbackLog.tsx`).
+- **After stage 1** on the plan card (`PlanStageList.tsx`): **Stage 2 · Product
+  truth** and **Stage 3 · Review mining**, each a checkbox while the plan is a
+  draft (`POST /api/research/plans/:id/stages/:stage` with `selected`; ticking 3
+  ticks 2, dropping 2 drops 3), and for product truth an optional landed cost per
+  unit and currency, saved when the box is left. Once approved: *Stage 1 combined
+  into one run: open it*, each stage's run status and **Open what it found →**,
+  and *waiting for your approval…* while review mining's card is open.
+- **Inbox, older text** (`InboxPage.tsx`, `/inbox`, linked in the header): every open card
   of the workspace (a lesson card has its text in an editable box; Approve saves
   the edit), **What we know about this brand** (`MemoryList.tsx`: every memory
   entry, marked *learned* or *yours* with its version, Edit and Delete each, and

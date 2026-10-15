@@ -5,15 +5,21 @@ import { RunError } from "../errors.js";
 import type { TaskEvents } from "../task/task-events.js";
 import type { TaskSupervisor } from "../task/task-supervisor.js";
 
+/** What resolving a card hands on to: the operator's reply, a lesson's decision, a draft's settling, and a plan stage's approval. */
+export interface CardResolvers {
+  reply: (workspaceId: string, text: string) => Promise<void>;
+  lesson: (lessonId: string, approved: boolean, text: string) => Promise<void>;
+  draft: (draftId: string, approved: boolean) => Promise<void>;
+  stage: (planId: string, approved: boolean) => Promise<void>;
+}
+
 /** The owner's cards (spec §7.2): a paused task's question, the operator's question, and approvals. Resolving one does what its action says, once. */
 export class CardDesk {
   constructor(
     private readonly store: ResearchStore,
     private readonly plans: PlanBook,
     private readonly tasks: TaskSupervisor,
-    private readonly reply: (workspaceId: string, text: string) => Promise<void>,
-    private readonly lesson: (lessonId: string, approved: boolean, text: string) => Promise<void>,
-    private readonly draft: (draftId: string, approved: boolean) => Promise<void>,
+    private readonly resolve: CardResolvers,
     events: TaskEvents,
   ) {
     Trace.line(import.meta.url, "CardDesk.constructor");
@@ -30,7 +36,7 @@ export class CardDesk {
     Trace.line(import.meta.url, "CardDesk.answer", { cardId });
     const card = await this.unresolved(cardId, scope, "question");
     if (card.action.kind === "answer_task") await this.tasks.answer(card.action.run_id, text);
-    if (card.action.kind === "reply_operator") await this.reply(card.workspace_id, `My answer to your question "${card.body}": ${text}`);
+    if (card.action.kind === "reply_operator") await this.resolve.reply(card.workspace_id, `My answer to your question "${card.body}": ${text}`);
     await this.feedback(card, "answer", text);
     return (await this.store.cards.resolve(card.id, "answered", text)) ?? { ...card, status: "answered", answer: text };
   }
@@ -40,10 +46,11 @@ export class CardDesk {
     Trace.line(import.meta.url, "CardDesk.approve", { cardId });
     const card = await this.unresolved(cardId, scope, "approval");
     if (card.action.kind === "lesson") {
-      await this.lesson(card.action.lesson_id, true, edit);
+      await this.resolve.lesson(card.action.lesson_id, true, edit);
       return (await this.store.cards.resolve(card.id, "approved", edit))!;
     }
     if (card.action.kind === "draft") return this.settleDraft(card, scope, true);
+    if (card.action.kind === "start_stage") return this.settleStage(card, true);
     if (card.action.kind !== "start_task") throw new RunError(`card ${cardId} has nothing to start`);
     const { brief, contract, plan_id, task_key } = card.action;
     const run = await this.tasks.start({ brief, contract }, card.workspace_id, { approved: true });
@@ -56,8 +63,9 @@ export class CardDesk {
     Trace.line(import.meta.url, "CardDesk.reject", { cardId });
     const card = await this.unresolved(cardId, scope, "approval");
     if (card.action.kind === "draft") return this.settleDraft(card, scope, false);
+    if (card.action.kind === "start_stage") return this.settleStage(card, false);
     if (card.action.kind === "start_task") await this.onPlan(card.action.plan_id, card.action.task_key, { error: "rejected by the owner" });
-    if (card.action.kind === "lesson") await this.lesson(card.action.lesson_id, false, "");
+    if (card.action.kind === "lesson") await this.resolve.lesson(card.action.lesson_id, false, "");
     else await this.feedback(card, "reject", "");
     return (await this.store.cards.resolve(card.id, "rejected", ""))!;
   }
@@ -65,14 +73,23 @@ export class CardDesk {
   /** The draft desk resolves the draft's card and records the feedback, against the draft. */
   private async settleDraft(card: Card, scope: Scope, approved: boolean): Promise<Card> {
     Trace.line(import.meta.url, "CardDesk.settleDraft", { cardId: card.id, approved });
-    if (card.action.kind === "draft") await this.draft(card.action.draft_id, approved);
+    if (card.action.kind === "draft") await this.resolve.draft(card.action.draft_id, approved);
     return (await this.store.cards.get(scope, card.id))!;
+  }
+
+  /** A plan stage's card: resolved first, so the stage it starts is never asked twice; the plan records the run or the refusal. */
+  private async settleStage(card: Card, approved: boolean): Promise<Card> {
+    Trace.line(import.meta.url, "CardDesk.settleStage", { cardId: card.id, approved });
+    const resolved = (await this.store.cards.resolve(card.id, approved ? "approved" : "rejected", ""))!;
+    if (card.action.kind === "start_stage") await this.resolve.stage(card.action.plan_id, approved);
+    await this.feedback(card, approved ? "accept" : "reject", "");
+    return resolved;
   }
 
   private async feedback(card: Card, verdict: FeedbackVerdict, text: string, startedRun = ""): Promise<void> {
     Trace.line(import.meta.url, "CardDesk.feedback", { cardId: card.id, verdict });
     const action = card.action;
-    const at = { run_id: action.kind === "answer_task" ? action.run_id : startedRun, plan_id: action.kind === "start_task" ? action.plan_id : "" };
+    const at = { run_id: action.kind === "answer_task" ? action.run_id : startedRun, plan_id: action.kind === "start_task" || action.kind === "start_stage" ? action.plan_id : "" };
     await this.store.feedback.record(card.workspace_id, { verdict, target: FeedbackStrengths.target("card", card.id, at), text });
   }
 

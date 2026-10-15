@@ -61,6 +61,8 @@ export interface RunSummary {
   workspace_id: string;
   product_id: string;
   source_run_id: string;
+  /** A durable task's run (one part of stage 1, a draft, a playbook), not a stage run. */
+  is_task: boolean;
   status: string;
   stage: number;
   model: string;
@@ -93,6 +95,7 @@ export class Runs {
       workspace_id: run.workspace_id,
       product_id: run.product_id,
       source_run_id: run.source_run_id,
+      is_task: run.contract !== null,
       status: run.status,
       stage: run.stage,
       model: run.model,

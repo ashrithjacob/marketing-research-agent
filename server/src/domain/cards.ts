@@ -11,6 +11,7 @@ export type CardAction =
   | { kind: "reply_operator" }
   | { kind: "lesson"; lesson_id: string; editable?: boolean }
   | { kind: "draft"; draft_id: string }
+  | { kind: "start_stage"; plan_id: string; stage: 3 }
   | { kind: "start_task"; brief: Brief; contract: TaskContract; plan_id: string; task_key: string };
 
 /** Something only the owner can settle, shown as a card until they do (spec §7.2). */

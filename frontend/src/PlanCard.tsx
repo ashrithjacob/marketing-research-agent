@@ -2,6 +2,7 @@ import { useState } from 'react';
 
 import { draftApi, workspaceApi, type Plan, type TaskCard } from './api';
 import { Link, paths } from './route';
+import PlanStageList from './PlanStageList';
 import StopWhen from './StopWhen';
 
 export default function PlanCard({ plan, tasks, onError }: { plan: Plan; tasks: TaskCard[]; onError: (message: string) => void }) {
@@ -79,6 +80,7 @@ export default function PlanCard({ plan, tasks, onError }: { plan: Plan; tasks: 
           );
         })}
       </ul>
+      <PlanStageList plan={plan} tasks={tasks} onAct={(work) => void act(work)} />
       {!draft && found && (
         <div className="plan-approve">
           {writing ? (

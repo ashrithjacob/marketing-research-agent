@@ -419,6 +419,9 @@ classDiagram
     class PlanTask {
       <<interface>>
     }
+    class PlanStage {
+      <<interface>>
+    }
     class Plan {
       <<interface>>
     }
@@ -646,6 +649,7 @@ classDiagram
     }
     class SavedPlans {
       tasks()
+      stages()
       task()
       arrange()
     }
@@ -1540,6 +1544,9 @@ classDiagram
       failover()
       withFallbacks()
     }
+    class CardResolvers {
+      <<interface>>
+    }
     class CardDesk {
       open()
       answer()
@@ -1564,6 +1571,7 @@ classDiagram
     class OwnerDesk {
       start()
       edit()
+      stage()
       approve()
       say()
     }
@@ -1573,11 +1581,19 @@ classDiagram
     class PlanDesk {
       draft()
       revise()
+      setStage()
       approve()
       startTask()
     }
     class PlanRelease {
       recover()
+    }
+    class PlanStageOne {
+      combine()
+    }
+    class PlanStages {
+      recover()
+      decide()
     }
     class WorkReport {
       write()
@@ -2346,6 +2362,7 @@ classDiagram
   CardDesk --> ResearchStore
   CardDesk --> PlanBook
   CardDesk --> TaskSupervisor
+  CardDesk --> CardResolvers
   CardDesk --> TaskEvents
   OperatorDesk --> PiHarness
   OperatorDesk --> ResearchStore
@@ -2367,6 +2384,9 @@ classDiagram
   PlanRelease --> PlanBook
   PlanRelease --> PlanDesk
   PlanRelease --> TaskEvents
+  PlanStageOne --> ResearchStore
+  PlanStageOne --> LiveRuns
+  PlanStages --> TaskEvents
   WorkReport --> ResearchStore
   WorkReport --> TaskSupervisor
   WorkspaceBoard --> ResearchStore
@@ -2693,7 +2713,7 @@ classDiagram
 | `agent` | `agent/live-runs.ts` | RunControl, Live, LiveRuns |
 | `agent` | `agent/llm-call-log.ts` | CallSequence, LlmCallLog |
 | `agent` | `agent/model-chain.ts` | ModelChain |
-| `agent` | `agent/operator/card-desk.ts` | CardDesk |
+| `agent` | `agent/operator/card-desk.ts` | CardResolvers, CardDesk |
 | `agent` | `agent/operator/chat-view.ts` | ChatView |
 | `agent` | `agent/operator/operator-act.ts` | OperatorAct |
 | `agent` | `agent/operator/operator-desk.ts` | OperatorDesk |
@@ -2701,6 +2721,8 @@ classDiagram
 | `agent` | `agent/operator/owner-desk.ts` | OwnerDesk |
 | `agent` | `agent/operator/plan-desk.ts` | PlanChange, PlanDesk |
 | `agent` | `agent/operator/plan-release.ts` | PlanRelease |
+| `agent` | `agent/operator/plan-stage-one.ts` | PlanStageOne |
+| `agent` | `agent/operator/plan-stages.ts` | PlanStages |
 | `agent` | `agent/operator/work-report.ts` | WorkReport |
 | `agent` | `agent/operator/workspace-board.ts` | WorkspaceBoard |
 | `agent` | `agent/operator/workspace-services.ts` | WorkspaceServices |
@@ -2832,7 +2854,7 @@ classDiagram
 | `domain` | `domain/nodes.ts` | Stages |
 | `domain` | `domain/packet-rows.ts` | PacketRowSet, PacketRows |
 | `domain` | `domain/paragraphs.ts` | Paragraph, Paragraphs |
-| `domain` | `domain/plans.ts` | PlanTask, Plan, PlanBook |
+| `domain` | `domain/plans.ts` | PlanTask, PlanStage, Plan, PlanBook |
 | `domain` | `domain/playbooks.ts` | PlaybookSection, PlaybookBody, Playbook, PlaybookBook |
 | `domain` | `domain/ports.ts` | ProductCatalog, AccountDirectory, AmazonListingSource, TargetListings, ChargeLedger, FindingLedger, PageFetcher, WebSearch, AdLibrary, CompetitorDiscovery, ResearchStore, GateVerdict, FetchGate, ReviewPullStore |
 | `domain` | `domain/primitives.ts` | PrimitiveSpec, Primitives |

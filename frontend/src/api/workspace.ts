@@ -19,11 +19,22 @@ export interface PlanTask {
   error: string;
 }
 
+export interface PlanStage {
+  stage: 2 | 3;
+  title: string;
+  selected: boolean;
+  run_id: string;
+  error: string;
+  inputs?: { landed_unit_cost: number | null; currency: string };
+}
+
 export interface Plan {
   id: string;
   workspace_id: string;
   brief: Brief;
   tasks: PlanTask[];
+  stages: PlanStage[];
+  stage_one_run_id: string;
   status: 'draft' | 'approved';
   created_at: string;
   updated_at: string;
@@ -115,6 +126,8 @@ export const workspaceApi = {
   plan: (id: string) => request<Plan>(`/api/research/plans/${id}`),
   editTask: (id: string, key: string, change: { selected?: boolean; stop_when?: string }) =>
     request<Plan>(`/api/research/plans/${id}/tasks/${key}`, { method: 'POST', body: JSON.stringify(change) }),
+  setStage: (id: string, stage: 2 | 3, change: { selected: boolean; landed_unit_cost?: number; currency?: string }) =>
+    request<Plan>(`/api/research/plans/${id}/stages/${stage}`, { method: 'POST', body: JSON.stringify(change) }),
   approve: (id: string) => request<Plan>(`/api/research/plans/${id}/approve`, { method: 'POST' }),
   answerCard: (id: string, answer: string) =>
     request<Card>(`/api/research/cards/${id}/answer`, { method: 'POST', body: JSON.stringify({ answer }) }),

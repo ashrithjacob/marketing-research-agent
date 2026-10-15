@@ -22,6 +22,7 @@ export interface Live {
 export class LiveRuns {
   private readonly live = new Map<string, Live>();
   private readonly writes = new Map<string, Promise<void>>();
+  private readonly enders = new Set<(runId: string, status: string) => Promise<void>>();
 
   constructor(private readonly store: ResearchStore) {}
 
@@ -85,6 +86,17 @@ export class LiveRuns {
     return () => live.subscribers.delete(subscriber);
   }
 
+  /** Told whenever any run, stage run or task, reaches its final status, after its final event is stored. */
+  onEnd(listener: (runId: string, status: string) => Promise<void>): void {
+    Trace.line(import.meta.url, "LiveRuns.onEnd");
+    this.enders.add(listener);
+  }
+
+  private async ended(runId: string, status: string): Promise<void> {
+    Trace.line(import.meta.url, "LiveRuns.ended", { runId, status });
+    for (const listener of this.enders) await listener(runId, status).catch((error: unknown) => console.error(`run ${runId}: an end listener failed`, error));
+  }
+
   /** Records the event and then tells the run's watchers, in the order emitted; the caller does not wait, and `written` waits for every event emitted so far. */
   emit(runId: string, kind: string, payload: Record<string, unknown>): void {
     Trace.tick(import.meta.url, "LiveRuns.emit", { kind });
@@ -93,6 +105,7 @@ export class LiveRuns {
       const event = await this.store.addEvent(runId, kind, payload);
       const live = this.live.get(runId);
       if (live) this.deliver(live, { id: event.id, kind, payload, created_at: event.created_at });
+      if (kind.startsWith("run.") && TERMINAL_STATUSES.has(kind.slice(4))) await this.ended(runId, kind.slice(4));
     }).catch((error: unknown) => console.error(`research run ${runId}: recording event ${kind} failed`, error));
     this.writes.set(runId, next);
   }

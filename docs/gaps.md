@@ -134,7 +134,10 @@ commit that closed it; do not delete it.
 32. **Only write playbooks exist.** Distil proposes a `write` playbook; research
     tasks read no playbook, so §5.5's per-version numbers cover writing only.
 
-33. **Stage 2 can build on the wrong stage-1 run after a plan.** Product truth
+33. ~~**Stage 2 can build on the wrong stage-1 run after a plan.**~~ Closed
+    2026-10-15: a plan's tasks are combined into one stage-1 run, and later
+    stages read only stage runs and combined runs (`StageOneHandoff` skips
+    task runs). Stages 2 and 3 are now plan steps, started from the inbox. Product truth
     starts from the newest delivered stage-1 run of the product
     (`StageOneHandoff.forBrief`, `agent/stage-one-handoff.ts`), and every task run
     is stored as stage 1: each plan task is its own run of one node, and write and
@@ -143,6 +146,25 @@ commit that closed it; do not delete it.
     **Stage run** before stage 2. Needs: stage 2 reading a plan's tasks together,
     and never a write or critique run. Product truth and review mining are still
     not plan tasks (gap 9), so stages 2 and 3 start only from the stage rail.
+
+34. **Product truth and review mining are stage runs, not tasks.** A plan starts
+    them, but a restart ends them `failed` as it ends any stage run; a task would
+    resume. Spec §3's `evidence` and `review_mine` primitives would make them
+    durable. Gap 9 is otherwise closed: they are plan steps.
+35. **Review mining's go-ahead lost its detail.** The deleted
+    `ReviewMiningPlan.tsx` let the owner pick targets and reviews per band and
+    showed each target's Amazon listing; the approval card states only the most it
+    can cost and mines every target at `MRA_APIFY_MAX_REVIEWS` per band.
+    `POST /review-mining/plan` and `/review-mining/listings` remain, unused by
+    the UI.
+36. **The operator cannot tick stages 2 and 3.** `revise_plan` changes tasks and
+    the market only; the stages are the plan card's checkboxes.
+37. **Every approved plan was combined at the first start of this build.** On the
+    local store, the five approved plans each got a combined stage-1 run
+    (model `plan`) on 2026-10-15; it costs nothing and is what later stages read.
+38. **Product truth's other inputs are not on the plan.** Only landed cost and
+    currency; MOQ, lead time and prices, which the deleted start form took, are
+    gapped.
 
 ## Built but not seen live
 

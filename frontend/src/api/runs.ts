@@ -81,6 +81,7 @@ export interface RunSummary {
   product_id: string;
   /** The stage-1 run a product-truth or review-mining run built on. Empty on stage 1. */
   source_run_id: string;
+  is_task: boolean;
   status: RunStatus;
   /** 1 collects the product, its competitors and its category; 2 is product truth; 3 is review mining. */
   stage: number;

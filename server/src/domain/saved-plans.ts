@@ -1,7 +1,7 @@
 import type { Brief } from "./brief.js";
 import type { Deliverable } from "./deliverable.js";
 import { Contracts } from "./contracts.js";
-import type { PlanTask } from "./plans.js";
+import type { PlanStage, PlanTask } from "./plans.js";
 import { CATEGORY_DELIVERABLE, CHAMPION_DELIVERABLE, COMPETITORS_DELIVERABLE, PRODUCT_DELIVERABLE } from "./role-deliverables.js";
 import { StageOnePlans, type StageOneAgent } from "./stage-one-agents.js";
 import type { TaskContract } from "./task-contract.js";
@@ -60,6 +60,15 @@ export class SavedPlans {
   static tasks(brief: Brief): PlanTask[] {
     Trace.line(import.meta.url, "SavedPlans.tasks", { brief });
     return SavedPlans.arrange(brief, SavedPlans.START.map((key) => SavedPlans.task(key, brief)));
+  }
+
+  /** The later stages a plan may run after stage 1, each off until the owner ticks it. */
+  static stages(): PlanStage[] {
+    Trace.line(import.meta.url, "SavedPlans.stages");
+    return [
+      { stage: 2, title: "Product truth", selected: false, run_id: "", error: "" },
+      { stage: 3, title: "Review mining", selected: false, run_id: "", error: "" },
+    ];
   }
 
   static task(key: string, brief: Brief): PlanTask {

@@ -30,6 +30,17 @@ export class WorkspaceRoutes {
         return this.owner.edit(c.req.param("planId"), Scope.forViewer(c.get("principal")), c.req.param("key"), change);
       }),
     );
+    api.post("/plans/:planId/stages/:stage", (c) =>
+      this.answer(c, 200, async () => {
+        const body = (await c.req.json().catch(() => null)) as { selected?: unknown; landed_unit_cost?: unknown; currency?: unknown } | null;
+        const change = {
+          selected: body?.selected === true,
+          ...(typeof body?.landed_unit_cost === "number" ? { landed_unit_cost: body.landed_unit_cost } : {}),
+          ...(typeof body?.currency === "string" ? { currency: body.currency } : {}),
+        };
+        return this.owner.stage(c.req.param("planId"), Scope.forViewer(c.get("principal")), Number(c.req.param("stage")), change);
+      }),
+    );
     api.post("/plans/:planId/approve", (c) => this.answer(c, 202, () => this.owner.approve(c.req.param("planId"), Scope.forViewer(c.get("principal")))));
     api.post("/chat", (c) =>
       this.answer(c, 202, async (workspace) => {

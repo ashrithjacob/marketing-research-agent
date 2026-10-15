@@ -1036,3 +1036,12 @@ details[open].tile-gap > summary.tile-gap-missing { white-space: normal; }
 .playbook-scores th, .playbook-scores td { text-align: left; padding: 5px 8px; border-bottom: 1px solid var(--line); }
 .playbook-scores th { color: var(--dim); font-weight: 500; }
 .playbook-body ol { margin: 6px 0; padding-left: 20px; }
+
+.plan-sub { margin: 16px 0 4px; font-size: 13px; }
+.always-row input.short { width: 56px; }
+
+.product-panels { list-style: none; padding: 0; margin: 8px 0 0; display: flex; flex-direction: column; gap: 6px; }
+.product-panel-head { width: 100%; text-align: left; display: flex; gap: 8px; align-items: center; }
+.product-results { display: flex; flex-direction: column; gap: 16px; margin: 10px 0 6px; }
+.product-stage .plan-head { gap: 10px; }
+.inbox h2 { margin: 18px 0 6px; }

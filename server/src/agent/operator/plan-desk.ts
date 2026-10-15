@@ -1,4 +1,4 @@
-import { Briefs, FeedbackStrengths, SAVED_TASKS, SavedPlans, Scope, briefSchema, type FeedbackBook, type Plan, type PlanBook, type PlanTask } from "../../domain/index.js";
+import { Briefs, FeedbackStrengths, SAVED_TASKS, SavedPlans, Scope, briefSchema, productTruthInputsSchema, type FeedbackBook, type Plan, type PlanBook, type PlanTask } from "../../domain/index.js";
 import { ContractCheck } from "../../extract/index.js";
 import { Trace } from "../../trace/index.js";
 
@@ -31,7 +31,7 @@ export class PlanDesk {
     if (!parsed.success) throw new RunError("a plan needs a brief: { brief: { url } } or { brief: { product } }");
     const brief = Briefs.normalise(parsed.data);
     if (!brief.product && !brief.url) throw new RunError("brief.product or brief.url is required");
-    return this.plans.create(workspaceId, brief, SavedPlans.tasks(brief));
+    return this.plans.create(workspaceId, brief, SavedPlans.tasks(brief), SavedPlans.stages());
   }
 
   async revise(planId: string, scope: Scope, change: PlanChange): Promise<Plan> {
@@ -55,6 +55,19 @@ export class PlanDesk {
     const saved = await this.plans.save({ ...plan, brief, tasks: SavedPlans.arrange(brief, tasks) });
     await this.feedback.record(plan.workspace_id, { verdict: "edited", target: FeedbackStrengths.target("contract", plan.id, { plan_id: plan.id }), text: "", diff: { ...change } });
     return saved;
+  }
+
+  /** A later stage of a draft plan ticked or not, with product truth's landed cost when given. Review mining builds on product truth, so ticking it ticks product truth, and dropping product truth drops it. */
+  async setStage(planId: string, scope: Scope, stage: number, selected: boolean, cost: { landed_unit_cost?: number; currency?: string } = {}): Promise<Plan> {
+    Trace.line(import.meta.url, "PlanDesk.setStage", { planId, stage, selected });
+    const plan = await this.open(planId, scope);
+    if (stage !== 2 && stage !== 3) throw new RunError("a plan's later stages are 2 (product truth) and 3 (review mining)");
+    const stages = plan.stages.map((s) => {
+      const on = s.stage === stage ? selected : stage === 3 && selected && s.stage === 2 ? true : stage === 2 && !selected && s.stage === 3 ? false : s.selected;
+      const given = s.stage === 2 && cost.landed_unit_cost !== undefined ? { inputs: productTruthInputsSchema.parse({ landed_unit_cost: cost.landed_unit_cost, currency: cost.currency ?? "" }) } : {};
+      return { ...s, ...given, selected: on };
+    });
+    return this.plans.save({ ...plan, stages });
   }
 
   /** The owner's approval: each kept task with nothing to wait for is started; a task that waits on another starts when that one ends (PlanRelease). */

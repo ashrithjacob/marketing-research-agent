@@ -16,7 +16,8 @@ export class WorkspaceBoard {
     Trace.line(import.meta.url, "WorkspaceBoard.snapshot", { workspaceId });
     const scope = Scope.of(workspaceId);
     const plans = await this.store.plans.list(scope, 5);
-    const runs = (await this.store.listRuns(scope, 50)).filter((run) => run.contract).slice(0, 20);
+    const planRuns = new Set(plans.flatMap((p) => [p.stage_one_run_id, ...p.stages.map((s) => s.run_id)]).filter(Boolean));
+    const runs = (await this.store.listRuns(scope, 50)).filter((run) => run.contract || planRuns.has(run.id)).slice(0, 25);
     const cards = await this.store.cards.list(scope, 50);
     const today = new Date().toISOString().slice(0, 10);
     return {

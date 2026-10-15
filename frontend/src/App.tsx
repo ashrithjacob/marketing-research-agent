@@ -4,8 +4,6 @@ import {
   briefLabel,
   TERMINAL_STATUSES,
   type Config,
-  type ResearchNode,
-  type RunSummary,
   type Session,
 } from './api';
 import HeaderNav from './HeaderNav';
@@ -16,15 +14,11 @@ import ProductRuns from './ProductRuns';
 import ProductsPage from './ProductsPage';
 import { Link, navigate, paths, useRoute } from './route';
 import RunView from './RunView';
-import StartRun from './StartRun';
 import StartPlan from './StartPlan';
 import PlanPage from './PlanPage';
 import InboxPage from './InboxPage';
 import DraftPage from './DraftPage';
 import PlaybooksPage from './PlaybooksPage';
-import ProductTruthStart from './ProductTruthStart';
-import ReviewMiningPlan from './ReviewMiningPlan';
-import { stageOfNode } from './stages';
 import StepIn from './StepIn';
 import { useClock } from './use-clock';
 import { useProduct, useProducts } from './use-products';
@@ -33,8 +27,6 @@ export default function App() {
   const [authed, setAuthed] = useState<boolean | null>(null);
   const [who, setWho] = useState<Session | null>(null);
   const [config, setConfig] = useState<Config | null>(null);
-  /** The Start run modal: null when closed, the nodes to run when open ([] = whole stage). */
-  const [startNodes, setStartNodes] = useState<ResearchNode[] | null>(null);
   const [stepInOpen, setStepInOpen] = useState(false);
   const [planOpen, setPlanOpen] = useState(false);
   const [error, setError] = useState('');
@@ -68,12 +60,6 @@ export default function App() {
     reloadProducts();
     reloadProduct();
   }, [reloadProducts, reloadProduct]);
-
-  function showStarted(run: RunSummary) {
-    setStartNodes(null);
-    navigate(paths.run(run.product_id, run.id));
-    reload();
-  }
 
   const activeRun = runs.find((r) => r.id === activeId) ?? null;
   const live = !!activeRun && !TERMINAL_STATUSES.has(activeRun.status);
@@ -140,9 +126,6 @@ export default function App() {
               Stop
             </button>
           )}
-          <button className="ghost" title="Start a stage-1 run directly, without a plan" onClick={() => setStartNodes([])}>
-            Stage run
-          </button>
           <button className="primary" onClick={() => setPlanOpen(true)}>
             Start
           </button>
@@ -193,42 +176,15 @@ export default function App() {
           requiredFields={config?.required_fields ?? {}}
           onSelectRun={(id) => navigate(paths.run(product.id, id))}
           onChanged={reload}
-          onRunNode={(node) => setStartNodes([node])}
         />
       )}
 
-      {startNodes && startNodes.some((node) => stageOfNode(node) === 2) && (
-        <ProductTruthStart
-          brief={activeRun?.brief ?? { product: '', url: '', market: '', notes: '' }}
-          onStarted={async (run) => showStarted(run)}
-          onFailed={async () => reload()}
-          onClose={() => setStartNodes(null)}
-        />
-      )}
-      {startNodes && startNodes.includes('review_mining') && (
-        <ReviewMiningPlan
-          brief={activeRun?.brief ?? { product: '', url: '', market: '', notes: '' }}
-          onStarted={async (run) => showStarted(run)}
-          onFailed={async () => reload()}
-          onClose={() => setStartNodes(null)}
-        />
-      )}
-      {startNodes && startNodes.every((node) => stageOfNode(node) === 1) && (
-        <StartRun
-          config={config}
-          nodes={startNodes}
-          initial={startNodes.length > 0 ? activeRun?.brief : undefined}
-          onClose={() => setStartNodes(null)}
-          onStarted={async (run) => showStarted(run)}
-          onFailed={async () => reload()}
-        />
-      )}
       {planOpen && (
         <StartPlan
           onClose={() => setPlanOpen(false)}
           onStarted={(plan) => {
             setPlanOpen(false);
-            navigate(paths.plan(plan.id));
+            navigate(paths.inbox());
           }}
         />
       )}

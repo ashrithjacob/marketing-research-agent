@@ -1050,6 +1050,25 @@ paragraph numbers: code copies the quote and its character range from the
 archived page (`ExcerptTool`, `domain/paragraphs.ts`). Stage 1 has no
 `record_excerpt`.
 
+### §2p — a plan past stage 1 (the inbox, 2026-10-15)
+
+A plan carries `stages` (2: product truth, 3: review mining, each `selected`,
+`run_id`, `error`, product truth's `inputs`) and `stage_one_run_id`.
+`PlanStages` listens to task ends (`TaskEvents`) and to every run's end
+(`LiveRuns.onEnd`, fired after a run's final `run.<status>` event is stored), and
+at startup (`recover`). For an approved plan whose kept stage-1 tasks have all
+ended, or could not start and wait on no card, it calls `PlanStageOne.combine`:
+a new stage-1 run (model `plan`, no contract) gets every live row of each task
+that delivered, a source once, and is assembled by `StageOneRunAssembly` over
+the tasks' nodes and ended through `RunEnd`. Then a ticked product truth starts
+through `RunSupervisor.start` with stage 2's nodes and the plan's landed cost;
+`StageOneHandoff.forBrief`, which skips any run with a contract, hands it the
+combined run. When product truth delivers, a ticked review mining opens an
+approval card (`start_stage`) with the most it can cost; its Approve calls
+`PlanStages.decide`, which starts stage 3 the same way. Steps for one plan run in
+turn, in this process. The combined run, product truth and review mining show on
+the board (`WorkspaceBoard`) and in the inbox's product panels.
+
 ### §2o — watchers (always-on parts 9–10)
 
 `AlwaysOnDesk.set` on starts one `mra.watcher` durable task per watch for the

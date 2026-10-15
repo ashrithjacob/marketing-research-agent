@@ -26,6 +26,12 @@ export class OwnerDesk {
     return this.plans.revise(planId, scope, { ...kept, ...(change.stop_when === undefined ? {} : { stop_when: { [key]: change.stop_when } }) });
   }
 
+  stage(planId: string, scope: Scope, stage: number, change: { selected: boolean; landed_unit_cost?: number; currency?: string }): Promise<Plan> {
+    Trace.line(import.meta.url, "OwnerDesk.stage", { planId, stage });
+    const { selected, ...cost } = change;
+    return this.plans.setStage(planId, scope, stage, selected, cost);
+  }
+
   async approve(planId: string, scope: Scope): Promise<Plan> {
     Trace.line(import.meta.url, "OwnerDesk.approve", { planId });
     const plan = await this.plans.approve(planId, scope);

@@ -4,13 +4,13 @@ import {
   DELIVERED_STATUSES,
   TERMINAL_STATUSES,
   type Judgement,
-  type ResearchNode,
   type RunDetail,
   type ProductTruthPacket,
   type RunSummary,
   type StagePacket,
 } from './api';
 import { ChatText } from './FileBox';
+import { Link, paths } from './route';
 import { nowPanel, runStage } from './run-view/now';
 import { RailColumn, subjectProgress } from './run-view/rail';
 import { StageOneTiles } from './run-view/stage-one-tiles';
@@ -19,16 +19,14 @@ import { useRunStream } from './run-view/use-run-stream';
 import { OutdatedVoice } from './run-view/outdated-voice';
 import { VoiceAnalysis } from './run-view/voice/VoiceAnalysis';
 
-const NEXT_STAGE: Record<2 | 3, { name: string; sub: string; node: ResearchNode }> = {
+const NEXT_STAGE: Record<2 | 3, { name: string; sub: string }> = {
   2: {
     name: 'Product truth',
-    sub: 'Stage 1 is in. Assess the product in isolation — its formula, doses, claim limits and economics. You enter its landed cost first.',
-    node: 'mechanism',
+    sub: 'Stage 1 is in. Product truth assesses the product in isolation: its formula, doses, claim limits and economics. Tick it on a plan in the inbox.',
   },
   3: {
     name: 'Review mining',
-    sub: 'Product truth is in. Mine verbatim customer language from the reviews of the product stage 1 found — you approve the plan before anything runs.',
-    node: 'review_mining',
+    sub: 'Product truth is in. Review mining collects customer language from the reviews of the products stage 1 found. Tick it on a plan in the inbox; you approve its cost on a card before anything runs.',
   },
 };
 
@@ -40,7 +38,6 @@ export default function RunView({
   requiredFields,
   onSelectRun,
   onChanged,
-  onRunNode,
 }: {
   runId: string;
   runs: RunSummary[];
@@ -49,7 +46,6 @@ export default function RunView({
   requiredFields: Record<string, string[]>;
   onSelectRun: (id: string) => void;
   onChanged: () => void;
-  onRunNode: (node: ResearchNode) => void;
 }) {
   const [loaded, setLoaded] = useState<RunDetail | null>(null);
   const [judgements, setJudgements] = useState<Judgement[]>([]);
@@ -109,7 +105,6 @@ export default function RunView({
         packet={packet}
         judgements={judgements}
         onSelectRun={onSelectRun}
-        onRunNode={onRunNode}
       />
 
       <div className="mid">
@@ -148,9 +143,9 @@ export default function RunView({
                 <b>Next: Stage {next} · {nextStage.name}</b>
                 <div className="sub">{nextStage.sub}</div>
               </div>
-              <button className="primary" onClick={() => onRunNode(nextStage.node)}>
-                Start stage {next} →
-              </button>
+              <Link to={paths.inbox()} className="primary">
+                Go to the inbox →
+              </Link>
             </div>
           )}
         </section>
@@ -182,7 +177,6 @@ export default function RunView({
               finished={!live}
               minedAt={runs.find((r) => r.id === run.source_run_id)?.created_at ?? ''}
               newerAt={progress.newerStageOne.created_at}
-              onRunNode={onRunNode}
             />
           ) : (
             <div className="voice-tile">
