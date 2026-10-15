@@ -65,8 +65,11 @@ beforeEach(async () => {
   const route: FauxResponseStep = (context) => {
     const first = text(context.messages.find((m) => m.role === "user")?.content ?? "");
     const started = context.messages.some((m) => m.role === "toolResult");
+    if (first.startsWith("[Signal]") || first.startsWith("Remember")) return fauxAssistantMessage("Noted.");
     if (first.startsWith("## New feedback from the owner")) {
       if (started) return fauxAssistantMessage("Done.");
+      const said = /\[([0-9a-f]{32})\] said \(instruction\) about a message to the operator in chat\. The owner's words: "Remember: we only sell in the UK"/.exec(first)?.[1];
+      if (said) return fauxAssistantMessage(fauxToolCall("propose_lesson", { change: "add", text: "The brand sells in the UK only.", why: "The owner said so in chat.", feedback_ids: [said] }), { stopReason: "toolUse" });
       const feedbackId = /\[([0-9a-f]{32})\] reject/.exec(first)?.[1];
       if (!feedbackId) return fauxAssistantMessage("Nothing to learn: no correction here.");
       return fauxAssistantMessage(fauxToolCall("propose_lesson", { change: "add", text: LESSON, why: "The owner rejected an affiliate page.", feedback_ids: [feedbackId] }), { stopReason: "toolUse" });
@@ -99,6 +102,15 @@ describe("the learning loop", () => {
     const next = await productTask();
     const prompts = (await store.listLlmCalls(next)).map((c) => c.system_prompt ?? "").join("\n");
     expect(prompts).toContain(edited);
+  });
+
+  it("learns from what the owner says in chat, as hermes does after a turn: a lesson card, then brand memory", async () => {
+    expect((await call("POST", "/chat", { text: "Remember: we only sell in the UK" })).status).toBe(202);
+    expect(await app.workspace!.reviewer.sweep()).toBe(1);
+    const card = (await until(() => store.cards.list(Scope.of("admin"), 10), (cards) => cards.some((c) => c.action.kind === "lesson")))[0]!;
+    expect((await call("POST", `/cards/${card.id}/approve`, { text: "The brand sells in the UK only." })).status).toBe(202);
+    expect((await store.memory.current(Scope.of("admin"))).map((m) => [m.text, m.by])).toEqual([["The brand sells in the UK only.", "lesson"]]);
+    expect(await app.workspace!.reviewer.sweep()).toBe(0);
   });
 
   it("refuses a lesson without feedback, with unknown feedback, or that the owner already rejected", async () => {

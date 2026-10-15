@@ -77,7 +77,7 @@ export interface Card {
 
 export interface Feedback {
   id: string;
-  verdict: 'reject' | 'edited' | 'accept' | 'answer' | 'steer' | 'outcome';
+  verdict: 'reject' | 'edited' | 'accept' | 'answer' | 'steer' | 'said' | 'outcome';
   strength: 'correction' | 'confirmation' | 'instruction' | 'outcome';
   target: { kind: string; id: string; run_id: string; plan_id: string };
   text: string;
@@ -119,6 +119,7 @@ export interface Board {
   always_on: AlwaysOnStatus;
   schedules: Schedule[];
   drafts: Draft[];
+  card_brands: Record<string, string>;
 }
 
 export const workspaceApi = {
@@ -132,6 +133,7 @@ export const workspaceApi = {
   answerCard: (id: string, answer: string) =>
     request<Card>(`/api/research/cards/${id}/answer`, { method: 'POST', body: JSON.stringify({ answer }) }),
   approveCard: (id: string, text = '') => request<Card>(`/api/research/cards/${id}/approve`, { method: 'POST', body: JSON.stringify({ text }) }),
+  alwaysOn: () => request<AlwaysOnStatus>('/api/research/always-on'),
   setAlwaysOn: (on: boolean, cap: number | null) =>
     request<AlwaysOnStatus>('/api/research/always-on', { method: 'POST', body: JSON.stringify({ on, daily_cap_usd: cap }) }),
   addSchedule: (taskKey: string, everyDays: number, brief: Brief) =>
@@ -143,13 +145,12 @@ export const workspaceApi = {
   rejectCard: (id: string) => request<Card>(`/api/research/cards/${id}/reject`, { method: 'POST' }),
   markSourceWrong: (runId: string, sourceId: string, why: string) =>
     request<Feedback>(`/api/research/runs/${runId}/sources/${encodeURIComponent(sourceId)}/wrong`, { method: 'POST', body: JSON.stringify({ why }) }),
-  say: (text: string, planId: string) =>
-    request<{ ok: boolean }>('/api/research/chat', { method: 'POST', body: JSON.stringify({ text, plan_id: planId }) }),
+  say: (text: string, brand: string) => request<{ ok: boolean }>('/api/research/chat', { method: 'POST', body: JSON.stringify({ text, brand }) }),
 };
 
-/** The workspace's one stream: the chat and the board, each a whole snapshot whenever it changes. EventSource reconnects by itself, and a reconnect starts from a fresh snapshot. */
-export function streamWorkspace(onChat: (chat: ChatMessage[]) => void, onBoard: (board: Board) => void, onState: (connected: boolean) => void): () => void {
-  const source = new EventSource('/api/research/workspace/stream');
+/** One brand's stream: its chat and the workspace's board, each a whole snapshot whenever it changes. EventSource reconnects by itself, and a reconnect starts from a fresh snapshot. */
+export function streamWorkspace(brand: string, onChat: (chat: ChatMessage[]) => void, onBoard: (board: Board) => void, onState: (connected: boolean) => void): () => void {
+  const source = new EventSource(`/api/research/workspace/stream?brand=${encodeURIComponent(brand)}`);
   source.addEventListener('chat', (event) => onChat(JSON.parse((event as MessageEvent).data) as ChatMessage[]));
   source.addEventListener('board', (event) => onBoard(JSON.parse((event as MessageEvent).data) as Board));
   source.onopen = () => onState(true);

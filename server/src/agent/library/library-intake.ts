@@ -73,6 +73,6 @@ export class LibraryIntake {
 
   private static title(filename: string): string {
     Trace.line(import.meta.url, "LibraryIntake.title", { filename });
-    return filename.replace(/\.pdf$/i, "").replace(/[_-]+/g, " ").trim() || "Untitled";
+    return filename.replace(/\.(pdf|md|markdown|txt)$/i, "").replace(/[_-]+/g, " ").trim() || "Untitled";
   }
 }

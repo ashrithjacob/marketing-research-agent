@@ -13,10 +13,10 @@ import { ReviewerTools } from "./reviewer-tools.js";
 
 const ReviewerIndex = defineDoc<{ workspaces: Record<string, ConversationId> }>({ kind: "mra.reviewers", version: 1, scope: "session", initial: () => ({ workspaces: {} }) });
 
-/** The reviewer (spec §5.3): every few seconds, each workspace's new corrections, answers and steers go to its reviewer conversation, which may only propose lessons. Feedback counts as reviewed once a lesson, or a recorded "nothing to learn", names it. */
+/** The reviewer (spec §5.3): every few seconds, each workspace's new corrections, answers, steers and chat messages go to its reviewer conversation, which may only propose lessons. Feedback counts as reviewed once a lesson, or a recorded "nothing to learn", names it. */
 export class Reviewer {
   static readonly SWEEP_MS = 15_000;
-  static readonly REVIEWED: ReadonlySet<Feedback["verdict"]> = new Set(["reject", "edited", "steer", "answer"]);
+  static readonly REVIEWED: ReadonlySet<Feedback["verdict"]> = new Set(["reject", "edited", "steer", "answer", "said"]);
   private readonly busy = new Set<string>();
   private timer: ReturnType<typeof setInterval> | null = null;
   readonly extension: Extension;

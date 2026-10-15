@@ -1,4 +1,4 @@
-import { Runs, Scope, type Board, type ResearchRun, type ResearchStore, type TaskCard } from "../../domain/index.js";
+import { Brands, Runs, Scope, type Board, type Card, type ResearchRun, type ResearchStore, type TaskCard } from "../../domain/index.js";
 import { Trace } from "../../trace/index.js";
 
 import type { AlwaysOnDesk } from "../always/always-on-desk.js";
@@ -20,17 +20,36 @@ export class WorkspaceBoard {
     const runs = (await this.store.listRuns(scope, 50)).filter((run) => run.contract || planRuns.has(run.id)).slice(0, 25);
     const cards = await this.store.cards.list(scope, 50);
     const today = new Date().toISOString().slice(0, 10);
+    const shown = cards.filter((card) => card.status === "open" || card.resolved_at.slice(0, 10) === today);
     return {
       plans,
       tasks: await Promise.all(runs.map((run) => this.card(run))),
-      cards: cards.filter((card) => card.status === "open" || card.resolved_at.slice(0, 10) === today),
+      cards: shown,
       cards_today: cards.filter((card) => card.created_at.slice(0, 10) === today).length,
       feedback: await this.store.feedback.list(scope, 30),
       memory: await this.store.memory.current(scope),
       always_on: await this.alwaysOn().status(workspaceId),
       schedules: await this.store.schedules.list(workspaceId),
       drafts: await this.store.drafts.list(scope, 10),
+      card_brands: Object.fromEntries(await Promise.all(shown.map(async (card) => [card.id, await this.brandOf(card)] as const))),
     };
+  }
+
+  /** The brand a card is about: the brief it would start, the task it pauses, the plan it belongs to, or the chat that asked; "" for the whole workspace. */
+  private async brandOf(card: Card): Promise<string> {
+    Trace.tick(import.meta.url, "WorkspaceBoard.brandOf", { kind: card.action.kind });
+    const action = card.action;
+    if (action.kind === "start_task") return Brands.key(action.brief);
+    if (action.kind === "reply_operator") return action.brand ?? "";
+    if (action.kind === "answer_task") {
+      const run = await this.store.getRun(action.run_id);
+      return run ? Brands.key(run.brief) : "";
+    }
+    if (action.kind === "start_stage") {
+      const plan = await this.store.plans.get(Scope.everything, action.plan_id);
+      return plan ? Brands.key(plan.brief) : "";
+    }
+    return "";
   }
 
   private async card(run: ResearchRun): Promise<TaskCard> {

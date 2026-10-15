@@ -1,13 +1,13 @@
 import type { Scope } from "./accounts.js";
 import { Trace } from "../trace/index.js";
 
-export const FEEDBACK_VERDICTS = ["reject", "edited", "accept", "answer", "steer", "outcome"] as const;
+export const FEEDBACK_VERDICTS = ["reject", "edited", "accept", "answer", "steer", "said", "outcome"] as const;
 export type FeedbackVerdict = (typeof FEEDBACK_VERDICTS)[number];
 export type FeedbackStrength = "correction" | "confirmation" | "instruction" | "outcome";
 
-/** What a piece of feedback is about: a source or finding of a run, a task of a plan, a card, or a running task. */
+/** What a piece of feedback is about: a source or finding of a run, a task of a plan, a card, a running task, or the chat with the operator. */
 export interface FeedbackTarget {
-  kind: "source" | "finding" | "contract" | "card" | "task" | "memory" | "lesson" | "draft";
+  kind: "source" | "finding" | "contract" | "card" | "task" | "memory" | "lesson" | "draft" | "chat";
   id: string;
   run_id: string;
   plan_id: string;
@@ -43,7 +43,7 @@ export class FeedbackStrengths {
   static of(verdict: FeedbackVerdict): FeedbackStrength {
     Trace.line(import.meta.url, "FeedbackStrengths.of", { verdict });
     if (verdict === "accept") return "confirmation";
-    if (verdict === "answer") return "instruction";
+    if (verdict === "answer" || verdict === "said") return "instruction";
     if (verdict === "outcome") return "outcome";
     return "correction";
   }

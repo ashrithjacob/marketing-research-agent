@@ -93,7 +93,7 @@ export default function DraftPage({ draftId, onError }: { draftId: string; onErr
         <span className={`status ${review ? 'queued' : draft.status === 'rejected' ? 'cancelled' : draft.status === 'approved' ? 'completed' : 'running'}`}>{STATUS[draft.status]}</span>
       </div>
       <p className="muted small">
-        Version {draft.version}, by {draft.by === 'owner' ? 'you' : 'the writer'} · <Link to={paths.inbox()}>Inbox</Link>
+        Version {draft.version}, by {draft.by === 'owner' ? 'you' : 'the writer'} · <Link to={paths.home()}>Back to the chat</Link>
       </p>
       {view.sections.map((section) => (
         <Section

@@ -8,7 +8,7 @@ export type CardStatus = "open" | "answered" | "approved" | "rejected";
 /** What resolving a card does: hand a paused task its answer, hand the operator its answer, or start a task the owner approved, or settle a draft. */
 export type CardAction =
   | { kind: "answer_task"; run_id: string }
-  | { kind: "reply_operator" }
+  | { kind: "reply_operator"; brand?: string }
   | { kind: "lesson"; lesson_id: string; editable?: boolean }
   | { kind: "draft"; draft_id: string }
   | { kind: "start_stage"; plan_id: string; stage: 3 }

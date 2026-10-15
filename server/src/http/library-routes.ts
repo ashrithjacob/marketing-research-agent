@@ -1,14 +1,15 @@
 import type { Hono } from "hono";
 import { streamSSE, type SSEStreamingApi } from "hono/streaming";
 
+import { FileMarkdown } from "../adapters/index.js";
 import type { LibraryIntake } from "../agent/index.js";
 import { Scope, type DocumentLibrary, type LibraryFrame } from "../domain/index.js";
 import type { ApiEnv } from "./api-env.js";
 import { Trace } from "../trace/index.js";
 
-/** `/library`: upload a PDF and get its row back at once, follow its conversion page by page, read its markdown. */
+/** `/library`: upload a PDF, markdown or text file and get its row back at once, follow its conversion page by page, read its markdown. */
 export class LibraryRoutes {
-  private static readonly PDF_MAGIC = "%PDF-";
+  private static readonly TEXT_FILE = /\.(md|markdown|txt)$/i;
 
   constructor(
     private readonly library: DocumentLibrary,
@@ -24,11 +25,11 @@ export class LibraryRoutes {
       if (Number(c.req.header("content-length") ?? 0) > this.maxBytes + 64 * 1024) return c.json({ detail: this.tooLarge() }, 413);
       const body = await c.req.parseBody().catch(() => null);
       const file = body?.file;
-      if (!(file instanceof File)) return c.json({ detail: "send the PDF as the multipart field `file`" }, 400);
+      if (!(file instanceof File)) return c.json({ detail: "send the file as the multipart field `file`" }, 400);
       if (file.size > this.maxBytes) return c.json({ detail: this.tooLarge() }, 413);
       const bytes = new Uint8Array(await file.arrayBuffer());
-      if (new TextDecoder().decode(bytes.subarray(0, 5)) !== LibraryRoutes.PDF_MAGIC) {
-        return c.json({ detail: "only PDF files can be added for now" }, 415);
+      if (!LibraryRoutes.TEXT_FILE.test(file.name) && !FileMarkdown.isPdf(bytes)) {
+        return c.json({ detail: "only PDF, markdown (.md) and text (.txt) files can be added" }, 415);
       }
       return c.json(await this.intake.accept(c.get("principal").workspaceId, { filename: file.name, bytes }), 202);
     });

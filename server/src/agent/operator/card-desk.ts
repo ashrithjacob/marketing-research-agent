@@ -7,7 +7,7 @@ import type { TaskSupervisor } from "../task/task-supervisor.js";
 
 /** What resolving a card hands on to: the operator's reply, a lesson's decision, a draft's settling, and a plan stage's approval. */
 export interface CardResolvers {
-  reply: (workspaceId: string, text: string) => Promise<void>;
+  reply: (workspaceId: string, brand: string, text: string) => Promise<void>;
   lesson: (lessonId: string, approved: boolean, text: string) => Promise<void>;
   draft: (draftId: string, approved: boolean) => Promise<void>;
   stage: (planId: string, approved: boolean) => Promise<void>;
@@ -36,7 +36,7 @@ export class CardDesk {
     Trace.line(import.meta.url, "CardDesk.answer", { cardId });
     const card = await this.unresolved(cardId, scope, "question");
     if (card.action.kind === "answer_task") await this.tasks.answer(card.action.run_id, text);
-    if (card.action.kind === "reply_operator") await this.resolve.reply(card.workspace_id, `My answer to your question "${card.body}": ${text}`);
+    if (card.action.kind === "reply_operator") await this.resolve.reply(card.workspace_id, card.action.brand ?? "", `My answer to your question "${card.body}": ${text}`);
     await this.feedback(card, "answer", text);
     return (await this.store.cards.resolve(card.id, "answered", text)) ?? { ...card, status: "answered", answer: text };
   }

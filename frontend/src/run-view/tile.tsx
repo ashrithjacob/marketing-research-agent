@@ -1,5 +1,8 @@
-import { useState, type ReactNode } from 'react';
+import { createContext, useContext, useState, type ReactNode } from 'react';
 import { factText, type Gap } from '../api';
+
+/** Whether tiles start open: off on a dashboard, on in a view given over to one section. */
+export const TilesOpen = createContext(false);
 
 /** A dashboard tile: headline figures visible, full values behind one click. */
 export function Tile({
@@ -21,7 +24,8 @@ export function Tile({
   open?: boolean;
   onToggle?: () => void;
 }) {
-  const [openSelf, setOpenSelf] = useState(defaultOpen);
+  const startOpen = useContext(TilesOpen);
+  const [openSelf, setOpenSelf] = useState(defaultOpen || startOpen);
   const open = openProp ?? openSelf;
   const toggle = () => (onToggle ? onToggle() : setOpenSelf((o) => !o));
   return (

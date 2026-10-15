@@ -389,6 +389,17 @@ refused by code. This is the main departure from hermes, whose review may save
 on its own judgement; here a lesson must trace to something the owner did,
 because otherwise the system learns from its own mistakes.
 
+*Changed 2026-10-15: the reviewer reads the chat, as hermes's background review
+reads each turn.* Every message the owner sends the operator is recorded as
+feedback with verdict `said` (strength `instruction`, target `chat`), and the
+reviewer's sweep reviews it with the rest. Its prompt says most chat messages
+are requests with nothing to learn, and to learn "remember …", "always …",
+"never …", facts about the brand, and corrections of the operator. Still not a
+fork: it reads the owner's words, not the transcript. The operator has no
+memory tool of its own; what it learns goes through the gate as a lesson card,
+so one mechanism writes memory. Tested against the faux model
+(`tests/learning.test.ts`).
+
 ### 5.4 The gate
 
 Lessons are staged. The dashboard shows them as cards: what changes, why
@@ -910,6 +921,12 @@ its question ("The Droplet site sells many products … which one should I focus
 on?") arrived as a card, the answer on the card resumed it, and it ended
 `completed`, 22 calls, $0.0475 billed.
 
+*Changed 2026-10-15:* a task's end is always a **signal** to the operator, not a
+note, whether Always on is on or not, so the chat tells the owner what it found.
+It costs one operator model call per batch of ended tasks (`followUpMode: "all"`
+batches four stage-1 tasks ending together into one). Always on still gates
+`create_task` starting work by itself, schedules and watchers.
+
 **What stays in the prompt, and what does not.** Prompt caching makes the
 unchanged start of a request cheap, and pi-durable re-sends a section only when
 its text changes, so "a section that returns something different every time
@@ -1200,6 +1217,17 @@ What it does not do yet: read scanned PDFs (no text layer means an empty
 document, reported as `failed` with that reason), read images, accept other
 formats, or turn a document into a playbook (§5.8).
 
+*Changed 2026-10-15:* the library is the **memory folder** on the chat page, and
+takes markdown and text playbooks as well as PDFs. `FileMarkdown`
+(`adapters/file-markdown.ts`) hands a file starting `%PDF-` to `PdfMarkdown` and
+keeps any other as its own UTF-8 text, as one page; the route admits a PDF by its
+first bytes or a `.md`, `.markdown` or `.txt` name, and a file that is not UTF-8
+ends `failed` with that reason. The operator reads the folder too: the same
+`library_index` and `library_read`, bound to its workspace
+(`agent/operator/library-shelf-tools.ts`). Seen locally: a two-heading `.md`
+uploaded with `mra library` ended `ready`, 1 page, 64 characters, both headings
+as sections.
+
 ## 11. The dashboard
 
 `../goal.md` (the parent) says it: the UI is a dashboard where agent actions take
@@ -1259,6 +1287,44 @@ combined runs, never a task's own run (`StageOneHandoff`). Where it differs from
 §3: product truth and review mining are not primitives here, they are the stage
 runs they were, started by the plan; a restart still ends them `failed` as it
 ends any stage run. Tested against a fake `start`; no plan stage has run live.
+
+*Decided 2026-10-15 with the owner, superseding "a button starts it" and the
+inbox above: the app is chat-native.* One page: the chat with the operator on the
+left, and on the right the results (each product's newest stage 1, 2 and 3 with
+their tiles), the memory folder and brand memory. Only buttons and drafts are
+clickable. The agent is two parts under the chat: the **operator**, the one
+voice the owner talks to, and the **research tasks** it starts, each its own
+durable conversation; a third, the **reviewer** (§5.3), learns in the
+background. Built (`agent/operator/stage-one-tools.ts`):
+- The operator's `start_stage_one` takes a brief (`url`, `product`, `market`) and
+  optional `parts` (some of `product_facts`, `competitors`, `category_numbers`),
+  drafts the saved stage-1 plan with only those parts selected
+  (`SavedPlans.tasks(brief, keep)`), and approves it at once, through the same
+  `PlanDesk.approve` the button used. Approval is the owner's request in chat, so
+  no "edited" feedback is recorded for the narrowing. A task with Apify in reach
+  still becomes an approval card (§11, rule 4 above holds); in the chat, open
+  cards appear under the conversation.
+- Stages 2 and 3 are not yet started from chat; a plan's stages stay unticked.
+- Tested against the faux model (`tests/operator.test.ts`, "chat starts the
+  work"); not seen live, because seeing it live means a model call.
+
+*Decided 2026-10-15 with the owner, later the same day: a chat per brand.* The
+first page is a tile per brand, with the brand's graphic read off its homepage;
+a tile opens the brand's results on the left and its own chat on the right. A
+brand is a website's domain, holding every page researched on it, or a product
+named without a page (`Brands.key`: `site:<domain>` or `product:<name>`, derived
+from the product keys that exist, so old runs fall into tiles with no migration).
+A brand's picture is its homepage's share image, else a stored Amazon listing
+photo, else the share image of a product page its runs read, else the site's
+icon (`BrandPictureSearch`). Each brand has its own operator conversation (`mra.brand-chats`), created by
+the new-brand tile with the owner's text as its first message, and told which
+brand it is about in a fixed section. A task's end goes to the chat of the brand
+its brief belongs to. Signals that belong to no brand (the watchers) go to the
+workspace's older conversation, which no page shows: a gap while Always on has no
+switch on screen. Brand memory, the library and lessons stay the workspace's,
+shared by its brands. Cards carry their brand on the board (`card_brands`); a
+brand's chat shows its own and the workspace's. Tested against the faux model
+(`tests/operator.test.ts`, `tests/brands.test.ts`).
 
 *Built 2026-10-14, part 3.* Where it differs from the above:
 - Plans are research-store records (`research_plans`), not harness state:

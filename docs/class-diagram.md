@@ -137,6 +137,31 @@ classDiagram
     class Schedules {
       nextDue()
     }
+    class BrandChat {
+      <<interface>>
+    }
+    class BrandFolder {
+      <<interface>>
+    }
+    class BrandImage {
+      <<interface>>
+    }
+    class BrandImageBook {
+      <<interface>>
+      list()
+      put()
+    }
+    class BrandImageFinder {
+      <<interface>>
+      find()
+    }
+    class Brands {
+      key()
+      ofProduct()
+      homepage()
+      label()
+      folders()
+    }
     class Trip {
       <<interface>>
     }
@@ -649,6 +674,7 @@ classDiagram
     }
     class SavedPlans {
       tasks()
+      parts()
       stages()
       task()
       arrange()
@@ -936,11 +962,20 @@ classDiagram
       admit()
       parse()
     }
+    class FileMarkdown {
+      convert()
+      isPdf()
+    }
     class FirecrawlPayload {
       <<interface>>
     }
     class Firecrawl {
       scrape()
+    }
+    class HomepageImage {
+      find()
+      pick()
+      publicHost()
     }
     class Http {
       withTimeout()
@@ -1082,6 +1117,10 @@ classDiagram
       list()
       remove()
       signalled()
+    }
+    class BrandImageTable {
+      list()
+      put()
     }
     class CallLog {
       add()
@@ -1544,6 +1583,10 @@ classDiagram
       failover()
       withFallbacks()
     }
+    class BrandShelf {
+      folders()
+      settled()
+    }
     class CardResolvers {
       <<interface>>
     }
@@ -1556,19 +1599,26 @@ classDiagram
     class ChatView {
       of()
     }
+    class LibraryShelfTools {
+      tools()
+    }
     class OperatorAct {
       run()
+      brand()
     }
     class OperatorDesk {
       say()
       signal()
       note()
       watch()
+      chats()
     }
     class OperatorTools {
       extension()
+      brandLine()
     }
     class OwnerDesk {
+      open()
       start()
       edit()
       stage()
@@ -1594,6 +1644,10 @@ classDiagram
     class PlanStages {
       recover()
       decide()
+    }
+    class StageOneTools {
+      tools()
+      report()
     }
     class WorkReport {
       write()
@@ -2133,6 +2187,9 @@ classDiagram
     class AuthGate {
       register()
     }
+    class BrandRoutes {
+      register()
+    }
     class CallStats {
       of()
     }
@@ -2238,6 +2295,7 @@ classDiagram
   Crawl4ai --> Settings
   FallbackPageFetcher --> PageFetcher
   OpenRouterGate --> Settings
+  FileMarkdown --> DocumentConverter
   Firecrawl --> Settings
   MetaInsights --> Settings
   MeteredWebSearch --> WebSearch
@@ -2269,6 +2327,7 @@ classDiagram
   AccountTable --> SqlDatabase
   AdTable --> SqlDatabase
   AlwaysOnTable --> SqlDatabase
+  BrandImageTable --> SqlDatabase
   CallLog --> SqlDatabase
   CardTable --> SqlDatabase
   ChargeTable --> SqlDatabase
@@ -2359,11 +2418,15 @@ classDiagram
   LimitClose --> DoneCheck
   LimitClose --> DeliverableCheck
   LiveRuns --> ResearchStore
+  BrandShelf --> ResearchStore
+  BrandShelf --> OperatorDesk
+  BrandShelf --> BrandImageFinder
   CardDesk --> ResearchStore
   CardDesk --> PlanBook
   CardDesk --> TaskSupervisor
   CardDesk --> CardResolvers
   CardDesk --> TaskEvents
+  LibraryShelfTools --> DocumentLibrary
   OperatorDesk --> PiHarness
   OperatorDesk --> ResearchStore
   OperatorDesk --> TaskSupervisor
@@ -2374,8 +2437,11 @@ classDiagram
   OperatorTools --> CardDesk
   OperatorTools --> MemoryDesk
   OperatorTools --> AlwaysOnTools
+  OperatorTools --> StageOneTools
+  OperatorTools --> LibraryShelfTools
   OwnerDesk --> PlanDesk
   OwnerDesk --> OperatorDesk
+  OwnerDesk --> FeedbackBook
   PlanDesk --> PlanBook
   PlanDesk --> TaskSupervisor
   PlanDesk --> CardDesk
@@ -2387,6 +2453,7 @@ classDiagram
   PlanStageOne --> ResearchStore
   PlanStageOne --> LiveRuns
   PlanStages --> TaskEvents
+  StageOneTools --> PlanDesk
   WorkReport --> ResearchStore
   WorkReport --> TaskSupervisor
   WorkspaceBoard --> ResearchStore
@@ -2555,6 +2622,8 @@ classDiagram
   App --> AmazonListingSource
   AuthGate --> Settings
   AuthGate --> AccountDirectory
+  BrandRoutes --> BrandShelf
+  BrandRoutes --> OwnerDesk
   CardRoutes --> CardDesk
   ConfigRoute --> Settings
   CorpusRoute --> ResearchStore
@@ -2615,7 +2684,9 @@ classDiagram
 | `adapters` | `adapters/crawl4ai.ts` | Crawl4aiPayload, Crawl4ai |
 | `adapters` | `adapters/fallback-fetcher.ts` | FallbackPageFetcher |
 | `adapters` | `adapters/fetch-gate.ts` | OpenRouterGate |
+| `adapters` | `adapters/file-markdown.ts` | FileMarkdown |
 | `adapters` | `adapters/firecrawl.ts` | FirecrawlPayload, Firecrawl |
+| `adapters` | `adapters/homepage-image.ts` | HomepageImage |
 | `adapters` | `adapters/http.ts` | Http |
 | `adapters` | `adapters/markdown-layout.ts` | PrintedLine, MarkdownLayout |
 | `adapters` | `adapters/meta-insights.ts` | InsightRow, MetaInsights |
@@ -2636,6 +2707,7 @@ classDiagram
 | `adapters` | `adapters/store/account-table.ts` | AccountTable |
 | `adapters` | `adapters/store/ad-table.ts` | AdTable |
 | `adapters` | `adapters/store/always-on-table.ts` | AlwaysOnTable |
+| `adapters` | `adapters/store/brand-image-table.ts` | BrandImageTable |
 | `adapters` | `adapters/store/call-log.ts` | CallLog |
 | `adapters` | `adapters/store/card-table.ts` | CardTable |
 | `adapters` | `adapters/store/charge-table.ts` | ChargeTable |
@@ -2713,8 +2785,10 @@ classDiagram
 | `agent` | `agent/live-runs.ts` | RunControl, Live, LiveRuns |
 | `agent` | `agent/llm-call-log.ts` | CallSequence, LlmCallLog |
 | `agent` | `agent/model-chain.ts` | ModelChain |
+| `agent` | `agent/operator/brand-shelf.ts` | BrandShelf |
 | `agent` | `agent/operator/card-desk.ts` | CardResolvers, CardDesk |
 | `agent` | `agent/operator/chat-view.ts` | ChatView |
+| `agent` | `agent/operator/library-shelf-tools.ts` | LibraryShelfTools |
 | `agent` | `agent/operator/operator-act.ts` | OperatorAct |
 | `agent` | `agent/operator/operator-desk.ts` | OperatorDesk |
 | `agent` | `agent/operator/operator-tools.ts` | OperatorTools |
@@ -2723,6 +2797,7 @@ classDiagram
 | `agent` | `agent/operator/plan-release.ts` | PlanRelease |
 | `agent` | `agent/operator/plan-stage-one.ts` | PlanStageOne |
 | `agent` | `agent/operator/plan-stages.ts` | PlanStages |
+| `agent` | `agent/operator/stage-one-tools.ts` | StageOneTools |
 | `agent` | `agent/operator/work-report.ts` | WorkReport |
 | `agent` | `agent/operator/workspace-board.ts` | WorkspaceBoard |
 | `agent` | `agent/operator/workspace-services.ts` | WorkspaceServices |
@@ -2833,6 +2908,7 @@ classDiagram
 | `domain` | `domain/ad-library.ts` | AdQuery, AdHit, AdPage |
 | `domain` | `domain/ad-results.ts` | AdAccount, AdInsight, AdResult, AdLink, AdInsights, AdBook, AdTotals, AdSums |
 | `domain` | `domain/always-on.ts` | AlwaysOn, AlwaysOnBook, Schedule, ScheduleBook, Schedules |
+| `domain` | `domain/brands.ts` | BrandChat, BrandFolder, BrandImage, BrandImageBook, BrandImageFinder, Brands |
 | `domain` | `domain/breakers.ts` | Trip, BreakerReadings, BreakerLimits, Breakers, RunStatuses |
 | `domain` | `domain/brief.ts` | Briefs |
 | `domain` | `domain/cards.ts` | Card, CardDraft, CardBook |
@@ -2910,6 +2986,7 @@ classDiagram
 | `http` | `http/always-on-routes.ts` | AlwaysOnRoutes |
 | `http` | `http/app.ts` | App |
 | `http` | `http/auth-gate.ts` | AuthGate |
+| `http` | `http/brand-routes.ts` | BrandRoutes |
 | `http` | `http/call-stats.ts` | CallStats |
 | `http` | `http/card-routes.ts` | CardRoutes |
 | `http` | `http/config-route.ts` | ConfigRoute |

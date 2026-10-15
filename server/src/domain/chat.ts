@@ -41,4 +41,6 @@ export interface Board {
   always_on: AlwaysOn & { spent_today: number; running: number };
   schedules: Schedule[];
   drafts: Draft[];
+  /** Each card's brand key, "" for one that belongs to the whole workspace (a lesson, a draft). */
+  card_brands: Record<string, string>;
 }

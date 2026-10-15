@@ -1,44 +1,27 @@
 import { useEffect, useState, type MouseEvent, type ReactNode } from 'react';
 
-export type Route =
-  | { page: 'products' }
-  | { page: 'product'; productId: string; runId: string | null }
-  | { page: 'logs'; runId: string }
-  | { page: 'library' }
-  | { page: 'plan'; planId: string }
-  | { page: 'inbox' }
-  | { page: 'draft'; draftId: string }
-  | { page: 'playbooks' }
-  | { page: 'missing' };
+export type Route = { page: 'home' } | { page: 'brand'; key: string; stage: { productId: string; n: 1 | 2 | 3; tab: string } | null } | { page: 'logs'; runId: string } | { page: 'draft'; draftId: string };
 
 export const paths = {
-  products: () => '/',
-  library: () => '/library',
-  plan: (planId: string) => `/plans/${planId}`,
-  inbox: () => '/inbox',
-  playbooks: () => '/playbooks',
+  home: () => '/',
+  brand: (key: string) => `/brands/${encodeURIComponent(key)}`,
+  stage: (key: string, productId: string, n: number, tab = '') => `/brands/${encodeURIComponent(key)}/products/${productId}/stages/${n}${tab ? `/${tab}` : ''}`,
   draft: (draftId: string) => `/drafts/${draftId}`,
-  product: (productId: string) => `/products/${productId}`,
-  run: (productId: string, runId: string) => `/products/${productId}/runs/${runId}`,
 };
 
 const NAVIGATED = 'mra:navigated';
 
 export function parseRoute(pathname: string): Route {
   const path = pathname.replace(/\/+$/, '') || '/';
-  if (path === '/') return { page: 'products' };
-  if (path === '/library') return { page: 'library' };
-  if (path === '/inbox') return { page: 'inbox' };
-  if (path === '/playbooks') return { page: 'playbooks' };
-  const plan = path.match(/^\/plans\/([0-9a-f]+)$/);
-  if (plan) return { page: 'plan', planId: plan[1] };
   const draft = path.match(/^\/drafts\/([0-9a-f]+)$/);
   if (draft) return { page: 'draft', draftId: draft[1] };
+  const stage = path.match(/^\/brands\/([^/]+)\/products\/([0-9a-f]+)\/stages\/([123])(?:\/([a-z_]+))?$/);
+  if (stage) return { page: 'brand', key: decodeURIComponent(stage[1]), stage: { productId: stage[2], n: Number(stage[3]) as 1 | 2 | 3, tab: stage[4] ?? '' } };
+  const brand = path.match(/^\/brands\/([^/]+)$/);
+  if (brand) return { page: 'brand', key: decodeURIComponent(brand[1]), stage: null };
   const logs = path.match(/^\/runs\/([0-9a-f]+)\/logs$/);
   if (logs) return { page: 'logs', runId: logs[1] };
-  const product = path.match(/^\/products\/([0-9a-f]+)(?:\/runs\/([0-9a-f]+))?$/);
-  if (product) return { page: 'product', productId: product[1], runId: product[2] ?? null };
-  return { page: 'missing' };
+  return { page: 'home' };
 }
 
 export function navigate(path: string) {

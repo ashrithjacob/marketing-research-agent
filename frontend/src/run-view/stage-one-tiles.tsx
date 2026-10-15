@@ -14,7 +14,9 @@ export function StageOneTiles({
   nodes,
   listings,
   requiredFields,
+  only,
 }: {
+  only?: 'product_data' | 'competitors' | 'category_data';
   runId: string;
   packet: StagePacket;
   nodes: ReadonlySet<string>;
@@ -37,11 +39,12 @@ export function StageOneTiles({
   const product = byNode.product_data ?? none;
   const competitors = byNode.competitors ?? none;
   const category = byNode.category_data ?? none;
-  const showCompetitors = !!packet.competitor_reference || (packet.competitors ?? []).length > 0;
+  const shows = (node: string) => !only || only === node;
+  const showCompetitors = shows('competitors') && (!!packet.competitor_reference || (packet.competitors ?? []).length > 0 || !!only);
 
   return (
     <>
-      {nodes.has('product_data') && (
+      {shows('product_data') && (nodes.has('product_data') || !!only) && (
         <ProductTile
           runId={runId}
           packet={packet}
@@ -64,7 +67,7 @@ export function StageOneTiles({
           listings={listings}
         />
       )}
-      {nodes.has('category_data') && (
+      {shows('category_data') && (nodes.has('category_data') || !!only) && (
         <CategoryTile
           runId={runId}
           attributes={category.attributes}

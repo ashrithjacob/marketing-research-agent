@@ -1,10 +1,10 @@
 import { Hono, type Context, type Next } from "hono";
 
 import { LibraryIntake, RunSupervisor, ToolRegistry, WorkspaceServices, type PiHarness } from "../agent/index.js";
-import { MarkdownLayout, PdfMarkdown, ServiceClients } from "../adapters/index.js";
+import { FileMarkdown, HomepageImage, MarkdownLayout, PdfMarkdown, ServiceClients } from "../adapters/index.js";
 import { AmazonListingLookup } from "../adapters/apify/index.js";
 import { Env, type Settings } from "../config/index.js";
-import type { AmazonListingSource, ResearchStore } from "../domain/index.js";
+import type { AmazonListingSource, BrandImageFinder, ResearchStore } from "../domain/index.js";
 import { Trace, TraceFile } from "../trace/index.js";
 
 import type { ApiEnv } from "./api-env.js";
@@ -29,6 +29,7 @@ export class App {
     supervisor?: RunSupervisor;
     listingSource?: AmazonListingSource | null;
     harness?: PiHarness;
+    brandImages?: BrandImageFinder;
     services?: ServiceClients;
   }) {
     Trace.line(import.meta.url, "App.constructor");
@@ -40,10 +41,10 @@ export class App {
       overrides.supervisor ?? new RunSupervisor({ store: this.store, settings: this.settings, services, ...(overrides.harness ? { models: overrides.harness.models } : {}) });
     const { supervisor, store, settings } = this;
     this.workspace = overrides.harness
-      ? new WorkspaceServices({ store, runs: supervisor.live, settings, harness: overrides.harness, tools: new ToolRegistry(services, settings), costs: supervisor.costs, ads: services.ads, insights: services.insights, start: (request, workspaceId) => supervisor.start(request, workspaceId) })
+      ? new WorkspaceServices({ store, runs: supervisor.live, settings, harness: overrides.harness, tools: new ToolRegistry(services, settings), costs: supervisor.costs, ads: services.ads, insights: services.insights, brandImages: overrides.brandImages ?? new HomepageImage(), start: (request, workspaceId) => supervisor.start(request, workspaceId) })
       : null;
 
-    this.intake = new LibraryIntake(this.store.library, new PdfMarkdown(new MarkdownLayout()));
+    this.intake = new LibraryIntake(this.store.library, new FileMarkdown(new PdfMarkdown(new MarkdownLayout())));
 
     const hono = new Hono<ApiEnv>();
     hono.use("*", (c, next) => this.request(c, next));

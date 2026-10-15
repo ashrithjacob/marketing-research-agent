@@ -55,7 +55,12 @@ the map of 1–4. The playbooks uploaded to the library are the method for 5.
   every unit of work reports progress live to the dashboard.
 - **Cost is billed, shown and bounded.** Every dollar spent is a measured
   charge, visible per agent, and money-spending work asks first.
-- **Start, review, then chat.** The owner starts with one button; the system
+- **Chat starts the work.** *Changed 2026-10-15, superseding the bullet below:*
+  the app is one page, a chat beside the results. The owner names a product or
+  pastes its page and asks; the operator starts the research. Only buttons and
+  drafts are clickable, and a button is still the only way to approve anything
+  that spends Apify money or changes what the system has learned.
+- ~~**Start, review, then chat.**~~ The owner starts with one button; the system
   answers with a plan of tasks to approve, and runs nothing before that. After
   that the owner guides the work by chatting with one operator, beside a
   dashboard of the work and its outcome. *Changed 2026-10-14:* this was "a

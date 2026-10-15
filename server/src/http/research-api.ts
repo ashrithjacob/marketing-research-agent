@@ -27,6 +27,7 @@ import { PlaybookRoutes } from "./playbook-routes.js";
 import { WatchRoutes } from "./watch-routes.js";
 import { TaskRoutes } from "./task-routes.js";
 import { WorkspaceRoutes } from "./workspace-routes.js";
+import { BrandRoutes } from "./brand-routes.js";
 import { WorkspaceStream } from "./workspace-stream.js";
 import { TraceRoute } from "./trace-route.js";
 
@@ -56,6 +57,7 @@ export class ResearchApi {
     if (workspace) {
       new TaskRoutes(store, workspace.tasks).register(api);
       new WorkspaceRoutes(workspace.owner, store.plans).register(api);
+      new BrandRoutes(workspace.brands, workspace.owner).register(api);
       new WorkspaceStream(workspace.operator, workspace.board).register(api);
       new CardRoutes(workspace.cards).register(api);
       new MemoryRoutes(workspace.memory).register(api);

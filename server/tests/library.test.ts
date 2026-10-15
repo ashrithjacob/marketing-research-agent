@@ -9,7 +9,7 @@ import { join } from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { MarkdownLayout, PdfMarkdown, ServiceClients, type PrintedLine, type SqlResearchStore } from "../src/adapters/index.js";
+import { FileMarkdown, MarkdownLayout, PdfMarkdown, ServiceClients, type PrintedLine, type SqlResearchStore } from "../src/adapters/index.js";
 import { LibraryIntake, LibraryTools, ToolRegistry } from "../src/agent/index.js";
 import { Env, type Settings } from "../src/config/index.js";
 import { DocumentSections, Roles, Scope, type ConvertedDocument, type DocumentConverter, type LibraryFrame } from "../src/domain/index.js";
@@ -179,7 +179,7 @@ describe("the library tools", () => {
 });
 
 describe("the library routes", () => {
-  it("take a PDF and answer 202 at once, stream it to ready, serve its markdown, and refuse what is not a PDF", async () => {
+  it("take a PDF or a markdown file and answer 202 at once, stream it to ready, serve its markdown, and refuse anything else", async () => {
     const app = new App({ settings: { ...Env.settings(), corpusPath: join(dir, "corpus"), staticDir: join(dir, "static"), appPasswordHash: "" }, store });
     const upload = (bytes: Uint8Array, name: string) => {
       const form = new FormData();
@@ -199,7 +199,25 @@ describe("the library routes", () => {
     expect(read.pages).toBe(1);
     expect(read.markdown).toContain("## Section 01 - The Hook");
 
-    expect((await upload(new TextEncoder().encode("hello"), "notes.txt")).status).toBe(415);
+    const notes = await upload(new TextEncoder().encode("# Hooks\n\nOpen with a question."), "brand_playbook.md");
+    expect(notes.status).toBe(202);
+    const playbook = (await notes.json()) as { id: string; title: string };
+    expect(playbook.title).toBe("brand playbook");
+    await (await app.fetch(new Request(`http://test/api/research/library/${playbook.id}/events`))).text();
+    expect(((await (await app.fetch(new Request(`http://test/api/research/library/${playbook.id}`))).json()) as { markdown: string }).markdown).toBe("# Hooks\n\nOpen with a question.\n");
+    expect((await upload(new TextEncoder().encode("hello"), "notes.docx")).status).toBe(415);
     await app.supervisor.close();
+  });
+});
+
+describe("FileMarkdown", () => {
+  it("hands a PDF to its converter, keeps markdown as it is, and refuses what is not UTF-8 text", async () => {
+    const files = new FileMarkdown(new FakeConverter({ markdown: "# From the PDF\n", pages: 3 }));
+    expect(await files.convert(new TextEncoder().encode("%PDF-1.7 ..."), () => undefined)).toEqual({ markdown: "# From the PDF\n", pages: 3 });
+    const pages: number[][] = [];
+    expect(await files.convert(new TextEncoder().encode("\n# Hooks\nask a question\n\n"), (page, of) => pages.push([page, of]))).toEqual({ markdown: "# Hooks\nask a question\n", pages: 1 });
+    expect(pages).toEqual([[1, 1]]);
+    await expect(files.convert(new Uint8Array([0xff, 0xfe, 0x00]), () => undefined)).rejects.toThrow("the file is not a PDF or UTF-8 text");
+    await expect(files.convert(new TextEncoder().encode("  \n"), () => undefined)).rejects.toThrow("the file is empty");
   });
 });

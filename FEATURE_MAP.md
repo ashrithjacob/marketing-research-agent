@@ -21,116 +21,152 @@ Keep it true. A new page or button that is not here will be guessed at.
 | Live | https://marketing.vanis.ai | login, unless `MRA_APP_PASSWORD_HASH` is empty |
 | Local | http://localhost:8080 after `mra up` | usually none — the hash is normally empty locally, which disables login entirely |
 
-Two routes exist, both served by the same SPA (`app.ts` `mountFrontend` sends
-`index.html` for anything that is not `/api/*`):
-
-- `/` — the cockpit
-- `/runs/:runId/logs` — the activity log for one run (`api.logsUrl`)
-
 ---
 
 ## URLs
 
 Real URLs over one React app (`route.tsx`, the History API; no router library).
-The server returns `index.html` for any path that is not a file or `api/`, so
-every URL survives a reload, a bookmark and the back button.
+The server returns `index.html` for any path that is not a file or `api/`.
 
 | URL | Page |
 |---|---|
-| `/` | Products: one card per product (`ProductsPage.tsx`) |
-| `/products/:productId` | That product's dashboard, on its default run |
-| `/products/:productId/runs/:runId` | That product's dashboard, on that run |
+| `/` | The brand tiles (`HomePage.tsx`, below) |
+| `/brands/:key` | One brand: its results and its chat (`BrandPage.tsx`, below); `key` is `site:<domain>` or `product:<name>`, URL-encoded |
+| `/drafts/:draftId` | One draft (`DraftPage.tsx`, below) |
 | `/runs/:runId/logs` | The activity log (below) |
-| `/library` | The document library (below) |
-| `/plans/:planId` | A plan, with the chat (below) |
-| `/inbox` | Cards, memory, drafts and feedback (below) |
-| `/drafts/:draftId` | One draft (below) |
-| `/playbooks` | Playbooks, their versions and numbers (below) |
+| anything else | The brand tiles |
 
-Anything else renders *No page here*; an unknown product id renders the same,
-under a `no such product` banner.
+*Superseded 2026-10-15:* `/products…`, `/library`, `/plans/:id`, `/inbox` and
+`/playbooks` are gone, with `ProductsPage`, `ProductRuns`, `RunView`, `StepIn`,
+`StartPlan`, `PlanPage`, `PlanCard`, `PlanStageList`, `StopWhen`, `InboxPage`,
+`LibraryPage`, `PlaybooksPage`, `AlwaysOnPanel`, `WatchPanel`, `FeedbackLog` and
+`HeaderNav` (in git before this date). Owner's decision: the app is one page where
+the owner chats; chat starts the work; only buttons and drafts are clickable. Their
+endpoints still exist (`workings.md` §3), and `mra` still drives them.
 
-## The cockpit shell (`App.tsx`)
+## The pages (`App.tsx`, `HomePage.tsx`, `BrandPage.tsx`)
 
-**Header.** `research cockpit` (a link to `/`), the **Library**, **Inbox** and
-**Playbooks** chips (`HeaderNav.tsx`), then the active run's brief as a chip and a
-clock chip, then the buttons: **Step in** (ghost), **Stop** (ghost, only while a
-run is live), **Start** (primary: a brief, then a plan in the inbox), a
-`user · workspace` chip (only when login is on), **Sign out** (ghost). Signed in as the admin, each run row in a product
-folder also names its workspace.
+*Changed 2026-10-15, twice:* first one page with the chat beside the results;
+then, the owner's decision, tiles per brand, each opening its own chat.
+
+**Header.** `marketing agent` (a link to `/`), the **Always on** control
+(`AlwaysOnSwitch.tsx`), a `user · workspace` chip (only when login is on), **Sign
+out**. Always on is the workspace's, not one brand's: a switch, a `$ __ /day` cap
+box, and today's billed spend (and how many tasks are running). The switch
+cannot be turned on with no cap above zero; changing the cap while on saves when
+the box is left. On, the operator's `create_task` may start product facts and
+category numbers by itself, schedules run, and the watchers start (spec-always-on
+§7.2–7.4); Apify spend still waits for an Approve card. `GET
+/api/research/always-on` every 15 s, `POST /api/research/always-on` with
+`{ on, daily_cap_usd }` (400 without a cap). `Loading…` in a bare `.boot` div means
+`GET /api/auth/session` has not answered: the server is down or the cookie is
+refused, not a UI bug.
+
+**`/`: the brand tiles.** A brand is a website's domain, holding every page
+researched on it, or a product named without a page (`Brands` in
+`domain/brands.ts`). First the **new brand** tile: a box for a site or a product's
+name and **Start**, which calls `POST /api/research/brands` (`{ text }`): it opens
+that brand's chat with the text as the owner's first message and answers its
+`key`; the page goes to `/brands/:key`. Then one tile per brand (`BrandTile.tsx`),
+newest activity first: its graphic, its name, how many products (or *chat only*,
+a chat with no research yet), the newest run's status chip. Below: the **Memory
+folder**, **What the agent has learned** and **Drafts**, which belong to the
+whole workspace.
 
 | Control | Calls | Broken looks like |
 |---|---|---|
-| Start | opens Start's form; `POST /api/research/plans` on submit, then `/inbox` | — |
-| Stop | `POST /api/research/runs/:id/stop` | button does nothing, run stays `running` |
-| Sign out | `POST /api/auth/logout` | stays logged in, or bounces to login and back |
-| `user · workspace` chip | `GET /api/auth/session` | missing while logged in: the session answer lacks `workspace` |
-| (on `/`) | `GET /api/research/products`, `GET /api/research/config` | `Loading products…` that never ends |
-| (on a product) | `GET /api/research/products/:id` and `…/:id/runs` | `Loading product…` that never ends |
+| (the tiles) | `GET /api/research/brands`, every 5 s (`use-brands.ts`) | `Loading brands…` that never ends |
+| Start | `POST /api/research/brands`; 400 when the box is empty | a red banner; the page stays |
+| a tile | goes to `/brands/:key` | — |
 
-`Loading…` in a bare `.boot` div means `GET /api/auth/session` has not
-answered — the server is down or the cookie is being rejected, not a UI bug.
+**The picture** is looked for in the background the first time a tile is
+listed (`BrandShelf`, `BrandPictureSearch`, `adapters/homepage-image.ts`), best
+first: the site's homepage share image (`og:image`, `twitter:image`); the photo
+of an Amazon listing already stored for one of its products; the share image of
+up to three of the product's own pages a run read (`first_party` sources, the
+product-facts pages first); the site's icon. It is stored in
+`research_brand_images` with its kind, and looked for again a day later while it
+is only an icon or nothing, since new research may have added pages. Measured
+2026-10-15 on the local data: 14 of 20 brands got a picture (8 with the homepage
+alone); 5 of the 6 without have neither an Amazon listing nor a page of their own
+in their runs, and the sixth's site (sportsresearch.com) answers a plain request
+with `429`. A missing or unloadable picture shows the name's first letter.
+The picture is loaded straight from the brand's site (`referrerPolicy:
+no-referrer`), so a site that refuses hotlinking shows the letter too.
 
-### Starting work: the inbox (since 2026-10-15)
+**`/brands/:key`: one brand.** Left: **← All brands**, the brand's picture and
+name, then, per product of the brand (named only when there are several), its
+three stages as steps down a rail (`stage-tiles/`), each with a numbered bubble
+(green when delivered, blue while running, red-ringed when failed, invalid or
+cancelled, grey when never run). Each step is a row for the stage's newest
+delivered stage run (else its newest of any status): its name, status chip and
+date, then its figures as pills, written from the run's packet by
+`api/stage-story.ts` (stage 1: sources, sites, facts, competitors, figures;
+stage 2: sources, sites, actives, doses checked, markets, prices; stage 3:
+sources, sites, quotes), gaps last in amber. The whole row is a button with a
+`›`; a stage never run is a dashed row with **Run in chat**, which puts "Run
+stage N … for <product>" in the chat box for the owner to send.
 
-*Superseded 2026-10-15:* the start-run modal (`StartRun.tsx`), product truth's
-start (`ProductTruthStart.tsx`) and the review-mining go-ahead
-(`ReviewMiningPlan.tsx`) are deleted, with the header's **Stage run**, the rail's
-**▶** and **Start stage N →** buttons. All work starts from **Start** and a plan
-in the inbox (below, "The inbox"): stage 1 as tasks, then **Stage 2 · Product
-truth** (with its landed cost) and **Stage 3 · Review mining** ticked on the plan.
-Review mining's itemised go-ahead (targets to pick, reviews per band) is replaced
-by an approval card with the most it can cost. A stage run can still be started
-with `mra run` or `POST /api/research/runs`. Owner's decision: one place to start
-and follow work; the product page shows results only.
+**`/brands/:key/products/:productId/stages/:n[/:tab]`: one stage**
+(`StageView.tsx`), in the left pane, the chat staying on the right. A breadcrumb
+(the brand, then *Stage n · name*, its status and when), the sentence of what it
+kept ("60 sources from 26 sites: 26 own pages, 22 ad-library searches, 9
+search-data pages."), the figures, then tabs, each its own URL: stage 1
+**Product · Competitors · Category**, stage 2 **Ingredients · Doses · Claims ·
+Economics**, stage 3 **Customer voice**, and for all **Sources (n)** (page, site,
+kind; a source the checks refused reads *not used*) and **Gaps (n)** (section,
+what was not found, what it would need). A section tab shows that section's tile
+already open (`TilesOpen` in `run-view/tile.tsx`). `GET
+/api/research/products/:id/runs`, then `GET /runs/:id` per stage.
 
-**A URL is a URL.** Start's form puts a pasted page in `brief.url`, leaving
-`brief.product` for the agent to read off the page. A URL in `brief.product` makes
-the agent search the web for the literal string `https://...` and come back with a
-confidently wrong product (the bug behind "why does it always go for magnesium").
-If a run's packet names a product that is not yours, check `brief` first.
+Right: **the brand's chat**
+(`ChatPanel.tsx`), one operator conversation per brand. "Research it", or one of
+the brand's pages, makes the operator call `start_stage_one`
+(`agent/operator/stage-one-tools.ts`), which drafts stage 1 as a plan and
+approves it in one step. A task that would spend Apify money (the champion,
+competitors) becomes an approval card instead; the tasks waiting on it start
+when it ends. When a task ends, the chat of the brand its brief belongs to is
+woken (a `[Signal]`) and says what it found. Under the conversation, the open
+**cards** of this brand, and those of the whole workspace (lessons, drafts)
+(`Cards.tsx`; the board's `card_brands` says which brand each is): a question
+has an answer box, an approval **Approve** and **Reject**, a draft's card
+**Read the draft →**.
 
-### The left column (`run-view/rail.tsx`)
+| Control | Calls | Broken looks like |
+|---|---|---|
+| Send | `POST /api/research/chat` with `{ text, brand }` (also recorded as `said` feedback for the reviewer) | the line never appears: the stream, not the send, is down (dot grey) |
+| Answer / Approve / Reject | `POST /api/research/cards/:id/answer`, `/approve`, `/reject` | card stays open; a red banner names why |
+| (the lines, the cards, the dot) | `GET /api/research/workspace/stream?brand=<key>` (`use-workspace.ts`): whole `chat` and `board` snapshots | dot grey: reconnecting |
 
-*Superseded 2026-10-15:* the stage rail (`StageRail.tsx`: Stage 1 to 6 with their
-nodes, *ready* and *not built*) and the Now panel's *Next: Stage N* strip are
-deleted. Owner's decision: the product page shows information, not steps; stages
-are started and followed on a plan in the inbox. The left column now shows the
-run (**Activity ↗**, scope, markets, started; since 2026-10-15 no model, tokens or
-cost, which are in the activity log), the
-standing judgements, and the product's runs (`ProductRuns.tsx`), where every run
-of the product is picked. A product-truth or review-mining run whose stage 1 has
-since been rerun still says so above its tiles (`newerStageOne`).
+Only the conversation is shown: the owner's lines blue, the operator's grey. Code's
+notes and the operator's tool calls stay in its transcript.
 
-### Products — `/` (`ProductsPage.tsx`) and the run list (`ProductRuns.tsx`)
+**Memory folder** (`MemoryFolder.tsx`, `use-library.ts`): **Add files** or drop
+PDFs, `.md` or `.txt` playbooks; each row's status (or `page n of m` while a PDF
+converts) and **Remove**. Every research task and every brand's operator read it
+with `library_index` / `library_read`. `POST /api/research/library` (`202`; `415`
+for any other file type, `413` over `MRA_LIBRARY_MAX_MB`), its SSE at
+`/library/:id/events`, `DELETE /library/:id`. A `failed` row says why: a PDF with
+no text layer, a file that is not UTF-8 text, or a restart mid-conversion.
 
-Every run belongs to a stored product (`research_products`). A new run's brief
-is reduced by `Briefs.key` and filed under the product with that key, created if
-new: a typed name ignores case and punctuation (`vitamin D` = `vitamin_d` =
-`VITAMIND`); a URL matches per page, and a URL typed into the product field counts
-as that URL. Market is not part of the key, so Vitamin D US and UK share a product.
+**What the agent has learned** (`MemoryList.tsx`): brand memory, each entry
+*learned* (an approved lesson) or *yours*, with **Edit** and **Delete**
+(`/api/research/memory/:id`). It grows from the reviewer (spec-always-on §5):
+what the owner says in any chat, answers, rejects or steers becomes a lesson card;
+approved, every later task and operator reads it. It is the workspace's, not one
+brand's.
 
-- **`/`** lists products, newest activity first: label, newest run's status, run
-  count, review count (distinct reviews over all its runs). No dashboard here.
-- **A product** opens on its `default_run_id`: the newest **completed** (or
-  `partial`) run of either stage, even when a newer run is running or failed; the newest run when none
-  completed. The left column ends with `← All products` and every run of the
-  product — completed, failed, cancelled, invalid, running — newest first. Each run
-  row, and each stage header in the rail, is a link to that run's URL.
+**Drafts** (`/drafts/:id`, `DraftPage.tsx`): the draft section by section, **What
+it cites**, the critic's verdicts; while it waits, **Edit** per section (**Save as
+a new version**, `POST /drafts/:id/edit`), **Reject** and **Approve this draft**;
+**The ad it became** (`DraftAds.tsx`). **Back to the chat** returns to `/`.
 
-The rail's stage status and headers are computed from the product's runs, all of
-them. `GET /api/research/runs` (newest 50, at most 200) still exists, but the
-cockpit no longer lists from it.
+### The tiles (`run-view/`), in a stage's section tab
 
-`GET /api/research/products/:id/rows` returns every fact the product's runs found,
-from the packet-row tables, each row tagged with its `run_id`.
-
-### The run view — middle and right (`RunView.tsx`)
-
-Two columns. The left rail carries the stage rail, the run meta, standing
-judgements and the run list. The middle column is the insight dashboard: the
-Now panel (with the **Activity log ↗** link), then tiles, then the sources
-list. There is no right column any more.
+*Superseded 2026-10-15:* the run view (`RunView.tsx`: rail, Now panel, sources
+list) is deleted, and so are `ProductPanels.tsx` and `ProductResults.tsx`; its
+tiles are what a stage's section tab shows. What follows is
+still true of the tiles.
 
 The light "Minimalist Modern" theme lives entirely in `styles.css` tokens
 (accent `#0052FF`, gradient to `#4D7CFF`; fonts Calistoga / Inter /
@@ -168,8 +204,7 @@ Source also carries a `node`, so source counts are per tile.
 | citations | every fact in a stage-1 tile (each field row, each competitor, its ads, the champion line) and stage 2 links the page it was read off, and **read** opens the archived copy the agent actually read; an ad-library search, which is not a web page, links its archived copy only (`run-view/cite.tsx`) | `packet.sources` by `source_id`; `GET /runs/:id/sources/:sourceId` for the archived copy |
 | cost list (rail) | one block per agent and a `run` block: its total, then LLM, Apify, Parallel, Trendtrack and pages, each for the services its tools can spend in (`run-view/CostTable.tsx`) | `GET /api/research/runs/:id/costs`, read every 5s while live (`run-view/use-costs.ts`) |
 | logs page, agent tab | that agent's row of the cost table | the same `/costs` |
-| products page | one card per product | `GET /api/research/products` |
-| run list | one row per run of the product | `GET /api/research/products/:id/runs` |
+| stage rows and view | one row per stage per product; a stage's tabs | `GET /api/research/brands`, `GET /api/research/products/:id/runs`, `GET /api/research/runs/:id` |
 
 > **`Tokens —` is a wiring bug, not an empty run.** The server sends
 > `usage.totalTokens`; a client that reads `usage.total_tokens` gets
@@ -208,36 +243,17 @@ output appear only when the ledger does not parse at all.
 new tab. The reasoning trace and the crawling lanes used to live on the
 cockpit's middle column; they are only on the activity log now.
 
-### Step in (`StepIn.tsx`)
+### Step in
 
-`Step in` → a modal of preset corrections plus a free-text box
-(`e.g. Ignore the UK market entirely — we can't ship there.`).
-
-- While a run is **live**: `POST /api/research/runs/:id/steer`
-- With **no** live run: `POST /api/research/judgements`, which applies to
-  future runs
-
-Same button, two endpoints. A correction that "did not take" is usually this:
-it was saved as a standing judgement because the run had already settled.
+*Superseded 2026-10-15:* deleted. Guidance to a running task is said in the chat;
+the operator passes it on with `guide_task`.
 
 ---
 
-## `/library` — the document library (`LibraryPage.tsx`, `use-library.ts`)
+## `/library`
 
-Strategy PDFs every research agent can read. A drop zone and **Choose files**
-(PDF only, several at once), then one row per document, newest first. Design:
-`docs/spec-always-on.md` §10.
-
-| Control | Calls | Broken looks like |
-|---|---|---|
-| (on open) | `GET /api/research/library` | `Loading library…` that never ends |
-| Drop / Choose files | `POST /api/research/library` (multipart `file`), answers `202` | red banner `<file>: only PDF files…` (415) or `…over 25 MB` (413) |
-| progress bar on a `converting` row | `GET /api/research/library/:id/events` (SSE: `page`, then `ready`/`failed`) | bar stays at 0 and the row stays `converting`: the stream is not reaching the browser |
-| Read | `GET /api/research/library/:id` | nothing opens; the markdown appears below the list in a monospace box |
-| Remove | `DELETE /api/research/library/:id` | row stays |
-
-A `failed` row shows its reason in red: `the PDF has no text layer…` (a scan),
-or `the server restarted while this was converting…`.
+*Superseded 2026-10-15:* the page is the **Memory folder** on the right of the
+page (above). It now also takes `.md` and `.txt`, kept as they are.
 
 ## `/runs/:runId/logs` — the activity log (`LogsPage.tsx`)
 
@@ -348,99 +364,9 @@ In order, because this order has been wrong before:
    UI while the diff says otherwise.
 
 
-## Start, review, chat (`StartPlan.tsx`, `PlanPage.tsx`, `PlanCard.tsx`, `ChatPanel.tsx`)
+## Start, review, chat
 
-Since 2026-10-14 the header's **Start** opens a small form (product or site,
-market) and lands in the inbox, where the new plan is first. The plan page,
-`/plans/:id`, still shows one plan with the chat.
-
-- **Left: the plan card.** Each task with a checkbox, its objective, and its
-  spend cap and time limit. While the plan is a draft, a checkbox calls
-  `POST /api/research/plans/:id/tasks/:key` and **Approve N tasks · up to $X**
-  calls `POST /plans/:id/approve`; nothing runs before that. Once approved,
-  each task shows its run's status chip, sources, facts, gaps, model calls and
-  billed cost, live, and **Open what it found →** goes to its run view.
-- **Since part 4** the plan has four tasks: Champion product, Product facts,
-  Competitors, Category numbers. The champion's checkbox is locked; it reads
-  *Needed first…* or *Not needed for the tasks kept*. A kept task that waits on
-  it reads *Starts when Champion product finishes* once approved. Champion and
-  Competitors would spend Apify money, so approving opens an approval card for
-  each instead of starting it.
-- **Always on** (`AlwaysOnPanel.tsx`, top of the inbox): the switch with its
-  daily cap (turning on needs a cap), today's billed spend against it, how many
-  tasks are running, and the schedules, each a saved task for a product or site
-  every so many days, with Add and Remove (`/api/research/always-on`,
-  `/api/research/schedules`).
-- **The inbox** (`InboxPage.tsx`, `/inbox`; since 2026-10-15 the main page): the
-  chat with the operator on the right (about the newest plan); on the left, the
-  cards waiting for you, the three newest **Plans** (each a plan card, below),
-  **Products** (`ProductPanels.tsx`: one row per product; opening one shows, from
-  `ProductResults.tsx`, the newest delivered stage 1, product truth and customer
-  voice that are stage runs or a plan's combined stage 1, each with its tiles and
-  **Full page →** to the product page), the drafts, then Always on, Watching,
-  brand memory and the feedback log (`FeedbackLog.tsx`).
-- **After stage 1** on the plan card (`PlanStageList.tsx`): **Stage 2 · Product
-  truth** and **Stage 3 · Review mining**, each a checkbox while the plan is a
-  draft (`POST /api/research/plans/:id/stages/:stage` with `selected`; ticking 3
-  ticks 2, dropping 2 drops 3), and for product truth an optional landed cost per
-  unit and currency, saved when the box is left. Once approved: *Stage 1 combined
-  into one run: open it*, each stage's run status and **Open what it found →**,
-  and *waiting for your approval…* while review mining's card is open.
-- **Inbox, older text** (`InboxPage.tsx`, `/inbox`, linked in the header): every open card
-  of the workspace (a lesson card has its text in an editable box; Approve saves
-  the edit), **What we know about this brand** (`MemoryList.tsx`: every memory
-  entry, marked *learned* or *yours* with its version, Edit and Delete each, and
-  an Add box), and the feedback log: each correction, approval, answer and
-  steer, newest first, with what it was about and its words or diff. On a run's
-  page, **wrong?** beside a cited source asks why and records it
-  (`POST /api/research/runs/:id/sources/:sourceId/wrong`).
-- **Drafts** (since part 8). Once a plan is approved and one of its tasks has
-  ended `completed` or `partial`, the plan card shows **Write a long-form static
-  from what was found** (`POST /api/research/plans/:id/write`). The draft's
-  approval card in the inbox has **Read the draft →**; the inbox also lists the
-  last ten drafts with their status. **`/drafts/:id`** (`DraftPage.tsx`) shows
-  the draft section by section as the owner reads it (quotes and figures filled
-  in, citations as `[n]`), **What it cites** (the footnotes), and the critic's
-  verdicts, met or not and why. While it waits for the owner each section has
-  **Edit** (the raw text with `[[id]]` and `{{id}}`; **Save as a new version**
-  calls `POST /drafts/:id/edit`), and the page has **Reject** and **Approve this
-  draft** (`/reject`, `/approve`). It reloads every 3 s.
-- **Playbooks** (`PlaybooksPage.tsx`, `/playbooks`, linked in the header; since
-  part 9). One card per playbook: status (active, stale, archived, with **Restore**
-  on archived), version and who made it, a warning line when the newest version
-  did worse than the one before, and a table per version: drafts, passed first
-  try, accepted unchanged of decided, corrected, ads and spend, return on ad
-  spend, and **Roll back to this** on older versions
-  (`POST /api/research/playbooks/:key/rollback`). **Show sections and criteria**
-  opens the body. In the library, each ready document has **Make a playbook**
-  (`POST /api/research/library/:id/distil`); its result is a lesson card in the
-  inbox. A playbook lesson card has no edit box.
-- **Watching** (`WatchPanel.tsx`, in the inbox under Always on; since part 10):
-  competitors to watch for new ads (a name with a dot is watched as a domain) with
-  Watch and Remove (`/api/research/watch/brands`), and Meta ad accounts with
-  Connect, Disconnect, when each was read and *reconnect needed* when Meta refused
-  (`/api/research/ad-accounts`). On an approved draft's page, **The ad it became**
-  (`DraftAds.tsx`) shows the tag to put in the ad's name, a box to paste an ad id
-  (`POST /api/research/drafts/:id/ads`), and each linked ad's settled and
-  provisional totals. Outcome feedback reads *Results came in for the ad a draft
-  became* in the feedback log.
-- **Stop and ask me when** (`StopWhen.tsx`): under each kept task of a draft
-  plan, a text box with the saved task's default; leaving it saves it
-  (`POST /plans/:id/tasks/:key` with `stop_when`). Once approved it reads
-  *Stops and asks you when: …*. A task the judge paused shows the amber
-  `waiting` chip and *Waiting for your answer, in the chat: …*; the question is
-  also a note in the chat, and the reply goes there.
-- **Right: the chat** with the workspace's operator (`POST /api/research/chat`,
-  with the plan's id). Only the conversation is shown: the owner's lines blue,
-  the operator's grey, and a paused task's question as an operator line ("A task
-  is paused and asks: …"). Since 2026-10-14 the notes code writes (plan started,
-  approved, a task ended) and the operator's tool calls stay in its transcript
-  but are not shown: the plan card already says the same. The dot in the header
-  is green while the stream is connected.
-- **Cards** (`Cards.tsx`), above the plan: what is waiting for the owner. A
-  question (a paused task's, or the operator's `send_owner`) has an answer box;
-  an approval (a task that would spend Apify money) has Approve and Reject.
-  Settled ones from today stay below, with the answer; the head counts today's
-  cards. Routes: `POST /api/research/cards/:id/answer`, `/approve`, `/reject`.
-- Both come from one stream, `GET /api/research/workspace/stream`
-  (`use-workspace.ts`), which sends whole snapshots: `chat` and `board`.
+*Superseded 2026-10-15:* Start's form, the plan card with its toggles, Always on,
+Watching, the playbook page and the feedback log are no longer on screen (see
+URLs above). The chat starts the work, and the cards in the chat are the only
+approvals. What the plan, cards and stream do on the server is unchanged.

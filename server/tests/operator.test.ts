@@ -28,6 +28,7 @@ let models: MutableModels;
 let faux: ReturnType<typeof fauxProvider>;
 let harness: PiHarness;
 let app: App;
+let looked: string[];
 
 const call = (method: string, path: string, body?: unknown) =>
   app.fetch(new Request(`http://mra.test/api/research${path}`, { method, headers: { "content-type": "application/json" }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) }));
@@ -41,9 +42,9 @@ async function until<T>(read: () => Promise<T>, done: (value: T) => boolean): Pr
   throw new Error("timed out");
 }
 
-async function chat(): Promise<ChatMessage[]> {
+async function chat(brand = ""): Promise<ChatMessage[]> {
   let seen: ChatMessage[] = [];
-  const stop = await app.workspace!.operator.watch("admin", (lines) => (seen = lines));
+  const stop = await app.workspace!.operator.watch("admin", brand, (lines) => (seen = lines));
   stop();
   return seen;
 }
@@ -59,7 +60,8 @@ beforeEach(async () => {
   models = createModels();
   models.setProvider(faux.provider);
   harness = await PiHarness.open(join(dir, "harness.sqlite"), models);
-  app = new App({ settings, store, harness });
+  looked = [];
+  app = new App({ settings, store, harness, brandImages: { read: async (page) => (looked.push(page), { share: `${page}og.png`, icon: "" }) } });
   await app.workspace!.tasks.recover();
   harness.resume();
 });
@@ -327,5 +329,85 @@ describe("feedback", () => {
     expect(log[3]).toMatchObject({ text: "Prefer the UK site.", target: { run_id: runId } });
     expect(log[4]).toMatchObject({ text: "an affiliate page, not the brand's", target: { id: "sha256:aaa", run_id: runId } });
     expect(log[5]!.target).toMatchObject({ kind: "card", id: card.id, plan_id: plan.id });
+  });
+});
+
+describe("chat starts the work", () => {
+  const text = (content: unknown) => (typeof content === "string" ? content : JSON.stringify(content));
+
+  it("a pasted link starts stage 1 as a url brief, the champion behind its Approve card and the rest after it; the message is feedback for the reviewer", async () => {
+    faux.setResponses([
+      fauxAssistantMessage(fauxToolCall("start_stage_one", { url: "https://magnacalm.example" }), { stopReason: "toolUse" }),
+      fauxAssistantMessage("Started. The champion needs your approval first."),
+    ]);
+    await call("POST", "/chat", { text: "research https://magnacalm.example" });
+    await until(chat, (seen) => seen.some((line) => line.role === "operator" && !line.partial));
+    const plan = (await store.plans.list(Scope.of("admin"), 5))[0]!;
+    expect(plan).toMatchObject({ status: "approved", brief: { url: "https://magnacalm.example", product: "" } });
+    expect(plan.tasks.map((t) => [t.key, t.run_id, t.error, t.after])).toEqual([
+      ["champion", "", "waiting for your approval: it would spend Apify money", []],
+      ["product_facts", "", "", ["champion"]],
+      ["competitors", "", "", ["champion"]],
+      ["category_numbers", "", "", ["champion"]],
+    ]);
+    expect((await store.cards.list(Scope.of("admin"), 10)).map((c) => [c.kind, c.title, c.status])).toEqual([["approval", "Approve Champion product?", "open"]]);
+    expect((await store.listRuns(Scope.of("admin"), 10)).length).toBe(0);
+    const said = (await store.feedback.list(Scope.of("admin"), 10)).filter((f) => f.verdict === "said");
+    expect(said.map((f) => [f.strength, f.target.kind, f.text])).toEqual([["instruction", "chat", "research https://magnacalm.example"]]);
+  });
+
+  it("a brand opened with a link gets its own chat: the research it starts reports there, and its tile lists the product with the site's graphic", async () => {
+    const route: FauxResponseStep = (context) => {
+      const first = text(context.messages.find((m) => m.role === "user")?.content ?? "");
+      const started = context.messages.some((m) => m.role === "toolResult");
+      if (first.includes("Your task: the product's fact sheet")) return started ? finish() : recordAll();
+      if (context.messages.some((m) => m.role === "user" && text(m.content).startsWith("[Signal]"))) return fauxAssistantMessage("Product facts are in: 1 source, nothing missing.");
+      return started ? fauxAssistantMessage("Started the product facts.") : fauxAssistantMessage(fauxToolCall("start_stage_one", { url: "https://magnacalm.example", parts: ["product_facts"] }), { stopReason: "toolUse" });
+    };
+    faux.setResponses(Array.from({ length: 20 }, () => route));
+    const opened = await call("POST", "/brands", { text: "https://www.magnacalm.example/" });
+    expect(opened.status).toBe(201);
+    const { key } = (await opened.json()) as { key: string };
+    expect(key).toBe("site:magnacalm.example");
+
+    const plan = await until(async () => (await store.plans.list(Scope.of("admin"), 5))[0], (p) => !!p?.tasks.find((t) => t.key === "product_facts")?.run_id);
+    expect(plan!.tasks.filter((t) => t.selected).map((t) => t.key)).toEqual(["product_facts"]);
+    const runId = plan!.tasks.find((t) => t.key === "product_facts")!.run_id;
+    expect((await until(() => store.getRun(runId), (run) => !!run && TERMINAL_STATUSES.has(run.status)))!.status).toBe("completed");
+    const lines = await until(() => chat(key), (seen) => seen.some((line) => line.text.startsWith("Product facts are in")));
+    expect(lines.filter((line) => !line.partial).map((line) => [line.role, line.text])).toEqual([
+      ["owner", "https://www.magnacalm.example/"],
+      ["operator", "Started the product facts."],
+      ["operator", "Product facts are in: 1 source, nothing missing."],
+    ]);
+    expect(await chat()).toEqual([]);
+
+    await call("GET", "/brands");
+    await app.workspace!.brands.settled();
+    const brands = ((await (await call("GET", "/brands")).json()) as { data: { key: string; label: string; image_url: string; products: { key: string }[] }[] }).data;
+    expect(brands.map((b) => [b.key, b.label, b.image_url, b.products.map((p) => p.key)])).toEqual([
+      ["site:magnacalm.example", "magnacalm.example", "https://magnacalm.example/og.png", ["page:magnacalm.example"]],
+    ]);
+    expect(looked).toEqual(["https://magnacalm.example/"]);
+  });
+
+  it("a brand's chat is there before any research is, and refuses an empty start", async () => {
+    faux.setResponses([fauxAssistantMessage("What would you like to know about it?")]);
+    const { key } = (await (await call("POST", "/brands", { text: "Magnesium Glycinate" })).json()) as { key: string };
+    expect(key).toBe("product:magnesiumglycinate");
+    const brands = ((await (await call("GET", "/brands")).json()) as { data: { key: string; label: string; products: unknown[] }[] }).data;
+    expect(brands.map((b) => [b.key, b.label, b.products.length])).toEqual([["product:magnesiumglycinate", "Magnesium Glycinate", 0]]);
+    expect((await call("POST", "/brands", { text: "  " })).status).toBe(400);
+  });
+
+  it("an unknown part comes back to the operator as an error, and nothing starts", async () => {
+    faux.setResponses([
+      fauxAssistantMessage(fauxToolCall("start_stage_one", { product: "magnesium glycinate", parts: ["ads"] }), { stopReason: "toolUse" }),
+      (context) => fauxAssistantMessage(text(context.messages.at(-1)?.content)),
+    ]);
+    await call("POST", "/chat", { text: "the ads part for magnesium glycinate" });
+    const lines = await until(chat, (seen) => seen.some((line) => line.role === "operator" && !line.partial));
+    expect(lines.at(-1)!.text).toContain("no stage-1 part ads; the parts are product_facts, competitors, category_numbers");
+    expect(await store.plans.list(Scope.of("admin"), 5)).toEqual([]);
   });
 });

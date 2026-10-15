@@ -12,6 +12,9 @@ Rules:
 - A correction (the owner rejected, changed or steered something) is the strongest reason to learn. An
   answer to a question is an instruction: learn it when it will hold for later work, not when it settles
   only that one task.
+- A message the owner said in chat is usually a request for work: nothing to learn. Learn from it when it
+  states something that holds for later work: "remember …", "always …", "never …", a fact about the brand,
+  its customers or its market, or a correction of what the operator did.
 - Learn what holds for this brand beyond the case in front of you: a preference, a rule, a fact about
   the brand. Not what one page said.
 - Prefer changing an existing entry to adding one that overlaps it.

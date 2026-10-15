@@ -5,7 +5,7 @@ import { Trace } from "../../trace/index.js";
 
 import { RunError } from "../errors.js";
 
-import { WorkspaceDoc } from "./operator-docs.js";
+import { BrandDoc, WorkspaceDoc } from "./operator-docs.js";
 
 /** Runs one operator tool inside the workspace its conversation belongs to, and hands a refusal back to the model as an error result rather than a crash. */
 export class OperatorAct {
@@ -18,5 +18,11 @@ export class OperatorAct {
       if (!(error instanceof RunError)) throw error;
       return { output: [{ type: "text", text: error.message }], isError: true };
     }
+  }
+
+  /** The brand the calling conversation's chat is about; "" for the workspace's own. */
+  static async brand(api: ToolExecutionApi, context: Context): Promise<string> {
+    Trace.line(import.meta.url, "OperatorAct.brand", { conversation: api.conversationId });
+    return (await api.snapshot(BrandDoc, api.conversationId, context))?.key ?? "";
   }
 }

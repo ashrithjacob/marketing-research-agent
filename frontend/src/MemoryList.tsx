@@ -44,34 +44,15 @@ function Entry({ entry, onError }: { entry: MemoryEntry; onError: (message: stri
 }
 
 export default function MemoryList({ entries, onError }: { entries: MemoryEntry[]; onError: (message: string) => void }) {
-  const [text, setText] = useState('');
   return (
-    <section className="memory">
-      <h2>What we know about this brand</h2>
-      <p className="muted small">Every task and the operator read this. Approved lessons add to it; you can add, change or delete anything. Nothing is overwritten: each change is a new version.</p>
+    <section className="side-box memory">
+      <h2>What the agent has learned</h2>
+      <p className="muted small">Every task and the agent read this. It grows from what you say and do, as lessons you approve in the chat. Each change is a new version.</p>
       <ul>
         {entries.map((entry) => (
           <Entry key={`${entry.entry_id}-${entry.version}`} entry={entry} onError={onError} />
         ))}
       </ul>
-      <form
-        className="memory-add"
-        onSubmit={async (e) => {
-          e.preventDefault();
-          if (!text.trim()) return;
-          try {
-            await workspaceApi.addMemory(text.trim());
-            setText('');
-          } catch (err) {
-            onError((err as Error).message);
-          }
-        }}
-      >
-        <input placeholder="Add something every task should know" value={text} onChange={(e) => setText(e.target.value)} />
-        <button className="primary" type="submit" disabled={!text.trim()}>
-          Add
-        </button>
-      </form>
     </section>
   );
 }

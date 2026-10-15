@@ -6,7 +6,7 @@ import { Trace } from "../trace/index.js";
 
 import type { ApiEnv } from "./api-env.js";
 
-/** One stream per workspace (spec §8): a snapshot of the chat and the board, then each change. The chat comes from the operator conversation's watch, sent at most every half second; the board is read from the store every two seconds and sent when it differs. */
+/** One stream per brand chat of a workspace (spec §8): a snapshot of the brand's chat and the workspace's board, then each change. The chat comes from the operator conversation's watch, sent at most every half second; the board is read from the store every two seconds and sent when it differs. */
 export class WorkspaceStream {
   static readonly TICK_MS = 500;
   static readonly BOARD_TICKS = 4;
@@ -21,18 +21,19 @@ export class WorkspaceStream {
     Trace.line(import.meta.url, "WorkspaceStream.register");
     api.get("/workspace/stream", (c) => {
       const workspaceId = c.get("principal").workspaceId;
-      return streamSSE(c, (stream) => this.follow(stream, workspaceId));
+      const brand = c.req.query("brand") ?? "";
+      return streamSSE(c, (stream) => this.follow(stream, workspaceId, brand));
     });
   }
 
-  private async follow(stream: SSEStreamingApi, workspaceId: string): Promise<void> {
-    Trace.line(import.meta.url, "WorkspaceStream.follow", { workspaceId });
+  private async follow(stream: SSEStreamingApi, workspaceId: string, brand: string): Promise<void> {
+    Trace.line(import.meta.url, "WorkspaceStream.follow", { workspaceId, brand });
     let closed = false;
     stream.onAbort(() => {
       closed = true;
     });
     const chats: string[] = [];
-    const stop = await this.operator.watch(workspaceId, (chat) => chats.push(JSON.stringify(chat)));
+    const stop = await this.operator.watch(workspaceId, brand, (chat) => chats.push(JSON.stringify(chat)));
     let lastChat = "";
     let lastBoard = "";
     try {

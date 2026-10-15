@@ -424,3 +424,13 @@ describe("the run ledger", () => {
     expect((await store.findings.list(run.id)).map((row) => row.payload)).toEqual([{ missing: "no COA" }]);
   });
 });
+
+describe("feedback order", () => {
+  it("lists two actions recorded in the same millisecond newest first, never shuffled", async () => {
+    const target = { kind: "card" as const, id: "c", run_id: "", plan_id: "" };
+    for (let i = 0; i < 20; i++) await store.feedback.record("ws", { verdict: "reject", target, text: String(i) });
+    const listed = await store.feedback.list(Scope.of("ws"), 50);
+    expect(listed.map((f) => f.text)).toEqual(Array.from({ length: 20 }, (_, i) => String(19 - i)));
+    expect(new Set(listed.map((f) => f.created_at)).size).toBe(20);
+  });
+});

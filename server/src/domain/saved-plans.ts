@@ -57,9 +57,17 @@ export const SAVED_TASKS: Readonly<Record<string, SavedTask>> = {
 export class SavedPlans {
   static readonly START: readonly string[] = ["champion", "product_facts", "competitors", "category_numbers"];
 
-  static tasks(brief: Brief): PlanTask[] {
-    Trace.line(import.meta.url, "SavedPlans.tasks", { brief });
-    return SavedPlans.arrange(brief, SavedPlans.START.map((key) => SavedPlans.task(key, brief)));
+  /** The tasks Start proposes; given `keep`, only those keys are selected, and the champion follows from them. */
+  static tasks(brief: Brief, keep: readonly string[] = []): PlanTask[] {
+    Trace.line(import.meta.url, "SavedPlans.tasks", { brief, keep });
+    const tasks = SavedPlans.START.map((key) => SavedPlans.task(key, brief));
+    return SavedPlans.arrange(brief, keep.length === 0 ? tasks : tasks.map((task) => (task.auto ? task : { ...task, selected: keep.includes(task.key) })));
+  }
+
+  /** The tasks an owner may name: every saved stage-1 task but the champion, which the plan keeps by itself. */
+  static parts(): string[] {
+    Trace.line(import.meta.url, "SavedPlans.parts");
+    return SavedPlans.START.filter((key) => key !== "champion");
   }
 
   /** The later stages a plan may run after stage 1, each off until the owner ticks it. */

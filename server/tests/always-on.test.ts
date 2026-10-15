@@ -125,7 +125,7 @@ describe("Always on", () => {
 
   it("collapses a repeated signal into one", async () => {
     await call("POST", "/always-on", { on: true, daily_cap_usd: 5 });
-    for (let i = 0; i < 2; i++) await app.workspace!.operator.signal("admin", "Task r1 ended completed.", "task:r1:ended");
+    for (let i = 0; i < 2; i++) await app.workspace!.operator.signal("admin", "", "Task r1 ended completed.", "task:r1:ended");
     await until(async () => said.filter((s) => s.includes("Task r1 ended")).length, (n) => n >= 1);
     await new Promise((resolve) => setTimeout(resolve, 100));
     expect(said.filter((s) => s.includes("Task r1 ended")).length).toBe(1);

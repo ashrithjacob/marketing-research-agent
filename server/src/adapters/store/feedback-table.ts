@@ -22,7 +22,17 @@ CREATE TABLE IF NOT EXISTS research_feedback (
 CREATE INDEX IF NOT EXISTS research_feedback_workspace ON research_feedback(workspace_id, created_at);
 `;
 
+  private last = "";
+
   constructor(private readonly db: SqlDatabase) {}
+
+  /** Now, or a millisecond after the last row this table wrote when now is not later, so newest-first is a total order even for two actions in the same millisecond. */
+  private stamp(): string {
+    Trace.line(import.meta.url, "FeedbackTable.stamp");
+    const now = Clock.nowIso();
+    this.last = now > this.last ? now : new Date(Date.parse(this.last) + 1).toISOString();
+    return this.last;
+  }
 
   async record(workspaceId: string, draft: FeedbackDraft): Promise<Feedback> {
     Trace.line(import.meta.url, "FeedbackTable.record", { workspaceId, verdict: draft.verdict, target: draft.target.kind });
@@ -34,7 +44,7 @@ CREATE INDEX IF NOT EXISTS research_feedback_workspace ON research_feedback(work
       target: draft.target,
       text: draft.text,
       diff: draft.diff ?? null,
-      created_at: Clock.nowIso(),
+      created_at: this.stamp(),
     };
     await this.db.run(
       "INSERT INTO research_feedback (id, workspace_id, verdict, strength, target, text, diff, created_at) VALUES (?,?,?,?,?,?,?,?)",

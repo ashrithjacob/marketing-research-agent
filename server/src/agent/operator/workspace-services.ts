@@ -1,6 +1,6 @@
 import type { OpenRouterPrices } from "../../adapters/index.js";
 import type { Settings } from "../../config/index.js";
-import { Scope, type AdInsights, type AdLibrary, type ResearchStore, type RunRequest } from "../../domain/index.js";
+import { Scope, type AdInsights, type AdLibrary, type BrandImageFinder, type ResearchStore, type RunRequest } from "../../domain/index.js";
 import { Trace } from "../../trace/index.js";
 
 import type { LiveRuns } from "../live-runs.js";
@@ -23,13 +23,16 @@ import { Reviewer } from "../learning/reviewer.js";
 import { DraftDesk } from "../write/draft-desk.js";
 import { DraftFlow } from "../write/draft-flow.js";
 
+import { BrandShelf } from "./brand-shelf.js";
 import { CardDesk } from "./card-desk.js";
+import { LibraryShelfTools } from "./library-shelf-tools.js";
 import { OperatorDesk } from "./operator-desk.js";
 import { OperatorTools } from "./operator-tools.js";
 import { OwnerDesk } from "./owner-desk.js";
 import { PlanDesk } from "./plan-desk.js";
 import { PlanRelease } from "./plan-release.js";
 import { PlanStages } from "./plan-stages.js";
+import { StageOneTools } from "./stage-one-tools.js";
 import { WorkspaceBoard } from "./workspace-board.js";
 
 /** Everything that runs on the harness, built together: durable tasks, plans, each workspace's operator, and the board. */
@@ -50,13 +53,14 @@ export class WorkspaceServices {
   readonly playbooks: PlaybookDesk;
   readonly watch: WatchDesk;
   readonly stages: PlanStages;
+  readonly brands: BrandShelf;
 
-  constructor(deps: { store: ResearchStore; runs: LiveRuns; settings: Settings; harness: PiHarness; tools: ToolRegistry; costs: OpenRouterPrices; ads: AdLibrary | null; insights: AdInsights | null; start: (request: RunRequest, workspaceId: string) => Promise<string> }) {
+  constructor(deps: { store: ResearchStore; runs: LiveRuns; settings: Settings; harness: PiHarness; tools: ToolRegistry; costs: OpenRouterPrices; ads: AdLibrary | null; insights: AdInsights | null; brandImages: BrandImageFinder; start: (request: RunRequest, workspaceId: string) => Promise<string> }) {
     Trace.line(import.meta.url, "WorkspaceServices.constructor");
     const events = new TaskEvents();
     this.memory = new MemoryDesk(deps.store);
     this.tasks = new TaskSupervisor({ ...deps, events, memory: this.memory });
-    const reply = (workspaceId: string, text: string) => this.operator.say(workspaceId, text, "");
+    const reply = (workspaceId: string, brand: string, text: string) => this.operator.say(workspaceId, brand, text);
     const decide = (lessonId: string, approved: boolean, text: string) => this.lessons.decide(lessonId, approved, text);
     this.draftDesk = new DraftDesk(deps.store);
     const settle = async (draftId: string, approved: boolean) => void (await (approved ? this.draftDesk.approve(draftId, Scope.everything) : this.draftDesk.reject(draftId, Scope.everything)));
@@ -71,11 +75,12 @@ export class WorkspaceServices {
     this.release = new PlanRelease(deps.store, deps.store.plans, plans, events);
     this.schedules = new ScheduleDesk(deps.store);
     const always = new AlwaysOnTools(new TaskCreation(this.tasks, plans), this.schedules);
-    const tools = new OperatorTools(deps.store, plans, this.tasks, this.cards, this.memory, always);
+    const tools = new OperatorTools(deps.store, plans, this.tasks, this.cards, this.memory, always, new StageOneTools(plans), new LibraryShelfTools(deps.store.library));
     this.operator = new OperatorDesk(deps.harness, deps.store, tools.extension(), deps.settings.model, this.tasks, events);
-    this.owner = new OwnerDesk(plans, this.operator);
+    this.brands = new BrandShelf(deps.store, this.operator, deps.brandImages);
+    this.owner = new OwnerDesk(plans, this.operator, deps.store.feedback);
     this.board = new WorkspaceBoard(deps.store, this.tasks, () => this.alwaysOn);
-    const signal = (workspaceId: string, text: string, key: string) => this.operator.signal(workspaceId, text, key);
+    const signal = (workspaceId: string, text: string, key: string) => this.operator.signal(workspaceId, "", text, key);
     this.alwaysOn = new AlwaysOnDesk(deps.store, WatchSet.build({ ...deps, limits: this.tasks.limits }, signal), new WorkspaceSpend(deps.store));
     this.playbooks = new PlaybookDesk(deps.store, this.tasks, { maxUsd: deps.settings.taskMaxUsd });
     this.watch = new WatchDesk(deps.store);

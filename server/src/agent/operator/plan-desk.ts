@@ -25,13 +25,16 @@ export class PlanDesk {
     private readonly feedback: FeedbackBook,
   ) {}
 
-  async draft(body: unknown, workspaceId: string): Promise<Plan> {
-    Trace.line(import.meta.url, "PlanDesk.draft", { workspaceId });
+  /** A draft plan for a brief, with only the `keep` tasks selected when given. */
+  async draft(body: unknown, workspaceId: string, keep: readonly string[] = []): Promise<Plan> {
+    Trace.line(import.meta.url, "PlanDesk.draft", { workspaceId, keep });
+    const unknown = keep.filter((key) => !SavedPlans.parts().includes(key));
+    if (unknown.length > 0) throw new RunError(`no stage-1 part ${unknown.join(", ")}; the parts are ${SavedPlans.parts().join(", ")}`);
     const parsed = briefSchema.safeParse((body as { brief?: unknown } | null)?.brief);
     if (!parsed.success) throw new RunError("a plan needs a brief: { brief: { url } } or { brief: { product } }");
     const brief = Briefs.normalise(parsed.data);
     if (!brief.product && !brief.url) throw new RunError("brief.product or brief.url is required");
-    return this.plans.create(workspaceId, brief, SavedPlans.tasks(brief), SavedPlans.stages());
+    return this.plans.create(workspaceId, brief, SavedPlans.tasks(brief, keep), SavedPlans.stages());
   }
 
   async revise(planId: string, scope: Scope, change: PlanChange): Promise<Plan> {

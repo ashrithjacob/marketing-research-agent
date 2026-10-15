@@ -20,6 +20,7 @@ import { ReviewPullTable } from "./review-pull-table.js";
 import { ReviewAnalysisTable } from "./review-analysis-table.js";
 import { ReviewPullBackfill } from "./review-pull-backfill.js";
 import { TargetListingTable } from "./target-listing-table.js";
+import { BrandImageTable } from "./brand-image-table.js";
 import type { SqlDatabase } from "./sql-database.js";
 import { Trace } from "../../trace/index.js";
 
@@ -32,7 +33,7 @@ export class StoreSchema {
     await db.exec(CallLog.DDL);
     await StoreMigrations.apply(db);
     await db.exec(StoreSchema.INDEXES);
-    for (const ddl of [PacketRowTable.DDL, ReviewAnalysisTable.DDL, TargetListingTable.DDL, FindingTable.DDL, ChargeTable.DDL, ReviewPullTable.DDL, DocumentTable.DDL, PlanTable.DDL, CardTable.DDL, FeedbackTable.DDL, MemoryTable.DDL, LessonTable.DDL, AlwaysOnTable.DDL, DraftTable.DDL, PlaybookTable.DDL, AdTable.DDL, WatchTable.DDL]) await db.exec(ddl);
+    for (const ddl of [PacketRowTable.DDL, ReviewAnalysisTable.DDL, TargetListingTable.DDL, FindingTable.DDL, ChargeTable.DDL, ReviewPullTable.DDL, DocumentTable.DDL, PlanTable.DDL, CardTable.DDL, FeedbackTable.DDL, MemoryTable.DDL, LessonTable.DDL, AlwaysOnTable.DDL, DraftTable.DDL, PlaybookTable.DDL, AdTable.DDL, WatchTable.DDL, BrandImageTable.DDL]) await db.exec(ddl);
     await StoreMigrations.once(db, CompetitorKinds.NAME, (tx) => new CompetitorKinds(tx).apply());
     await StoreMigrations.once(db, ReviewPullBackfill.NAME, async (tx) => { await new ReviewPullBackfill(tx).apply(); });
   }

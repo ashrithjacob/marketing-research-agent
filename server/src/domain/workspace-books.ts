@@ -8,6 +8,7 @@ import type { MemoryBook } from "./memory.js";
 import type { PlanBook } from "./plans.js";
 import type { PlaybookBook } from "./playbooks.js";
 import type { WatchBook } from "./watching.js";
+import type { BrandImageBook } from "./brands.js";
 
 /** The always-on side of the store: what a workspace's owner and its operator work with, beside the research runs. */
 export interface WorkspaceBooks {
@@ -22,4 +23,5 @@ export interface WorkspaceBooks {
   readonly playbooks: PlaybookBook;
   readonly ads: AdBook;
   readonly watch: WatchBook;
+  readonly brandImages: BrandImageBook;
 }

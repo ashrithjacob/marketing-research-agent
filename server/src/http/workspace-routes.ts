@@ -44,10 +44,10 @@ export class WorkspaceRoutes {
     api.post("/plans/:planId/approve", (c) => this.answer(c, 202, () => this.owner.approve(c.req.param("planId"), Scope.forViewer(c.get("principal")))));
     api.post("/chat", (c) =>
       this.answer(c, 202, async (workspace) => {
-        const body = (await c.req.json().catch(() => null)) as { text?: unknown; plan_id?: unknown } | null;
+        const body = (await c.req.json().catch(() => null)) as { text?: unknown; brand?: unknown } | null;
         const text = typeof body?.text === "string" ? body.text.trim() : "";
         if (!text) throw new RunError("say something: { text }");
-        await this.owner.say(workspace, text, typeof body?.plan_id === "string" ? body.plan_id : "");
+        await this.owner.say(workspace, typeof body?.brand === "string" ? body.brand : "", text);
         return { ok: true };
       }),
     );
