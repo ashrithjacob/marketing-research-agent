@@ -5,12 +5,14 @@ import { RunError } from "../errors.js";
 import type { TaskEvents } from "../task/task-events.js";
 import type { TaskSupervisor } from "../task/task-supervisor.js";
 
-/** What resolving a card hands on to: the operator's reply, a lesson's decision, a draft's settling, and a plan stage's approval. */
+/** What resolving a card hands on to: the operator's reply, a lesson's decision, a draft's settling, a plan stage's approval, and a stage brief run or set aside. */
 export interface CardResolvers {
   reply: (workspaceId: string, brand: string, text: string) => Promise<void>;
   lesson: (lessonId: string, approved: boolean, text: string) => Promise<void>;
   draft: (draftId: string, approved: boolean) => Promise<void>;
   stage: (planId: string, approved: boolean) => Promise<void>;
+  /** A stage brief's card: approved, the stage runs with `text` as its brief; set aside, the chat is told. */
+  brief: (card: Card, approved: boolean, text: string) => Promise<void>;
 }
 
 /** The owner's cards (spec §7.2): a paused task's question, the operator's question, and approvals. Resolving one does what its action says, once. */
@@ -51,6 +53,7 @@ export class CardDesk {
     }
     if (card.action.kind === "draft") return this.settleDraft(card, scope, true);
     if (card.action.kind === "start_stage") return this.settleStage(card, true);
+    if (card.action.kind === "stage_brief") return this.runBrief(card, edit);
     if (card.action.kind !== "start_task") throw new RunError(`card ${cardId} has nothing to start`);
     const { brief, contract, plan_id, task_key } = card.action;
     const run = await this.tasks.start({ brief, contract }, card.workspace_id, { approved: true });
@@ -64,10 +67,22 @@ export class CardDesk {
     const card = await this.unresolved(cardId, scope, "approval");
     if (card.action.kind === "draft") return this.settleDraft(card, scope, false);
     if (card.action.kind === "start_stage") return this.settleStage(card, false);
+    if (card.action.kind === "stage_brief") await this.resolve.brief(card, false, "");
     if (card.action.kind === "start_task") await this.onPlan(card.action.plan_id, card.action.task_key, { error: "rejected by the owner" });
     if (card.action.kind === "lesson") await this.resolve.lesson(card.action.lesson_id, false, "");
     else await this.feedback(card, "reject", "");
     return (await this.store.cards.resolve(card.id, "rejected", ""))!;
+  }
+
+  /** A stage brief run as the owner approved it, before the card is settled, so a stage that cannot run leaves the card open with why. A brief the owner changed is an edit, with the change as its diff. */
+  private async runBrief(card: Card, edit: string): Promise<Card> {
+    Trace.line(import.meta.url, "CardDesk.runBrief", { cardId: card.id });
+    const text = edit.trim() || card.body.trim();
+    await this.resolve.brief(card, true, text);
+    const changed = text !== card.body.trim();
+    const target = FeedbackStrengths.target("brief", card.action.kind === "stage_brief" ? `stage ${card.action.stage}` : card.id);
+    await this.store.feedback.record(card.workspace_id, { verdict: changed ? "edited" : "accept", target, text: changed ? text : "", ...(changed ? { diff: { before: card.body, after: text } } : {}) });
+    return (await this.store.cards.resolve(card.id, "approved", text))!;
   }
 
   /** The draft desk resolves the draft's card and records the feedback, against the draft. */

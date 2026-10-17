@@ -52,6 +52,10 @@ export function milestoneText(event: RunEvent): { text: string; cls: string } {
       return p.error
         ? { text: `Amazon lookup failed — ${p.error}`, cls: 'rule' }
         : { text: `Amazon listings looked up — ${p.matched} of ${p.total} targets are on Amazon`, cls: 'good' };
+    case 'packet.reworded':
+      return p.error
+        ? { text: `Rewriting the gate for reading failed — ${p.error} — its own words are shown`, cls: 'rule' }
+        : { text: `The gate's reasoning rewritten to read on its own — ${p.kept} parts`, cls: 'good' };
     case 'run.ended_early':
       return { text: `An agent ended early (${p.error || 'no detail'}) — the ledger still passed`, cls: 'rule' };
     case 'packet.invalid':

@@ -16,6 +16,9 @@ const findingKind = z.enum(FINDING_KINDS);
 const fieldRuleSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("distinct_periods"), min: z.number().int().positive() }).strict(),
   z.object({ kind: z.literal("number_on_latest") }).strict(),
+  z.object({ kind: z.literal("one_of"), values: z.array(z.string().min(1)).min(1) }).strict(),
+  z.object({ kind: z.literal("stage_from_elements") }).strict(),
+  z.object({ kind: z.literal("where"), field: z.string().min(1), value: z.string().min(1) }).strict(),
 ]);
 
 const fieldSpecSchema = z
@@ -25,14 +28,16 @@ const fieldSpecSchema = z
     required: z.boolean(),
     describe: z.string().min(1),
     how: z.string().optional(),
+    brief: z.string().optional(),
     rule: fieldRuleSchema.optional(),
+    reword: z.boolean().optional(),
   })
   .strict();
 
 const itemPartSchema = z.object({ key: z.string().min(1), required: z.boolean(), describe: z.string().min(1) }).strict();
 
 const itemNeedSchema = z
-  .object({ key: z.string().min(1), record: findingKind, match: z.array(z.string()), field: z.string().optional(), describe: z.string().min(1) })
+  .object({ key: z.string().min(1), record: findingKind, match: z.array(z.string()), field: z.string().optional(), describe: z.string().min(1), brief: z.string().optional() })
   .strict();
 
 const itemSourceSchema = z.discriminatedUnion("from", [

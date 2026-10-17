@@ -3,12 +3,17 @@ import type { ProductTruthPacket } from './product-truth';
 import type { RunDetail, RunSummary } from './runs';
 import { DELIVERED_STATUSES } from './runs';
 
-export type StageNumber = 1 | 2 | 3;
+export type StageNumber = 1 | 2 | 3 | 4 | 5;
+
+/** The order the stages are worked in, and shown: market truth and its gate come before customer voice, which is paid and only worth it once the gate has not said drop; customer truth reads customer voice's reviews. */
+export const STAGE_ORDER: readonly StageNumber[] = [1, 2, 4, 3, 5];
 
 export const STAGE_STORY: Record<StageNumber, { title: string; about: string }> = {
   1: { title: 'Market', about: 'The product, its competitors and its category' },
   2: { title: 'Product truth', about: 'Ingredients, doses against studies, what ads may claim, costs' },
   3: { title: 'Customer voice', about: 'What buyers say in their reviews' },
+  4: { title: 'Market truth', about: 'Market size, offers, sophistication, breaking point, and whether to go on' },
+  5: { title: 'Customer truth', about: 'Who buys, in their own words: avatars, their language, identity and awareness' },
 };
 
 const KIND_WORDS: Record<string, string> = {
@@ -61,6 +66,14 @@ export function stageOverview(stage: StageNumber, run: RunDetail): { read: strin
   }
   const p = packet as StagePacket;
   if (stage === 3) return { read: readLine(p.sources), stats: [...base, { label: 'quotes', value: p.excerpts.length }, gaps] };
+  if (stage === 5) {
+    const top = (p.avatars ?? []).filter((a) => !a.parent).length;
+    return { read: `${(p.quotes ?? []).length} customer quotes, copied from their reviews and posts.`, stats: [{ label: 'avatars', value: top }, { label: 'quotes', value: (p.quotes ?? []).length }, { label: 'identity entries', value: (p.identity_entries ?? []).length }, gaps] };
+  }
+  if (stage === 4) {
+    const level = Number(marketWord(p, 'stage'));
+    return { read: readLine(p.sources), stats: [...base, ...(level ? [{ label: 'sophistication', value: level }] : []), { label: 'breaking points', value: p.attributes.filter((a) => a.key === 'moments').length }, gaps] };
+  }
   return {
     read: readLine(p.sources),
     stats: [
@@ -88,6 +101,19 @@ export function stageTabs(stage: StageNumber, run: RunDetail | null): StageTab[]
       { key: 'cogs_refills', label: 'Economics' },
     ],
     3: [{ key: 'voice', label: 'Customer voice' }],
+    4: [
+      { key: 'viability', label: 'Verdict' },
+      { key: 'tam_sam', label: 'Market size' },
+      { key: 'offers', label: 'Offers' },
+      { key: 'sophistication', label: 'Sophistication' },
+      { key: 'breaking_point', label: 'Breaking point' },
+    ],
+    5: [
+      { key: 'avatars', label: 'Avatars' },
+      { key: 'language_bank', label: 'Language bank' },
+      { key: 'identity', label: 'Identity' },
+      { key: 'awareness', label: 'Awareness' },
+    ],
   };
   return [...sections[stage], { key: 'sources', label: 'Sources', count: (run?.packet?.sources ?? []).filter((s) => s.admitted !== false).length }, { key: 'gaps', label: 'Gaps', count: run?.packet?.gaps.length ?? 0 }];
 }
@@ -98,6 +124,12 @@ export function sourceKindWords(kind: string): string {
 
 export function sourceHost(url: string): string {
   return host(url);
+}
+
+/** The first word of a market-truth attribute, such as the gate's verdict or the sophistication digit; "" when it is not there. */
+export function marketWord(packet: StagePacket, key: string): string {
+  const value = packet.attributes.find((a) => a.key === key)?.value ?? '';
+  return value.trim().toLowerCase().split(/[^a-z0-9]+/)[0] ?? '';
 }
 
 function readLine(sources: Source[]): string {

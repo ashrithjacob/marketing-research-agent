@@ -1,4 +1,4 @@
-import { Briefs, FeedbackStrengths, SAVED_TASKS, SavedPlans, Scope, briefSchema, productTruthInputsSchema, type FeedbackBook, type Plan, type PlanBook, type PlanTask } from "../../domain/index.js";
+import { Brands, Briefs, FeedbackStrengths, SAVED_TASKS, SavedPlans, Scope, briefSchema, productTruthInputsSchema, type FeedbackBook, type Plan, type PlanBook, type PlanTask } from "../../domain/index.js";
 import { ContractCheck } from "../../extract/index.js";
 import { Trace } from "../../trace/index.js";
 
@@ -102,9 +102,13 @@ export class PlanDesk {
 
   private async askApproval(plan: Plan, task: PlanTask): Promise<void> {
     Trace.line(import.meta.url, "PlanDesk.askApproval", { planId: plan.id, key: task.key });
-    const body = `${task.contract.objective}. ${ContractCheck.asksFirst(task.contract).join("; ")}; at most $${task.contract.budget.max_usd.toFixed(2)}.`;
+    const name = plan.brief.product || Brands.label(Brands.key(plan.brief));
+    const plain = SAVED_TASKS[task.key]?.approval;
+    const why = plain ? plain.why.replaceAll("{name}", name) : `${task.contract.objective}. ${ContractCheck.asksFirst(task.contract).join("; ")}.`;
+    const body = `${why} It can spend up to $${task.contract.budget.max_usd.toFixed(2)} in all.`;
+    const title = plain ? plain.title.replaceAll("{name}", name) : `Approve ${task.title}?`;
     const action = { kind: "start_task" as const, brief: plan.brief, contract: task.contract, plan_id: plan.id, task_key: task.key };
-    await this.cards.open(plan.workspace_id, { kind: "approval", title: `Approve ${task.title}?`, body, action });
+    await this.cards.open(plan.workspace_id, { kind: "approval", title, body, action });
   }
 
   private async open(planId: string, scope: Scope): Promise<Plan> {

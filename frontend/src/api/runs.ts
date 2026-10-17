@@ -24,7 +24,16 @@ export type ResearchNode =
   | 'mechanism'
   | 'dose_vs_study'
   | 'claim_limits'
-  | 'cogs_refills';
+  | 'cogs_refills'
+  | 'tam_sam'
+  | 'offers'
+  | 'sophistication'
+  | 'breaking_point'
+  | 'viability'
+  | 'language_bank'
+  | 'identity'
+  | 'avatars'
+  | 'awareness';
 
 export const TERMINAL_STATUSES: ReadonlySet<RunStatus> = new Set([
   'completed',

@@ -3,6 +3,7 @@ import { factText, type Gap } from '../api';
 
 /** Whether tiles start open: off on a dashboard, on in a view given over to one section. */
 export const TilesOpen = createContext(false);
+export const GapsInOwnTab = createContext(false);
 
 /** A dashboard tile: headline figures visible, full values behind one click. */
 export function Tile({
@@ -84,6 +85,8 @@ export function Chip({
 
 /** The gaps that belong to one tile, so a hole in the data sits next to the data. */
 export function TileGaps({ gaps, force }: { gaps: Gap[]; force?: boolean }) {
+  const elsewhere = useContext(GapsInOwnTab);
+  if (elsewhere) return null;
   if (gaps.length === 0) {
     return force ? <p className="muted">No data gaps here — everything wanted was captured.</p> : null;
   }

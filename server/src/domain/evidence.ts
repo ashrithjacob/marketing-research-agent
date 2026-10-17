@@ -71,6 +71,8 @@ export const attributeSchema = z
     value: z.string(),
     source_id: z.string(),
     locator: locatorSchema.nullable().default(null),
+    reads_as: z.string().optional(),
+    sections: z.array(z.object({ title: z.string(), text: z.string() }).strict()).optional(),
   })
   .strict();
 export type Attribute = z.infer<typeof attributeSchema>;

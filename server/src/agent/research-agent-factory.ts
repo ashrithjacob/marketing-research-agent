@@ -14,6 +14,8 @@ import {
   type Node,
   type ResearchStore,
   type RoleSpec,
+  type Source,
+  type StoredRunReview,
 } from "../domain/index.js";
 import { Trace } from "../trace/index.js";
 
@@ -26,7 +28,7 @@ import { RoleChecks } from "./role-checks.js";
 import { RowRepair } from "./row-repair.js";
 import { RunFindings } from "./run-findings.js";
 import { ToolSteps } from "./tool-steps.js";
-import { LedgerToolset, LibraryTools, TracedTool, type ToolRegistry } from "./tools/index.js";
+import { LedgerToolset, LibraryTools, NumberedPage, TracedTool, type ToolRegistry } from "./tools/index.js";
 import { TurnBreakers } from "./turn-breakers.js";
 
 /** What every role's agent needs from the run it belongs to, whichever stage. */
@@ -45,6 +47,10 @@ export interface RoleContext {
   onCall: (call: LlmCall) => void;
   onChecked: (agentId: string, valid: boolean, problems: readonly string[]) => Promise<void>;
   meter: (agentId: string) => ChargeMeter;
+  /** The sources earlier stages read, for a role that may cite them through `use_source`. */
+  earlier?: readonly Source[];
+  /** The reviews customer voice mined, for a role that reads them and quotes customers by reference. */
+  reviews?: readonly StoredRunReview[];
 }
 
 /** Builds the agent for any role: its tools by name, its prompt around them, its record kinds, its finish check, its turn limit. */
@@ -72,6 +78,7 @@ export class ResearchAgentFactory {
       market: run.brief.market,
       discovery: DiscoveryQuestions.of(rows, run.brief),
       meter: run.meter(role.id),
+      ...(role.tools.includes("read_reviews") ? { view: new NumberedPage() } : {}),
     });
     const ledger = new LedgerToolset({
       findings,
@@ -81,6 +88,8 @@ export class ResearchAgentFactory {
       tally: breakers,
       ...(role.tools.includes("wait_for") ? { roster: run.roster } : {}),
       ...(run.pollMs !== undefined ? { pollMs: run.pollMs } : {}),
+      ...(role.tools.includes("use_source") && run.earlier ? { earlier: { sources: run.earlier, node: Roles.node(role, run.nodes) } } : {}),
+      ...(role.tools.includes("read_reviews") && run.reviews ? { voices: { reviews: run.reviews, corpus: this.corpus } } : {}),
     }).build();
     const agent = new Agent({
       streamFn: new LlmCallLog({ runId: run.runId, agentId: role.id, sequence: run.sequence, store: this.store, onCall: run.onCall })

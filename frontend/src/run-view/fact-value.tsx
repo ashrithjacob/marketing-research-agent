@@ -1,11 +1,25 @@
-import { factText, type Source } from '../api';
+import { factText, findSource, type Source } from '../api';
 import { Cite, InlineCite } from './cite';
 
-/** A recorded value laid out to read: a list when the agent recorded several items, and each source id it pasted into the text shown as a link to that source, never as the raw id. */
+const LONG = 280;
+
+/** Long prose cut into short paragraphs of two sentences, so a page of reasoning reads as paragraphs, not a wall. */
+function paragraphs(text: string): string[] {
+  const sentences = text.split(/(?<=[.!?])\s+(?=[A-Z'"‘(])/);
+  const out: string[] = [];
+  for (let i = 0; i < sentences.length; i += 2) out.push(sentences.slice(i, i + 2).join(' '));
+  return out;
+}
+
+/** A recorded value laid out to read: a list when the agent recorded several items, long prose as short paragraphs, and each source id it pasted into the text shown as a numbered link to that source, never as the raw id. */
 export function FactValue({ value, runId, sources }: { value: unknown; runId: string; sources: Source[] }) {
   const { items } = factText(value);
+  const text = typeof value === 'string' ? value : '';
   const numbers = new Map<string, number>();
-  const numberOf = (id: string) => numbers.get(id) ?? (numbers.set(id, numbers.size + 1), numbers.size);
+  const numberOf = (cited: string) => {
+    const id = findSource(sources, cited)?.id ?? cited;
+    return numbers.get(id) ?? (numbers.set(id, numbers.size + 1), numbers.size);
+  };
   const render = (item: ReturnType<typeof factText>['items'][number], key: number) => (
     <span key={key}>
       {item.map((piece, i) =>
@@ -13,6 +27,15 @@ export function FactValue({ value, runId, sources }: { value: unknown; runId: st
       )}
     </span>
   );
+  if (items.length <= 1 && text.length > LONG) {
+    return (
+      <div className="fact-prose">
+        {paragraphs(text).map((paragraph, i) => (
+          <p key={i}>{factText(paragraph).items.map(render)}</p>
+        ))}
+      </div>
+    );
+  }
   if (items.length <= 1) return <>{items.map(render)}</>;
   return (
     <ul className="fact-items">

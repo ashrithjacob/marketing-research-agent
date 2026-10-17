@@ -35,13 +35,17 @@ export class PromptBlocks {
     return lines.join("\n");
   }
 
+  static readonly OWNER_BRIEF =
+    "The owner approved this brief. Follow it: where it adds guidance, follow the guidance; where it leaves out or changes something your own checklist asks for, do as it says and record that item as a gap naming the owner's choice.";
+
+  /** The brief, and the owner's approved brief for the stage, word for word, when there is one. */
   static brief(brief: Brief): string {
     Trace.line(import.meta.url, "PromptBlocks.brief", { brief });
     const lines = ["## The brief", ""];
     lines.push(...PromptBlocks.subject(brief));
     if (brief.market) lines.push(...PromptBlocks.market(brief.market));
-    if (brief.notes) lines.push(`**Notes:** ${brief.notes}`);
-    return lines.join("\n");
+    if (!brief.notes.trim()) return lines.join("\n");
+    return [...lines, "", "## The owner's brief for this stage", "", brief.notes.trim(), "", PromptBlocks.OWNER_BRIEF].join("\n");
   }
 
   private static subject(brief: Brief): string[] {

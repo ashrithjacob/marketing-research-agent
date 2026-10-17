@@ -10,6 +10,8 @@ import {
 import { Trace } from "../trace/index.js";
 
 import { LatestRows } from "./latest-rows.js";
+import { BuyerStages } from "./buyer-stages.js";
+import { SophisticationStage } from "./sophistication-stage.js";
 import type { PacketSection } from "./row-blame.js";
 
 /** Builds the packet from the run ledger, the way ReviewAssembly builds its review half: the model never writes it. */
@@ -24,6 +26,13 @@ export class PacketAssembly {
     saturation: { kind: "saturation", one: false },
     nodes: { kind: "node_status", one: false },
     gaps: { kind: "gap", one: false },
+    ad_elements: { kind: "ad_elements", one: false },
+    buyer_stages: { kind: "buyer_stage", one: false },
+    quotes: { kind: "quote", one: false },
+    identity_entries: { kind: "identity_entry", one: false },
+    pain_profiles: { kind: "pain_profile", one: false },
+    avatars: { kind: "avatar", one: false },
+    awareness: { kind: "awareness", one: false },
   };
 
   private readonly live: readonly Finding[];
@@ -51,6 +60,15 @@ export class PacketAssembly {
       saturation: this.payloads("saturation"),
       nodes: this.payloads("node_status"),
       gaps: this.payloads("gap"),
+      ad_elements: this.payloads("ad_elements"),
+      element_shares: SophisticationStage.shares(this.live).filter((share) => share.of > 0),
+      buyer_stages: this.payloads("buyer_stage"),
+      buyer_stage_shares: BuyerStages.shares(this.live).filter((share) => share.of > 0),
+      quotes: this.payloads("quote"),
+      identity_entries: this.payloads("identity_entry"),
+      pain_profiles: this.payloads("pain_profile"),
+      avatars: this.payloads("avatar"),
+      awareness: this.payloads("awareness"),
     };
   }
 

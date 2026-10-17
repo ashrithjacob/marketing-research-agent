@@ -7,17 +7,17 @@ export interface FactText {
   items: FactPiece[][];
 }
 
-const HASH = /(?:sha256:)?\b([0-9a-f]{40,64})\b/g;
-const HASH_GROUP = /\(\s*(?:(?:sha256:)?[0-9a-f]{40,64}\s*,?\s*)+\)/g;
+const HASH = /sha256:([0-9a-f]{6,64})\b|\b([0-9a-f]{40,64})\b/g;
+const HASH_GROUP = /\(\s*(?:(?:sha256:[0-9a-f]{6,64}|[0-9a-f]{40,64})\s*[,;]?\s*)+\)/g;
 
 function pieces(text: string): FactPiece[] {
   const out: FactPiece[] = [];
   let last = 0;
-  const marked = text.replace(HASH_GROUP, (group) => group.replace(/[(),]/g, ' '));
+  const marked = text.replace(HASH_GROUP, (group) => group.replace(/[(),;]/g, ' '));
   for (const match of marked.matchAll(HASH)) {
     const before = marked.slice(last, match.index);
     if (before.trim()) out.push({ text: before.replace(/\s+/g, ' ') });
-    out.push({ source: `sha256:${match[1]}` });
+    out.push({ source: `sha256:${match[1] ?? match[2]}` });
     last = (match.index ?? 0) + match[0].length;
   }
   const rest = marked.slice(last);
@@ -31,4 +31,12 @@ export function factText(value: unknown): FactText {
   const items = (parts.length >= 3 ? parts : [text]).map(pieces).filter((item) => item.length > 0);
   const preview = text.replace(HASH_GROUP, '').replace(HASH, '').replace(/\s+\|\s+/g, ' · ').replace(/\s+/g, ' ').trim();
   return { preview, items };
+}
+
+/** The source an id names: the exact id, or the one source whose id starts with a shortened one; undefined when it names none or several. */
+export function findSource<T extends { id: string }>(sources: readonly T[], id: string): T | undefined {
+  const exact = sources.find((s) => s.id === id);
+  if (exact) return exact;
+  const starting = sources.filter((s) => s.id.startsWith(id));
+  return starting.length === 1 ? starting[0] : undefined;
 }

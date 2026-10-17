@@ -3,7 +3,7 @@ import { stat } from "node:fs/promises";
 import type { Hono } from "hono";
 
 import type { Settings } from "../config/index.js";
-import { CATEGORY_DELIVERABLE, DEFAULT_REJECTED_KINDS, PRODUCT_DELIVERABLE, type FieldsDeliverable } from "../domain/index.js";
+import { BREAKING_POINT_DELIVERABLE, CATEGORY_DELIVERABLE, DEFAULT_REJECTED_KINDS, GATE_DELIVERABLE, MARKET_SIZE_DELIVERABLE, OFFERS_DELIVERABLE, PRODUCT_DELIVERABLE, SOPHISTICATION_DELIVERABLE, type FieldsDeliverable } from "../domain/index.js";
 import type { ApiEnv } from "./api-env.js";
 import { Trace } from "../trace/index.js";
 
@@ -28,6 +28,7 @@ export class ConfigRoute {
         required_fields: {
           product_data: ConfigRoute.required(PRODUCT_DELIVERABLE),
           category_data: ConfigRoute.required(CATEGORY_DELIVERABLE),
+          ...Object.fromEntries([MARKET_SIZE_DELIVERABLE, OFFERS_DELIVERABLE, SOPHISTICATION_DELIVERABLE, BREAKING_POINT_DELIVERABLE, GATE_DELIVERABLE].map((d) => [d.node, ConfigRoute.required(d)])),
         },
         review_mining: {
           configured: Boolean(this.settings.apifyToken),

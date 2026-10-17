@@ -1,4 +1,4 @@
-import type { RunBilling } from "../adapters/index.js";
+import type { Billed, RunBilling } from "../adapters/index.js";
 import { RunStatuses, stagePacketSchema, type Node, type ResearchStore } from "../domain/index.js";
 import { Trace } from "../trace/index.js";
 
@@ -29,6 +29,18 @@ export class RunWrapUp {
     } catch (error) {
       runs.emit(runId, "packet.listings", { error: error instanceof Error ? error.message : String(error) });
     }
+  }
+
+  /** A later call's billed cost, added to what the run already billed rather than replacing it. */
+  async addBilling(billing: RunBilling): Promise<void> {
+    Trace.line(import.meta.url, "RunWrapUp.addBilling");
+    const { store, runId } = this;
+    const added = await billing.settle();
+    if (!added) return;
+    const usage = (await store.getRun(runId))?.usage ?? {};
+    const was = (usage as { billed?: Billed }).billed ?? { total: 0, turns: 0, resolved: 0 };
+    const billed = { total: was.total + added.total, turns: was.turns + added.turns, resolved: was.resolved + added.resolved };
+    await store.updateRun(runId, { usage: { ...usage, billed } });
   }
 
   async recordBilling(billing: RunBilling): Promise<void> {

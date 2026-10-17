@@ -63,6 +63,7 @@ export class ReviewCase {
     if (target.kind === "task") return `a running task: ${String((await this.store.getRun(target.run_id))?.contract?.objective ?? target.run_id)}`;
     if (target.kind === "memory") return "an entry of brand memory";
     if (target.kind === "chat") return "a message to the operator in chat";
+    if (target.kind === "brief") return `the brief for a research stage (${target.id}), as the owner edited it before approving`;
     if (target.kind === "draft") {
       const draft = await this.store.drafts.get(Scope.everything, target.id);
       return draft ? `a draft written with playbook ${draft.playbook} version ${draft.playbook_version}` : "a draft";

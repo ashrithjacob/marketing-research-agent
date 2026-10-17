@@ -9,8 +9,13 @@ import { RunError } from "./errors.js";
 import type { LiveRuns } from "./live-runs.js";
 import { ModelChain } from "./model-chain.js";
 import { ModelPricing } from "./pricing.js";
+import { CustomerTruthRun } from "./customer-truth-run.js";
+import { MarketTruthRun } from "./market-truth-run.js";
+import { OwnerCosts } from "./owner-costs.js";
+import { OwnerReword } from "./owner-reword.js";
 import { ProductTruthRun } from "./product-truth-run.js";
 import { RunEnd } from "./run-end.js";
+import { RunInputs } from "./run-inputs.js";
 import type { RetryPolicy } from "./retry.js";
 import type { ReviewMiningJob } from "./review-mining-job.js";
 import type { ResearchAgentFactory } from "./research-agent-factory.js";
@@ -25,7 +30,7 @@ export interface RunKinds {
   mining: ReviewMiningJob;
 }
 
-/** Starts one run: records it, and hands LiveRuns the stage-1 agents or the product-truth agents, with their models resolved and priced, or the review-mining pipeline. */
+/** Starts one run: records it, and hands LiveRuns the stage-1, product-truth, market-truth or customer-truth agents, with their models resolved and priced, or the review-mining pipeline. */
 export class RunLauncher {
   constructor(
     private readonly store: ResearchStore,
@@ -36,6 +41,12 @@ export class RunLauncher {
     private readonly retry: RetryPolicy,
     private readonly kinds: RunKinds,
   ) {}
+
+  /** The judge model's pass over a run's owner-facing values; a backfill uses it too. */
+  reword(): OwnerReword {
+    Trace.line(import.meta.url, "RunLauncher.reword");
+    return new OwnerReword(this.store, this.models, this.costs, this.settings.judgeModel);
+  }
 
   async launch(request: RunRequest, workspaceId: string): Promise<string> {
     Trace.line(import.meta.url, "RunLauncher.launch", { request, workspaceId });
@@ -58,9 +69,15 @@ export class RunLauncher {
     const { store, runs, costs, retry, kinds } = this;
     const deps = { store, runs, costs, retry };
     const brief = { runId: run.id, brief: request.brief, rejectKinds, judgements, chain };
-    const team = stage === 2
-      ? new ProductTruthRun({ ...deps, factory: kinds.factory }, { ...brief, ...(await this.source(run, request, workspaceId)), inputs: productTruthInputsSchema.parse(request.inputs ?? {}) })
-      : new StageOneRun({ ...deps, factory: kinds.factory, listings: kinds.listings }, { ...brief, nodes });
+    const inputs = new RunInputs(this.store, this.runs, kinds.handoff);
+    const team =
+      stage === 2
+        ? new ProductTruthRun({ ...deps, factory: kinds.factory }, { ...brief, ...(await inputs.productTruth(run, request, workspaceId)), inputs: await new OwnerCosts(this.store).intoInputs(productTruthInputsSchema.parse(request.inputs ?? {}), workspaceId, run.product_id) })
+        : stage === 4
+          ? new MarketTruthRun({ ...deps, factory: kinds.factory, reword: this.reword() }, { ...brief, evidence: await inputs.marketTruth(run, request, workspaceId) })
+          : stage === 5
+            ? new CustomerTruthRun({ ...deps, factory: kinds.factory }, { ...brief, evidence: await inputs.customerTruth(run, request, workspaceId) })
+            : new StageOneRun({ ...deps, factory: kinds.factory, listings: kinds.listings }, { ...brief, nodes });
     await this.store.updateRun(run.id, { agent_run_id: run.id, session_id: `research-${run.id}`, status: "running" });
     this.runs.emit(run.id, "run.started", { model: this.settings.model, nodes });
     const done = Trace.within(run.id, header, () => team.start());
@@ -78,18 +95,7 @@ export class RunLauncher {
     throw new RunError(error);
   }
 
-  /** The completed stage-1 run product truth reads, recorded on the run so a newer stage 1 shows this one as out of date. */
-  private async source(run: ResearchRun, request: RunRequest, workspaceId: string): Promise<{ sourceRunId: string; stageOne: StagePacket }> {
-    Trace.line(import.meta.url, "RunLauncher.source", { runId: run.id });
-    const found = await this.kinds.handoff.forBrief(request.brief, Scope.of(workspaceId));
-    if (!found) {
-      const error = "product truth reads a completed stage-1 run, and this brief has none";
-      await new RunEnd(this.store, this.runs).refuse(run.id, error);
-      throw new RunError(error);
-    }
-    await this.store.updateRun(run.id, { source_run_id: found.run.id });
-    return { sourceRunId: found.run.id, stageOne: found.packet };
-  }
+
 
   private async launchPipeline(run: ResearchRun, request: RunRequest, workspaceId: string, header: Record<string, unknown>): Promise<string> {
     Trace.line(import.meta.url, "RunLauncher.launchPipeline", { workspaceId, targets: request.targets });

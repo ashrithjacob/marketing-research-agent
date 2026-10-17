@@ -30,6 +30,12 @@ export class PlanStages {
     return plans.length;
   }
 
+  /** Moves a plan made elsewhere (the chat's stages) on as far as it can now, as a run ending would. */
+  follow(planId: string): Promise<void> {
+    Trace.line(import.meta.url, "PlanStages.follow", { planId });
+    return this.inTurn(planId);
+  }
+
   /** The owner's answer on review mining's card: approved, it starts; rejected, the step records why it did not. */
   async decide(planId: string, approved: boolean): Promise<void> {
     Trace.line(import.meta.url, "PlanStages.decide", { planId, approved });

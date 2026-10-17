@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 
-import { api, stageRun, type RunDetail, type RunSummary, type StageNumber } from '../api';
+import { api, STAGE_ORDER, stageRun, type RunDetail, type RunSummary, type StageNumber } from '../api';
 import { useProduct } from '../use-products';
 
-export const STAGES: StageNumber[] = [1, 2, 3];
+export const STAGES: readonly StageNumber[] = STAGE_ORDER;
 
 /** A product's run for each stage, and each one's detail once it has loaded. */
 export function useStageRuns(productId: string, onError: (message: string) => void): { stage: StageNumber; summary: RunSummary | null; run: RunDetail | null }[] {

@@ -19,6 +19,15 @@ describe("what each role may write", () => {
       dose_vs_study: ["source", "dose_study", "gap"],
       claim_limits: ["source", "claim_limit", "gap"],
       cogs_refills: ["source", "price_point", "gap"],
+      market_size: ["source", "measurement", "attribute", "node_status", "gap"],
+      offers: ["source", "attribute", "node_status", "gap"],
+      sophistication: ["source", "ad_elements", "attribute", "node_status", "gap"],
+      breaking_point: ["source", "attribute", "buyer_stage", "node_status", "gap"],
+      gate: ["source", "attribute", "node_status", "gap"],
+      voices: ["source", "quote", "node_status", "gap"],
+      identity: ["source", "identity_entry", "pain_profile", "node_status", "gap"],
+      avatars: ["source", "avatar", "attribute", "node_status", "gap"],
+      awareness: ["source", "awareness", "node_status", "gap"],
     };
     for (const role of ROLES) expect(RoleRecords.of(role), role.id).toEqual(before[role.id]);
   });

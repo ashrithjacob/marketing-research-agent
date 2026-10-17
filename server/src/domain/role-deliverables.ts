@@ -21,10 +21,10 @@ export const PRODUCT_DELIVERABLE: FieldsDeliverable = {
     { key: "full_ingredient_panel", record: "attribute", required: true, describe: "every ingredient as listed, in order" },
     { key: "price", record: "attribute", required: true, describe: "price and currency for each pack size sold" },
     { key: "subscription_terms", record: "attribute", required: true, describe: "subscribe price, frequency, minimum orders, how to cancel — or \"none offered\"" },
-    { key: "claims_made_on_own_site", record: "attribute", required: true, describe: "the claims the product page makes, word for word, separated by \" \\| \"" },
+    { key: "claims_made_on_own_site", record: "attribute", required: true, brief: "the claims the product page makes, word for word", describe: "the claims the product page makes, word for word, separated by \" \\| \"" },
     { key: "coa_present", record: "attribute", required: true, describe: "\"yes — <where>\" if a certificate of analysis is published, else \"no\"" },
     { key: "ad_activity", record: "attribute", required: false, describe: "how many Meta ads, which pages run them, first and last seen" },
-    { key: "ad_claims", record: "attribute", required: false, describe: "the claims the ads make, word for word, separated by \" \\| \"" },
+    { key: "ad_claims", record: "attribute", required: false, brief: "the claims its ads make, word for word", describe: "the claims the ads make, word for word, separated by \" \\| \"" },
   ],
 };
 
@@ -36,16 +36,16 @@ export const CATEGORY_DELIVERABLE: FieldsDeliverable = {
       key: "search_volume",
       record: "measurement",
       required: true,
-      describe: "`record_measurement`, `metric` \"search_volume\" (or \"search_volume: <keyword>\"), `unit` \"searches\", `period` the year or month (\"2023\", \"2024-11\"). One row per period.",
+      brief: "how many people search for the category, for at least three years, as a trend", describe: "`record_measurement`, `metric` \"search_volume\" (or \"search_volume: <keyword>\"), `unit` \"searches\", `period` the year or month (\"2023\", \"2024-11\"). One row per period.",
       rule: { kind: "distinct_periods", min: 3 },
     },
     {
       key: "category_size",
       record: "measurement",
       required: true,
-      describe: "`record_measurement`, `metric` \"category_size: <segment the source names>\", `value` as stated, `unit` currency and scale (\"USD billion\"), `period` the year it is for",
+      brief: "the category's size in money, for the year a source states it", describe: "`record_measurement`, `metric` \"category_size: <segment the source names>\", `value` as stated, `unit` currency and scale (\"USD billion\"), `period` the year it is for",
     },
-    { key: "seasonality", record: "attribute", required: true, describe: "`record_attribute`, `key` \"seasonality\", the months or season demand peaks, in the source's words" },
+    { key: "seasonality", record: "attribute", required: true, brief: "the months or season demand peaks", describe: "`record_attribute`, `key` \"seasonality\", the months or season demand peaks, in the source's words" },
     { key: "meta_ads_matching", record: "measurement", required: false, describe: "Meta ads matching the customer's problem in the brief's markets" },
   ],
 };
@@ -80,8 +80,8 @@ export const MECHANISM_DELIVERABLE: PerItemDeliverable = {
   node: "mechanism",
   over: { from: "ledger", kind: "active", by: "name" },
   needs: [
-    { key: "mechanism", record: "mechanism", match: ["active"], describe: "record it with record_mechanism" },
-    { key: "time_to_effect", record: "mechanism", match: ["active"], field: "time_to_effect", describe: "record it on its mechanism row" },
+    { key: "mechanism", record: "mechanism", match: ["active"], brief: "how it works", describe: "record it with record_mechanism" },
+    { key: "time_to_effect", record: "mechanism", match: ["active"], field: "time_to_effect", brief: "how long it takes to work", describe: "record it on its mechanism row" },
   ],
   oneMarked: { key: "carrier", record: "mechanism", field: "story_weight", value: "carrier", describe: "mark the active the product's story rests on as story_weight \"carrier\"" },
 };
@@ -90,14 +90,14 @@ export const DOSE_DELIVERABLE: PerItemDeliverable = {
   shape: "per_item",
   node: "dose_vs_study",
   over: { from: "ledger", kind: "active", by: "name", only: { present: "amount", absent: "in_blend" } },
-  needs: [{ key: "dose", record: "dose_study", match: ["active"], describe: "record its studied dose with record_dose_study" }],
+  needs: [{ key: "dose", record: "dose_study", match: ["active"], brief: "the dose the studies used, beside ours", describe: "record its studied dose with record_dose_study" }],
 };
 
 export const CLAIMS_DELIVERABLE: PerItemDeliverable = {
   shape: "per_item",
   node: "claim_limits",
   over: { from: "markets", times: AD_PLATFORMS },
-  needs: [{ key: "claims", record: "claim_limit", match: ["market", "platform"], describe: "record its permitted and forbidden claims with record_claim_limits" }],
+  needs: [{ key: "claims", record: "claim_limit", match: ["market", "platform"], brief: "what ads may and may not claim", describe: "record its permitted and forbidden claims with record_claim_limits" }],
 };
 
 export const COGS_DELIVERABLE: FieldsDeliverable = {

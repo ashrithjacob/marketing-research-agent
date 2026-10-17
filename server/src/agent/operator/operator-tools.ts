@@ -5,7 +5,6 @@ import { defineExtension, section, defineTool, type Extension, type ToolExecutio
 import { Brands, SAVED_TASKS, Scope, type ResearchStore } from "../../domain/index.js";
 import { Trace } from "../../trace/index.js";
 
-import { RunError } from "../errors.js";
 import { OPERATOR_SYSTEM } from "../prompt/text/operator.js";
 import type { TaskSupervisor } from "../task/task-supervisor.js";
 
@@ -17,7 +16,8 @@ import type { CardDesk } from "./card-desk.js";
 import type { LibraryShelfTools } from "./library-shelf-tools.js";
 import { OperatorAct } from "./operator-act.js";
 import type { PlanDesk } from "./plan-desk.js";
-import type { StageOneTools } from "./stage-one-tools.js";
+import type { RunControlTools } from "./run-control-tools.js";
+import type { StageTools } from "./stage-tools.js";
 import { WorkReport } from "./work-report.js";
 
 const list = Type.Array(Type.String());
@@ -31,8 +31,9 @@ export class OperatorTools {
     private readonly cards: CardDesk,
     private readonly memory: MemoryDesk,
     private readonly always: AlwaysOnTools,
-    private readonly stageOne: StageOneTools,
+    private readonly control: RunControlTools,
     private readonly library: LibraryShelfTools,
+    private readonly stageTools: StageTools,
   ) {}
 
   extension(): Extension {
@@ -70,13 +71,8 @@ export class OperatorTools {
               return `Plan ${plan.id} now: market ${plan.brief.market || "none"}; ${plan.tasks.map((t) => `${t.key} ${t.selected ? "kept" : "dropped"}`).join(", ")}. The owner approves it with its button.`;
             }),
         }),
-        defineTool({
-          name: "stop_task",
-          description: "Stop a running task by its run id. What it found so far is kept.",
-          parameters: Type.Object({ run_id: Type.String() }),
-          execute: (args, api, context) => OperatorAct.run(api, context, async (workspace) => (await this.running(args.run_id, workspace), await this.tasks.stop(args.run_id), `Stopping ${args.run_id}.`)),
-        }),
-        ...this.stageOne.tools(),
+        ...this.control.tools(),
+        ...this.stageTools.tools(),
         ...this.library.tools(),
         ...this.always.tools(),
         defineTool({
@@ -89,23 +85,6 @@ export class OperatorTools {
               return "Asked; the owner answers on a card, and their answer comes back to you.";
             }),
         }),
-        defineTool({
-          name: "answer_task",
-          description: "Pass the owner's answer to a task that is paused and waiting on its question; it goes on with the answer.",
-          parameters: Type.Object({ run_id: Type.String(), answer: Type.String() }),
-          execute: (args, api, context) =>
-            OperatorAct.run(api, context, async (workspace) => {
-              await this.owned(args.run_id, workspace);
-              await this.tasks.answer(args.run_id, args.answer);
-              return `Passed the answer to ${args.run_id}; it goes on.`;
-            }),
-        }),
-        defineTool({
-          name: "guide_task",
-          description: "Pass the owner's guidance to a running task, by its run id; the task reads it at its next step.",
-          parameters: Type.Object({ run_id: Type.String(), text: Type.String() }),
-          execute: (args, api, context) => OperatorAct.run(api, context, (workspace) => this.guide(args.run_id, args.text, workspace)),
-        }),
       ],
     });
   }
@@ -116,25 +95,5 @@ export class OperatorTools {
     if (!brand.key) return "This is the workspace's own chat, about no one brand.";
     const site = Brands.homepage(brand.key);
     return `This chat is about one brand: ${brand.label}${site ? `, whose site is ${site}` : ""}. When the owner asks to research it without naming a page, research ${site ? `that site (\`url\`)` : `"${brand.label}" (\`product\`)`}.`;
-  }
-
-  private async owned(runId: string, workspace: string): Promise<string> {
-    Trace.line(import.meta.url, "OperatorTools.owned", { runId });
-    const run = await this.store.getRun(runId);
-    if (!run?.contract || !Scope.of(workspace).admits(run.workspace_id)) throw new RunError(`no task ${runId} in this brand's work`);
-    return run.status;
-  }
-
-  private async running(runId: string, workspace: string): Promise<void> {
-    Trace.line(import.meta.url, "OperatorTools.running", { runId });
-    const status = await this.owned(runId, workspace);
-    if (status !== "running") throw new RunError(`task ${runId} is ${status}, not running`);
-  }
-
-  private async guide(runId: string, text: string, workspace: string): Promise<string> {
-    Trace.line(import.meta.url, "OperatorTools.guide", { runId });
-    await this.running(runId, workspace);
-    if (!(await this.tasks.guide(runId, text))) throw new RunError(`task ${runId} has no conversation to guide`);
-    return `Passed to ${runId}.`;
   }
 }

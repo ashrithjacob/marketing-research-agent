@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react';
-import { gridColumns, issueIndex, productSide, productsIn, quotesFor, sliceOf, type ReviewAnalysis } from '../../api';
+import { useEffect, useMemo, useState } from 'react';
+import { gridColumns, issueIndex, productSide, productsIn, quotesFor, sliceOf, type GroupScope, type ReviewAnalysis } from '../../api';
 import { Chip, Tile } from '../tile';
 import { IssueGrid } from './IssueGrid';
 import { IssueList, type IssueRow } from './IssueList';
@@ -11,7 +11,11 @@ export function VoiceAnalysis({ runId, finished }: { runId: string; finished: bo
   const { analysis, loaded, error, start } = useReviewAnalysis(runId);
   const [open, setOpen] = useState(true);
   const running = analysis?.status === 'running';
-  const done = analysis?.status === 'done' ? analysis : null;
+  const [lastDone, setLastDone] = useState<ReviewAnalysis | null>(null);
+  useEffect(() => {
+    if (analysis?.status === 'done') setLastDone(analysis);
+  }, [analysis]);
+  const done = analysis?.status === 'done' ? analysis : lastDone;
 
   return (
     <Tile
@@ -34,22 +38,18 @@ export function VoiceAnalysis({ runId, finished }: { runId: string; finished: bo
           <button className={done ? 'ghost' : 'primary'} disabled={!finished} onClick={() => void start()}>
             {done ? 'Re-run analysis' : 'Analyse reviews'}
           </button>
-          <span className="muted">
-            {finished
-              ? 'Cleans the mined reviews, groups them into issues and ranks them. A few LLM calls; no Apify.'
-              : 'Available once the run has finished mining.'}
-          </span>
+          {!finished && <span className="muted">Available once the run has finished mining.</span>}
         </div>
       )}
       {analysis?.status === 'failed' && <div className="error">Analysis failed: {analysis.error}</div>}
-      {running && <p className="muted">Reading every review in bulk batches — usually under two minutes.</p>}
+      {running && <p className="muted">Re-reading every review in bulk batches — usually under two minutes. The last analysis stays below until then.</p>}
       {done && <Findings analysis={done} />}
     </Tile>
   );
 }
 
 function Findings({ analysis }: { analysis: ReviewAnalysis }) {
-  const [filter, setFilter] = useState<VoiceFilter>({ source: 'all', group: 'product', target: '' });
+  const [filter, setFilter] = useState<VoiceFilter>(() => ({ source: 'all', group: firstWithReviews(analysis), target: '' }));
   const index = useMemo(() => issueIndex(analysis), [analysis]);
   const products = productsIn(analysis, filter.source, filter.group);
   const product = products.find((p) => p.target_id === filter.target);
@@ -99,4 +99,10 @@ function Findings({ analysis }: { analysis: ReviewAnalysis }) {
       <StarSpread products={products} />
     </div>
   );
+}
+
+/** The group the dashboard opens on: the product's own reviews when it has any, else the first group that does, so a product with no reviews of its own never opens on an empty page. */
+function firstWithReviews(analysis: ReviewAnalysis): GroupScope {
+  const groups: GroupScope[] = ['product', 'direct', 'indirect'];
+  return groups.find((group) => (sliceOf(analysis, 'all', group)?.reviews ?? 0) > 0) ?? 'product';
 }

@@ -1,6 +1,6 @@
 import type { ResearchNode } from './api';
 
-export type CollectingStage = 1 | 2 | 3;
+export type CollectingStage = 1 | 2 | 3 | 4 | 5;
 
 export const NODE_LABELS: Record<ResearchNode, string> = {
   product_data: 'Product data',
@@ -11,6 +11,15 @@ export const NODE_LABELS: Record<ResearchNode, string> = {
   claim_limits: 'Claim limits',
   cogs_refills: 'COGS & refills',
   review_mining: 'Review mining',
+  tam_sam: 'Market size',
+  offers: 'Offers',
+  sophistication: 'Sophistication',
+  breaking_point: 'Breaking point',
+  viability: 'Viability gate',
+  language_bank: 'Language bank',
+  identity: 'Identity',
+  avatars: 'Avatars',
+  awareness: 'Awareness',
 };
 
 /** Which nodes each collecting stage owns. Mirrors `STAGE_NODES` in `server/src/domain/nodes.ts`. */
@@ -18,12 +27,16 @@ export const STAGE_NODES: Record<CollectingStage, ResearchNode[]> = {
   1: ['product_data', 'competitors', 'category_data'],
   2: ['mechanism', 'dose_vs_study', 'claim_limits', 'cogs_refills'],
   3: ['review_mining'],
+  4: ['tam_sam', 'offers', 'sophistication', 'breaking_point', 'viability'],
+  5: ['language_bank', 'identity', 'avatars', 'awareness'],
 };
 
 export const STAGE_NAMES: Record<CollectingStage, string> = {
   1: 'Raw material',
   2: 'Product truth',
   3: 'Review mining',
+  4: 'Market truth',
+  5: 'Customer truth',
 };
 
 export const NODE_ORDER: ResearchNode[] = [...STAGE_NODES[1], ...STAGE_NODES[2], ...STAGE_NODES[3]];

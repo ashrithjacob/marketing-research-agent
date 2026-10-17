@@ -9,11 +9,30 @@ import StageView from './stage-tiles/StageView';
 import { useBrands } from './use-brands';
 import { useWorkspace } from './use-workspace';
 
+const CHAT_OPEN = 'mra:chat-open';
+
+function readChatOpen(): boolean {
+  try {
+    return localStorage.getItem(CHAT_OPEN) !== '0';
+  } catch {
+    return true;
+  }
+}
+
 export default function BrandPage({ brandKey, stage, onError }: { brandKey: string; stage: Extract<Route, { page: 'brand' }>['stage']; onError: (message: string) => void }) {
   const brands = useBrands(onError);
   const { chat, board, connected } = useWorkspace(brandKey);
   const [config, setConfig] = useState<Config | null>(null);
   const [draft, setDraft] = useState({ text: '', n: 0 });
+  const [chatOpen, setChatOpen] = useState(() => readChatOpen());
+  const showChat = (open: boolean) => {
+    setChatOpen(open);
+    try {
+      localStorage.setItem(CHAT_OPEN, open ? '1' : '0');
+    } catch {
+      return;
+    }
+  };
   useEffect(() => {
     api.config().then(setConfig).catch(() => undefined);
   }, []);
@@ -22,7 +41,7 @@ export default function BrandPage({ brandKey, stage, onError }: { brandKey: stri
   const products = brand?.products ?? [];
   const cards = (board?.cards ?? []).filter((card) => [brandKey, ''].includes(board?.card_brands[card.id] ?? ''));
   return (
-    <div className="home">
+    <div className={`home${chatOpen ? '' : ' chat-hidden'}`}>
       <div className="side">
         <div className="brand-head">
           <button className="ghost" onClick={() => navigate(stage ? paths.brand(brandKey) : paths.home())}>
@@ -41,12 +60,18 @@ export default function BrandPage({ brandKey, stage, onError }: { brandKey: stri
               product={product}
               showLabel={products.length > 1}
               onOpen={(n) => navigate(paths.stage(brandKey, product.id, n))}
-              onAsk={(text) => setDraft((d) => ({ text, n: d.n + 1 }))}
+              onAsk={(text) => (setDraft((d) => ({ text, n: d.n + 1 })), showChat(true))}
               onError={onError}
             />
           ))}
       </div>
-      <ChatPanel brand={brandKey} chat={chat} cards={cards} connected={connected} draft={draft} onError={onError} />
+      {chatOpen ? (
+        <ChatPanel brand={brandKey} chat={chat} cards={cards} connected={connected} draft={draft} onHide={() => showChat(false)} onError={onError} />
+      ) : (
+        <button className="primary chat-open-btn" onClick={() => showChat(true)}>
+          Chat{cards.filter((c) => c.status === 'open').length > 0 && <span className="chat-badge">{cards.filter((c) => c.status === 'open').length} waiting</span>}
+        </button>
+      )}
     </div>
   );
 }

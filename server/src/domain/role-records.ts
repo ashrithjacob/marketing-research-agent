@@ -9,7 +9,7 @@ export class RoleRecords {
     Trace.line(import.meta.url, "RoleRecords.of", { role: role.id });
     const named = Deliverables.kinds(role.deliverable);
     const curve: FindingKind[] = role.deliverable.shape === "list" ? ["saturation"] : [];
-    const status: FindingKind[] = role.consistency === "stage_one_node" ? ["node_status"] : [];
+    const status: FindingKind[] = role.consistency === "stage_one_node" || role.consistency === "market_node" || role.consistency === "customer_node" ? ["node_status"] : [];
     return [...new Set<FindingKind>(["source", ...named, ...curve, ...status, "gap"])];
   }
 }

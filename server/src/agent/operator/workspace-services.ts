@@ -1,6 +1,6 @@
 import type { OpenRouterPrices } from "../../adapters/index.js";
 import type { Settings } from "../../config/index.js";
-import { Scope, type AdInsights, type AdLibrary, type BrandImageFinder, type ResearchStore, type RunRequest } from "../../domain/index.js";
+import { Scope, type AdInsights, type AdLibrary, type BrandImageFinder, type Card, type ResearchStore, type RunRequest } from "../../domain/index.js";
 import { Trace } from "../../trace/index.js";
 
 import type { LiveRuns } from "../live-runs.js";
@@ -32,7 +32,12 @@ import { OwnerDesk } from "./owner-desk.js";
 import { PlanDesk } from "./plan-desk.js";
 import { PlanRelease } from "./plan-release.js";
 import { PlanStages } from "./plan-stages.js";
-import { StageOneTools } from "./stage-one-tools.js";
+import { RunControlTools, type StageRunControl } from "./run-control-tools.js";
+import { StageBriefDesk } from "./stage-brief-desk.js";
+import { StageTools } from "./stage-tools.js";
+import { BrandResearch } from "./brand-research.js";
+import { ChatStages } from "./chat-stages.js";
+import { ChatReviews, type ReviewAnalysisStarter } from "./chat-reviews.js";
 import { WorkspaceBoard } from "./workspace-board.js";
 
 /** Everything that runs on the harness, built together: durable tasks, plans, each workspace's operator, and the board. */
@@ -54,8 +59,9 @@ export class WorkspaceServices {
   readonly watch: WatchDesk;
   readonly stages: PlanStages;
   readonly brands: BrandShelf;
+  readonly briefs: StageBriefDesk;
 
-  constructor(deps: { store: ResearchStore; runs: LiveRuns; settings: Settings; harness: PiHarness; tools: ToolRegistry; costs: OpenRouterPrices; ads: AdLibrary | null; insights: AdInsights | null; brandImages: BrandImageFinder; start: (request: RunRequest, workspaceId: string) => Promise<string> }) {
+  constructor(deps: { store: ResearchStore; runs: LiveRuns; settings: Settings; harness: PiHarness; tools: ToolRegistry; costs: OpenRouterPrices; ads: AdLibrary | null; insights: AdInsights | null; brandImages: BrandImageFinder; stageRuns: StageRunControl & { analyst: ReviewAnalysisStarter; isLive: (runId: string) => boolean }; start: (request: RunRequest, workspaceId: string) => Promise<string> }) {
     Trace.line(import.meta.url, "WorkspaceServices.constructor");
     const events = new TaskEvents();
     this.memory = new MemoryDesk(deps.store);
@@ -65,7 +71,8 @@ export class WorkspaceServices {
     this.draftDesk = new DraftDesk(deps.store);
     const settle = async (draftId: string, approved: boolean) => void (await (approved ? this.draftDesk.approve(draftId, Scope.everything) : this.draftDesk.reject(draftId, Scope.everything)));
     const stage = (planId: string, approved: boolean) => this.stages.decide(planId, approved);
-    this.cards = new CardDesk(deps.store, deps.store.plans, this.tasks, { reply, lesson: decide, draft: settle, stage }, events);
+    const brief = (card: Card, approved: boolean, text: string) => this.brief(card, approved, text);
+    this.cards = new CardDesk(deps.store, deps.store.plans, this.tasks, { reply, lesson: decide, draft: settle, stage, brief }, events);
     const { apifyMaxReviews: reviewsPerBand, reviewReuseDays: reuseDays } = deps.settings;
     this.stages = new PlanStages({ store: deps.store, runs: deps.runs, start: deps.start, reviewsPerBand, reuseDays }, events);
     this.drafts = new DraftFlow(deps.store, this.tasks, { maxUsd: deps.settings.taskMaxUsd }, events);
@@ -75,14 +82,27 @@ export class WorkspaceServices {
     this.release = new PlanRelease(deps.store, deps.store.plans, plans, events);
     this.schedules = new ScheduleDesk(deps.store);
     const always = new AlwaysOnTools(new TaskCreation(this.tasks, plans), this.schedules);
-    const tools = new OperatorTools(deps.store, plans, this.tasks, this.cards, this.memory, always, new StageOneTools(plans), new LibraryShelfTools(deps.store.library));
+    this.playbooks = new PlaybookDesk(deps.store, this.tasks, { maxUsd: deps.settings.taskMaxUsd });
+    const chatStages = new ChatStages(deps.store, deps.store.plans, this.stages, deps.start);
+    this.briefs = new StageBriefDesk(deps.store, plans, chatStages, (workspaceId, draft) => this.cards.open(workspaceId, draft));
+    const research = new StageTools(new BrandResearch(deps.store), this.briefs, chatStages, new ChatReviews(deps.store, deps.stageRuns.analyst, deps.stageRuns.isLive));
+    const tools = new OperatorTools(deps.store, plans, this.tasks, this.cards, this.memory, always, new RunControlTools(deps.store, this.tasks, deps.stageRuns), new LibraryShelfTools(deps.store.library, this.playbooks), research);
     this.operator = new OperatorDesk(deps.harness, deps.store, tools.extension(), deps.settings.model, this.tasks, events);
     this.brands = new BrandShelf(deps.store, this.operator, deps.brandImages);
     this.owner = new OwnerDesk(plans, this.operator, deps.store.feedback);
     this.board = new WorkspaceBoard(deps.store, this.tasks, () => this.alwaysOn);
     const signal = (workspaceId: string, text: string, key: string) => this.operator.signal(workspaceId, "", text, key);
     this.alwaysOn = new AlwaysOnDesk(deps.store, WatchSet.build({ ...deps, limits: this.tasks.limits }, signal), new WorkspaceSpend(deps.store));
-    this.playbooks = new PlaybookDesk(deps.store, this.tasks, { maxUsd: deps.settings.taskMaxUsd });
     this.watch = new WatchDesk(deps.store);
+  }
+
+  /** A stage brief's card settled: approved, its stage runs with the text as approved and the brand's chat is told, so it can say so; set aside, the chat is told without a reply. */
+  private async brief(card: Card, approved: boolean, text: string): Promise<void> {
+    Trace.line(import.meta.url, "WorkspaceServices.brief", { cardId: card.id, approved });
+    if (card.action.kind !== "stage_brief") return;
+    const brand = card.action.brand;
+    if (!approved) return this.operator.note(card.workspace_id, brand, `The owner set aside the brief "${card.title}".`);
+    const started = await this.briefs.run(card.workspace_id, card.action, text);
+    await this.operator.signal(card.workspace_id, brand, `The owner approved the brief "${card.title}"${text !== card.body.trim() ? " with changes" : ""}, and it started. ${started}`, `brief:${card.id}`);
   }
 }

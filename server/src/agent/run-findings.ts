@@ -11,6 +11,15 @@ const NODE_ENTITY: Readonly<Record<Node, string>> = {
   dose_vs_study: "product",
   claim_limits: "product",
   cogs_refills: "product",
+  tam_sam: "market",
+  offers: "market",
+  sophistication: "market",
+  breaking_point: "market",
+  viability: "market",
+  language_bank: "customer",
+  identity: "customer",
+  avatars: "customer",
+  awareness: "customer",
 };
 
 export type Recorded = { recorded: Finding; replaced: string | null } | { problems: string };

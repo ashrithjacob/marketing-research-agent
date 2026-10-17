@@ -1,4 +1,4 @@
-import { STAGE_STORY, stageOverview, stageTabs, type StageNumber } from '../api';
+import { STAGE_ORDER, STAGE_STORY, stageOverview, stageTabs, type StageNumber } from '../api';
 import { navigate, paths } from '../route';
 import StageDetail from './StageDetail';
 import StageStats from './StageStats';
@@ -18,12 +18,13 @@ export default function StageView({ brandKey, brandLabel, productId, stage, tab,
         </button>
         <span aria-hidden>›</span>
         <span>
-          Stage {stage} · {STAGE_STORY[stage].title}
+          Step {STAGE_ORDER.indexOf(stage) + 1} · {STAGE_STORY[stage].title}
         </span>
         {summary && <span className={`status ${summary.status}`}>{summary.status}</span>}
         {summary && <span className="muted small">{new Date(summary.created_at).toLocaleString()}</span>}
       </nav>
       {!summary && <p className="muted small">{stages.every((s) => !s.summary) ? 'Loading…' : 'This stage has not run for this product.'}</p>}
+      {run && <BriefUsed notes={run.brief.notes ?? ''} />}
       {overview && (
         <div className="stage-view-head">
           <p className="stage-read">{overview.read}</p>
@@ -47,5 +48,16 @@ export default function StageView({ brandKey, brandLabel, productId, stage, tab,
         </div>
       )}
     </div>
+  );
+}
+
+/** The brief this stage's run was given, as the owner approved it, read from the run itself. */
+function BriefUsed({ notes }: { notes: string }) {
+  if (!notes.trim()) return <p className="muted small">This run had no brief from you: its agents followed their standard checklist.</p>;
+  return (
+    <details className="brief-used">
+      <summary>The brief you gave this stage</summary>
+      <pre>{notes.trim()}</pre>
+    </details>
   );
 }

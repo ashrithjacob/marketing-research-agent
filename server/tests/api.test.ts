@@ -205,6 +205,18 @@ describe("the corpus route", () => {
     expect(response.headers.get("X-Corpus-Digest-Matches")).toBe("false");
   });
 
+  it("serves a page a later stage cites from the earlier run that archived it, as run 111f09aa's stage-4 links needed", async () => {
+    const earlier = await runId();
+    const digest = write(earlier, "the product page stage 1 read");
+    const later = await runId();
+    await store.updateRun(later, { packet: { sources: [{ id: `sha256:${digest}` }] } });
+    const response = await get(`/api/research/runs/${later}/sources/${digest}`);
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe("the product page stage 1 read");
+    const uncited = await runId();
+    expect((await get(`/api/research/runs/${uncited}/sources/${digest}`)).status).toBe(404);
+  });
+
   it("404s a hash that was never archived", async () => {
     const id = await runId();
     expect((await get(`/api/research/runs/${id}/sources/${"a".repeat(64)}`)).status).toBe(404);

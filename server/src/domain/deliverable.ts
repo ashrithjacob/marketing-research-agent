@@ -5,7 +5,10 @@ import { Trace } from "../trace/index.js";
 /** A requirement beyond "a row fills it". */
 export type FieldRule =
   | { kind: "distinct_periods"; min: number }
-  | { kind: "number_on_latest" };
+  | { kind: "number_on_latest" }
+  | { kind: "one_of"; values: readonly string[] }
+  | { kind: "stage_from_elements" }
+  | { kind: "where"; field: string; value: string };
 
 /** One field a `fields` deliverable names: an attribute's key, a measurement's metric, or any row of another kind. */
 export interface FieldSpec {
@@ -16,6 +19,10 @@ export interface FieldSpec {
   /** What `finish` tells the agent to do about it, where "record it" is not enough. */
   how?: string;
   rule?: FieldRule;
+  /** Shown to the shop owner as the gate's reasoning: after the run, the judge model rewrites it to read on its own, without the ledger it cites. */
+  reword?: boolean;
+  /** The field in the owner's words, for the stage brief, where `describe` is written for the agent's tools. */
+  brief?: string;
 }
 
 /** One part of each item in a `list` deliverable: a field of the item's row. */
@@ -32,6 +39,8 @@ export interface ItemNeed {
   match: readonly string[];
   field?: string;
   describe: string;
+  /** The need in the owner's words, for the stage brief. */
+  brief?: string;
 }
 
 export type ItemSource =

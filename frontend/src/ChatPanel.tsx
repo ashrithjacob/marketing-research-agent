@@ -4,7 +4,7 @@ import { workspaceApi, type Card, type ChatMessage } from './api';
 import Cards from './Cards';
 import ChatText from './ChatText';
 
-export default function ChatPanel({ brand, chat, cards, connected, draft, onError }: { brand: string; chat: ChatMessage[]; cards: Card[]; connected: boolean; draft: { text: string; n: number }; onError: (message: string) => void }) {
+export default function ChatPanel({ brand, chat, cards, connected, draft, onHide, onError }: { brand: string; chat: ChatMessage[]; cards: Card[]; connected: boolean; draft: { text: string; n: number }; onHide: () => void; onError: (message: string) => void }) {
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
   const end = useRef<HTMLDivElement>(null);
@@ -34,6 +34,9 @@ export default function ChatPanel({ brand, chat, cards, connected, draft, onErro
     <section className="chat">
       <div className="chat-head">
         Marketing agent <span className={`dot ${connected ? 'on' : ''}`} title={connected ? 'live' : 'reconnecting'} />
+        <button className="ghost chat-hide" onClick={onHide} title="Hide the chat to read at full width">
+          Hide ⟩
+        </button>
       </div>
       <div className="chat-lines">
         {chat.length === 0 && <p className="muted small">Ask for market research on this brand, or paste one of its product pages.</p>}

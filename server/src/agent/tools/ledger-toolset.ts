@@ -1,6 +1,7 @@
 import type { AgentTool } from "@earendil-works/pi-agent-core";
 
-import type { FindingKind } from "../../domain/index.js";
+import type { Corpus } from "../../adapters/corpus.js";
+import type { FindingKind, Node, Source, StoredRunReview } from "../../domain/index.js";
 import { Trace } from "../../trace/index.js";
 
 import type { AgentRoster } from "../agent-roster.js";
@@ -12,6 +13,9 @@ import type { RunFindings } from "../run-findings.js";
 import { FinishTool, type FinishTally } from "./finish-tool.js";
 import { ReadLedgerTool, WaitForTool } from "./ledger-read-tools.js";
 import { RecordTool, RetractTool } from "./ledger-tools.js";
+import { QuoteTool } from "./quote-tool.js";
+import { ReadReviewsTool } from "./read-reviews-tool.js";
+import { UseSourceTool } from "./use-source-tool.js";
 
 export interface LedgerOptions {
   findings: RunFindings;
@@ -21,6 +25,10 @@ export interface LedgerOptions {
   tally: FinishTally;
   roster?: AgentRoster;
   pollMs?: number;
+  /** Sources the earlier stages read, for `use_source`, with the node they are filed under in this run. */
+  earlier?: { sources: readonly Source[]; node: Node };
+  /** The mined reviews customer truth reads, and the corpus its quotes are copied from: read_reviews and record_quote. */
+  voices?: { reviews: readonly StoredRunReview[]; corpus: Corpus };
 }
 
 /** An agent's hand on the run ledger: a record tool per kind it may write, retract, read, wait_for when it has agents to wait on, and finish. */
@@ -34,8 +42,12 @@ export class LedgerToolset {
       new RecordTool(spec, ledger.findings).tool(),
     );
     const wait = ledger.roster ? [new WaitForTool(ledger.findings, ledger.roster, ledger.pollMs).tool()] : [];
+    const earlier = ledger.earlier ? [new UseSourceTool(ledger.findings, ledger.earlier.sources, ledger.earlier.node).tool()] : [];
+    const voices = ledger.voices ? [new ReadReviewsTool(ledger.voices.reviews).tool(), new QuoteTool(ledger.findings, ledger.voices.reviews, ledger.voices.corpus).tool()] : [];
     return [
       ...records,
+      ...earlier,
+      ...voices,
       new RetractTool(ledger.findings).tool(),
       new ReadLedgerTool(ledger.findings).tool(),
       ...wait,

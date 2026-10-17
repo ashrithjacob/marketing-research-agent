@@ -1,6 +1,7 @@
 import { COMPETITORS_DELIVERABLE, Findings, type Finding, type FindingKind } from "../domain/index.js";
 import { Trace } from "../trace/index.js";
 
+import { CustomerPicks } from "./customer-picks.js";
 import { ListCheck } from "./list-check.js";
 import { SharedActives } from "./shared-actives.js";
 
@@ -16,6 +17,11 @@ export class RowPicks {
         return RowPicks.active(kind, payload, live);
       case "claim_limit":
         return RowPicks.market(payload, markets);
+      case "identity_entry":
+      case "pain_profile":
+      case "avatar":
+      case "awareness":
+        return CustomerPicks.problems(kind, payload, live);
       default:
         return [];
     }

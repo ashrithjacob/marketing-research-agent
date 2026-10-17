@@ -1,6 +1,7 @@
+import { STAGE_ORDER, type StageNumber } from './api';
 import { useEffect, useState, type MouseEvent, type ReactNode } from 'react';
 
-export type Route = { page: 'home' } | { page: 'brand'; key: string; stage: { productId: string; n: 1 | 2 | 3; tab: string } | null } | { page: 'logs'; runId: string } | { page: 'draft'; draftId: string };
+export type Route = { page: 'home' } | { page: 'brand'; key: string; stage: { productId: string; n: StageNumber; tab: string } | null } | { page: 'logs'; runId: string } | { page: 'draft'; draftId: string };
 
 export const paths = {
   home: () => '/',
@@ -15,8 +16,9 @@ export function parseRoute(pathname: string): Route {
   const path = pathname.replace(/\/+$/, '') || '/';
   const draft = path.match(/^\/drafts\/([0-9a-f]+)$/);
   if (draft) return { page: 'draft', draftId: draft[1] };
-  const stage = path.match(/^\/brands\/([^/]+)\/products\/([0-9a-f]+)\/stages\/([123])(?:\/([a-z_]+))?$/);
-  if (stage) return { page: 'brand', key: decodeURIComponent(stage[1]), stage: { productId: stage[2], n: Number(stage[3]) as 1 | 2 | 3, tab: stage[4] ?? '' } };
+  const stage = path.match(/^\/brands\/([^/]+)\/products\/([0-9a-f]+)\/stages\/(\d+)(?:\/([a-z_]+))?$/);
+  const n = STAGE_ORDER.find((known) => known === Number(stage?.[3]));
+  if (stage && n) return { page: 'brand', key: decodeURIComponent(stage[1]), stage: { productId: stage[2], n, tab: stage[4] ?? '' } };
   const brand = path.match(/^\/brands\/([^/]+)$/);
   if (brand) return { page: 'brand', key: decodeURIComponent(brand[1]), stage: null };
   const logs = path.match(/^\/runs\/([0-9a-f]+)\/logs$/);

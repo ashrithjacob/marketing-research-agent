@@ -5,14 +5,15 @@ import type { TaskContract } from "./task-contract.js";
 export type CardKind = "question" | "approval";
 export type CardStatus = "open" | "answered" | "approved" | "rejected";
 
-/** What resolving a card does: hand a paused task its answer, hand the operator its answer, or start a task the owner approved, or settle a draft. */
+/** What resolving a card does: hand a paused task its answer, hand the operator its answer, start a task the owner approved, settle a draft, or run a stage with the brief the owner approved, as they edited it. */
 export type CardAction =
   | { kind: "answer_task"; run_id: string }
   | { kind: "reply_operator"; brand?: string }
   | { kind: "lesson"; lesson_id: string; editable?: boolean }
   | { kind: "draft"; draft_id: string }
   | { kind: "start_stage"; plan_id: string; stage: 3 }
-  | { kind: "start_task"; brief: Brief; contract: TaskContract; plan_id: string; task_key: string };
+  | { kind: "start_task"; brief: Brief; contract: TaskContract; plan_id: string; task_key: string }
+  | { kind: "stage_brief"; editable: true; brand: string; stage: number; brief: Brief; product: string; parts: string[]; inputs: { landed_unit_cost?: number; currency?: string }; fresh: boolean };
 
 /** Something only the owner can settle, shown as a card until they do (spec §7.2). */
 export interface Card {

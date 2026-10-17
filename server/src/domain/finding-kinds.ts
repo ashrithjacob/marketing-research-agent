@@ -9,6 +9,8 @@ import {
   saturationSchema,
 } from "./packet.js";
 import type { Node } from "./nodes.js";
+import { adElementsSchema, buyerStageSchema } from "./persuasion.js";
+import { avatarSchema, awarenessSchema, identityEntrySchema, painProfileSchema, quoteSchema } from "./customer-truth.js";
 import {
   activeSchema,
   claimLimitSchema,
@@ -36,11 +38,18 @@ export const FINDING_KINDS = [
   "claim_limit",
   "price_point",
   "operator_input",
+  "ad_elements",
+  "buyer_stage",
+  "quote",
+  "identity_entry",
+  "pain_profile",
+  "avatar",
+  "awareness",
 ] as const;
 export type FindingKind = (typeof FINDING_KINDS)[number];
 
 /** Kinds whose packet `id` is the ledger row's id, so the agent never invents one. */
-export const CODE_ID_KINDS: ReadonlySet<FindingKind> = new Set(["excerpt", "measurement", "attribute"]);
+export const CODE_ID_KINDS: ReadonlySet<FindingKind> = new Set(["excerpt", "measurement", "attribute", "quote"]);
 
 export const FINDING_SCHEMAS: Readonly<Record<FindingKind, z.ZodTypeAny>> = {
   source: sourceSchema,
@@ -59,6 +68,13 @@ export const FINDING_SCHEMAS: Readonly<Record<FindingKind, z.ZodTypeAny>> = {
   claim_limit: claimLimitSchema,
   price_point: pricePointSchema,
   operator_input: operatorInputSchema,
+  ad_elements: adElementsSchema,
+  buyer_stage: buyerStageSchema,
+  quote: quoteSchema,
+  identity_entry: identityEntrySchema,
+  pain_profile: painProfileSchema,
+  avatar: avatarSchema,
+  awareness: awarenessSchema,
 };
 
 /** The node a kind with no `node` field of its own is filed under. The champion's reference has none: it belongs to every stage-1 run. */
@@ -71,6 +87,13 @@ export const FINDING_NODES: Readonly<Partial<Record<FindingKind, Node>>> = {
   regimen: "cogs_refills",
   price_point: "cogs_refills",
   operator_input: "cogs_refills",
+  ad_elements: "sophistication",
+  buyer_stage: "breaking_point",
+  quote: "language_bank",
+  identity_entry: "identity",
+  pain_profile: "identity",
+  avatar: "avatars",
+  awareness: "awareness",
 };
 
 export const FINDING_ROW_PREFIX: Readonly<Record<FindingKind, string>> = {
@@ -90,4 +113,11 @@ export const FINDING_ROW_PREFIX: Readonly<Record<FindingKind, string>> = {
   claim_limit: "cl",
   price_point: "pp",
   operator_input: "op",
+  ad_elements: "ae",
+  buyer_stage: "bs",
+  quote: "qt",
+  identity_entry: "ie",
+  pain_profile: "pf",
+  avatar: "av",
+  awareness: "aw",
 };

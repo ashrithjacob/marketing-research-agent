@@ -8,6 +8,8 @@ import {
   measurementSchema,
   sourceSchema,
 } from "./evidence.js";
+import { adElementsSchema, buyerStageSchema, buyerStageShareSchema, elementShareSchema } from "./persuasion.js";
+import { avatarSchema, awarenessSchema, identityEntrySchema, painProfileSchema, quoteSchema } from "./customer-truth.js";
 import { formSchema, relationSchema } from "./vocabulary.js";
 
 export const saturationPointSchema = z
@@ -100,7 +102,7 @@ export type Competitor = z.infer<typeof competitorSchema>;
 export const stagePacketSchema = z
   .object({
     contract_version: z.string().default(CONTRACT_VERSION),
-    stage: z.union([z.literal(1), z.literal(3)]).default(1),
+    stage: z.union([z.literal(1), z.literal(3), z.literal(4), z.literal(5)]).default(1),
     run_id: z.string().default(""),
     brief: briefSchema,
     sources: z.array(sourceSchema).default([]),
@@ -112,6 +114,15 @@ export const stagePacketSchema = z
     saturation: z.array(saturationSchema).default([]),
     nodes: z.array(nodeStatusSchema).default([]),
     gaps: z.array(gapSchema).default([]),
+    ad_elements: z.array(adElementsSchema).default([]),
+    element_shares: z.array(elementShareSchema).default([]),
+    buyer_stages: z.array(buyerStageSchema).default([]),
+    buyer_stage_shares: z.array(buyerStageShareSchema).default([]),
+    quotes: z.array(quoteSchema.extend({ id: z.string() })).default([]),
+    identity_entries: z.array(identityEntrySchema).default([]),
+    pain_profiles: z.array(painProfileSchema).default([]),
+    avatars: z.array(avatarSchema).default([]),
+    awareness: z.array(awarenessSchema).default([]),
   })
   .strict();
 export type StagePacket = z.infer<typeof stagePacketSchema>;

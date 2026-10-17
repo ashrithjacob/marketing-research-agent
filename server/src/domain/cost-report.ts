@@ -24,6 +24,8 @@ export const TOOL_COST_COLUMNS: Readonly<Record<ToolName, readonly CostColumn[]>
   ad_library_search: ["trendtrack"],
   amazon_find_product: ["apify"],
   library_index: [],
+  use_source: [],
+  read_reviews: [],
   library_read: [],
   wait_for: [],
 };

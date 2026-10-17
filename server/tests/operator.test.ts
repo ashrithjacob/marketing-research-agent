@@ -11,7 +11,7 @@ import { fauxAssistantMessage, fauxProvider, fauxToolCall, type FauxResponseStep
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import type { SqlResearchStore } from "../src/adapters/index.js";
-import { PiHarness } from "../src/agent/index.js";
+import { PiHarness, PromptBlocks } from "../src/agent/index.js";
 import { Env, type Settings } from "../src/config/index.js";
 import { Scope, TERMINAL_STATUSES, type ChatMessage, type Plan } from "../src/domain/index.js";
 import { App } from "../src/http/index.js";
@@ -270,7 +270,8 @@ describe("stage 1 as a plan", () => {
     expect((await store.listRuns(Scope.of("admin"), 10)).length).toBe(0);
 
     const first = (await store.cards.list(Scope.of("admin"), 10)).find((c) => c.kind === "approval")!;
-    expect(first.title).toBe("Approve Champion product?");
+    expect(first.title).toBe("Search Amazon for the category's best-seller?");
+    expect(first.body).toBe("To compare magnesium glycinate with the product that leads its category, the agent looks it up on Amazon, which is a paid search. It can spend up to $0.50 in all.");
     await call("POST", `/cards/${first.id}/approve`);
     const released = await until(
       async () => ((await (await call("GET", `/plans/${plan.id}`)).json()) as Plan).tasks,
@@ -286,7 +287,7 @@ describe("stage 1 as a plan", () => {
     ]);
     expect((await until(() => store.getRun(productRun), (run) => !!run && TERMINAL_STATUSES.has(run.status)))!.status).toBe("completed");
     const open = (await store.cards.list(Scope.of("admin"), 10)).filter((c) => c.status === "open").map((c) => c.title);
-    expect(open).toEqual(["Approve Competitors?"]);
+    expect(open).toEqual(["Look up magnesium glycinate's competitors on Amazon?"]);
   });
 });
 
@@ -335,25 +336,38 @@ describe("feedback", () => {
 describe("chat starts the work", () => {
   const text = (content: unknown) => (typeof content === "string" ? content : JSON.stringify(content));
 
-  it("a pasted link starts stage 1 as a url brief, the champion behind its Approve card and the rest after it; the message is feedback for the reviewer", async () => {
+  it("a pasted link puts market research's brief on a card and starts nothing; the owner's edited brief runs, reaches the agents word for word, and is feedback", async () => {
     faux.setResponses([
-      fauxAssistantMessage(fauxToolCall("start_stage_one", { url: "https://magnacalm.example" }), { stopReason: "toolUse" }),
-      fauxAssistantMessage("Started. The champion needs your approval first."),
+      fauxAssistantMessage(fauxToolCall("propose_stage", { stage: 1, url: "https://magnacalm.example" }), { stopReason: "toolUse" }),
+      fauxAssistantMessage("Here is what market research will look for. Edit it and run it when ready."),
+      fauxAssistantMessage("Started. The best-seller lookup needs your approval first."),
     ]);
     await call("POST", "/chat", { text: "research https://magnacalm.example" });
     await until(chat, (seen) => seen.some((line) => line.role === "operator" && !line.partial));
+    expect(await store.plans.list(Scope.of("admin"), 5)).toEqual([]);
+    const card = (await store.cards.list(Scope.of("admin"), 10))[0]!;
+    expect([card.kind, card.title, card.action.kind]).toEqual(["approval", "Run market research for magnacalm.example?", "stage_brief"]);
+    for (const section of ["## The category's best-seller", "## Product facts", "## Competitors", "## Category numbers", "## Your guidance"]) expect(card.body).toContain(section);
+    expect(card.body).toContain("- search volume: how many people search for the category");
+
+    const edited = `${card.body}\n- Stay in the UK market only.`;
+    expect((await call("POST", `/cards/${card.id}/approve`, { text: edited })).status).toBe(202);
     const plan = (await store.plans.list(Scope.of("admin"), 5))[0]!;
-    expect(plan).toMatchObject({ status: "approved", brief: { url: "https://magnacalm.example", product: "" } });
+    expect(plan).toMatchObject({ status: "approved", brief: { url: "https://magnacalm.example", product: "", notes: edited.trim() } });
     expect(plan.tasks.map((t) => [t.key, t.run_id, t.error, t.after])).toEqual([
       ["champion", "", "waiting for your approval: it would spend Apify money", []],
       ["product_facts", "", "", ["champion"]],
       ["competitors", "", "", ["champion"]],
       ["category_numbers", "", "", ["champion"]],
     ]);
-    expect((await store.cards.list(Scope.of("admin"), 10)).map((c) => [c.kind, c.title, c.status])).toEqual([["approval", "Approve Champion product?", "open"]]);
-    expect((await store.listRuns(Scope.of("admin"), 10)).length).toBe(0);
-    const said = (await store.feedback.list(Scope.of("admin"), 10)).filter((f) => f.verdict === "said");
-    expect(said.map((f) => [f.strength, f.target.kind, f.text])).toEqual([["instruction", "chat", "research https://magnacalm.example"]]);
+    expect((await store.cards.list(Scope.of("admin"), 10)).map((c) => [c.title, c.status])).toEqual([
+      ["Search Amazon for the category's best-seller?", "open"],
+      ["Run market research for magnacalm.example?", "approved"],
+    ]);
+    const feedback = await store.feedback.list(Scope.of("admin"), 10);
+    expect(feedback.find((f) => f.verdict === "edited")).toMatchObject({ target: { kind: "brief", id: "stage 1" }, text: edited.trim(), diff: { before: card.body, after: edited.trim() } });
+    expect(feedback.filter((f) => f.verdict === "said").map((f) => f.text)).toEqual(["research https://magnacalm.example"]);
+    expect(PromptBlocks.brief(plan.brief)).toContain(`## The owner's brief for this stage\n\n${edited.trim()}`);
   });
 
   it("a brand opened with a link gets its own chat: the research it starts reports there, and its tile lists the product with the site's graphic", async () => {
@@ -361,14 +375,18 @@ describe("chat starts the work", () => {
       const first = text(context.messages.find((m) => m.role === "user")?.content ?? "");
       const started = context.messages.some((m) => m.role === "toolResult");
       if (first.includes("Your task: the product's fact sheet")) return started ? finish() : recordAll();
+      if (context.messages.some((m) => m.role === "user" && text(m.content).startsWith("[Signal] Task"))) return fauxAssistantMessage("Product facts are in: 1 source, nothing missing.");
+      if (context.messages.some((m) => m.role === "user" && text(m.content).startsWith("[Signal] The owner approved"))) return fauxAssistantMessage("Started the product facts.");
       if (context.messages.some((m) => m.role === "user" && text(m.content).startsWith("[Signal]"))) return fauxAssistantMessage("Product facts are in: 1 source, nothing missing.");
-      return started ? fauxAssistantMessage("Started the product facts.") : fauxAssistantMessage(fauxToolCall("start_stage_one", { url: "https://magnacalm.example", parts: ["product_facts"] }), { stopReason: "toolUse" });
+      return started ? fauxAssistantMessage("The brief is on a card below.") : fauxAssistantMessage(fauxToolCall("propose_stage", { stage: 1, url: "https://magnacalm.example", parts: ["product_facts"] }), { stopReason: "toolUse" });
     };
     faux.setResponses(Array.from({ length: 20 }, () => route));
     const opened = await call("POST", "/brands", { text: "https://www.magnacalm.example/" });
     expect(opened.status).toBe(201);
     const { key } = (await opened.json()) as { key: string };
     expect(key).toBe("site:magnacalm.example");
+    const card = await until(async () => (await store.cards.list(Scope.of("admin"), 5)).find((c) => c.action.kind === "stage_brief"), (c) => !!c);
+    expect((await call("POST", `/cards/${card!.id}/approve`, {})).status).toBe(202);
 
     const plan = await until(async () => (await store.plans.list(Scope.of("admin"), 5))[0], (p) => !!p?.tasks.find((t) => t.key === "product_facts")?.run_id);
     expect(plan!.tasks.filter((t) => t.selected).map((t) => t.key)).toEqual(["product_facts"]);
@@ -377,6 +395,7 @@ describe("chat starts the work", () => {
     const lines = await until(() => chat(key), (seen) => seen.some((line) => line.text.startsWith("Product facts are in")));
     expect(lines.filter((line) => !line.partial).map((line) => [line.role, line.text])).toEqual([
       ["owner", "https://www.magnacalm.example/"],
+      ["operator", "The brief is on a card below."],
       ["operator", "Started the product facts."],
       ["operator", "Product facts are in: 1 source, nothing missing."],
     ]);
@@ -402,12 +421,13 @@ describe("chat starts the work", () => {
 
   it("an unknown part comes back to the operator as an error, and nothing starts", async () => {
     faux.setResponses([
-      fauxAssistantMessage(fauxToolCall("start_stage_one", { product: "magnesium glycinate", parts: ["ads"] }), { stopReason: "toolUse" }),
+      fauxAssistantMessage(fauxToolCall("propose_stage", { stage: 1, product: "magnesium glycinate", parts: ["ads"] }), { stopReason: "toolUse" }),
       (context) => fauxAssistantMessage(text(context.messages.at(-1)?.content)),
     ]);
     await call("POST", "/chat", { text: "the ads part for magnesium glycinate" });
     const lines = await until(chat, (seen) => seen.some((line) => line.role === "operator" && !line.partial));
-    expect(lines.at(-1)!.text).toContain("no stage-1 part ads; the parts are product_facts, competitors, category_numbers");
+    expect(lines.at(-1)!.text).toContain("no part ads; the parts are product_facts, competitors, category_numbers");
     expect(await store.plans.list(Scope.of("admin"), 5)).toEqual([]);
+    expect(await store.cards.list(Scope.of("admin"), 5)).toEqual([]);
   });
 });

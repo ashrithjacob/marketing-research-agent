@@ -2,7 +2,7 @@ import { createModels, type Models } from "@earendil-works/pi-ai";
 import { openrouterProvider } from "@earendil-works/pi-ai/providers/openrouter";
 
 import { Corpus } from "../adapters/corpus.js";
-import { OpenRouterPrices, ServiceClients } from "../adapters/index.js";
+import { OpenRouterPrices, RunBilling, ServiceClients } from "../adapters/index.js";
 import type { Settings } from "../config/index.js";
 import {
   FeedbackStrengths,
@@ -27,6 +27,7 @@ import { RunError } from "./errors.js";
 import { InvalidRunResettle } from "./invalid-run-resettle.js";
 import { RunEnd } from "./run-end.js";
 import { RunLauncher } from "./run-launcher.js";
+import { RunWrapUp } from "./run-wrap-up.js";
 import { StoredRunAssembly } from "./stored-run-assembly.js";
 
 /** Owns a research run for its whole life: one Agent per run, in this process. */
@@ -101,6 +102,17 @@ export class RunSupervisor {
   resettleInvalidRuns(): Promise<string[]> {
     Trace.line(import.meta.url, "RunSupervisor.resettleInvalidRuns");
     return new InvalidRunResettle(this.store, this.runs).resettleAll();
+  }
+
+  /** Rewrites a finished market-truth run's gate for the owner, as a run now does when it ends; its billed cost is added to the run's. */
+  async reword(runId: string): Promise<number> {
+    Trace.line(import.meta.url, "RunSupervisor.reword", { runId });
+    const run = await this.store.getRun(runId);
+    if (!run || run.stage !== 4) throw new RunError("only a market-truth run has a gate to rewrite");
+    const billing = new RunBilling(this.costs);
+    const kept = await this.launcher.reword().apply(runId, billing);
+    await new RunWrapUp(this.store, this.runs, runId).addBilling(billing);
+    return kept;
   }
 
   async steer(runId: string, judgement: Judgement): Promise<void> {

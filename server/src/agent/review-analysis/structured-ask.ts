@@ -18,7 +18,7 @@ export class StructuredAsk {
 
   async ask<T>(
     request: { system: string; user: string; tool: Tool<TSchema>; schema: z.ZodType<T> },
-    onUsage: (usage: Usage) => void,
+    onUsage: (usage: Usage, responseId?: string) => void,
   ): Promise<T> {
     Trace.line(import.meta.url, "StructuredAsk.ask", { tool: request.tool.name });
     let problem = "";
@@ -40,7 +40,7 @@ export class StructuredAsk {
           onPayload: this.chain.withFallbacks(StructuredAsk.forceTool(request.tool.name)),
         },
       );
-      onUsage(reply.usage);
+      onUsage(reply.usage, reply.responseId);
       StructuredAsk.replied(request.tool.name, attempt, reply, (Date.now() - started) / 1000);
       if (reply.stopReason === "error" || reply.stopReason === "aborted") {
         problem = reply.errorMessage ?? reply.stopReason;

@@ -6,3 +6,8 @@ export * from "./role-briefing.js";
 export * from "./deliverable-table.js";
 export * from "./contract-table.js";
 export * from "./task-briefing.js";
+export * from "./market-builder.js";
+export * from "./market-digest.js";
+export * from "./customer-builder.js";
+export * from "./customer-digest.js";
+export * from "./stage-brief-template.js";

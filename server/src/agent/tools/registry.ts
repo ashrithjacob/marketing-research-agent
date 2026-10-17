@@ -48,7 +48,7 @@ export interface ToolContext {
   view?: PageView;
 }
 
-/** Builds the research tools a role names, in its order, each charging what it spends to the agent's meter; a tool whose service is not configured, or whose input the run lacks (the library tools, with nothing in the library), is left out, not stubbed. `wait_for` is a ledger tool and is built with the ledger's. */
+/** Builds the research tools a role names, in its order, each charging what it spends to the agent's meter; a tool whose service is not configured, or whose input the run lacks (the library tools, with nothing in the library), is left out, not stubbed. `wait_for` and `use_source` are ledger tools and are built with the ledger's. */
 export class ToolRegistry {
   constructor(
     private readonly services: ServiceClients,
@@ -96,6 +96,8 @@ export class ToolRegistry {
       case "library_read":
         return library ? { tool: library.read(), line: LIBRARY_READ_LINE } : null;
       case "wait_for":
+      case "use_source":
+      case "read_reviews":
         return null;
     }
   }

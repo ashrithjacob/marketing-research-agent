@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-import { api, workspaceApi, type Source } from '../api';
+import { api, findSource, workspaceApi, type Source } from '../api';
 
 function MarkWrong({ runId, sourceId }: { runId: string; sourceId: string }) {
   const [marked, setMarked] = useState(false);
@@ -30,7 +30,7 @@ function label(source: Source): string {
 /** Where one fact came from: the page it was read off, and the archived copy that was read; a source that is not a web page (an ad-library search) links to its archived copy only, and an operator's figure says so. */
 export function Cite({ runId, id, sources }: { runId: string; id: string; sources: Source[] }) {
   if (id === 'operator') return <span className="cite muted">entered by the operator</span>;
-  const source = sources.find((s) => s.id === id);
+  const source = findSource(sources, id);
   if (!source) return <span className="cite muted">source not recorded</span>;
   const live = /^https?:\/\//.test(source.url);
   const archived = source.archived ? api.sourceUrl(runId, source.id) : null;
@@ -57,11 +57,11 @@ export function Cite({ runId, id, sources }: { runId: string; id: string; source
   );
 }
 
-/** A source named inside a fact's own text, as a numbered link to the copy that was read, so a run of them stays short. */
+/** A source named inside a fact's own text, as a numbered link to the page itself, or to the copy that was read when it is not a web page, so a run of them stays short. */
 export function InlineCite({ runId, id, sources, n }: { runId: string; id: string; sources: Source[]; n: number }) {
-  const source = sources.find((s) => s.id === id);
+  const source = findSource(sources, id);
   if (!source) return <sup className="cite-n muted">[{n}]</sup>;
-  const href = source.archived ? api.sourceUrl(runId, source.id) : /^https?:\/\//.test(source.url) ? source.url : undefined;
+  const href = /^https?:\/\//.test(source.url) ? source.url : source.archived ? api.sourceUrl(runId, source.id) : undefined;
   return (
     <sup className="cite-n">
       <a href={href} target="_blank" rel="noreferrer" title={`${label(source)} — ${source.title || source.url}`}>

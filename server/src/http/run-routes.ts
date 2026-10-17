@@ -1,6 +1,6 @@
 import type { Context, Hono } from "hono";
 
-import { RunError, RunSupervisor, type StageOneHandoff, type ReviewMiningListings } from "../agent/index.js";
+import { CustomerTruthInputs, MarketTruthInputs, RunError, RunSupervisor, type StageOneHandoff, type ReviewMiningListings } from "../agent/index.js";
 import { ReviewMiningRoster } from "../extract/index.js";
 import { Briefs, Runs, Scope, Stages, judgementInSchema, runRequestSchema, stagePacketSchema, type Brief, type ResearchRun, type ResearchStore, type TargetListing } from "../domain/index.js";
 
@@ -87,6 +87,14 @@ export class RunRoutes {
     if (!source) {
       return `stage ${stage} builds on stage 1: run stage 1 for this brief first, and let it complete. ` +
         "No completed stage-1 packet exists for this subject yet.";
+    }
+    if (stage === 4) {
+      const evidence = await new MarketTruthInputs(this.store, this.handoff).load(brief, Scope.of(workspaceId));
+      return "error" in evidence ? `market truth builds on stage 1 and product truth: ${evidence.error}.` : null;
+    }
+    if (stage === 5) {
+      const evidence = await new CustomerTruthInputs(this.store).load(brief, Scope.of(workspaceId));
+      return "error" in evidence ? `customer truth builds on product truth, market truth and customer voice: ${evidence.error}.` : null;
     }
     if (stage === 3 && !(await this.handoff.hasCompleted(2, source.run.id, Scope.of(workspaceId)))) {
       return `review mining is stage 3: it starts once product truth (stage 2) has completed on stage-1 run ${source.run.id.slice(0, 8)}, ` +

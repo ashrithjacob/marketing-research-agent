@@ -43,6 +43,8 @@ export interface AttributeRecord {
   key: string;
   value: string;
   source_id: string;
+  reads_as?: string;
+  sections?: { title: string; text: string }[];
 }
 
 export interface SaturationPoint {
@@ -131,4 +133,63 @@ export interface StagePacket {
   saturation: Saturation[];
   nodes: NodeStatus[];
   gaps: Gap[];
+  element_shares?: ElementShare[];
+  buyer_stage_shares?: BuyerStageShare[];
+  quotes?: Quote[];
+  identity_entries?: IdentityEntry[];
+  pain_profiles?: PainProfile[];
+  avatars?: Avatar[];
+  awareness?: Awareness[];
+}
+
+/** A customer's own words, copied by code from a mined review or an archived page. */
+export interface Quote {
+  id: string;
+  review_ref: string;
+  source_id: string;
+  text: string;
+  star: number | null;
+  posted_at: string;
+  function: 'pain' | 'outcome' | 'objection' | 'proof';
+  buyer_stage: BuyerStageShare['stage'] | null;
+}
+
+type Provenanced = { quote_ids: string[]; provenance: 'evidenced' | 'inferred' };
+
+export type IdentityEntry = Provenanced & { kind: 'label_self' | 'label_others' | 'guilt' | 'loss' | 'feared_identity'; summary: string };
+
+export type PainProfile = Provenanced & { pain: string; emotion: string; intensity: string; duration: string; social: string };
+
+export type Avatar = Provenanced & {
+  id: string;
+  parent: string | null;
+  name: string;
+  proxy: boolean;
+  situation: string;
+  history: string;
+  demographics: string;
+  pains: string[];
+  outcomes: string[];
+  objections: string[];
+  identity: string;
+  secondary_gain: string;
+  blame: 'outward' | 'inward' | 'mixed';
+};
+
+export type AwarenessLevel = 'unaware' | 'problem_aware' | 'solution_aware' | 'product_aware' | 'most_aware';
+
+export type Awareness = Provenanced & { avatar_id: string; channel: string; weights: Record<AwarenessLevel, number>; entry: AwarenessLevel; why: string };
+
+/** How many of the customer voices a run read stand at one buyer stage. */
+export interface BuyerStageShare {
+  stage: 'beginner' | 'explorer' | 'researcher' | 'skeptic' | 'hopeless';
+  voices: number;
+  of: number;
+}
+
+/** How many of the tagged competitor brands use one persuasion element; the stage is the most advanced one at least half use. */
+export interface ElementShare {
+  element: 'claim' | 'amplifier' | 'mechanism' | 'proof' | 'identity';
+  brands: number;
+  of: number;
 }

@@ -146,6 +146,9 @@ classDiagram
     class BrandImage {
       <<interface>>
     }
+    class PagePicture {
+      <<interface>>
+    }
     class BrandImageBook {
       <<interface>>
       list()
@@ -153,7 +156,7 @@ classDiagram
     }
     class BrandImageFinder {
       <<interface>>
-      find()
+      read()
     }
     class Brands {
       key()
@@ -258,6 +261,13 @@ classDiagram
     }
     class CostReport {
       <<interface>>
+    }
+    class CustomerFields {
+      quote()
+      entry()
+    }
+    class Provenance {
+      cited()
     }
     class FieldSpec {
       <<interface>>
@@ -564,6 +574,14 @@ classDiagram
       tools()
       ceiling()
     }
+    class ProductCosts {
+      <<interface>>
+    }
+    class ProductCostBook {
+      <<interface>>
+      get()
+      put()
+    }
     class RunHead {
       <<interface>>
     }
@@ -752,6 +770,9 @@ classDiagram
     class BriefCheck {
       problems()
     }
+    class BuyerStages {
+      shares()
+    }
     class ChampionCheck {
       problems()
       ranking()
@@ -782,6 +803,13 @@ classDiagram
     class CostReports {
       of()
     }
+    class CustomerPicks {
+      problems()
+    }
+    class CustomerTruthCheck {
+      avatars()
+      awareness()
+    }
     class Missing {
       <<interface>>
     }
@@ -807,6 +835,7 @@ classDiagram
     class FieldsCheck {
       missing()
       gapped()
+      oneOf()
     }
     class FindingCheck {
       check()
@@ -869,6 +898,10 @@ classDiagram
       of()
       select()
     }
+    class RewordCheck {
+      keeps()
+      sourceIds()
+    }
     class PacketSection {
       <<interface>>
     }
@@ -883,6 +916,11 @@ classDiagram
     }
     class SharedActives {
       problems()
+    }
+    class SophisticationStage {
+      shares()
+      of()
+      describe()
     }
     class TruthCitations {
       problems()
@@ -973,7 +1011,7 @@ classDiagram
       scrape()
     }
     class HomepageImage {
-      find()
+      read()
       pick()
       publicHost()
     }
@@ -1250,6 +1288,10 @@ classDiagram
       runHeads()
       packetRows()
     }
+    class ProductCostTable {
+      get()
+      put()
+    }
     class ProductTable {
       ensure()
       get()
@@ -1438,6 +1480,19 @@ classDiagram
     class BuiltAgent {
       <<interface>>
     }
+    class CustomerContract {
+      problems()
+    }
+    class CustomerEvidence {
+      <<interface>>
+    }
+    class CustomerTruthInputs {
+      load()
+      verdict()
+    }
+    class CustomerTruthRun {
+      start()
+    }
     class DoneCheck {
       <<interface>>
       problems()
@@ -1577,11 +1632,31 @@ classDiagram
     class LlmCallLog {
       wrap()
     }
+    class MarketEvidence {
+      <<interface>>
+    }
+    class MarketTruthInputs {
+      load()
+    }
+    class MarketTruthRun {
+      start()
+    }
     class ModelChain {
       resolve()
       fallbacksAfter()
       failover()
       withFallbacks()
+    }
+    class BrandPictureSearch {
+      find()
+    }
+    class StageState {
+      <<interface>>
+    }
+    class BrandResearch {
+      report()
+      next()
+      verdict()
     }
     class BrandShelf {
       folders()
@@ -1596,8 +1671,27 @@ classDiagram
       approve()
       reject()
     }
+    class ReviewAnalysisStarter {
+      <<interface>>
+      start()
+    }
+    class ChatReviews {
+      analyse()
+    }
+    class LaterStageStart {
+      <<interface>>
+    }
+    class ChatStages {
+      subject()
+      start()
+      product()
+    }
     class ChatView {
       of()
+    }
+    class PlaybookMaker {
+      <<interface>>
+      distil()
     }
     class LibraryShelfTools {
       tools()
@@ -1643,11 +1737,25 @@ classDiagram
     }
     class PlanStages {
       recover()
+      follow()
       decide()
     }
-    class StageOneTools {
+    class StageRunControl {
+      <<interface>>
+    }
+    class RunControlTools {
       tools()
+    }
+    class StageProposal {
+      <<interface>>
+    }
+    class StageBriefDesk {
+      propose()
+      run()
       report()
+    }
+    class StageTools {
+      tools()
     }
     class WorkReport {
       write()
@@ -1659,6 +1767,13 @@ classDiagram
     }
     class OperatorInputs {
       record()
+    }
+    class OwnerCosts {
+      intoInputs()
+      intoTruth()
+    }
+    class OwnerReword {
+      apply()
     }
     class CloseReason {
       <<interface>>
@@ -1700,9 +1815,30 @@ classDiagram
     class ContractTable {
       render()
     }
+    class CustomerInstructions {
+      <<interface>>
+    }
+    class CustomerTruthPrompts {
+      system()
+      instructions()
+    }
+    class CustomerDigest {
+      render()
+    }
     class DeliverableTable {
       render()
       stop()
+    }
+    class MarketInstructions {
+      <<interface>>
+    }
+    class MarketTruthPrompts {
+      system()
+      instructions()
+      found()
+    }
+    class MarketDigest {
+      render()
     }
     class AgentMessages {
       steer()
@@ -1720,6 +1856,18 @@ classDiagram
     class ProductTruthBriefing {
       system()
       instructions()
+    }
+    class MarketTruthBriefing {
+      system()
+      instructions()
+    }
+    class CustomerTruthBriefing {
+      system()
+      instructions()
+    }
+    class StageBriefTemplate {
+      of()
+      roles()
     }
     class TaskBriefing {
       system()
@@ -1867,10 +2015,16 @@ classDiagram
       live()
       own()
     }
+    class RunInputs {
+      productTruth()
+      marketTruth()
+      customerTruth()
+    }
     class RunKinds {
       <<interface>>
     }
     class RunLauncher {
+      reword()
       launch()
     }
     class RunMeter {
@@ -1880,6 +2034,7 @@ classDiagram
       start()
       recoverRunsKilledByRestart()
       resettleInvalidRuns()
+      reword()
       steer()
       stop()
       close()
@@ -1887,6 +2042,7 @@ classDiagram
     }
     class RunWrapUp {
       lookUpListings()
+      addBilling()
       recordBilling()
     }
     class StageOneHandoff {
@@ -2073,6 +2229,12 @@ classDiagram
     class NumberedPage {
       render()
     }
+    class QuoteTool {
+      tool()
+    }
+    class ReadReviewsTool {
+      tool()
+    }
     class BuiltTool {
       <<interface>>
     }
@@ -2084,6 +2246,9 @@ classDiagram
     }
     class TracedTool {
       wrap()
+    }
+    class UseSourceTool {
+      tool()
     }
     class WebFetchTool {
       tool()
@@ -2239,6 +2404,9 @@ classDiagram
     class PlaybookRoutes {
       register()
     }
+    class ProductCostRoutes {
+      register()
+    }
     class ProductRoutes {
       register()
     }
@@ -2249,6 +2417,9 @@ classDiagram
       register()
     }
     class ReviewMiningRoutes {
+      register()
+    }
+    class RewordRoute {
       register()
     }
     class RunRoutes {
@@ -2350,6 +2521,7 @@ classDiagram
   SqlProductCatalog --> ProductTable
   SqlProductCatalog --> RunTable
   SqlProductCatalog --> PacketRowTable
+  ProductCostTable --> SqlDatabase
   ProductTable --> SqlDatabase
   ReviewAnalysisTable --> SqlDatabase
   ReviewPullBackfill --> SqlDatabase
@@ -2390,6 +2562,10 @@ classDiagram
   WorkspaceSpend --> ResearchStore
   BilledCosts --> ResearchStore
   BilledCosts --> LiveRuns
+  CustomerContract --> RunFindings
+  CustomerContract --> DoneCheck
+  CustomerTruthInputs --> ResearchStore
+  CustomerTruthRun --> ResearchAgentFactory
   NodeContract --> RunFindings
   ChampionContract --> RunFindings
   TruthContract --> RunFindings
@@ -2418,6 +2594,12 @@ classDiagram
   LimitClose --> DoneCheck
   LimitClose --> DeliverableCheck
   LiveRuns --> ResearchStore
+  MarketTruthInputs --> ResearchStore
+  MarketTruthInputs --> StageOneHandoff
+  MarketTruthRun --> OwnerReword
+  BrandPictureSearch --> ResearchStore
+  BrandPictureSearch --> BrandImageFinder
+  BrandResearch --> ResearchStore
   BrandShelf --> ResearchStore
   BrandShelf --> OperatorDesk
   BrandShelf --> BrandImageFinder
@@ -2426,7 +2608,13 @@ classDiagram
   CardDesk --> TaskSupervisor
   CardDesk --> CardResolvers
   CardDesk --> TaskEvents
+  ChatReviews --> ResearchStore
+  ChatReviews --> ReviewAnalysisStarter
+  ChatStages --> ResearchStore
+  ChatStages --> PlanBook
+  ChatStages --> PlanStages
   LibraryShelfTools --> DocumentLibrary
+  LibraryShelfTools --> PlaybookMaker
   OperatorDesk --> PiHarness
   OperatorDesk --> ResearchStore
   OperatorDesk --> TaskSupervisor
@@ -2437,8 +2625,9 @@ classDiagram
   OperatorTools --> CardDesk
   OperatorTools --> MemoryDesk
   OperatorTools --> AlwaysOnTools
-  OperatorTools --> StageOneTools
+  OperatorTools --> RunControlTools
   OperatorTools --> LibraryShelfTools
+  OperatorTools --> StageTools
   OwnerDesk --> PlanDesk
   OwnerDesk --> OperatorDesk
   OwnerDesk --> FeedbackBook
@@ -2453,7 +2642,16 @@ classDiagram
   PlanStageOne --> ResearchStore
   PlanStageOne --> LiveRuns
   PlanStages --> TaskEvents
-  StageOneTools --> PlanDesk
+  RunControlTools --> ResearchStore
+  RunControlTools --> TaskSupervisor
+  RunControlTools --> StageRunControl
+  StageBriefDesk --> ResearchStore
+  StageBriefDesk --> PlanDesk
+  StageBriefDesk --> ChatStages
+  StageTools --> BrandResearch
+  StageTools --> StageBriefDesk
+  StageTools --> ChatStages
+  StageTools --> ChatReviews
   WorkReport --> ResearchStore
   WorkReport --> TaskSupervisor
   WorkspaceBoard --> ResearchStore
@@ -2461,7 +2659,11 @@ classDiagram
   WorkspaceBoard --> AlwaysOnDesk
   WorkspaceServices --> AdLibrary
   WorkspaceServices --> AdInsights
+  WorkspaceServices --> StageRunControl
   OperatorInputs --> FindingLedger
+  OwnerCosts --> ResearchStore
+  OwnerReword --> ResearchStore
+  OwnerReword --> OpenRouterPrices
   PartClose --> RunFindings
   PartClose --> DeliverableCheck
   ModelPricing --> OpenRouterPrices
@@ -2472,6 +2674,10 @@ classDiagram
   StageOneBriefing --> Judgement
   ProductTruthBriefing --> ProductTruthPrompts
   ProductTruthBriefing --> Judgement
+  MarketTruthBriefing --> MarketTruthPrompts
+  MarketTruthBriefing --> MarketInstructions
+  CustomerTruthBriefing --> CustomerTruthPrompts
+  CustomerTruthBriefing --> CustomerInstructions
   ResearchAgentFactory --> ResearchStore
   ResearchAgentFactory --> ToolRegistry
   ResearchAgentFactory --> Corpus
@@ -2504,6 +2710,9 @@ classDiagram
   RunEnd --> ResearchStore
   RunEnd --> LiveRuns
   RunFindings --> FindingLedger
+  RunInputs --> ResearchStore
+  RunInputs --> LiveRuns
+  RunInputs --> StageOneHandoff
   RunLauncher --> ResearchStore
   RunLauncher --> Settings
   RunLauncher --> OpenRouterPrices
@@ -2566,8 +2775,13 @@ classDiagram
   RetractTool --> RunFindings
   LedgerToolset --> LedgerOptions
   LibraryTools --> DocumentLibrary
+  QuoteTool --> RunFindings
+  QuoteTool --> StoredRunReview
+  QuoteTool --> Corpus
+  ReadReviewsTool --> StoredRunReview
   ToolRegistry --> ServiceClients
   ToolRegistry --> Settings
+  UseSourceTool --> RunFindings
   WebFetchTool --> Settings
   WebFetchTool --> PageFetcher
   WebFetchTool --> Corpus
@@ -2639,6 +2853,7 @@ classDiagram
   LibraryRoutes --> LibraryIntake
   MemoryRoutes --> MemoryDesk
   PlaybookRoutes --> PlaybookDesk
+  ProductCostRoutes --> ResearchStore
   ProductRoutes --> ResearchStore
   ResearchApi --> AmazonListingSource
   ResearchApi --> WorkspaceServices
@@ -2648,6 +2863,8 @@ classDiagram
   ReviewMiningRoutes --> StageOneHandoff
   ReviewMiningRoutes --> Settings
   ReviewMiningRoutes --> ReviewMiningListings
+  RewordRoute --> ResearchStore
+  RewordRoute --> RunSupervisor
   RunRoutes --> ResearchStore
   RunRoutes --> RunSupervisor
   RunRoutes --> StageOneHandoff
@@ -2729,6 +2946,7 @@ classDiagram
 | `adapters` | `adapters/store/postgres-dialect.ts` | PostgresDialect |
 | `adapters` | `adapters/store/product-backfill.ts` | ProductBackfill |
 | `adapters` | `adapters/store/product-catalog.ts` | SqlProductCatalog |
+| `adapters` | `adapters/store/product-cost-table.ts` | ProductCostTable |
 | `adapters` | `adapters/store/product-table.ts` | ProductTable |
 | `adapters` | `adapters/store/review-analysis-table.ts` | ReviewAnalysisTable |
 | `adapters` | `adapters/store/review-pull-backfill.ts` | ReviewPullBackfill |
@@ -2762,6 +2980,9 @@ classDiagram
 | `agent` | `agent/always/workspace-spend.ts` | WorkspaceSpend |
 | `agent` | `agent/billed-costs.ts` | BilledCosts |
 | `agent` | `agent/built-agent.ts` | BuiltAgent |
+| `agent` | `agent/customer-contract.ts` | CustomerContract |
+| `agent` | `agent/customer-truth-inputs.ts` | CustomerEvidence, CustomerTruthInputs |
+| `agent` | `agent/customer-truth-run.ts` | CustomerTruthRun |
 | `agent` | `agent/done-check.ts` | DoneCheck, NodeContract, ChampionContract, TruthContract |
 | `agent` | `agent/errors.ts` | RunError, ApprovalNeeded |
 | `agent` | `agent/event-recorder.ts` | TurnEnd, AgentEventRecorder |
@@ -2784,11 +3005,17 @@ classDiagram
 | `agent` | `agent/listing-match.ts` | ListingMatch |
 | `agent` | `agent/live-runs.ts` | RunControl, Live, LiveRuns |
 | `agent` | `agent/llm-call-log.ts` | CallSequence, LlmCallLog |
+| `agent` | `agent/market-truth-inputs.ts` | MarketEvidence, MarketTruthInputs |
+| `agent` | `agent/market-truth-run.ts` | MarketTruthRun |
 | `agent` | `agent/model-chain.ts` | ModelChain |
+| `agent` | `agent/operator/brand-picture-search.ts` | BrandPictureSearch |
+| `agent` | `agent/operator/brand-research.ts` | StageState, BrandResearch |
 | `agent` | `agent/operator/brand-shelf.ts` | BrandShelf |
 | `agent` | `agent/operator/card-desk.ts` | CardResolvers, CardDesk |
+| `agent` | `agent/operator/chat-reviews.ts` | ReviewAnalysisStarter, ChatReviews |
+| `agent` | `agent/operator/chat-stages.ts` | LaterStageStart, ChatStages |
 | `agent` | `agent/operator/chat-view.ts` | ChatView |
-| `agent` | `agent/operator/library-shelf-tools.ts` | LibraryShelfTools |
+| `agent` | `agent/operator/library-shelf-tools.ts` | PlaybookMaker, LibraryShelfTools |
 | `agent` | `agent/operator/operator-act.ts` | OperatorAct |
 | `agent` | `agent/operator/operator-desk.ts` | OperatorDesk |
 | `agent` | `agent/operator/operator-tools.ts` | OperatorTools |
@@ -2797,11 +3024,15 @@ classDiagram
 | `agent` | `agent/operator/plan-release.ts` | PlanRelease |
 | `agent` | `agent/operator/plan-stage-one.ts` | PlanStageOne |
 | `agent` | `agent/operator/plan-stages.ts` | PlanStages |
-| `agent` | `agent/operator/stage-one-tools.ts` | StageOneTools |
+| `agent` | `agent/operator/run-control-tools.ts` | StageRunControl, RunControlTools |
+| `agent` | `agent/operator/stage-brief-desk.ts` | StageProposal, StageBriefDesk |
+| `agent` | `agent/operator/stage-tools.ts` | StageTools |
 | `agent` | `agent/operator/work-report.ts` | WorkReport |
 | `agent` | `agent/operator/workspace-board.ts` | WorkspaceBoard |
 | `agent` | `agent/operator/workspace-services.ts` | WorkspaceServices |
 | `agent` | `agent/operator-inputs.ts` | OperatorInputs |
+| `agent` | `agent/owner-costs.ts` | OwnerCosts |
+| `agent` | `agent/owner-reword.ts` | OwnerReword |
 | `agent` | `agent/part-close.ts` | CloseReason, PartClose |
 | `agent` | `agent/pi-harness.ts` | PiHarness |
 | `agent` | `agent/pricing.ts` | ModelPricing |
@@ -2810,9 +3041,14 @@ classDiagram
 | `agent` | `agent/prompt/blocks.ts` | PromptBlocks |
 | `agent` | `agent/prompt/builder.ts` | AgentInstructions, PromptBuilder |
 | `agent` | `agent/prompt/contract-table.ts` | ContractTable |
+| `agent` | `agent/prompt/customer-builder.ts` | CustomerInstructions, CustomerTruthPrompts |
+| `agent` | `agent/prompt/customer-digest.ts` | CustomerDigest |
 | `agent` | `agent/prompt/deliverable-table.ts` | DeliverableTable |
+| `agent` | `agent/prompt/market-builder.ts` | MarketInstructions, MarketTruthPrompts |
+| `agent` | `agent/prompt/market-digest.ts` | MarketDigest |
 | `agent` | `agent/prompt/messages.ts` | AgentMessages |
-| `agent` | `agent/prompt/role-briefing.ts` | RoleBriefing, StageOneBriefing, ProductTruthBriefing |
+| `agent` | `agent/prompt/role-briefing.ts` | RoleBriefing, StageOneBriefing, ProductTruthBriefing, MarketTruthBriefing, CustomerTruthBriefing |
+| `agent` | `agent/prompt/stage-brief-template.ts` | StageBriefTemplate |
 | `agent` | `agent/prompt/task-briefing.ts` | TaskBriefing |
 | `agent` | `agent/prompt/truth-blocks.ts` | TruthBlocks |
 | `agent` | `agent/prompt/truth-builder.ts` | TruthInstructions, ProductTruthPrompts |
@@ -2841,6 +3077,7 @@ classDiagram
 | `agent` | `agent/run-assembly.ts` | Assembled, RunAssembly |
 | `agent` | `agent/run-end.ts` | RunEnd |
 | `agent` | `agent/run-findings.ts` | RunFindings |
+| `agent` | `agent/run-inputs.ts` | RunInputs |
 | `agent` | `agent/run-launcher.ts` | RunKinds, RunLauncher |
 | `agent` | `agent/run-meter.ts` | RunMeter |
 | `agent` | `agent/run-supervisor.ts` | RunSupervisor |
@@ -2880,8 +3117,11 @@ classDiagram
 | `agent` | `agent/tools/ledger-toolset.ts` | LedgerOptions, LedgerToolset |
 | `agent` | `agent/tools/library-tools.ts` | LibraryTools |
 | `agent` | `agent/tools/page-views.ts` | PageView, PlainPage, NumberedPage |
+| `agent` | `agent/tools/quote-tool.ts` | QuoteTool |
+| `agent` | `agent/tools/read-reviews-tool.ts` | ReadReviewsTool |
 | `agent` | `agent/tools/registry.ts` | BuiltTool, ToolContext, ToolRegistry |
 | `agent` | `agent/tools/traced-tool.ts` | TracedTool |
+| `agent` | `agent/tools/use-source-tool.ts` | UseSourceTool |
 | `agent` | `agent/tools/web-fetch-tool.ts` | WebFetchTool |
 | `agent` | `agent/tools/web-search-tool.ts` | WebSearchTool |
 | `agent` | `agent/turn-breakers.ts` | TurnBreakers |
@@ -2908,7 +3148,7 @@ classDiagram
 | `domain` | `domain/ad-library.ts` | AdQuery, AdHit, AdPage |
 | `domain` | `domain/ad-results.ts` | AdAccount, AdInsight, AdResult, AdLink, AdInsights, AdBook, AdTotals, AdSums |
 | `domain` | `domain/always-on.ts` | AlwaysOn, AlwaysOnBook, Schedule, ScheduleBook, Schedules |
-| `domain` | `domain/brands.ts` | BrandChat, BrandFolder, BrandImage, BrandImageBook, BrandImageFinder, Brands |
+| `domain` | `domain/brands.ts` | BrandChat, BrandFolder, BrandImage, PagePicture, BrandImageBook, BrandImageFinder, Brands |
 | `domain` | `domain/breakers.ts` | Trip, BreakerReadings, BreakerLimits, Breakers, RunStatuses |
 | `domain` | `domain/brief.ts` | Briefs |
 | `domain` | `domain/cards.ts` | Card, CardDraft, CardBook |
@@ -2918,6 +3158,8 @@ classDiagram
 | `domain` | `domain/competitor-discovery.ts` | CompetitorCandidate, DiscoveryQuestion, DiscoveryReport, DiscoveryQuestions |
 | `domain` | `domain/contracts.ts` | Contracts |
 | `domain` | `domain/cost-report.ts` | CostCell, CostRow, CostReport |
+| `domain` | `domain/customer-deliverables.ts` | CustomerFields |
+| `domain` | `domain/customer-truth.ts` | Provenance |
 | `domain` | `domain/deliverable.ts` | FieldSpec, ItemPart, ItemNeed, FieldsDeliverable, ListDeliverable, OneMarked, PerItemDeliverable, Deliverables |
 | `domain` | `domain/drafts.ts` | DraftSection, Verdict, Draft, DraftBook, DraftView, DraftText |
 | `domain` | `domain/feedback.ts` | FeedbackTarget, Feedback, FeedbackDraft, FeedbackBook, FeedbackStrengths |
@@ -2934,6 +3176,7 @@ classDiagram
 | `domain` | `domain/playbooks.ts` | PlaybookSection, PlaybookBody, Playbook, PlaybookBook |
 | `domain` | `domain/ports.ts` | ProductCatalog, AccountDirectory, AmazonListingSource, TargetListings, ChargeLedger, FindingLedger, PageFetcher, WebSearch, AdLibrary, CompetitorDiscovery, ResearchStore, GateVerdict, FetchGate, ReviewPullStore |
 | `domain` | `domain/primitives.ts` | PrimitiveSpec, Primitives |
+| `domain` | `domain/product-costs.ts` | ProductCosts, ProductCostBook |
 | `domain` | `domain/products.ts` | RunHead, Product, ProductSummary, ProductFolders |
 | `domain` | `domain/records.ts` | Clock, Ids, ResearchRun, RunDraft, RunSummary, Runs |
 | `domain` | `domain/reject-kinds.ts` | RejectKinds |
@@ -2950,6 +3193,7 @@ classDiagram
 | `domain` | `domain/web.ts` | SearchHit, SearchPage, SearchScope, FetchedPage, ServiceUnavailableError |
 | `domain` | `domain/workspace-books.ts` | WorkspaceBooks |
 | `extract` | `extract/brief-check.ts` | BriefCheck |
+| `extract` | `extract/buyer-stages.ts` | BuyerStages |
 | `extract` | `extract/champion-check.ts` | ChampionCheck |
 | `extract` | `extract/check.ts` | PacketContext, PacketCheck |
 | `extract` | `extract/citation-check.ts` | CitationCheck |
@@ -2957,6 +3201,8 @@ classDiagram
 | `extract` | `extract/completeness-check.ts` | CompletenessCheck |
 | `extract` | `extract/contract-check.ts` | ContractGrounds, ContractCheck |
 | `extract` | `extract/cost-reports.ts` | CostReports |
+| `extract` | `extract/customer-picks.ts` | CustomerPicks |
+| `extract` | `extract/customer-truth-check.ts` | CustomerTruthCheck |
 | `extract` | `extract/deliverable-check.ts` | Missing, DeliverableCheck, DeliverableChecks |
 | `extract` | `extract/dose-bands.ts` | DoseBands |
 | `extract` | `extract/draft-check.ts` | DraftCheck |
@@ -2976,10 +3222,12 @@ classDiagram
 | `extract` | `extract/review-mining-offer.ts` | TrustpilotDomain, ReviewMiningOffer |
 | `extract` | `extract/review-mining-packet.ts` | PullFailure, ReviewMiningPacket |
 | `extract` | `extract/review-mining-roster.ts` | ReviewMiningRoster |
+| `extract` | `extract/reword-check.ts` | RewordCheck |
 | `extract` | `extract/row-blame.ts` | PacketSection, RowBlame |
 | `extract` | `extract/row-picks.ts` | RowPicks |
 | `extract` | `extract/scope-check.ts` | ScopeCheck |
 | `extract` | `extract/shared-actives.ts` | SharedActives |
+| `extract` | `extract/sophistication-stage.ts` | SophisticationStage |
 | `extract` | `extract/truth-citations.ts` | TruthCitations |
 | `extract` | `extract/validator.ts` | ZodProblems, PacketValidator |
 | `http` | `http/account-commands.ts` | AccountCommands |
@@ -3002,10 +3250,12 @@ classDiagram
 | `http` | `http/memory-routes.ts` | MemoryRoutes |
 | `http` | `http/passwords.ts` | Passwords |
 | `http` | `http/playbook-routes.ts` | PlaybookRoutes |
+| `http` | `http/product-cost-routes.ts` | ProductCostRoutes |
 | `http` | `http/product-routes.ts` | ProductRoutes |
 | `http` | `http/research-api.ts` | ResearchApi |
 | `http` | `http/review-analysis-routes.ts` | ReviewAnalysisRoutes |
 | `http` | `http/review-mining-routes.ts` | ReviewMiningRoutes |
+| `http` | `http/reword-route.ts` | RewordRoute |
 | `http` | `http/run-routes.ts` | RunRoutes |
 | `http` | `http/scope-guard.ts` | ScopeGuard |
 | `http` | `http/secret-prompt.ts` | SecretPrompt |

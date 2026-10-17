@@ -2,8 +2,10 @@ import {
   Findings,
   productTruthPacketSchema,
   type Brief,
+  type CustomerTruthAgent,
   type Finding,
   type Judgement,
+  type MarketTruthAgent,
   type Node,
   type ProductTruthAgent,
   type RoleSpec,
@@ -14,6 +16,8 @@ import { ProductTruthAssembly } from "../../extract/index.js";
 import { Trace } from "../../trace/index.js";
 
 import type { PromptBuilder } from "./builder.js";
+import type { CustomerInstructions, CustomerTruthPrompts } from "./customer-builder.js";
+import type { MarketInstructions, MarketTruthPrompts } from "./market-builder.js";
 import type { ProductTruthPrompts } from "./truth-builder.js";
 
 /** One run's prompts for any of its roles: the system prompt around the tools the agent was built with, and the task with what the ledger already holds. */
@@ -58,5 +62,41 @@ export class ProductTruthBriefing implements RoleBriefing {
     const { runId, sourceRunId, brief } = this.run;
     const sofar = productTruthPacketSchema.parse(new ProductTruthAssembly(rows).draft({ runId, sourceRunId, brief, nodes: [] }));
     return this.prompts.instructions(role.id as ProductTruthAgent, { ...this.run, sofar });
+  }
+}
+
+/** A market-truth run's prompts: every agent is shown what the earlier stages found; the gate is shown what the others recorded too. */
+export class MarketTruthBriefing implements RoleBriefing {
+  constructor(
+    private readonly prompts: MarketTruthPrompts,
+    private readonly run: MarketInstructions,
+  ) {}
+
+  system(role: RoleSpec, tools: string): string {
+    Trace.line(import.meta.url, "MarketTruthBriefing.system", { role: role.id });
+    return this.prompts.system(role.id as MarketTruthAgent, tools);
+  }
+
+  instructions(role: RoleSpec, rows: readonly Finding[]): string {
+    Trace.line(import.meta.url, "MarketTruthBriefing.instructions", { role: role.id });
+    return this.prompts.instructions(role.id as MarketTruthAgent, this.run, rows);
+  }
+}
+
+/** A customer-truth run's prompts: the avatars and awareness agents are shown what the agents before them recorded. */
+export class CustomerTruthBriefing implements RoleBriefing {
+  constructor(
+    private readonly prompts: CustomerTruthPrompts,
+    private readonly run: CustomerInstructions,
+  ) {}
+
+  system(role: RoleSpec, tools: string): string {
+    Trace.line(import.meta.url, "CustomerTruthBriefing.system", { role: role.id });
+    return this.prompts.system(role.id as CustomerTruthAgent, tools);
+  }
+
+  instructions(role: RoleSpec, rows: readonly Finding[]): string {
+    Trace.line(import.meta.url, "CustomerTruthBriefing.instructions", { role: role.id });
+    return this.prompts.instructions(role.id as CustomerTruthAgent, this.run, rows);
   }
 }

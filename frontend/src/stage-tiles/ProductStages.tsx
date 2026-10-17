@@ -11,11 +11,11 @@ export default function ProductStages({ product, showLabel, onOpen, onAsk, onErr
         {stages.map(({ stage, summary, run }, i) => (
           <li key={stage} className="stage-step">
             <div className="stage-rail">
-              <span className={`stage-bubble ${summary ? summary.status : 'none'}`}>{stage}</span>
+              <span className={`stage-bubble ${summary ? summary.status : 'none'}`}>{i + 1}</span>
               {i < stages.length - 1 && <span className="stage-line" />}
             </div>
             <div className="stage-body">
-              <StageRow stage={stage} summary={summary} run={run} onOpen={() => onOpen(stage)} onAsk={() => onAsk(`Run stage ${stage}, ${STAGE_STORY[stage].title.toLowerCase()}, for ${product.label}`)} />
+              <StageRow stage={stage} summary={summary} run={run} onOpen={() => onOpen(stage)} onAsk={() => onAsk(`Run ${STAGE_STORY[stage].title.toLowerCase()} for ${product.label.replace(/^https?:\/\//, '')}`)} />
             </div>
           </li>
         ))}

@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 
-import { ReviewAnalyst, RunSupervisor, StageOneHandoff, ReviewMiningListings, type LibraryIntake, type WorkspaceServices } from "../agent/index.js";
+import { RunSupervisor, StageOneHandoff, ReviewMiningListings, type LibraryIntake, type ReviewAnalyst, type WorkspaceServices } from "../agent/index.js";
 import { TrustpilotProfiles } from "../adapters/index.js";
 import type { Settings } from "../config/index.js";
 import type { AmazonListingSource, PageFetcher, ResearchStore } from "../domain/index.js";
@@ -16,8 +16,10 @@ import { JudgementRoutes } from "./judgement-routes.js";
 import { LibraryRoutes } from "./library-routes.js";
 import { ReviewAnalysisRoutes } from "./review-analysis-routes.js";
 import { RunRoutes } from "./run-routes.js";
+import { RewordRoute } from "./reword-route.js";
 import { ReviewMiningRoutes } from "./review-mining-routes.js";
 import { ProductRoutes } from "./product-routes.js";
+import { ProductCostRoutes } from "./product-cost-routes.js";
 import { ScopeGuard } from "./scope-guard.js";
 import { AlwaysOnRoutes } from "./always-on-routes.js";
 import { CardRoutes } from "./card-routes.js";
@@ -43,17 +45,19 @@ export class ResearchApi {
       listingSource: AmazonListingSource | null;
       pages: PageFetcher;
       workspace: WorkspaceServices | null;
+      analyst: ReviewAnalyst;
     },
   ) {}
 
   router(): Hono<ApiEnv> {
     Trace.line(import.meta.url, "ResearchApi.router");
     const api = new Hono<ApiEnv>();
-    const { store, supervisor, intake, settings, traces, listingSource, pages, workspace } = this.options;
+    const { store, supervisor, intake, settings, traces, listingSource, pages, workspace, analyst } = this.options;
     const handoff = new StageOneHandoff(store);
     new ScopeGuard(store).register(api);
     const listings = new ReviewMiningListings(store.listings, listingSource, settings.apifyConcurrency, new TrustpilotProfiles(pages));
     new RunRoutes(store, supervisor, handoff, listings).register(api);
+    new RewordRoute(store, supervisor).register(api);
     if (workspace) {
       new TaskRoutes(store, workspace.tasks).register(api);
       new WorkspaceRoutes(workspace.owner, store.plans).register(api);
@@ -69,8 +73,9 @@ export class ResearchApi {
     new CostRoute(store).register(api);
     new FeedbackRoutes(store).register(api);
     new ReviewMiningRoutes(handoff, settings, listings).register(api);
-    new ReviewAnalysisRoutes(store, supervisor, new ReviewAnalyst(store, settings, supervisor.models, supervisor.costs)).register(api);
+    new ReviewAnalysisRoutes(store, supervisor, analyst).register(api);
     new ProductRoutes(store).register(api);
+    new ProductCostRoutes(store).register(api);
     new EventStream(store, supervisor).register(api);
     new CorpusRoute(store, settings).register(api);
     new JudgementRoutes(store).register(api);

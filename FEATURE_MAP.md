@@ -96,41 +96,81 @@ no-referrer`), so a site that refuses hotlinking shows the letter too.
 
 **`/brands/:key`: one brand.** Left: **← All brands**, the brand's picture and
 name, then, per product of the brand (named only when there are several), its
-three stages as steps down a rail (`stage-tiles/`), each with a numbered bubble
+four stages as steps down a rail (`stage-tiles/`), in the order they are worked
+(market research, product truth, market truth, customer voice: `STAGE_ORDER`), each
+with a bubble numbered by its position
 (green when delivered, blue while running, red-ringed when failed, invalid or
 cancelled, grey when never run). Each step is a row for the stage's newest
 delivered stage run (else its newest of any status): its name, status chip and
 date, then its figures as pills, written from the run's packet by
 `api/stage-story.ts` (stage 1: sources, sites, facts, competitors, figures;
 stage 2: sources, sites, actives, doses checked, markets, prices; stage 3:
-sources, sites, quotes), gaps last in amber. The whole row is a button with a
+sources, sites, quotes; market truth: sources, sites, sophistication level, breaking
+points, with the gate's verdict as a chip, Go green, Reposition amber, Drop red),
+gaps last in amber. The whole row is a button with a
 `›`; a stage never run is a dashed row with **Run in chat**, which puts "Run
 stage N … for <product>" in the chat box for the owner to send.
 
 **`/brands/:key/products/:productId/stages/:n[/:tab]`: one stage**
 (`StageView.tsx`), in the left pane, the chat staying on the right. A breadcrumb
-(the brand, then *Stage n · name*, its status and when), the sentence of what it
+(the brand, then *Stage n · name*, its status and when), **The brief you gave this stage** (folded; the
+run's `brief.notes` as approved, or a line saying it ran on the standard checklist), the sentence of what it
 kept ("60 sources from 26 sites: 26 own pages, 22 ad-library searches, 9
 search-data pages."), the figures, then tabs, each its own URL: stage 1
 **Product · Competitors · Category**, stage 2 **Ingredients · Doses · Claims ·
-Economics**, stage 3 **Customer voice**, and for all **Sources (n)** (page, site,
+Economics**, market truth **Verdict** (`VerdictPanel.tsx`: the verdict, what it means in one
+line, and which criteria fail, are unknown and pass; **Why the agent decided this**
+folded; then one card per criterion with its result, its question and its first
+sentence; **Read the reasoning** opens that criterion full width below the cards.
+Each criterion and the verdict show `reads_as` when it is set: the gate's text rewritten
+by the judge model (`MRA_JUDGE_MODEL`, `agent/owner-reword.ts`) after the run ends, so it
+reads without the ledger it cites; a rewrite that changes the leading word or the sources
+cited is dropped and the gate's own words show. `POST /runs/:id/reword` does it for a run
+that ended before this existed. **Why the agent decided this** opens on the verdict in four
+parts when the rewrite returned them (`sections`): Where it stands, What has to change, What we
+need from you, What would change this verdict. The Margin card asks for the owner's landed unit
+cost (`MarginInput.tsx`, `GET/POST /products/:id/costs`) and shows the gross margin at each price
+the newest product truth found; the number is saved per workspace and product and used by later
+product-truth and market-truth runs. A section tab draws no "Data gaps" box: gaps are on the
+**Gaps** tab only (`GapsInOwnTab` in `run-view/tile.tsx`). An inline citation in a later stage opens
+the archived copy from whichever run of the workspace fetched it (`CorpusRoute.archived`))
+**· Market size · Offers · Sophistication · Breaking point** (`MarketSection.tsx`; Sophistication opens on `ElementShares.tsx`: per persuasion element, stage 1 to 5, how many tagged competitor brands use it, the ones at least half use in bold; then `BuyerStageShares.tsx`: the customer voices the breaking-point agent read, counted per buyer stage, beginner to hopeless),
+customer voice **Customer voice**, customer truth **Avatars · Language bank · Identity · Awareness** (`run-view/customer/`: avatar cards with sub-avatars and the quotes each rests on, quotes by function, identity entries and pain profiles, an awareness table per avatar with the entry level in bold; every quote shows its stars and date, or links to its page), and for all **Sources (n)** (page, site,
 kind; a source the checks refused reads *not used*) and **Gaps (n)** (section,
 what was not found, what it would need). A section tab shows that section's tile
 already open (`TilesOpen` in `run-view/tile.tsx`). `GET
 /api/research/products/:id/runs`, then `GET /runs/:id` per stage.
 
 Right: **the brand's chat**
-(`ChatPanel.tsx`), one operator conversation per brand. "Research it", or one of
-the brand's pages, makes the operator call `start_stage_one`
-(`agent/operator/stage-one-tools.ts`), which drafts stage 1 as a plan and
-approves it in one step. A task that would spend Apify money (the champion,
-competitors) becomes an approval card instead; the tasks waiting on it start
-when it ends. When a task ends, the chat of the brand its brief belongs to is
-woken (a `[Signal]`) and says what it found. Under the conversation, the open
+(`ChatPanel.tsx`; **Hide ⟩** in its header gives the left side the full width, and a
+floating **Chat** button, showing how many cards wait, brings it back; the choice is
+kept in the browser), one operator conversation per brand, and the way into everything
+the app runs (spec-always-on §11, 2026-10-16). The operator reads the brand's
+research (`brand_research`: every stage of every product, what it found and could
+not) before it speaks of it, says what can run next and what it needs from the
+owner, and offers only the next stage or plugging gaps. "Research it", or one of
+the brand's pages, makes it call `propose_stage`, which puts that stage's **brief**
+on a card under the chat (`StageBriefDesk`, `StageBriefTemplate`): what each of
+the stage's agents will look for, in plain words, and "Your guidance" at the end;
+it opens on the brief last approved for that product and stage. The owner edits
+it in its box and presses **Run with this brief** (or **Not now**): the text as
+approved becomes the run's `brief.notes`, which every agent of the stage reads as
+"The owner's brief for this stage"; a changed brief is `edited` feedback. Market
+research then works as before: a part that would spend Apify money (the champion,
+competitors) is a second approval card, and the parts waiting on it start when it
+ends. Customer voice starts with `start_customer_voice`, its paid-pulls card being
+its brief; review analysis with `analyse_reviews`; running research is stopped or
+guided with `stop_research` and `guide_research`; a memory-folder document becomes
+a playbook with `make_playbook`. When research ends, the brand's chat is woken (a
+`[Signal]`) and says what it found. Under the conversation, the open
 **cards** of this brand, and those of the whole workspace (lessons, drafts)
 (`Cards.tsx`; the board's `card_brands` says which brand each is): a question
 has an answer box, an approval **Approve** and **Reject**, a draft's card
-**Read the draft →**.
+**Read the draft →**. Written for the owner, not in system terms: a paid Amazon
+search reads "Search Amazon for the category's best-seller?" or "Look up
+<name>'s competitors on Amazon?", why, and the most it can spend
+(`SAVED_TASKS[…].approval`); a lesson shows its text in an editable box, "Because
+…" under the title, and what approving does.
 
 | Control | Calls | Broken looks like |
 |---|---|---|
@@ -186,7 +226,7 @@ generic gaps table:
 | Dose vs study (stage 2) | active · ours per day · studied per day · ratio · class · form match · study; an unassessable row says why | `packet.doses`, computed by `extract/dose-bands.ts` |
 | Claim limits (stage 2) | the guard ("not legal advice…"), then per market × Meta / Google Ads: disclaimers, evidence standard, permitted and forbidden claims side by side | `packet.claim_limits` |
 | Economics (stage 2) | days of supply, each carrier's time to effect (red when the container runs out first), the churn flag, the operator's costs, the margin at every price | `packet.economics`, computed by `extract/product-economics.ts` |
-| Customer voice (stage 3, `run-view/voice/`) | reviews cleaned (duplicates, under three words, off-product), issues ranked worst and best with quotes, product × issue grid, star spread — all filtered by source (all / Amazon / other sites) and group (all / your product / direct / indirect), or one product. Started by **Analyse reviews**; LLM calls only, no Apify | `GET`/`POST /runs/:id/review-analysis`, `agent/review-analysis/` |
+| Customer voice (stage 3, `run-view/voice/`; opens on the first product group that has reviews, the product's own when it has any, and keeps the last finished analysis on screen while a re-run works; also started from the chat with `analyse_reviews`) | reviews cleaned (duplicates, under three words, off-product), issues ranked worst and best with quotes, product × issue grid, star spread — all filtered by source (all / Amazon / other sites) and group (all / your product / direct / indirect), or one product. Started by **Analyse reviews**; LLM calls only, no Apify | `GET`/`POST /runs/:id/review-analysis`, `agent/review-analysis/` |
 
 A run's view shows only its own packet. A product-truth run shows its four
 tiles; a review-mining run shows Customer voice alone; the stage-1 tiles are one
@@ -200,7 +240,7 @@ Source also carries a `node`, so source counts are per tile.
 | Panel | Field | Source |
 |---|---|---|
 | runmeta | tokens | `usage.totalTokens` |
-| fact rows | every product and category field, each competitor and each data gap is a closed row: name and a one-line preview; opened, the whole value — a bulleted list when the agent separated three or more items with " \| " — and the page it was read off. A source id the agent pasted into its text (`sha256:…`) is never shown: it becomes a numbered link [n] to that source's archived copy (`api/fact-text.ts`, `run-view/fact-value.tsx`) | the same packet fields |
+| fact rows | (long values read as paragraphs of two sentences; a source id the agent wrote, whole or shortened as `sha256:6e3e2037`, is a numbered link, never shown) every product and category field, each competitor and each data gap is a closed row: name and a one-line preview; opened, the whole value — a bulleted list when the agent separated three or more items with " \| " — and the page it was read off. A source id the agent pasted into its text (`sha256:…`) is never shown: it becomes a numbered link [n] to that source's archived copy (`api/fact-text.ts`, `run-view/fact-value.tsx`) | the same packet fields |
 | citations | every fact in a stage-1 tile (each field row, each competitor, its ads, the champion line) and stage 2 links the page it was read off, and **read** opens the archived copy the agent actually read; an ad-library search, which is not a web page, links its archived copy only (`run-view/cite.tsx`) | `packet.sources` by `source_id`; `GET /runs/:id/sources/:sourceId` for the archived copy |
 | cost list (rail) | one block per agent and a `run` block: its total, then LLM, Apify, Parallel, Trendtrack and pages, each for the services its tools can spend in (`run-view/CostTable.tsx`) | `GET /api/research/runs/:id/costs`, read every 5s while live (`run-view/use-costs.ts`) |
 | logs page, agent tab | that agent's row of the cost table | the same `/costs` |
@@ -246,7 +286,7 @@ cockpit's middle column; they are only on the activity log now.
 ### Step in
 
 *Superseded 2026-10-15:* deleted. Guidance to a running task is said in the chat;
-the operator passes it on with `guide_task`.
+the operator passes it on with `guide_research`, to a task or a stage run.
 
 ---
 

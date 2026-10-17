@@ -18,6 +18,7 @@ import { PlaybookTable } from "./playbook-table.js";
 import { AdTable } from "./ad-table.js";
 import { WatchTable } from "./watch-table.js";
 import { BrandImageTable } from "./brand-image-table.js";
+import { ProductCostTable } from "./product-cost-table.js";
 import { FeedbackTable } from "./feedback-table.js";
 import { LessonTable } from "./lesson-table.js";
 import { MemoryTable } from "./memory-table.js";
@@ -61,6 +62,7 @@ export class StoreTables {
   readonly ads: AdTable;
   readonly watch: WatchTable;
   readonly brandImages: BrandImageTable;
+  readonly productCosts: ProductCostTable;
 
   private constructor(readonly db: SqlDatabase) {
     Trace.line(import.meta.url, "StoreTables.constructor");
@@ -90,6 +92,7 @@ export class StoreTables {
     this.ads = new AdTable(db);
     this.watch = new WatchTable(db);
     this.brandImages = new BrandImageTable(db);
+    this.productCosts = new ProductCostTable(db);
     this.catalog = new SqlProductCatalog(this.products, this.runs, this.packetRows);
   }
 

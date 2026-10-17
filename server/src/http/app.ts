@@ -1,6 +1,6 @@
 import { Hono, type Context, type Next } from "hono";
 
-import { LibraryIntake, RunSupervisor, ToolRegistry, WorkspaceServices, type PiHarness } from "../agent/index.js";
+import { LibraryIntake, RunSupervisor, ToolRegistry, WorkspaceServices, type PiHarness, ReviewAnalyst } from "../agent/index.js";
 import { FileMarkdown, HomepageImage, MarkdownLayout, PdfMarkdown, ServiceClients } from "../adapters/index.js";
 import { AmazonListingLookup } from "../adapters/apify/index.js";
 import { Env, type Settings } from "../config/index.js";
@@ -17,6 +17,7 @@ export class App {
   readonly fetch: Hono["fetch"];
   readonly supervisor: RunSupervisor;
   readonly intake: LibraryIntake;
+  readonly analyst: ReviewAnalyst;
   readonly workspace: WorkspaceServices | null;
   readonly store: ResearchStore;
   readonly settings: Settings;
@@ -40,8 +41,19 @@ export class App {
     this.supervisor =
       overrides.supervisor ?? new RunSupervisor({ store: this.store, settings: this.settings, services, ...(overrides.harness ? { models: overrides.harness.models } : {}) });
     const { supervisor, store, settings } = this;
+    this.analyst = new ReviewAnalyst(store, settings, supervisor.models, supervisor.costs);
+    const stageRuns = {
+      analyst: this.analyst,
+      isLive: (runId: string) => supervisor.isLive(runId),
+      stop: (runId: string) => supervisor.stop(runId),
+      steer: async (runId: string, text: string) => {
+        Trace.line(import.meta.url, "App.constructor.steer", { runId });
+        const run = await store.getRun(runId);
+        if (run) await supervisor.steer(runId, await store.addJudgement(run.workspace_id, { kind: "custom", text, rejects_kinds: [] }));
+      },
+    };
     this.workspace = overrides.harness
-      ? new WorkspaceServices({ store, runs: supervisor.live, settings, harness: overrides.harness, tools: new ToolRegistry(services, settings), costs: supervisor.costs, ads: services.ads, insights: services.insights, brandImages: overrides.brandImages ?? new HomepageImage(), start: (request, workspaceId) => supervisor.start(request, workspaceId) })
+      ? new WorkspaceServices({ store, runs: supervisor.live, settings, harness: overrides.harness, tools: new ToolRegistry(services, settings), costs: supervisor.costs, ads: services.ads, insights: services.insights, brandImages: overrides.brandImages ?? new HomepageImage(), stageRuns, start: (request, workspaceId) => supervisor.start(request, workspaceId) })
       : null;
 
     this.intake = new LibraryIntake(this.store.library, new FileMarkdown(new PdfMarkdown(new MarkdownLayout())));
@@ -61,6 +73,7 @@ export class App {
         listingSource: overrides.listingSource !== undefined ? overrides.listingSource : App.listingSource(services),
         pages: services.pages,
         workspace: this.workspace,
+        analyst: this.analyst,
       }).router(),
     );
     new Frontend(this.settings.staticDir).mount(hono);

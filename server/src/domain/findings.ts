@@ -54,6 +54,18 @@ export class Findings {
       case "regimen":
       case "operator_input":
         return kind;
+      case "ad_elements":
+        return String(payload.source_id ?? "");
+      case "quote":
+        return String(payload.review_ref || `${String(payload.source_id ?? "")}:${String(payload.paragraphs ?? "")}`);
+      case "pain_profile":
+        return Findings.name(payload.pain);
+      case "avatar":
+        return String(payload.id ?? "");
+      case "awareness":
+        return `${String(payload.avatar_id ?? "")}:${String(payload.channel ?? "")}`;
+      case "buyer_stage":
+        return `${String(payload.source_id ?? "")}:${Findings.name(payload.who)}`;
       default:
         return null;
     }

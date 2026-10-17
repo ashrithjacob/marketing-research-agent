@@ -13,6 +13,11 @@ human-only process can afford to do.**
 The system does the work an agency bills for: research, synthesis, angle
 finding, ad writing, testing and reporting. The owner makes the judgement calls.
 
+**Narrowed 2026-10-16, by the customer:** the product is an avatar research
+tool for long-form statics. That means research, sophistication and awareness,
+review mining, and avatars sliced from reviews, ads and the web. Positioning
+and synthesis (outcome 4 below) are out. `docs/spec-avatar.md`.
+
 ## What "better than a human process" means here
 
 A human team samples. It reads a few dozen reviews, a handful of competitor ads,
@@ -29,7 +34,8 @@ advantage is **coverage and traceability**, not speed alone:
 1. **Product truth** — what the product is, what it can legally claim, what it
    costs to make. (Stage 2.)
 2. **Market truth** — who it competes with, what the market has already been
-   sold, how sophisticated it is, where it breaks. (Stage 1, then stage 3.)
+   sold, how sophisticated it is, where it breaks. (Stage 1, then market truth,
+   code stage 4, with the viability gate: `docs/spec-market-truth.md`.)
 3. **Customer truth** — who buys, in their own words: avatars, awareness, the
    language bank. (Review mining, stage 3.)
 4. **Synthesis** — mechanism, claim ladder, positioning, the angle map.
@@ -60,6 +66,10 @@ the map of 1–4. The playbooks uploaded to the library are the method for 5.
   pastes its page and asks; the operator starts the research. Only buttons and
   drafts are clickable, and a button is still the only way to approve anything
   that spends Apify money or changes what the system has learned.
+  *2026-10-16:* the chat is the interface: every process runs from it, it
+  guides the owner to the next step, and each stage starts from a brief the
+  owner sees and edits, which becomes the research agents' prompt
+  (`docs/spec-always-on.md` §11).
 - ~~**Start, review, then chat.**~~ The owner starts with one button; the system
   answers with a plan of tasks to approve, and runs nothing before that. After
   that the owner guides the work by chatting with one operator, beside a

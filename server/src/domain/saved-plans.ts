@@ -7,9 +7,10 @@ import { StageOnePlans, type StageOneAgent } from "./stage-one-agents.js";
 import type { TaskContract } from "./task-contract.js";
 import { Trace } from "../trace/index.js";
 
-/** A task Start may propose: what it is called, the stage-1 role it works as, what it asks for, what done means, what it may spend, and when it stops to ask. */
+/** A task Start may propose: what it is called, the stage-1 role it works as, what it asks for, what done means, what it may spend, when it stops to ask, and, for one that may spend Apify money, how its approval is put to the owner in plain words. */
 interface SavedTask {
   title: string;
+  approval?: { title: string; why: string };
   method: StageOneAgent;
   objective: string;
   complete: Deliverable;
@@ -20,6 +21,7 @@ interface SavedTask {
 export const SAVED_TASKS: Readonly<Record<string, SavedTask>> = {
   champion: {
     title: "Champion product",
+    approval: { title: "Search Amazon for the category's best-seller?", why: "To compare {name} with the product that leads its category, the agent looks it up on Amazon, which is a paid search." },
     method: "champion",
     objective: "The product every other task measures {subject} against",
     complete: CHAMPION_DELIVERABLE,
@@ -37,6 +39,7 @@ export const SAVED_TASKS: Readonly<Record<string, SavedTask>> = {
   },
   competitors: {
     title: "Competitors",
+    approval: { title: "Look up {name}'s competitors on Amazon?", why: "To see who else sells to {name}'s customers, and how they price and rate, the agent looks each competitor up on Amazon, which is a paid search." },
     method: "competitors",
     objective: "Every product sold to {subject}'s customer: direct, indirect by form, and indirect by active",
     complete: COMPETITORS_DELIVERABLE,

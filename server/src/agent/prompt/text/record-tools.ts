@@ -73,6 +73,65 @@ export const RECORD_TOOLS = [
       '"three consecutive sources added no new theme"}',
   },
   {
+    name: "record_ad_elements",
+    kind: "ad_elements",
+    description:
+      "Record which persuasion elements one competitor ad or page uses, from: \"claim\" (a big, direct promise), " +
+      "\"amplifier\" (the promise made faster, bigger, easier or \"without\" a downside), \"mechanism\" (how it works), " +
+      "\"proof\" (testimonials, UGC, customer counts, before and afters, demonstrations, experts, studies, celebrities), " +
+      "\"identity\" (it shifts what the buyer believes about themselves: \"it's not your fault\"). One row per ad or page; " +
+      REPLACES + ' Example: {"brand":"Betterbrand","source_id":"sha256:0e47…","elements":["claim","amplifier","proof"]}',
+  },
+  {
+    name: "record_buyer_stage",
+    kind: "buyer_stage",
+    description:
+      "Record where one customer voice (a review, a forum post) stands, read from their own words: \"beginner\" (the problem " +
+      "is new; they have barely looked), \"explorer\" (has seen or tried a little, open to options, asks which is best), " +
+      "\"researcher\" (reads labels, compares doses, asks how it works), \"skeptic\" (tried things that failed, distrusts " +
+      "claims, wants proof), \"hopeless\" (believes nothing works for them: \"I'm too far gone\"). `who` names the voice, " +
+      "not their words. One row per voice; " + REPLACES +
+      ' Example: {"source_id":"sha256:8569…","who":"Amazon reviewer, 2 stars, March 2026","stage":"skeptic"}',
+  },
+  {
+    name: "record_identity_entry",
+    kind: "identity_entry",
+    description:
+      "Record one identity entry: `kind` is \"label_self\", \"label_others\", \"guilt\", \"loss\" or \"feared_identity\"; " +
+      "`summary` in your own words, short; `quote_ids` the quotes that show it; `provenance` \"evidenced\" or \"inferred\". " +
+      'Example: {"kind":"guilt","summary":"blames herself for years of smoking","quote_ids":["qt12","qt30"],"provenance":"evidenced"}',
+  },
+  {
+    name: "record_pain_profile",
+    kind: "pain_profile",
+    description:
+      "Record the emotional profile of one major pain: `emotion` (fear, guilt, shame, grief, anger, helplessness), " +
+      "`intensity` (low, medium, high), `duration` (acute, chronic, episodic), `social` (private, visible, relationship), " +
+      REPLACES + ' Example: {"pain":"night coughing","emotion":"helplessness","intensity":"high","duration":"chronic",' +
+      '"social":"relationship","quote_ids":["qt4"],"provenance":"evidenced"}',
+  },
+  {
+    name: "record_avatar",
+    kind: "avatar",
+    description:
+      "Record one avatar, or a sub-avatar with `parent` set to its avatar's id. `blame` is outward, inward or mixed; " +
+      "`proxy` true for someone buying for another person. " + REPLACES + ' Example: {"id":"ex_smoker","parent":null,' +
+      '"name":"The ex-smoker who still coughs","proxy":false,"situation":"quit 2 years ago, cough never left",' +
+      '"history":"tried NAC and mullein tea; nothing changed","demographics":"45–60, either sex","pains":["morning cough"],' +
+      '"outcomes":["a clear chest by the morning"],"objections":["another supplement that does nothing"],' +
+      '"identity":"the one who did the damage","secondary_gain":"the cough excuses skipping exercise","blame":"inward",' +
+      '"quote_ids":["qt3","qt9"],"provenance":"evidenced"}',
+  },
+  {
+    name: "record_awareness",
+    kind: "awareness",
+    description:
+      "Record one avatar's awareness on one channel: weights on the five levels summing to 1, and the entry level. " +
+      REPLACES + ' Example: {"avatar_id":"ex_smoker","channel":"cold_social","weights":{"unaware":0.1,"problem_aware":0.6,' +
+      '"solution_aware":0.25,"product_aware":0.05,"most_aware":0},"entry":"problem_aware",' +
+      '"why":"they name the cough, not a remedy","quote_ids":["qt3"],"provenance":"evidenced"}',
+  },
+  {
     name: "record_node_status",
     kind: "node_status",
     description:

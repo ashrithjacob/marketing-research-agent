@@ -93,3 +93,7 @@ export const proposePlaybookParameters = Type.Object({
   criteria: Type.Array(Type.String(), { description: "What an editor checks, one sentence each." }),
   why: Type.String({ description: "One line: what in the document this comes from." }),
 });
+
+export const useSourceParameters = Type.Object({
+  source_id: Type.String({ description: "The id of a source the earlier stages read, as listed in your instructions (sha256:…)." }),
+});

@@ -2,6 +2,7 @@ import { RoleRecords, Roles, type Brief, type Node, type RoleSpec, type Trip } f
 import { DeliverableChecks } from "../extract/index.js";
 import { Trace } from "../trace/index.js";
 
+import { CustomerContract } from "./customer-contract.js";
 import { ChampionContract, NodeContract, TruthContract, type DoneCheck } from "./done-check.js";
 import { LimitClose, type LimitClosed } from "./limit-close.js";
 import { RoleDone } from "./role-done.js";
@@ -35,9 +36,12 @@ export class RoleChecks {
       case "champion":
         return new ChampionContract(findings, run.brief);
       case "stage_one_node":
+      case "market_node":
         return new NodeContract(findings, { brief: run.brief, node: Roles.node(role, run.nodes), champion: role.id === "competitors" ? "champion" : null });
       case "product_truth":
         return new TruthContract(findings);
+      case "customer_node":
+        return new CustomerContract(findings, new NodeContract(findings, { brief: run.brief, node: Roles.node(role, run.nodes), champion: null }));
     }
   }
 }

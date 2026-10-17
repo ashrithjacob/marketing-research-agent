@@ -19,10 +19,14 @@ deploy steps are about **agentchat**, a different app. Use the ones below.
   stage 1 is four agents (champion, then product/competitors/category side by
   side): `workings_stage1.md`.
   What is on the screen and what it calls: `FEATURE_MAP.md`.
-- The north star every change answers to: `docs/goal.md`. The always-on
-  refactor being built on the `ubiquitous` branch: `docs/spec-always-on.md`.
-- Older specs (`spec.md`, `cockpit-spec.md`) still describe hermes as the engine.
-  That is superseded by `pi-agent-core`. Trust `setup.md`.
+- Trendtrack's own API docs (auth, credits, errors, rate limits, time windows)
+  are in `trendtrack/`, one resource per file under `trendtrack/api/`
+  (`Ads.md`, `brandtrackers.md`, …). Read them before touching
+  `adapters/trendtrack-ads.ts`; `trendtrack-api.md` is only the index.
+- The north star every change answers to: `docs/goal.md`, narrowed on
+  2026-10-16 to avatar research for long-form statics: `docs/spec-avatar.md`.
+  Every older spec was deleted on 2026-10-17 when the product's goal changed;
+  git history has them. Trust `setup.md` and the code.
 
 ## The one command
 
@@ -76,7 +80,7 @@ and **every stage-1 run except a url brief without `competitors`**: its step-1
 `champion` agent calls `amazon_find_product` (`workings_stage1.md`). With
 `competitors` in scope that agent can call it too, and **when the run completes,
 code looks up the Amazon listing of the champion and every competitor
-automatically**, about $0.01 each (`spec-stage-2-pipeline.md` §3a).
+automatically**, about $0.01 each.
 To see a change work, run a url brief on `product_data` and/or `category_data`
 (`mra run "https://…" product_data,category_data`), which skips the champion and
 only uses web search and page fetches. A genre brief runs the champion, even on
@@ -231,8 +235,7 @@ Still only written down, because no rule catches them:
 - **A model never copies content by writing it out.** When a quote, a review,
   a finding or a draft moves from one place to another, the model names it by
   id (`source_id`, `ref`, finding id, paragraph number) and code copies it.
-  Re-typed text costs output tokens and can change silently. See
-  `docs/spec-always-on.md` §6.8; the stage-1 `excerpt.text` still breaks this
+  Re-typed text costs output tokens and can change silently. The stage-1 `excerpt.text` still breaks this
   until part 2.
 - **`invalid` is not `failed`.** `failed` is a crash; `invalid` means the agent
   finished and produced something the schema refused, which is the most

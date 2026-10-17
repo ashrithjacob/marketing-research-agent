@@ -12,16 +12,27 @@ export const NODES = [
   "dose_vs_study",
   "claim_limits",
   "cogs_refills",
+  "tam_sam",
+  "offers",
+  "sophistication",
+  "breaking_point",
+  "viability",
+  "language_bank",
+  "identity",
+  "avatars",
+  "awareness",
 ] as const;
 export type Node = (typeof NODES)[number];
 
-export const STAGES = [1, 2, 3] as const;
+export const STAGES = [1, 2, 3, 4, 5] as const;
 export type Stage = (typeof STAGES)[number];
 
 export const STAGE_NODES: Readonly<Record<Stage, readonly Node[]>> = {
   1: ["product_data", "competitors", "category_data"],
   2: ["mechanism", "dose_vs_study", "claim_limits", "cogs_refills"],
   3: ["review_mining"],
+  4: ["tam_sam", "offers", "sophistication", "breaking_point", "viability"],
+  5: ["language_bank", "identity", "avatars", "awareness"],
 };
 
 export const nodeSchema = z.enum(NODES);
@@ -40,12 +51,14 @@ export class Stages {
     return stages.size === 1 ? ([...stages][0] ?? null) : null;
   }
 
-  /** A run's nodes in order, empty meaning the whole of stage 1. Product truth runs whole: each of its nodes needs what another found. */
+  /** A run's nodes in order, empty meaning the whole of stage 1. Product truth, market truth and customer truth run whole: each of their nodes needs what another found. */
   static expand(nodes: readonly string[] | undefined): Node[] {
     Trace.line(import.meta.url, "Stages.expand", { nodes });
     const wanted = new Set(nodes ?? []);
     const scoped = NODES.filter((node) => wanted.has(node));
     if (scoped.some((node) => Stages.of(node) === 2)) return [...STAGE_NODES[2]];
+    if (scoped.some((node) => Stages.of(node) === 4)) return [...STAGE_NODES[4]];
+    if (scoped.some((node) => Stages.of(node) === 5)) return [...STAGE_NODES[5]];
     return scoped.length > 0 ? scoped : [...STAGE_NODES[1]];
   }
 
