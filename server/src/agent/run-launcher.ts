@@ -1,115 +1,78 @@
-import type { Models } from "@earendil-works/pi-ai";
-
-import type { OpenRouterPrices } from "../adapters/index.js";
 import type { Settings } from "../config/index.js";
-import { RejectKinds, Scope, Stages, productTruthInputsSchema, type ResearchRun, type ResearchStore, type RunRequest, type StagePacket } from "../domain/index.js";
+import type { Competitor, Product, Run } from "../domain/index.js";
 import { Trace } from "../trace/index.js";
 
-import { RunError } from "./errors.js";
+import { ModelChain } from "./kernel/model-chain.js";
 import type { LiveRuns } from "./live-runs.js";
-import { ModelChain } from "./model-chain.js";
-import { ModelPricing } from "./pricing.js";
-import { CustomerTruthRun } from "./customer-truth-run.js";
-import { MarketTruthRun } from "./market-truth-run.js";
-import { OwnerCosts } from "./owner-costs.js";
-import { OwnerReword } from "./owner-reword.js";
-import { ProductTruthRun } from "./product-truth-run.js";
+import type { Pipeline } from "./pipeline/pipeline.js";
+import { RunContext, type RunServices } from "./pipeline/run-context.js";
+import { StageProgress } from "./pipeline/stage-progress.js";
+import type { ProductResolver } from "./resolve/product-resolver.js";
 import { RunEnd } from "./run-end.js";
-import { RunInputs } from "./run-inputs.js";
-import type { RetryPolicy } from "./retry.js";
-import type { ReviewMiningJob } from "./review-mining-job.js";
-import type { ResearchAgentFactory } from "./research-agent-factory.js";
-import type { StageOneHandoff } from "./stage-one-handoff.js";
-import type { StageOneListings } from "./stage-one-listings.js";
-import { StageOneRun } from "./stage-one-run.js";
 
-export interface RunKinds {
-  factory: ResearchAgentFactory;
-  listings: StageOneListings;
-  handoff: StageOneHandoff;
-  mining: ReviewMiningJob;
-}
-
-/** Starts one run: records it, and hands LiveRuns the stage-1, product-truth, market-truth or customer-truth agents, with their models resolved and priced, or the review-mining pipeline. */
+/** Runs a run's two phases in the background: resolving what the user typed, and, once they confirm, the stages. */
 export class RunLauncher {
+  readonly runEnd: RunEnd;
+
   constructor(
-    private readonly store: ResearchStore,
+    private readonly services: RunServices,
     private readonly settings: Settings,
-    private readonly models: Models,
-    private readonly costs: OpenRouterPrices,
-    private readonly runs: LiveRuns,
-    private readonly retry: RetryPolicy,
-    private readonly kinds: RunKinds,
-  ) {}
-
-  /** The judge model's pass over a run's owner-facing values; a backfill uses it too. */
-  reword(): OwnerReword {
-    Trace.line(import.meta.url, "RunLauncher.reword");
-    return new OwnerReword(this.store, this.models, this.costs, this.settings.judgeModel);
+    private readonly live: LiveRuns,
+    private readonly pipeline: Pipeline,
+    private readonly resolver: ProductResolver,
+  ) {
+    Trace.line(import.meta.url, "RunLauncher.constructor");
+    this.runEnd = new RunEnd(services.store, services.events);
   }
 
-  async launch(request: RunRequest, workspaceId: string): Promise<string> {
-    Trace.line(import.meta.url, "RunLauncher.launch", { request, workspaceId });
-    const judgements = await this.store.listJudgements(Scope.of(workspaceId), true);
-    const rejectKinds = RejectKinds.effective(request, judgements);
-    const nodes = Stages.expand(request.nodes);
-    const stage = Stages.covering(nodes) ?? 1;
-    const run = await this.store.createRun({
-      workspaceId,
-      brief: request.brief as unknown as Record<string, unknown>,
-      model: stage === 3 ? "" : this.settings.model,
-      rejectKinds,
-      judgementIds: judgements.map((j) => j.id),
-      nodes,
-      stage,
+  chain(): ModelChain {
+    Trace.line(import.meta.url, "RunLauncher.chain");
+    const resolved = ModelChain.resolve([this.settings.model, ...this.settings.backupModels], this.services.models);
+    if ("unknown" in resolved) throw new Error(`model ${resolved.unknown} is not in OpenRouter's catalogue; fix MRA_MODEL or MRA_BACKUP_MODELS`);
+    return resolved.chain;
+  }
+
+  resolve(run: Run): void {
+    Trace.line(import.meta.url, "RunLauncher.resolve", { runId: run.id });
+    const chain = this.chain();
+    this.live.start(run.id, { phase: "resolve", product: run.input.product_url ?? run.input.product_name }, async (signal) => {
+      const context = new RunContext(run, signal, this.services, chain);
+      try {
+        const result = await this.resolver.resolve(context);
+        await context.settled();
+        if (result.status === "completed") {
+          await this.services.store.runs.updateRun(run.id, { status: "awaiting_confirmation", resolution: result.value });
+          await context.emit("run.resolved", { competitors: result.value.competitors.length });
+          return;
+        }
+        const error = result.status === "invalid" ? result.problems.join("; ") : result.status === "failed" ? result.error : "";
+        await this.runEnd.end(run.id, { status: result.status, error: `resolving: ${error}` });
+      } catch (error) {
+        await this.crashed(run.id, context, error);
+      }
     });
-    const header = { product: request.brief.product, url: request.brief.url, model: stage === 3 ? "pipeline" : this.settings.model, nodes };
-    if (stage === 3) return this.launchPipeline(run, request, workspaceId, header);
-    const chain = await this.chain(run.id);
-    const { store, runs, costs, retry, kinds } = this;
-    const deps = { store, runs, costs, retry };
-    const brief = { runId: run.id, brief: request.brief, rejectKinds, judgements, chain };
-    const inputs = new RunInputs(this.store, this.runs, kinds.handoff);
-    const team =
-      stage === 2
-        ? new ProductTruthRun({ ...deps, factory: kinds.factory }, { ...brief, ...(await inputs.productTruth(run, request, workspaceId)), inputs: await new OwnerCosts(this.store).intoInputs(productTruthInputsSchema.parse(request.inputs ?? {}), workspaceId, run.product_id) })
-        : stage === 4
-          ? new MarketTruthRun({ ...deps, factory: kinds.factory, reword: this.reword() }, { ...brief, evidence: await inputs.marketTruth(run, request, workspaceId) })
-          : stage === 5
-            ? new CustomerTruthRun({ ...deps, factory: kinds.factory }, { ...brief, evidence: await inputs.customerTruth(run, request, workspaceId) })
-            : new StageOneRun({ ...deps, factory: kinds.factory, listings: kinds.listings }, { ...brief, nodes });
-    await this.store.updateRun(run.id, { agent_run_id: run.id, session_id: `research-${run.id}`, status: "running" });
-    this.runs.emit(run.id, "run.started", { model: this.settings.model, nodes });
-    const done = Trace.within(run.id, header, () => team.start());
-    this.runs.add(run.id, { control: { abort: team.abort, steer: team.steer }, subscribers: new Set(), done });
-    return run.id;
   }
 
-  /** The configured model and its backups, priced; a model the provider does not know fails the run before anything starts. */
-  private async chain(runId: string): Promise<ModelChain> {
-    Trace.line(import.meta.url, "RunLauncher.chain", { runId });
-    const resolved = ModelChain.resolve([this.settings.model, ...this.settings.backupModels], this.models, new ModelPricing(this.costs));
-    if (!("unknown" in resolved)) return resolved.chain;
-    const error = `unknown model ${JSON.stringify(resolved.unknown)} for provider openrouter`;
-    await new RunEnd(this.store, this.runs).refuse(runId, error);
-    throw new RunError(error);
+  research(run: Run, product: Product, competitors: readonly Competitor[]): void {
+    Trace.line(import.meta.url, "RunLauncher.research", { runId: run.id });
+    const chain = this.chain();
+    this.live.start(run.id, { phase: "research", product: product.url }, async (signal) => {
+      const context = new RunContext(run, signal, this.services, chain);
+      try {
+        const progress = new StageProgress(structuredClone(run.stage_status), this.services.store.runs, context);
+        await this.pipeline.run({ context, product, competitors }, progress);
+        await context.settled();
+        await this.runEnd.end(run.id, RunEnd.verdict(progress.snapshot(), signal.aborted));
+      } catch (error) {
+        await this.crashed(run.id, context, error);
+      }
+    });
   }
 
-
-
-  private async launchPipeline(run: ResearchRun, request: RunRequest, workspaceId: string, header: Record<string, unknown>): Promise<string> {
-    Trace.line(import.meta.url, "RunLauncher.launchPipeline", { workspaceId, targets: request.targets });
-    const job = Trace.within(run.id, header, () =>
-      this.kinds.mining.start(run.id, {
-        brief: request.brief,
-        targets: request.targets ?? [],
-        reviewsPerBand: request.reviews_per_band ?? this.settings.apifyMaxReviews,
-        workspaceId,
-      }),
-    );
-    await this.store.updateRun(run.id, { status: "running" });
-    this.runs.emit(run.id, "run.started", { model: "", nodes: run.nodes });
-    this.runs.add(run.id, { control: { abort: job.abort }, subscribers: new Set(), done: job.done });
-    return run.id;
+  private async crashed(runId: string, context: RunContext, error: unknown): Promise<void> {
+    Trace.line(import.meta.url, "RunLauncher.crashed", { runId });
+    console.error(`run ${runId} crashed`, error);
+    await context.settled().catch(() => undefined);
+    await this.runEnd.end(runId, { status: "failed", error: error instanceof Error ? error.message : String(error) });
   }
 }

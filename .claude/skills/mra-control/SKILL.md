@@ -8,16 +8,18 @@ description: Run, inspect and verify the marketing-research-agent cockpit throug
 There is one way to drive this app, and it is `mra`. It lives at
 `.claude/skills/mra-control/bin/mra`. Use it rather than writing a fresh curl
 each time: the point is that two sessions a week apart produce comparable
-evidence, and that the flags which matter here (a URL belongs in `brief.url`;
-`invalid` is not `failed`) are already encoded rather than re-remembered.
+evidence, and that the flags which matter here (a URL belongs in `product_url`,
+never `product_name`; `invalid` is not `failed`) are already encoded rather than
+re-remembered.
 
 ```
 mra check [--changed]     the gate: conventions, typecheck, tests, frontend build
 mra up | down | logs [n]  the local stack
 mra health [local|live]
-mra run "<brief>" [nodes] start a run          mra watch [runId]   follow it
-mra calls [runId]         the LLM call log     mra deployed        what is live
-mra library [file.pdf]    upload a PDF and watch it convert; no file lists the library
+mra run "<product>"       start an analysis    mra watch [runId]   follow it
+mra confirm [runId]       accept what it resolved and start the stages
+mra calls [runId]         the LLM call log     mra trace [runId]   its trace file
+mra deployed              what is live
 ```
 
 ## The gate
@@ -38,19 +40,20 @@ failure shapes. For anything user-visible:
 
 ```bash
 mra up
-mra run "https://thedropletco.co.uk" product_data
+mra run "https://mullevia.com/products/mullevia-mullein-drops"
+mra watch          # stops at awaiting_confirmation
+mra confirm        # or confirm in the cockpit, editing the competitors
 mra watch
 ```
 
-Then read the outcome rather than asserting it. `mra watch` prints the status,
-the counts and both costs. `succeeded` with zero excerpts is not a success.
-`invalid` means the agent finished and the schema refused what it produced —
-`mra calls` shows which turn went wrong, and the rejection message names the
-field.
+Then read the outcome rather than asserting it. `mra watch` prints each built
+stage's status and summary, the competitors with their relationship, and the
+cost. `invalid` means an agent finished and its submit was refused by the
+schema or a code check (a source it never read, a url it never met) —
+`mra calls` shows which turn, and the refusal names the field.
 
-A run costs real money (OpenRouter per token, Apify per review event). Scope it
-with a single node while iterating; run the whole stage when the change could
-affect more than one.
+A run costs real money: OpenRouter per token, Parallel per search, Firecrawl per
+page. Ask before starting one, and one run is enough to verify something.
 
 ## Diagnosing a bug report
 

@@ -1,9 +1,10 @@
 import { PGlite } from "@electric-sql/pglite";
+import { vector } from "@electric-sql/pglite-pgvector";
 import { PGLiteSocketServer } from "@electric-sql/pglite-socket";
 
 import { PostgresDatabase, SqlResearchStore } from "../src/adapters/index.js";
 
-/** The research store on an in-process Postgres, reached through the same `pg` driver production uses. One connection: PGlite runs one session. */
+/** The research store on an in-process Postgres with pgvector, reached through the same `pg` driver production uses. One connection: PGlite runs one session. */
 export class PostgresStores {
   private constructor(
     private readonly pglite: PGlite,
@@ -13,7 +14,7 @@ export class PostgresStores {
   ) {}
 
   static async start(): Promise<PostgresStores> {
-    const pglite = await PGlite.create();
+    const pglite = await PGlite.create({ extensions: { vector } });
     const server = new PGLiteSocketServer({ db: pglite, port: 0, host: "127.0.0.1" });
     await server.start();
     const { port } = (server as unknown as { server: { address(): { port: number } } }).server.address();

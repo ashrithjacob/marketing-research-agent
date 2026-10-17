@@ -1,16 +1,16 @@
-import { ADMIN_WORKSPACE, type AccountDirectory } from "../domain/index.js";
+import { ADMIN_ACCOUNT, type AccountDirectory } from "../domain/index.js";
 
 import { Passwords } from "./passwords.js";
 import { SecretPrompt } from "./secret-prompt.js";
 import { Trace } from "../trace/index.js";
 
-/** The admin CLI for workspaces and logins: there is no signup page, so this is how an account comes to exist. */
+/** The admin CLI for client accounts and logins: there is no signup page, so this is how a login comes to exist. */
 export class AccountCommands {
   static readonly USAGE = [
     "usage: accounts <command>",
     "  list",
-    "  add-workspace <name>",
-    "  add-user <username> <workspace> [--admin]",
+    "  add-account <name>",
+    "  add-user <username> <account> [--admin]",
     "  reset-password <username>",
     "  disable <username>",
     "  enable <username>",
@@ -29,7 +29,7 @@ export class AccountCommands {
     const [command, first, second] = argv;
     try {
       if (command === "list") return await this.list();
-      if (command === "add-workspace" && first) return await this.addWorkspace(first);
+      if (command === "add-account" && first) return await this.addAccount(first);
       if (command === "add-user" && first && second) {
         return await this.addUser(first, second, argv.includes("--admin"));
       }
@@ -46,30 +46,30 @@ export class AccountCommands {
 
   private async list(): Promise<number> {
     Trace.line(import.meta.url, "AccountCommands.list");
-    for (const a of await this.accounts.list()) {
+    for (const a of await this.accounts.users()) {
       const flags = [a.is_admin ? "admin" : "", a.disabled ? "DISABLED" : ""].filter(Boolean).join(",");
-      this.out(`${a.workspace}\t${a.username}\t${flags}`);
+      this.out(`${a.account}\t${a.username}\t${flags}`);
     }
     return 0;
   }
 
-  private async addWorkspace(name: string): Promise<number> {
-    Trace.line(import.meta.url, "AccountCommands.addWorkspace", { name });
-    if (!AccountCommands.NAME.test(name)) throw new Error("a workspace name is lowercase letters, digits and dashes");
-    if (await this.accounts.workspaceNamed(name)) throw new Error(`workspace ${name} already exists`);
-    this.out(`created workspace ${(await this.accounts.addWorkspace(name)).name}`);
+  private async addAccount(name: string): Promise<number> {
+    Trace.line(import.meta.url, "AccountCommands.addAccount", { name });
+    if (!AccountCommands.NAME.test(name)) throw new Error("an account name is lowercase letters, digits and dashes");
+    if (await this.accounts.accountNamed(name)) throw new Error(`account ${name} already exists`);
+    this.out(`created account ${(await this.accounts.addAccount(name)).name}`);
     return 0;
   }
 
-  private async addUser(username: string, workspaceName: string, isAdmin: boolean): Promise<number> {
-    Trace.line(import.meta.url, "AccountCommands.addUser", { username, workspaceName, isAdmin });
-    const workspace = await this.accounts.workspaceNamed(workspaceName);
-    if (!workspace) throw new Error(`no workspace ${workspaceName}; add-workspace it first`);
+  private async addUser(username: string, accountName: string, isAdmin: boolean): Promise<number> {
+    Trace.line(import.meta.url, "AccountCommands.addUser", { username, accountName, isAdmin });
+    const account = await this.accounts.accountNamed(accountName);
+    if (!account) throw new Error(`no account ${accountName}; add-account it first`);
     if (await this.accounts.byUsername(username)) throw new Error(`user ${username} already exists`);
-    if (isAdmin && workspace.id !== ADMIN_WORKSPACE) throw new Error("admins belong to the admin workspace");
+    if (isAdmin && account.id !== ADMIN_ACCOUNT) throw new Error("admins belong to the admin account");
     const passwordHash = await Passwords.hash(await SecretPrompt.newPassword(this.ask));
-    await this.accounts.addAccount({ username, passwordHash, workspaceId: workspace.id, isAdmin });
-    this.out(`created ${username} in ${workspace.name}`);
+    await this.accounts.addUser({ username, passwordHash, accountId: account.id, isAdmin });
+    this.out(`created ${username} in ${account.name}`);
     return 0;
   }
 

@@ -6,7 +6,6 @@ export interface AdQuery {
   searchIn: AdSearchField;
   countries: readonly string[];
   limit: number;
-  /** `newest` for a watcher looking for ads it has not seen; reach otherwise. */
   sortBy?: "reach" | "newest";
 }
 

@@ -1,28 +1,31 @@
 import { Trace } from "../trace/index.js";
 
-export const ADMIN_WORKSPACE = "admin";
+export const ADMIN_ACCOUNT = "admin";
 
-export interface Workspace {
+/** A client: every row of research belongs to exactly one, and no client sees another's. */
+export interface Account {
   id: string;
   name: string;
-  billing_status: string;
+  vertical: string;
+  markets: string[];
   created_at: string;
 }
 
-export interface Account {
+/** A login, belonging to one account. */
+export interface User {
   id: string;
   username: string;
   password_hash: string;
-  workspace_id: string;
+  account_id: string;
   is_admin: boolean;
   token_version: number;
   disabled: boolean;
   created_at: string;
 }
 
-export interface AccountListing {
+export interface UserListing {
   username: string;
-  workspace: string;
+  account: string;
   is_admin: boolean;
   disabled: boolean;
   created_at: string;
@@ -32,28 +35,28 @@ export interface AccountListing {
 export interface Principal {
   userId: string;
   username: string;
-  workspaceId: string;
+  accountId: string;
   isAdmin: boolean;
 }
 
-/** Which workspace's rows a read may return; `everything` is for an admin and for the server itself. */
+/** Which account's rows a read may return; `everything` is for an admin and for the server itself. */
 export class Scope {
-  private constructor(readonly workspaceId: string | null) {}
+  private constructor(readonly accountId: string | null) {}
 
   static readonly everything = new Scope(null);
 
-  static of(workspaceId: string): Scope {
-    Trace.line(import.meta.url, "Scope.of", { workspaceId });
-    return new Scope(workspaceId);
+  static of(accountId: string): Scope {
+    Trace.line(import.meta.url, "Scope.of", { accountId });
+    return new Scope(accountId);
   }
 
   static forViewer(principal: Principal): Scope {
     Trace.line(import.meta.url, "Scope.forViewer", { principal });
-    return principal.isAdmin ? Scope.everything : Scope.of(principal.workspaceId);
+    return principal.isAdmin ? Scope.everything : Scope.of(principal.accountId);
   }
 
-  admits(workspaceId: string): boolean {
-    Trace.line(import.meta.url, "Scope.admits", { workspaceId });
-    return this.workspaceId === null || this.workspaceId === workspaceId;
+  admits(accountId: string): boolean {
+    Trace.line(import.meta.url, "Scope.admits", { accountId });
+    return this.accountId === null || this.accountId === accountId;
   }
 }

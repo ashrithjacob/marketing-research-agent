@@ -1,116 +1,68 @@
-# The whole marketing research agent: cockpit and agent. One file, one
-# command:
+# The research cockpit, locally: the app and its own Postgres. One command:
 #
 #     cp .env.example .env   # fill in the keys, first time only
 #     docker compose up -d --build
 #     open http://localhost:8080
 #
-#     docker compose down    # stop it; the volumes keep your runs
+#     docker compose down    # stop it; the pg_data volume keeps your runs
 #
-# One container, two volumes. Nothing on the host, nothing in systemd, nothing
-# that has to be running when you are not using it.
-#
-# **Superseded:** this stack used to be four containers — the cockpit, its own
-# hermes gateway, a one-shot `hermes-config` that pointed hermes at the right
-# search backend, and SearXNG. The harness now runs inside the cockpit process
-# (pi-agent-core), so `hermes` and `hermes-config` are gone, and with them the
-# whole class of failure where the agent's web access depended on which backend
-# hermes had auto-detected. See README.md and spec-stage-1.md §10. SearXNG
-# went on 2026-10-01: search engines blocked it (CAPTCHA, rate limits) and
-# every search came back empty; search is Parallel's cloud API now.
+# Two containers. The app runs the agent in-process (pi-agent-core); the store
+# is Postgres with pgvector, the same engine the VPS uses on Neon. SQLite went
+# on 2026-10-17 with the avatar rewrite (docs/spec.md): the spec's schema needs
+# pgvector, and one engine means one set of SQL.
 name: mra
 
 services:
+  db:
+    image: pgvector/pgvector:pg17
+    container_name: mra-db
+    restart: on-failure
+    # No `ports:`. Only the app reaches it, over this stack's own network.
+    environment:
+      - POSTGRES_USER=mra
+      - POSTGRES_PASSWORD=mra
+      - POSTGRES_DB=mra
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "mra"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
   mra:
     build:
       context: .
       dockerfile: Dockerfile
     image: mra:latest
     container_name: mra
-    # Not `unless-stopped`: this stack is on-demand, so it should survive a
-    # crash without resurrecting itself days after you brought it down.
-    #
-    # A restart is not free any more. The agent runs inside this container, so
-    # restarting kills any run in progress; the server marks such a run
-    # `failed` on the way back up rather than leaving it stuck on `running`.
+    # Not `unless-stopped`: this stack is on-demand. A restart ends any run in
+    # progress; the server marks it `failed` on the way back up.
     restart: on-failure
-    # Bound to 127.0.0.1, not 0.0.0.0: with no password set
-    # (MRA_APP_PASSWORD_HASH below) anyone on your network would otherwise
-    # reach an unauthenticated agent with web access.
-    #
-    # This line is what makes today's answer "reach it directly in a browser"
-    # rather than "through a reverse proxy" — the right choice for one person
-    # on one laptop. It is also the one line that changes on the day this moves
-    # behind a TLS-terminating proxy (Caddy, on the VPS): a published host port
-    # and a reverse-proxied container are two different network shapes, and
-    # that day's setup will say so rather than silently reusing this file.
+    depends_on:
+      db:
+        condition: service_healthy
+    # Bound to 127.0.0.1: with no password set anyone on your network would
+    # otherwise reach an unauthenticated agent with web access.
     ports: ["127.0.0.1:8080:8000"]
     volumes:
       - mra_data:/data
-      # Read-write, where it used to be read-only. The corpus was written by
-      # hermes's shell tool and only *read* here; `web_fetch` now writes it
-      # directly, so this process owns it. What kept the old arrangement safe
-      # is kept explicitly instead: nothing ever executes out of this
-      # directory, and the route that serves it back sends `text/plain` with
-      # `Content-Security-Policy: default-src 'none'`, so a scraped page cannot
-      # become a script on this origin.
-      - corpus:/corpus
     environment:
       - MRA_APP_USER=${MRA_APP_USER:-ash}
       - MRA_APP_PASSWORD_HASH=${MRA_APP_PASSWORD_HASH:-}
       - MRA_JWT_SECRET=${MRA_JWT_SECRET}
-      # http://localhost cannot set a Secure cookie — a browser silently drops
-      # it, so login would appear to succeed and then immediately log you back
-      # out. .env.example sets this to false for exactly that reason; flip it
-      # back to true (the default here) the day this sits behind real TLS.
       - MRA_COOKIE_SECURE=${MRA_COOKIE_SECURE:-true}
-      - MRA_DATABASE_PATH=/data/research.db
-      - MRA_CORPUS_PATH=/corpus
-      # Inference goes straight to OpenRouter from this process. There is no
-      # gateway in between any more, so there is also no gateway default: the
-      # model is always named. See .env.example for why this one.
+      # Written here, never taken from .env: .env's DATABASE_URL points at Neon,
+      # and a local stack must never write to it.
+      - DATABASE_URL=postgres://mra:mra@db:5432/mra
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
       - MRA_MODEL=${MRA_MODEL:?MRA_MODEL must be set in .env - the model id lives only there}
       - MRA_BACKUP_MODELS=${MRA_BACKUP_MODELS:-}
-      # Page content from Firecrawl's cloud API. Leave FIRECRAWL_API_KEY blank
-      # and web_fetch fails loudly on every call, which is more useful than a
-      # run that quietly records nothing but search snippets.
       - FIRECRAWL_API_KEY=${FIRECRAWL_API_KEY}
-      # Fallback page reader: used only when Firecrawl can fetch nothing at all
-      # (out of credits, key refused, or no key). Blank disables the fallback.
       - CRAWL4AI_API_KEY=${CRAWL4AI_API_KEY:-}
-      # Every web_search, stage 1 and product truth, goes to Parallel, and
-      # product truth reads pages through it too. Blank: every search fails.
       - PARALLEL_API_KEY=${PARALLEL_API_KEY:-}
-      # Meta ad search for the product, competitors and category agents
-      # (ad_library_search). Blank: the tool is not offered.
       - TRENDTRACK_API_KEY=${TRENDTRACK_API_KEY:-}
-      - META_ACCESS_TOKEN=${META_ACCESS_TOKEN:-}
-      # Cheap pre-read gate: every fetched page passes a small model before it
-      # reaches the researcher's context. Empty disables the gate (tools then
-      # behave as before). :free models cost nothing but can rate-limit; the
-      # gate fails open, so an outage degrades to no gate, never a dead run.
-      - MRA_GATE_MODEL=${MRA_GATE_MODEL:-}
-      - MRA_JUDGE_MODEL=${MRA_JUDGE_MODEL:-}
-      - MRA_GATE_CHAR_LIMIT=${MRA_GATE_CHAR_LIMIT:-4000}
-      - MRA_GATE_TIMEOUT_SECONDS=${MRA_GATE_TIMEOUT_SECONDS:-12}
-      # Review mining. Unset is fine and is the default: the three review tools
-      # are then withheld from the agent entirely, rather than offered and
-      # failing on call — stage 1 gaps `review_mining` and says why. Amazon is
-      # unreachable from this host by any other route (it serves a bot page at
-      # HTTP 200), so without this there are no marketplace reviews at all.
-      # Billed per event against a real card, with no allowance. See
-      # .env.example and spec-review-mining.md §5.
-      - APIFY_TOKEN=${APIFY_TOKEN:-}
-      # Reviews requested per product per star band. The FREE plan's actor caps
-      # this at 10 per run regardless, and drops the extras without erroring.
-      - MRA_APIFY_MAX_REVIEWS=${MRA_APIFY_MAX_REVIEWS:-50}
-      # Apify actor runs mine_reviews keeps in flight at once.
-      - MRA_APIFY_CONCURRENCY=${MRA_APIFY_CONCURRENCY:-16}
 
 volumes:
-  # Runs, events and packets. Losing this loses your research history.
+  pg_data: {}
   mra_data: {}
-  # Raw fetched bodies, content-addressed. `docker compose exec mra ls
-  # /corpus/runs` to look inside.
-  corpus: {}

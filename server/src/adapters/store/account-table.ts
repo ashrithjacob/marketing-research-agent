@@ -1,126 +1,100 @@
 import {
-  ADMIN_WORKSPACE,
-  Clock,
+  ADMIN_ACCOUNT,
   Ids,
   type Account,
   type AccountDirectory,
-  type AccountListing,
-  type Workspace,
+  type User,
+  type UserListing,
 } from "../../domain/index.js";
 import { Trace } from "../../trace/index.js";
 
 import type { SqlDatabase } from "./sql-database.js";
 
-/** Workspaces and their logins; a password change or a disable bumps `token_version`, which ends every session. */
+/** Client accounts and their logins; a password change or a disable bumps `token_version`, which ends every session. */
 export class AccountTable implements AccountDirectory {
-  static readonly DDL = `
-CREATE TABLE IF NOT EXISTS research_workspaces (
-    id             TEXT PRIMARY KEY,
-    name           TEXT NOT NULL UNIQUE,
-    billing_status TEXT NOT NULL DEFAULT 'exempt',
-    created_at     TEXT NOT NULL
-);
-CREATE TABLE IF NOT EXISTS research_accounts (
-    id            TEXT PRIMARY KEY,
-    username      TEXT NOT NULL UNIQUE,
-    password_hash TEXT NOT NULL,
-    workspace_id  TEXT NOT NULL REFERENCES research_workspaces(id),
-    is_admin      INTEGER NOT NULL DEFAULT 0,
-    token_version INTEGER NOT NULL DEFAULT 0,
-    disabled      INTEGER NOT NULL DEFAULT 0,
-    created_at    TEXT NOT NULL
-);`;
-
   constructor(private readonly db: SqlDatabase) {}
 
-  async addWorkspace(name: string): Promise<Workspace> {
-    Trace.line(import.meta.url, "AccountTable.addWorkspace", { name });
-    return this.insertWorkspace(name, name);
+  async addAccount(name: string): Promise<Account> {
+    Trace.line(import.meta.url, "AccountTable.addAccount", { name });
+    return this.insertAccount(Ids.next(), name);
   }
 
-  async workspace(id: string): Promise<Workspace | null> {
-    Trace.line(import.meta.url, "AccountTable.workspace", { id });
-    return this.db.get<Workspace>("SELECT * FROM research_workspaces WHERE id = ?", [id]);
+  async account(id: string): Promise<Account | null> {
+    Trace.line(import.meta.url, "AccountTable.account", { id });
+    return this.db.get<Account>("SELECT * FROM accounts WHERE id = ?", [id]);
   }
 
-  async workspaceNamed(name: string): Promise<Workspace | null> {
-    Trace.line(import.meta.url, "AccountTable.workspaceNamed", { name });
-    return this.db.get<Workspace>("SELECT * FROM research_workspaces WHERE name = ?", [name]);
+  async accountNamed(name: string): Promise<Account | null> {
+    Trace.line(import.meta.url, "AccountTable.accountNamed", { name });
+    return this.db.get<Account>("SELECT * FROM accounts WHERE name = ?", [name]);
   }
 
-  async addAccount(input: { username: string; passwordHash: string; workspaceId: string; isAdmin: boolean }): Promise<Account> {
-    Trace.line(import.meta.url, "AccountTable.addAccount", { input });
+  async addUser(input: { username: string; passwordHash: string; accountId: string; isAdmin: boolean }): Promise<User> {
+    Trace.line(import.meta.url, "AccountTable.addUser", { username: input.username, accountId: input.accountId });
     const id = Ids.next();
-    await this.db.run(
-      "INSERT INTO research_accounts (id, username, password_hash, workspace_id, is_admin, created_at) VALUES (?,?,?,?,?,?)",
-      [id, input.username, input.passwordHash, input.workspaceId, input.isAdmin ? 1 : 0, Clock.nowIso()],
-    );
-    return (await this.get(id))!;
+    await this.db.run("INSERT INTO users (id, username, password_hash, account_id, is_admin) VALUES (?,?,?,?,?)", [
+      id,
+      input.username,
+      input.passwordHash,
+      input.accountId,
+      input.isAdmin,
+    ]);
+    return (await this.user(id))!;
   }
 
-  async get(accountId: string): Promise<Account | null> {
-    Trace.line(import.meta.url, "AccountTable.get", { accountId });
-    return AccountTable.account(await this.db.get("SELECT * FROM research_accounts WHERE id = ?", [accountId]));
+  async user(userId: string): Promise<User | null> {
+    Trace.line(import.meta.url, "AccountTable.user", { userId });
+    return this.db.get<User>("SELECT * FROM users WHERE id = ?", [userId]);
   }
 
-  async byUsername(username: string): Promise<Account | null> {
+  async byUsername(username: string): Promise<User | null> {
     Trace.line(import.meta.url, "AccountTable.byUsername", { username });
-    return AccountTable.account(await this.db.get("SELECT * FROM research_accounts WHERE username = ?", [username]));
+    return this.db.get<User>("SELECT * FROM users WHERE username = ?", [username]);
   }
 
-  async list(): Promise<AccountListing[]> {
-    Trace.line(import.meta.url, "AccountTable.list");
-    const rows = await this.db.all(
-      "SELECT a.username, w.name AS workspace, a.is_admin, a.disabled, a.created_at" +
-        " FROM research_accounts a JOIN research_workspaces w ON w.id = a.workspace_id" +
-        " ORDER BY w.name, a.username",
+  async users(): Promise<UserListing[]> {
+    Trace.line(import.meta.url, "AccountTable.users");
+    return this.db.all<UserListing>(
+      "SELECT u.username, a.name AS account, u.is_admin, u.disabled, u.created_at" +
+        " FROM users u JOIN accounts a ON a.id = u.account_id ORDER BY a.name, u.username",
     );
-    return rows.map((row) => ({ ...row, is_admin: Boolean(row.is_admin), disabled: Boolean(row.disabled) }) as AccountListing);
   }
 
   async setPassword(username: string, passwordHash: string): Promise<boolean> {
-    Trace.line(import.meta.url, "AccountTable.setPassword", { username, passwordHash });
+    Trace.line(import.meta.url, "AccountTable.setPassword", { username });
     return this.change("password_hash = ?", passwordHash, username);
   }
 
   async setDisabled(username: string, disabled: boolean): Promise<boolean> {
     Trace.line(import.meta.url, "AccountTable.setDisabled", { username, disabled });
-    return this.change("disabled = ?", disabled ? 1 : 0, username);
+    return this.change("disabled = ?", disabled, username);
   }
 
-  async revokeSessions(accountId: string): Promise<void> {
-    Trace.line(import.meta.url, "AccountTable.revokeSessions", { accountId });
-    await this.db.run("UPDATE research_accounts SET token_version = token_version + 1 WHERE id = ?", [accountId]);
+  async revokeSessions(userId: string): Promise<void> {
+    Trace.line(import.meta.url, "AccountTable.revokeSessions", { userId });
+    await this.db.run("UPDATE users SET token_version = token_version + 1 WHERE id = ?", [userId]);
   }
 
   async seedAdmin(username: string, passwordHash: string): Promise<boolean> {
-    Trace.line(import.meta.url, "AccountTable.seedAdmin", { username, passwordHash });
-    const count = await this.db.get<{ n: number }>("SELECT COUNT(*) AS n FROM research_accounts");
+    Trace.line(import.meta.url, "AccountTable.seedAdmin", { username });
+    const count = await this.db.get<{ n: number }>("SELECT COUNT(*) AS n FROM users");
     if (count!.n > 0 || !passwordHash) return false;
-    if (!(await this.workspace(ADMIN_WORKSPACE))) await this.insertWorkspace(ADMIN_WORKSPACE, ADMIN_WORKSPACE);
-    await this.addAccount({ username, passwordHash, workspaceId: ADMIN_WORKSPACE, isAdmin: true });
+    await this.addUser({ username, passwordHash, accountId: ADMIN_ACCOUNT, isAdmin: true });
     return true;
   }
 
-  private async insertWorkspace(id: string, name: string): Promise<Workspace> {
-    Trace.line(import.meta.url, "AccountTable.insertWorkspace", { id, name });
-    await this.db.run("INSERT INTO research_workspaces (id, name, created_at) VALUES (?,?,?)", [id, name, Clock.nowIso()]);
-    return (await this.workspace(id))!;
+  private async insertAccount(id: string, name: string): Promise<Account> {
+    Trace.line(import.meta.url, "AccountTable.insertAccount", { id, name });
+    await this.db.run("INSERT INTO accounts (id, name) VALUES (?,?)", [id, name]);
+    return (await this.account(id))!;
   }
 
-  private async change(assignment: string, value: string | number, username: string): Promise<boolean> {
-    Trace.line(import.meta.url, "AccountTable.change", { assignment, value, username });
-    const changed = await this.db.run(
-      `UPDATE research_accounts SET ${assignment}, token_version = token_version + 1 WHERE username = ?`,
-      [value, username],
-    );
+  private async change(assignment: string, value: string | boolean, username: string): Promise<boolean> {
+    Trace.line(import.meta.url, "AccountTable.change", { assignment, username });
+    const changed = await this.db.run(`UPDATE users SET ${assignment}, token_version = token_version + 1 WHERE username = ?`, [
+      value,
+      username,
+    ]);
     return changed > 0;
-  }
-
-  private static account(row: unknown): Account | null {
-    Trace.line(import.meta.url, "AccountTable.account", { row });
-    if (!row) return null;
-    const r = row as Record<string, any>;
-    return { ...r, is_admin: Boolean(r.is_admin), disabled: Boolean(r.disabled) } as Account;
   }
 }

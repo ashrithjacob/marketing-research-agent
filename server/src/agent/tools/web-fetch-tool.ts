@@ -1,110 +1,37 @@
 import type { AgentTool } from "@earendil-works/pi-agent-core";
 
-import { Corpus } from "../../adapters/corpus.js";
-import type { Settings } from "../../config/index.js";
-import type { FetchGate, PageFetcher } from "../../domain/index.js";
-
-import { EXTERNAL_PAGE_NOTE } from "../prompt/text/external.js";
-
-import type { FetchRecord } from "./lanes.js";
-import { PlainPage, type PageView } from "./page-views.js";
-import { fetchParameters } from "./parameters.js";
+import type { PageFetcher } from "../../domain/index.js";
 import { Trace } from "../../trace/index.js";
+import { EXTERNAL_NOTE } from "../prompt/text/external.js";
 
+import type { UrlLedger } from "./url-ledger.js";
+import { fetchParameters } from "./tool-parameters.js";
+
+/** Reads one page and remembers that this agent read it; a page longer than the limit is cut, and says so. */
 export class WebFetchTool {
   constructor(
-    private readonly settings: Settings,
-    private readonly firecrawl: PageFetcher,
-    private readonly corpus: Corpus,
-    private readonly runId: string,
-    private readonly onFetch?: (record: FetchRecord) => void,
-    private readonly gate?: FetchGate,
-    private readonly subject = "",
-    private readonly market = "",
-    private readonly view: PageView = new PlainPage(),
+    private readonly pages: PageFetcher,
+    private readonly urls: UrlLedger,
+    private readonly charLimit: number,
   ) {}
 
   tool(): AgentTool<typeof fetchParameters> {
     Trace.line(import.meta.url, "WebFetchTool.tool");
-    const { settings, firecrawl, corpus, runId, onFetch, gate, subject, market, view } = this;
+    const { pages, urls, charLimit } = this;
     return {
       name: "web_fetch",
       label: "Fetch page",
-      description:
-        "Fetch one url and return its readable text. The body is archived and " +
-        "hashed before you see it; the result carries the source_id to cite. Use " +
-        "that id verbatim as the source's `id` and set `archived` to what the " +
-        "result reports.",
+      description: "Read one url as text. Only pages read with this tool may be cited as a source_url.",
       parameters: fetchParameters,
       async execute(_id, params, signal) {
-        Trace.line(import.meta.url, "WebFetchTool.tool.execute", { params });
-        const { text, title } = await firecrawl.scrape(params.url, signal);
-
-        if (gate) {
-          const verdict = await gate.admit({
-            url: params.url,
-            title,
-            body: text,
-            subject,
-            market,
-          });
-          if (!verdict.admit) {
-            const filtered: FetchRecord = {
-              source_id: "",
-              url: params.url,
-              title,
-              archived: false,
-              chars: text.length,
-              truncated: false,
-              filtered: true,
-              gate_reason: `${verdict.reason} (${verdict.model}, ${verdict.ms}ms)`,
-            };
-            onFetch?.(filtered);
-            return {
-              content: [
-                {
-                  type: "text",
-                  text:
-                    `FILTERED — a relevance gate read this page before you and ` +
-                    `blocked it: ${verdict.reason}. Do not record it as a source ` +
-                    "and do not cite it; fetch a different url instead.",
-                },
-              ],
-              details: filtered,
-            };
-          }
-        }
-
-        const { sourceId, archived } = await corpus.write(runId, text);
-        const { shown, truncated, note } = view.render(text, settings.fetchCharLimit);
-
-        const record: FetchRecord = {
-          source_id: sourceId,
-          url: params.url,
-          title,
-          archived,
-          chars: text.length,
-          truncated,
-        };
-        onFetch?.(record);
-
-        const header = [
-          `source_id: ${sourceId}`,
-          `url: ${params.url}`,
-          title ? `title: ${title}` : "",
-          `archived: ${archived}`,
-          archived
-            ? ""
-            : "NOTE: the corpus volume could not be written. Record this source " +
-              "with archived: false and add a gap entry saying so.",
-          note,
-        ]
-          .filter(Boolean)
-          .join("\n");
-
+        Trace.line(import.meta.url, "WebFetchTool.tool.execute", { url: params.url });
+        const { text, title } = await pages.scrape(params.url, signal);
+        urls.read(params.url);
+        const cut = text.length > charLimit;
+        const shown = cut ? `${text.slice(0, charLimit)}\n[cut at ${charLimit} of ${text.length} characters]` : text;
         return {
-          content: [{ type: "text", text: `${header}\n\n<page source_id="${sourceId}">\n${shown}\n</page>\n${EXTERNAL_PAGE_NOTE}` }],
-          details: record,
+          content: [{ type: "text", text: `url: ${params.url}\ntitle: ${title}\n\n<page>\n${shown}\n</page>\n${EXTERNAL_NOTE}` }],
+          details: { url: params.url, title, chars: text.length, cut },
         };
       },
     };

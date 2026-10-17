@@ -186,7 +186,7 @@ function checkEnvDeclaration() {
   // And the reverse: anything the compose file hands the `mra` container must
   // be a variable settings.ts actually reads, or it is dead config that looks
   // live.
-  const settings = read("server/src/settings.ts");
+  const settings = read("server/src/config/settings.ts");
   const compose = read("docker-compose.yaml");
   if (!settings || !compose) return;
   const mraBlock = compose.split(/^\s{2}mra:/m)[1];

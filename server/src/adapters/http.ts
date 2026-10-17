@@ -1,6 +1,6 @@
 import { Trace } from "../trace/index.js";
 
-/** fetch with a deadline, and a bounded-concurrency map. */
+/** fetch with a deadline. */
 export class Http {
   static async withTimeout(
     url: string,
@@ -12,24 +12,5 @@ export class Http {
     const timeout = AbortSignal.timeout(timeoutSeconds * 1000);
     const combined = signal ? AbortSignal.any([signal, timeout]) : timeout;
     return await fetch(url, { ...init, signal: combined });
-  }
-
-  static async pool<T, R>(
-    items: readonly T[],
-    limit: number,
-    work: (item: T, index: number) => Promise<R>,
-  ): Promise<R[]> {
-    Trace.line(import.meta.url, "Http.pool", { items, limit, work });
-    const results = new Array<R>(items.length);
-    let next = 0;
-    const workers = Array.from({ length: Math.max(1, Math.min(limit, items.length)) }, async () => {
-      for (;;) {
-        const index = next++;
-        if (index >= items.length) return;
-        results[index] = await work(items[index]!, index);
-      }
-    });
-    await Promise.all(workers);
-    return results;
   }
 }

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { api } from './api';
+import { auth } from './api';
 
 export default function Login({ onSuccess }: { onSuccess: () => void }) {
   const [username, setUsername] = useState('');
@@ -12,7 +12,7 @@ export default function Login({ onSuccess }: { onSuccess: () => void }) {
     setBusy(true);
     setError('');
     try {
-      await api.login(username, password);
+      await auth.login(username, password);
       onSuccess();
     } catch {
       setError('Invalid credentials');

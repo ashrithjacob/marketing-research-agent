@@ -1,105 +1,59 @@
-
-import { Clock, Ids, type ResearchRun, type RunDraft, type RunHead, type RunUpdate, type Scope } from "../../domain/index.js";
-
-import { Rows } from "./rows.js";
-import type { SqlDatabase } from "./sql-database.js";
-import { ScopeFilter } from "./scope-filter.js";
+import { Ids, type AnalysisInput, type Run, type RunStore, type RunUpdate, type Scope, type StageStates } from "../../domain/index.js";
 import { Trace } from "../../trace/index.js";
 
-const COLUMNS = new Set([
-  "agent_run_id",
-  "session_id",
-  "stage",
-  "status",
-  "model",
-  "brief",
-  "reject_kinds",
-  "judgement_ids",
-  "packet",
-  "error",
-  "output",
-  "usage",
-  "ended_at",
-  "packet_source",
-  "source_run_id",
-  "task_id",
-  "conversation_id",
-]);
+import type { SqlDatabase, SqlValue } from "./sql-database.js";
 
-const JSON_COLUMNS = new Set(["brief", "reject_kinds", "judgement_ids", "packet", "usage"]);
+const JSON_FIELDS: ReadonlySet<string> = new Set(["resolution", "stage_status"]);
 
-export class RunTable {
+export class RunTable implements RunStore {
   constructor(private readonly db: SqlDatabase) {}
 
-  async create(input: RunDraft & { productId: string }): Promise<ResearchRun> {
-    Trace.line(import.meta.url, "RunTable.create", { input });
-    const now = Clock.nowIso();
-    const runId = Ids.next();
-    await this.db.run(
-      "INSERT INTO research_runs (id, workspace_id, product_id, status, stage, model, brief, reject_kinds," +
-        " judgement_ids, nodes, contract, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
-      [
-        runId,
-        input.workspaceId,
-        input.productId,
-        "queued",
-        input.stage ?? 1,
-        input.model,
-        JSON.stringify(input.brief),
-        JSON.stringify(input.rejectKinds),
-        JSON.stringify(input.judgementIds),
-        JSON.stringify(input.nodes ?? []),
-        input.contract ? JSON.stringify(input.contract) : "",
-        now,
-        now,
-      ],
-    );
-    const run = await this.get(runId);
-    if (!run) throw new Error("run vanished immediately after insert");
-    return run;
+  async create(input: { accountId: string; input: AnalysisInput; model: string; stages: StageStates }): Promise<Run> {
+    Trace.line(import.meta.url, "RunTable.create", { accountId: input.accountId });
+    const id = Ids.next();
+    await this.db.run("INSERT INTO runs (id, account_id, status, input, stage_status, model) VALUES (?,?,?,?,?,?)", [
+      id,
+      input.accountId,
+      "resolving",
+      JSON.stringify(input.input),
+      JSON.stringify(input.stages),
+      input.model,
+    ]);
+    return (await this.get(id))!;
   }
 
-  async get(runId: string): Promise<ResearchRun | null> {
+  async get(runId: string): Promise<Run | null> {
     Trace.line(import.meta.url, "RunTable.get", { runId });
-    const row = await this.db.get("SELECT * FROM research_runs WHERE id = ?", [runId]);
-    return row ? Rows.run(row) : null;
+    return RunTable.run(await this.db.get("SELECT * FROM runs WHERE id = ?", [runId]));
   }
 
-  async list(scope: Scope, limit = 50): Promise<ResearchRun[]> {
-    Trace.line(import.meta.url, "RunTable.list", { scope, limit });
-    const rows = await this.db.all(
-      `SELECT * FROM research_runs WHERE ${ScopeFilter.sql("workspace_id")} ORDER BY created_at DESC LIMIT ?`,
-      [...ScopeFilter.args(scope), limit],
-    );
-    return rows.map(Rows.run);
+  async list(scope: Scope, limit = 50): Promise<Run[]> {
+    Trace.line(import.meta.url, "RunTable.list", { accountId: scope.accountId, limit });
+    const rows =
+      scope.accountId === null
+        ? await this.db.all("SELECT * FROM runs ORDER BY created_at DESC LIMIT ?", [limit])
+        : await this.db.all("SELECT * FROM runs WHERE account_id = ? ORDER BY created_at DESC LIMIT ?", [scope.accountId, limit]);
+    return rows.map((row) => RunTable.run(row)!);
   }
 
-  async heads(scope: Scope): Promise<RunHead[]> {
-    Trace.line(import.meta.url, "RunTable.heads", { scope });
-    const rows = await this.db.all(
-      "SELECT id, product_id, stage, status, created_at FROM research_runs" +
-        ` WHERE ${ScopeFilter.sql("workspace_id")} ORDER BY created_at DESC`,
-      ScopeFilter.args(scope),
-    );
-    return rows.map(Rows.head);
+  async updateRun(runId: string, fields: RunUpdate): Promise<void> {
+    Trace.line(import.meta.url, "RunTable.updateRun", { runId, fields: Object.keys(fields) });
+    const entries = Object.entries(fields).filter(([, value]) => value !== undefined);
+    if (entries.length === 0) return;
+    const assignments = entries.map(([key]) => `${key} = ?`).join(", ");
+    const values: SqlValue[] = entries.map(([key, value]) => (JSON_FIELDS.has(key) ? JSON.stringify(value) : (value as SqlValue)));
+    await this.db.run(`UPDATE runs SET ${assignments}, updated_at = now() WHERE id = ?`, [...values, runId]);
   }
 
-  async update(runId: string, fields: RunUpdate): Promise<void> {
-    Trace.line(import.meta.url, "RunTable.update", { runId, fields });
-    const keys = Object.keys(fields) as Array<keyof RunUpdate>;
-    const unknown = keys.filter((key) => !COLUMNS.has(key as string));
-    if (unknown.length > 0) {
-      throw new Error(`not run columns: ${unknown.sort().join(", ")}`);
-    }
-    if (keys.length === 0) return;
-    const values = keys.map((key) => {
-      const value = fields[key];
-      if (JSON_COLUMNS.has(key as string) && typeof value !== "string") {
-        return JSON.stringify(value ?? null);
-      }
-      return value as string | number;
-    });
-    const assignments = keys.map((key) => `${key} = ?`).join(", ");
-    await this.db.run(`UPDATE research_runs SET ${assignments}, updated_at = ? WHERE id = ?`, [...values, Clock.nowIso(), runId]);
+  async unfinished(): Promise<Run[]> {
+    Trace.line(import.meta.url, "RunTable.unfinished");
+    const rows = await this.db.all("SELECT * FROM runs WHERE status IN ('resolving', 'running', 'stopping') ORDER BY created_at");
+    return rows.map((row) => RunTable.run(row)!);
+  }
+
+  private static run(row: Record<string, any> | null): Run | null {
+    Trace.line(import.meta.url, "RunTable.run", { found: row !== null });
+    if (!row) return null;
+    return { ...row, ended_at: row.ended_at ?? "" } as Run;
   }
 }

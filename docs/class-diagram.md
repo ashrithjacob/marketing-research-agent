@@ -54,13 +54,13 @@ classDiagram
     }
   }
   namespace domain {
-    class Workspace {
-      <<interface>>
-    }
     class Account {
       <<interface>>
     }
-    class AccountListing {
+    class User {
+      <<interface>>
+    }
+    class UserListing {
       <<interface>>
     }
     class Principal {
@@ -80,126 +80,8 @@ classDiagram
     class AdPage {
       <<interface>>
     }
-    class AdAccount {
-      <<interface>>
-    }
-    class AdInsight {
-      <<interface>>
-    }
-    class AdResult {
-      <<interface>>
-    }
-    class AdLink {
-      <<interface>>
-    }
-    class AdInsights {
-      <<interface>>
-      read()
-    }
-    class AdBook {
-      <<interface>>
-      accounts()
-      connect()
-      disconnect()
-      markRead()
-      save()
-      results()
-      link()
-      links()
-    }
-    class AdTotals {
-      <<interface>>
-    }
-    class AdSums {
-      of()
-      tag()
-      settledBefore()
-    }
-    class AlwaysOn {
-      <<interface>>
-    }
-    class AlwaysOnBook {
-      <<interface>>
-      get()
-      set()
-      on()
-    }
-    class Schedule {
-      <<interface>>
-    }
-    class ScheduleBook {
-      <<interface>>
-      add()
-      list()
-      remove()
-      signalled()
-    }
-    class Schedules {
-      nextDue()
-    }
-    class BrandChat {
-      <<interface>>
-    }
-    class BrandFolder {
-      <<interface>>
-    }
-    class BrandImage {
-      <<interface>>
-    }
-    class PagePicture {
-      <<interface>>
-    }
-    class BrandImageBook {
-      <<interface>>
-      list()
-      put()
-    }
-    class BrandImageFinder {
-      <<interface>>
-      read()
-    }
-    class Brands {
-      key()
-      ofProduct()
-      homepage()
-      label()
-      folders()
-    }
-    class Trip {
-      <<interface>>
-    }
-    class BreakerReadings {
-      <<interface>>
-    }
-    class BreakerLimits {
-      <<interface>>
-    }
-    class Breakers {
-      trip()
-      warnNow()
-    }
-    class RunStatuses {
-      delivered()
-    }
-    class Briefs {
-      markets()
-      looksLikeUrl()
-      normalise()
-      label()
-      key()
-    }
-    class Card {
-      <<interface>>
-    }
-    class CardDraft {
-      <<interface>>
-    }
-    class CardBook {
-      <<interface>>
-      create()
-      get()
-      list()
-      resolve()
+    class Markets {
+      countries()
     }
     class ChargeDraft {
       <<interface>>
@@ -214,201 +96,20 @@ classDiagram
     class ServiceUse {
       <<interface>>
     }
-    class ChatMessage {
+    class Competitor {
       <<interface>>
     }
-    class TaskCard {
-      <<interface>>
+    class CompetitorRelationship {
+      classify()
+      domainOf()
     }
-    class Board {
-      <<interface>>
+    class Clock {
+      nowIso()
     }
-    class RowRef {
-      <<interface>>
-    }
-    class CheckProblem {
-      <<interface>>
-    }
-    class CheckProblems {
-      of()
-      at()
-      texts()
-    }
-    class CompetitorCandidate {
-      <<interface>>
-    }
-    class DiscoveryQuestion {
-      <<interface>>
-    }
-    class DiscoveryReport {
-      <<interface>>
-    }
-    class DiscoveryQuestions {
-      of()
-    }
-    class Contracts {
-      deliverable()
-      draft()
-      verdict()
-      playbook()
-      node()
-    }
-    class CostCell {
-      <<interface>>
-    }
-    class CostRow {
-      <<interface>>
-    }
-    class CostReport {
-      <<interface>>
-    }
-    class CustomerFields {
-      quote()
-      entry()
-    }
-    class Provenance {
-      cited()
-    }
-    class FieldSpec {
-      <<interface>>
-    }
-    class ItemPart {
-      <<interface>>
-    }
-    class ItemNeed {
-      <<interface>>
-    }
-    class FieldsDeliverable {
-      <<interface>>
-    }
-    class ListDeliverable {
-      <<interface>>
-    }
-    class OneMarked {
-      <<interface>>
-    }
-    class PerItemDeliverable {
-      <<interface>>
-    }
-    class Deliverables {
-      kinds()
-    }
-    class DraftSection {
-      <<interface>>
-    }
-    class Verdict {
-      <<interface>>
-    }
-    class Draft {
-      <<interface>>
-    }
-    class DraftBook {
-      <<interface>>
-      write()
-      ofRun()
-      get()
-      list()
-      edit()
-      mark()
-    }
-    class DraftView {
-      <<interface>>
-    }
-    class DraftText {
-      cites()
-      places()
-      typedFigures()
-      render()
-      view()
-      value()
-    }
-    class FeedbackTarget {
-      <<interface>>
-    }
-    class Feedback {
-      <<interface>>
-    }
-    class FeedbackDraft {
-      <<interface>>
-    }
-    class FeedbackBook {
-      <<interface>>
-      record()
-      list()
-    }
-    class FeedbackStrengths {
-      of()
-      target()
-    }
-    class FindingDraft {
-      <<interface>>
-    }
-    class Finding {
-      <<interface>>
-    }
-    class Findings {
-      rowId()
-      key()
-      identity()
-      name()
-      live()
-    }
-    class DurableHarness {
-      <<interface>>
-      resume()
-      close()
-    }
-    class Lesson {
-      <<interface>>
-    }
-    class LessonDraft {
-      <<interface>>
-    }
-    class LessonBook {
-      <<interface>>
-      stage()
-      get()
-      list()
-      attach()
-      resolve()
-    }
-    class LibraryDocument {
-      <<interface>>
-    }
-    class ConvertedDocument {
-      <<interface>>
-    }
-    class DocumentSection {
-      <<interface>>
-    }
-    class DocumentLibrary {
-      <<interface>>
-      add()
-      finish()
-      fail()
-      failConverting()
-      list()
-      get()
-      markdown()
-      delete()
-    }
-    class DocumentConverter {
-      <<interface>>
-      convert()
-    }
-    class DocumentSections {
-      of()
+    class Ids {
+      next()
     }
     class RunEvent {
-      <<interface>>
-    }
-    class Judgement {
-      <<interface>>
-    }
-    class PacketCheck {
-      <<interface>>
-    }
-    class RunUpdate {
       <<interface>>
     }
     class LlmCallRecord {
@@ -419,110 +120,6 @@ classDiagram
     }
     class LlmCall {
       <<interface>>
-    }
-    class MemoryEntry {
-      <<interface>>
-    }
-    class MemoryWrite {
-      <<interface>>
-    }
-    class MemoryBook {
-      <<interface>>
-      current()
-      history()
-      write()
-    }
-    class Stages {
-      of()
-      covering()
-      expand()
-      isPartial()
-    }
-    class PacketRowSet {
-      <<interface>>
-    }
-    class PacketRows {
-      of()
-    }
-    class Paragraph {
-      <<interface>>
-    }
-    class Paragraphs {
-      split()
-      range()
-    }
-    class PlanTask {
-      <<interface>>
-    }
-    class PlanStage {
-      <<interface>>
-    }
-    class Plan {
-      <<interface>>
-    }
-    class PlanBook {
-      <<interface>>
-      create()
-      get()
-      list()
-      save()
-    }
-    class PlaybookSection {
-      <<interface>>
-    }
-    class PlaybookBody {
-      <<interface>>
-    }
-    class Playbook {
-      <<interface>>
-    }
-    class PlaybookBook {
-      <<interface>>
-      current()
-      at()
-      list()
-      history()
-      add()
-      mark()
-    }
-    class ProductCatalog {
-      <<interface>>
-      list()
-      get()
-      byKey()
-      runHeads()
-      packetRows()
-    }
-    class AccountDirectory {
-      <<interface>>
-      addWorkspace()
-      workspace()
-      workspaceNamed()
-      addAccount()
-      get()
-      byUsername()
-      list()
-      setPassword()
-    }
-    class AmazonListingSource {
-      <<interface>>
-      lookup()
-    }
-    class TargetListings {
-      <<interface>>
-      save()
-      list()
-    }
-    class ChargeLedger {
-      <<interface>>
-      add()
-      list()
-    }
-    class FindingLedger {
-      <<interface>>
-      append()
-      retract()
-      list()
     }
     class PageFetcher {
       <<interface>>
@@ -536,166 +133,73 @@ classDiagram
       <<interface>>
       search()
     }
-    class CompetitorDiscovery {
+    class GenerationSource {
       <<interface>>
-      discover()
+      generation()
+    }
+    class AccountDirectory {
+      <<interface>>
+      addAccount()
+      account()
+      accountNamed()
+      addUser()
+      user()
+      byUsername()
+      users()
+      setPassword()
+    }
+    class RunStore {
+      <<interface>>
+      create()
+      get()
+      list()
+      updateRun()
+      unfinished()
+    }
+    class ProductStore {
+      <<interface>>
+      upsert()
+      get()
+      saveBrief()
+    }
+    class CompetitorStore {
+      <<interface>>
+      confirm()
+      list()
+      saveProfile()
+    }
+    class EventLog {
+      <<interface>>
+      add()
+      list()
+    }
+    class ChargeLedger {
+      <<interface>>
+      add()
+      list()
+    }
+    class CallLog {
+      <<interface>>
+      add()
+      setGeneration()
+      list()
     }
     class ResearchStore {
       <<interface>>
-      createRun()
-      getRun()
-      listRuns()
-      updateRun()
-      addEvent()
-      listEvents()
-      lastEventId()
-      listJudgements()
-    }
-    class GateVerdict {
-      <<interface>>
-    }
-    class FetchGate {
-      <<interface>>
-      admit()
-    }
-    class ReviewPullStore {
-      <<interface>>
-      latest()
-      newest()
-      save()
-    }
-    class PrimitiveSpec {
-      <<interface>>
-    }
-    class Primitives {
-      role()
-      nodes()
-      agent()
-      tools()
-      ceiling()
-    }
-    class ProductCosts {
-      <<interface>>
-    }
-    class ProductCostBook {
-      <<interface>>
-      get()
-      put()
-    }
-    class RunHead {
-      <<interface>>
+      close()
     }
     class Product {
       <<interface>>
     }
-    class ProductSummary {
+    class Run {
       <<interface>>
     }
-    class ProductFolders {
-      summaries()
-      runIds()
-    }
-    class Clock {
-      nowIso()
-    }
-    class Ids {
-      next()
-    }
-    class ResearchRun {
+    class RunUpdate {
       <<interface>>
     }
-    class RunDraft {
-      <<interface>>
-    }
-    class RunSummary {
-      <<interface>>
-    }
-    class Runs {
-      summary()
-    }
-    class RejectKinds {
-      effective()
-    }
-    class Relations {
-      expected()
-    }
-    class RoleSpec {
-      <<interface>>
-    }
-    class Roles {
-      of()
-      node()
-      scope()
-    }
-    class AnalysedReview {
-      <<interface>>
-    }
-    class CleaningTally {
-      <<interface>>
-    }
-    class IssueQuote {
-      <<interface>>
-    }
-    class ProductIssue {
-      <<interface>>
-    }
-    class ProductVoice {
-      <<interface>>
-    }
-    class RankedIssue {
-      <<interface>>
-    }
-    class IssueSlice {
-      <<interface>>
-    }
-    class ReviewAnalysis {
-      <<interface>>
-    }
-    class BestsellerRank {
-      <<interface>>
-    }
-    class AmazonListing {
-      <<interface>>
-    }
-    class TrustpilotSummary {
-      <<interface>>
-    }
-    class TargetListing {
-      <<interface>>
-    }
-    class ReviewExcerpt {
-      <<interface>>
-    }
-    class ReviewResult {
-      <<interface>>
-    }
-    class LedgerPull {
-      <<interface>>
-    }
-    class LedgerReview {
-      <<interface>>
-    }
-    class ReviewLedgerSnapshot {
-      <<interface>>
-    }
-    class StoredRunReview {
-      <<interface>>
-    }
-    class StoredPull {
-      <<interface>>
-    }
-    class RoleRecords {
-      of()
-    }
-    class SavedTask {
-      <<interface>>
-    }
-    class SavedPlans {
-      tasks()
-      parts()
-      stages()
-      task()
-      arrange()
+    class Schemas {
+      json()
+      parse()
     }
     class ServicePart {
       <<interface>>
@@ -703,32 +207,15 @@ classDiagram
     class ServiceReport {
       <<interface>>
     }
-    class ServiceReports {
-      is()
-    }
-    class StageOnePlan {
+    class StagePlan {
       <<interface>>
     }
-    class StageOnePlans {
-      of()
-      nodeOf()
-    }
-    class WatchedBrand {
+    class StageState {
       <<interface>>
     }
-    class WorkspaceCharge {
-      <<interface>>
-    }
-    class WatchBook {
-      <<interface>>
-      brands()
-      addBrand()
-      removeBrand()
-      checked()
-      mark()
-      setMark()
-      charge()
-      charges()
+    class Stages {
+      initial()
+      ended()
     }
     class SearchHit {
       <<interface>>
@@ -743,9 +230,6 @@ classDiagram
       <<interface>>
     }
     class ServiceUnavailableError {
-    }
-    class WorkspaceBooks {
-      <<interface>>
     }
   }
   namespace config {
@@ -762,231 +246,11 @@ classDiagram
       backups()
       number()
       optionalNumber()
-      prices()
       flag()
-    }
-  }
-  namespace extract {
-    class BriefCheck {
-      problems()
-    }
-    class BuyerStages {
-      shares()
-    }
-    class ChampionCheck {
-      problems()
-      ranking()
-    }
-    class PacketContext {
-      <<interface>>
-    }
-    class PacketCheck {
-      <<interface>>
-      problems()
-    }
-    class CitationCheck {
-      problems()
-    }
-    class CompetitorCheck {
-      problems()
-    }
-    class CompletenessCheck {
-      problems()
-    }
-    class ContractGrounds {
-      <<interface>>
-    }
-    class ContractCheck {
-      problems()
-      asksFirst()
-    }
-    class CostReports {
-      of()
-    }
-    class CustomerPicks {
-      problems()
-    }
-    class CustomerTruthCheck {
-      avatars()
-      awareness()
-    }
-    class Missing {
-      <<interface>>
-    }
-    class DeliverableCheck {
-      <<interface>>
-      missing()
-    }
-    class DeliverableChecks {
-      of()
-    }
-    class DoseBands {
-      classOf()
-      assess()
-    }
-    class DraftCheck {
-      problems()
-    }
-    class PacketDraft {
-      coerce()
-    }
-    class PacketError {
-    }
-    class FieldsCheck {
-      missing()
-      gapped()
-      oneOf()
-    }
-    class FindingCheck {
-      check()
-    }
-    class LatestRows {
-      payloads()
-      rows()
-    }
-    class ListCheck {
-      missing()
-      parts()
-    }
-    class MarketCheck {
-      problems()
-    }
-    class Names {
-      normalise()
-      squash()
-      sameHost()
-    }
-    class BrandLabels {
-      of()
-    }
-    class PacketAssembly {
-      draft()
-    }
-    class Item {
-      <<interface>>
-    }
-    class PerItemCheck {
-      missing()
-    }
-    class ProductEconomics {
-      of()
-      churn()
-      margin()
-    }
-    class NodeReport {
-      <<interface>>
-    }
-    class ProductTruthAssembly {
-      draft()
-    }
-    class ReviewAssembly {
-      expand()
-    }
-    class TrustpilotDomain {
-      of()
-    }
-    class ReviewMiningOffer {
-      of()
-    }
-    class PullFailure {
-      <<interface>>
-    }
-    class ReviewMiningPacket {
-      draft()
-    }
-    class ReviewMiningRoster {
-      of()
-      select()
-    }
-    class RewordCheck {
-      keeps()
-      sourceIds()
-    }
-    class PacketSection {
-      <<interface>>
-    }
-    class RowBlame {
-      problems()
-    }
-    class RowPicks {
-      problems()
-    }
-    class ScopeCheck {
-      problems()
-    }
-    class SharedActives {
-      problems()
-    }
-    class SophisticationStage {
-      shares()
-      of()
-      describe()
-    }
-    class TruthCitations {
-      problems()
-    }
-    class ZodProblems {
-      readable()
-      list()
-    }
-    class PacketValidator {
-      expand()
-      validate()
-      inspect()
+      settings()
     }
   }
   namespace adapters {
-    class Spend {
-      capFor()
-    }
-    class AmazonReviews {
-      fetch()
-    }
-    class BandFiling {
-      file()
-    }
-    class Field {
-      text()
-      numberOrNull()
-    }
-    class ReviewKey {
-      of()
-    }
-    class AmazonListingLookup {
-      lookup()
-    }
-    class AmazonProducts {
-      find()
-    }
-    class ApifyCreditError {
-    }
-    class ActorRun {
-      <<interface>>
-    }
-    class ActorRunner {
-      <<interface>>
-      run()
-    }
-    class MeteredActorRunner {
-      run()
-    }
-    class ApifyActorRunner {
-      run()
-    }
-    class ActorRunners {
-      forSettings()
-    }
-    class TrustpilotReviews {
-      fetch()
-    }
-    class AmazonProduct {
-      <<interface>>
-    }
-    class Corpus {
-      write()
-      read()
-      pages()
-    }
     class Crawl4aiPayload {
       <<interface>>
     }
@@ -996,42 +260,14 @@ classDiagram
     class FallbackPageFetcher {
       scrape()
     }
-    class OpenRouterGate {
-      admit()
-      parse()
-    }
-    class FileMarkdown {
-      convert()
-      isPdf()
-    }
     class FirecrawlPayload {
       <<interface>>
     }
     class Firecrawl {
       scrape()
     }
-    class HomepageImage {
-      read()
-      pick()
-      publicHost()
-    }
     class Http {
       withTimeout()
-      pool()
-    }
-    class PrintedLine {
-      <<interface>>
-    }
-    class MarkdownLayout {
-      render()
-    }
-    class InsightRow {
-      <<interface>>
-    }
-    class MetaInsights {
-      read()
-      insight()
-      purchase()
     }
     class MeteredWebSearch {
       find()
@@ -1041,9 +277,6 @@ classDiagram
     }
     class MeteredAdLibrary {
       search()
-    }
-    class MeteredDiscovery {
-      discover()
     }
     class OpenRouterGeneration {
       parse()
@@ -1059,21 +292,6 @@ classDiagram
       post()
       get()
     }
-    class Basis {
-      <<interface>>
-    }
-    class ParallelCompetitorDiscovery {
-      discover()
-    }
-    class ExtractResult {
-      <<interface>>
-    }
-    class ExtractError {
-      <<interface>>
-    }
-    class ParallelExtract {
-      scrape()
-    }
     class ParallelUsage {
       <<interface>>
     }
@@ -1082,15 +300,6 @@ classDiagram
     }
     class ParallelSearch {
       find()
-    }
-    class ParallelTask {
-      run()
-    }
-    class TextPiece {
-      <<interface>>
-    }
-    class PdfMarkdown {
-      convert()
     }
     class RateLimitWait {
       askedMs()
@@ -1110,16 +319,8 @@ classDiagram
       perMillion()
       rates()
     }
-    class RunBilling {
-      track()
-      settle()
-    }
-    class EvidenceServices {
-      <<interface>>
-    }
     class ServiceClients {
       forSettings()
-      withActors()
     }
     class Waiter {
       <<interface>>
@@ -1128,138 +329,42 @@ classDiagram
       run()
     }
     class AccountTable {
-      addWorkspace()
-      workspace()
-      workspaceNamed()
       addAccount()
-      get()
+      account()
+      accountNamed()
+      addUser()
+      user()
       byUsername()
-      list()
+      users()
       setPassword()
     }
-    class AdTable {
-      accounts()
-      connect()
-      disconnect()
-      markRead()
-      save()
-      results()
-      link()
-      links()
-    }
-    class AlwaysOnTable {
-      get()
-      set()
-      on()
-      add()
-      list()
-      remove()
-      signalled()
-    }
-    class BrandImageTable {
-      list()
-      put()
-    }
-    class CallLog {
+    class CallTable {
       add()
       setGeneration()
       list()
-    }
-    class CardTable {
-      create()
-      get()
-      list()
-      resolve()
     }
     class ChargeTable {
       add()
       list()
     }
-    class PacketCheckLog {
+    class CompetitorTable {
+      confirm()
+      list()
+      saveProfile()
+    }
+    class EventTable {
       add()
       list()
     }
-    class CompetitorKinds {
-      apply()
-    }
-    class DocumentTable {
-      add()
-      finish()
-      fail()
-      failConverting()
-      list()
-      get()
-      markdown()
-      delete()
-    }
-    class DraftTable {
-      write()
-      ofRun()
-      get()
-      list()
-      edit()
-      mark()
-    }
-    class EventLog {
-      add()
-      lastId()
-      list()
-    }
-    class FeedbackTable {
-      record()
-      list()
-    }
-    class FindingTable {
-      append()
-      retract()
-      list()
-    }
-    class JudgementTable {
-      list()
-      add()
-      delete()
-      bump()
-    }
-    class LessonTable {
-      stage()
-      get()
-      list()
-      attach()
-      resolve()
-    }
-    class MemoryTable {
-      current()
-      history()
-      write()
-    }
-    class StoreMigrations {
-      apply()
-      once()
-    }
-    class PacketRowTable {
-      replace()
-      list()
-    }
-    class PlanTable {
-      create()
-      get()
-      list()
-      save()
-    }
-    class PlaybookTable {
-      current()
-      at()
-      list()
-      history()
-      add()
-      mark()
+    class Migrator {
+      checksum()
+      migrate()
     }
     class PostgresStatements {
       all()
       get()
       run()
       exec()
-      columns()
       transaction()
       close()
     }
@@ -1269,72 +374,24 @@ classDiagram
       get()
       run()
       exec()
-      columns()
       transaction()
       close()
     }
     class PostgresDialect {
       statement()
-      script()
       parser()
     }
-    class ProductBackfill {
-      apply()
-    }
-    class SqlProductCatalog {
-      list()
-      get()
-      byKey()
-      runHeads()
-      packetRows()
-    }
-    class ProductCostTable {
-      get()
-      put()
-    }
     class ProductTable {
-      ensure()
+      upsert()
       get()
-      byKey()
-      list()
-    }
-    class ReviewAnalysisTable {
-      save()
-      get()
-    }
-    class ReviewPullBackfill {
-      apply()
-    }
-    class ReviewPullTable {
-      latest()
-      newest()
-      save()
-    }
-    class ReviewTable {
-      save()
-      list()
-    }
-    class Rows {
-      json()
-      head()
-      run()
-    }
-    class RunLock {
-      claim()
+      saveBrief()
     }
     class RunTable {
       create()
       get()
       list()
-      heads()
-      update()
-    }
-    class StoreSchema {
-      apply()
-    }
-    class ScopeFilter {
-      sql()
-      args()
+      updateRun()
+      unfinished()
     }
     class SqlDatabase {
       <<interface>>
@@ -1342,74 +399,21 @@ classDiagram
       get()
       run()
       exec()
-      columns()
       transaction()
       close()
-    }
-    class SqliteStatements {
-      all()
-      get()
-      run()
-      exec()
-      columns()
-      transaction()
-      close()
-    }
-    class SqliteDatabase {
-      open()
-      all()
-      get()
-      run()
-      exec()
-      columns()
-      transaction()
-      close()
-    }
-    class CopiedTable {
-      <<interface>>
-    }
-    class StoreCopy {
-      leftBehind()
-      copy()
-    }
-    class StoreDatabase {
-      forSettings()
     }
     class SqlResearchStore {
       open()
-      createRun()
-      getRun()
-      listRuns()
-      updateRun()
-      addEvent()
-      lastEventId()
-      listEvents()
+      close()
     }
-    class StoreTables {
-      open()
-    }
-    class TargetListingTable {
-      save()
-      list()
-    }
-    class WatchTable {
-      brands()
-      addBrand()
-      removeBrand()
-      checked()
-      mark()
-      setMark()
-      charge()
-      charges()
+    class Migration {
+      <<interface>>
     }
     class ThrottledPageFetcher {
       scrape()
     }
     class ThrottledWebSearch {
       find()
-    }
-    class ThrottledActorRunner {
-      run()
     }
     class ThrottledAdLibrary {
       search()
@@ -1420,209 +424,26 @@ classDiagram
     class TrendtrackAds {
       search()
     }
-    class TrustpilotProfiles {
-      read()
-      parse()
-    }
   }
   namespace agent {
-    class AgentOutcome {
-      <<interface>>
-    }
-    class AgentDriver {
-      drive()
-    }
-    class AgentRoster {
-      end()
-      hasEnded()
-    }
-    class TeamMember {
-      <<interface>>
-    }
-    class AgentTeam {
-      run()
-      written()
-      output()
-    }
-    class AlwaysOnStatus {
-      <<interface>>
-    }
-    class AlwaysOnDesk {
-      set()
-      status()
+    class AnalysisService {
+      start()
+      confirm()
+      stop()
+      get()
       recover()
     }
-    class AlwaysOnTools {
-      tools()
+    class AgentJob {
+      <<interface>>
     }
-    class MoneyGate {
-      block()
-      paid()
+    class AgentRunnerDeps {
+      <<interface>>
     }
-    class ScheduleDesk {
-      add()
-      list()
-      remove()
-    }
-    class TaskCreation {
-      create()
-    }
-    class WorkspaceLimits {
-      blocks()
-      overCap()
-    }
-    class WorkspaceSpend {
-      today()
+    class AgentRunner {
+      run()
     }
     class BilledCosts {
-      written()
-    }
-    class BuiltAgent {
-      <<interface>>
-    }
-    class CustomerContract {
-      problems()
-    }
-    class CustomerEvidence {
-      <<interface>>
-    }
-    class CustomerTruthInputs {
-      load()
-      verdict()
-    }
-    class CustomerTruthRun {
-      start()
-    }
-    class DoneCheck {
-      <<interface>>
-      problems()
-    }
-    class NodeContract {
-      problems()
-    }
-    class ChampionContract {
-      problems()
-    }
-    class TruthContract {
-      problems()
-    }
-    class RunError {
-    }
-    class ApprovalNeeded {
-    }
-    class TurnEnd {
-      <<interface>>
-    }
-    class AgentEventRecorder {
-      record()
-      text()
-    }
-    class FallbackModels {
-      wrap()
-    }
-    class EventFrame {
-      <<interface>>
-    }
-    class Frames {
-      toolPreview()
-      toolErrorText()
-      callSummary()
-    }
-    class InvalidRunResettle {
-      resettleAll()
-    }
-    class DistilWorks {
-      build()
-      check()
-      assembly()
-    }
-    class LessonChecks {
-      problems()
-    }
-    class LessonDesk {
-      stage()
-      nothing()
-      decide()
-    }
-    class LessonText {
-      title()
-      body()
-      said()
-    }
-    class MemoryDesk {
-      list()
-      section()
-      write()
-    }
-    class PlaybookDesk {
-      list()
-      rollback()
-      restore()
-      distil()
-    }
-    class VersionScore {
-      <<interface>>
-    }
-    class PlaybookReport {
-      <<interface>>
-    }
-    class PlaybookScores {
-      report()
-      flag()
-    }
-    class PlaybookShelf {
-      current()
-      at()
-      list()
-    }
-    class ReviewCase {
-      write()
-    }
-    class ReviewerTools {
-      extension()
-    }
-    class Reviewer {
-      start()
-      stop()
-      sweep()
-    }
-    class LiveConversion {
-      <<interface>>
-    }
-    class LibraryIntake {
-      accept()
-      subscribe()
       settled()
-      recover()
-      drain()
-    }
-    class LimitClosed {
-      <<interface>>
-    }
-    class LimitClose {
-      close()
-    }
-    class ListingMatch {
-      mismatch()
-      formMatches()
-      words()
-    }
-    class RunControl {
-      <<interface>>
-      abort()
-    }
-    class Live {
-      <<interface>>
-    }
-    class LiveRuns {
-      add()
-      remove()
-      get()
-      ids()
-      abortAll()
-      drain()
-      has()
-      waitFor()
     }
     class CallSequence {
       next()
@@ -1632,264 +453,10 @@ classDiagram
     class LlmCallLog {
       wrap()
     }
-    class MarketEvidence {
-      <<interface>>
-    }
-    class MarketTruthInputs {
-      load()
-    }
-    class MarketTruthRun {
-      start()
-    }
     class ModelChain {
       resolve()
-      fallbacksAfter()
       failover()
       withFallbacks()
-    }
-    class BrandPictureSearch {
-      find()
-    }
-    class StageState {
-      <<interface>>
-    }
-    class BrandResearch {
-      report()
-      next()
-      verdict()
-    }
-    class BrandShelf {
-      folders()
-      settled()
-    }
-    class CardResolvers {
-      <<interface>>
-    }
-    class CardDesk {
-      open()
-      answer()
-      approve()
-      reject()
-    }
-    class ReviewAnalysisStarter {
-      <<interface>>
-      start()
-    }
-    class ChatReviews {
-      analyse()
-    }
-    class LaterStageStart {
-      <<interface>>
-    }
-    class ChatStages {
-      subject()
-      start()
-      product()
-    }
-    class ChatView {
-      of()
-    }
-    class PlaybookMaker {
-      <<interface>>
-      distil()
-    }
-    class LibraryShelfTools {
-      tools()
-    }
-    class OperatorAct {
-      run()
-      brand()
-    }
-    class OperatorDesk {
-      say()
-      signal()
-      note()
-      watch()
-      chats()
-    }
-    class OperatorTools {
-      extension()
-      brandLine()
-    }
-    class OwnerDesk {
-      open()
-      start()
-      edit()
-      stage()
-      approve()
-      say()
-    }
-    class PlanChange {
-      <<interface>>
-    }
-    class PlanDesk {
-      draft()
-      revise()
-      setStage()
-      approve()
-      startTask()
-    }
-    class PlanRelease {
-      recover()
-    }
-    class PlanStageOne {
-      combine()
-    }
-    class PlanStages {
-      recover()
-      follow()
-      decide()
-    }
-    class StageRunControl {
-      <<interface>>
-    }
-    class RunControlTools {
-      tools()
-    }
-    class StageProposal {
-      <<interface>>
-    }
-    class StageBriefDesk {
-      propose()
-      run()
-      report()
-    }
-    class StageTools {
-      tools()
-    }
-    class WorkReport {
-      write()
-    }
-    class WorkspaceBoard {
-      snapshot()
-    }
-    class WorkspaceServices {
-    }
-    class OperatorInputs {
-      record()
-    }
-    class OwnerCosts {
-      intoInputs()
-      intoTruth()
-    }
-    class OwnerReword {
-      apply()
-    }
-    class CloseReason {
-      <<interface>>
-    }
-    class PartClose {
-      close()
-    }
-    class PiHarness {
-      open()
-      resume()
-      close()
-    }
-    class ModelPricing {
-      apply()
-    }
-    class ProductTruthRunAssembly {
-      assemble()
-    }
-    class ProductTruthBrief {
-      <<interface>>
-    }
-    class ProductTruthRun {
-      start()
-    }
-    class PromptBlocks {
-      code()
-      sources()
-      judgements()
-      brief()
-      champion()
-    }
-    class AgentInstructions {
-      <<interface>>
-    }
-    class PromptBuilder {
-      system()
-      instructions()
-    }
-    class ContractTable {
-      render()
-    }
-    class CustomerInstructions {
-      <<interface>>
-    }
-    class CustomerTruthPrompts {
-      system()
-      instructions()
-    }
-    class CustomerDigest {
-      render()
-    }
-    class DeliverableTable {
-      render()
-      stop()
-    }
-    class MarketInstructions {
-      <<interface>>
-    }
-    class MarketTruthPrompts {
-      system()
-      instructions()
-      found()
-    }
-    class MarketDigest {
-      render()
-    }
-    class AgentMessages {
-      steer()
-      resume()
-    }
-    class RoleBriefing {
-      <<interface>>
-      system()
-      instructions()
-    }
-    class StageOneBriefing {
-      system()
-      instructions()
-    }
-    class ProductTruthBriefing {
-      system()
-      instructions()
-    }
-    class MarketTruthBriefing {
-      system()
-      instructions()
-    }
-    class CustomerTruthBriefing {
-      system()
-      instructions()
-    }
-    class StageBriefTemplate {
-      of()
-      roles()
-    }
-    class TaskBriefing {
-      system()
-      instructions()
-    }
-    class TruthBlocks {
-      stageOne()
-      actives()
-      doses()
-    }
-    class TruthInstructions {
-      <<interface>>
-    }
-    class ProductTruthPrompts {
-      system()
-      instructions()
-    }
-    class RoleContext {
-      <<interface>>
-    }
-    class ResearchAgentFactory {
-      build()
     }
     class RetryPolicy {
       <<interface>>
@@ -1899,356 +466,114 @@ classDiagram
       backoffMs()
       sleep()
     }
-    class AnalysisPrompts {
-      catalogSystem()
-      catalogUser()
-      tagSystem()
-      tagUser()
-    }
-    class IssueSlices {
-      build()
-    }
-    class Mention {
-      <<interface>>
-    }
-    class IssueTally {
-      products()
-      ranked()
-      quote()
-      weight()
-    }
-    class NewIssueMerge {
-      apply()
-    }
-    class ReviewAnalysisJob {
-      run()
-    }
-    class ReviewAnalyst {
-      read()
-      start()
-      waitFor()
-    }
-    class ReviewCleaner {
-      clean()
-    }
-    class ReviewSample {
-      forCatalog()
-      batches()
-    }
-    class StructuredAsk {
-      ask()
-    }
-    class PullLabel {
-      <<interface>>
-    }
-    class ReviewFiling {
-      file()
-    }
-    class ReviewLedger {
-      record()
-      size()
-      saveTo()
-      snapshot()
-    }
-    class MiningRequest {
-      <<interface>>
-    }
-    class ReviewMiningJob {
-      start()
-    }
-    class ReviewMiningListings {
-      judged()
-      ensure()
-      marketplace()
-      strategy()
-      query()
-    }
-    class ReviewMiningPlanner {
-      plan()
-    }
-    class ReviewMiningRunAssembly {
-      assemble()
-    }
-    class PullJob {
-      <<interface>>
-    }
-    class PullEvents {
-      <<interface>>
-      started()
-      ended()
-    }
-    class ReviewPuller {
-      pullAll()
-    }
-    class ReviewReuse {
-      split()
-      settle()
-    }
-    class CheckedRun {
-      <<interface>>
-    }
-    class RoleChecks {
-      done()
-      closer()
-    }
-    class RoleDone {
-      problems()
-    }
-    class RowRepair {
-      repair()
-    }
-    class Assembled {
-      <<interface>>
-    }
-    class RunAssembly {
-      <<interface>>
-      assemble()
-    }
-    class RunEnd {
-      end()
-      refuse()
-    }
-    class RunFindings {
-      record()
-      retract()
-      rows()
-      live()
-      own()
-    }
-    class RunInputs {
-      productTruth()
-      marketTruth()
-      customerTruth()
-    }
-    class RunKinds {
-      <<interface>>
-    }
-    class RunLauncher {
-      reword()
-      launch()
-    }
     class RunMeter {
       charge()
     }
-    class RunSupervisor {
-      start()
-      recoverRunsKilledByRestart()
-      resettleInvalidRuns()
-      reword()
-      steer()
-      stop()
-      close()
-      defaultModels()
-    }
-    class RunWrapUp {
-      lookUpListings()
-      addBilling()
-      recordBilling()
-    }
-    class StageOneHandoff {
-      forBrief()
-      forRun()
-      hasCompleted()
-    }
-    class StageOneListings {
-      lookUp()
-    }
-    class StageOneParts {
-      planned()
-      problems()
-      close()
-    }
-    class StageOneRunAssembly {
-      assemble()
-    }
-    class StageOneRun {
-      start()
-    }
-    class StoredRunAssembly {
-      of()
-    }
-    class ChampionRunAssembly {
-      assemble()
-    }
-    class CountedTally {
-      refuse()
-    }
-    class DurableTool {
-      from()
-    }
-    class ResearchTaskDeps {
+    class Submission {
       <<interface>>
     }
-    class ResearchTasks {
-    }
-    class TaskCallLog {
-      sent()
-      answered()
-      count()
-      written()
-    }
-    class TaskEnd {
-      finish()
-      stop()
-    }
-    class TaskEvents {
-      on()
-      onAsked()
-      asked()
-      onAnswered()
-      answered()
-      ended()
-    }
-    class TaskExtensions {
-      install()
-      uninstall()
-      nameOf()
-    }
-    class TaskInputs {
-      copy()
-    }
-    class TaskIntake {
-      admit()
-    }
-    class Verdict {
-      <<interface>>
-    }
-    class TaskJudge {
-      verdict()
-      brief()
-      lastStep()
-      parse()
-    }
-    class TaskPause {
-      ask()
-      give()
-      answer()
-      question()
-      answered()
-    }
-    class TaskReadings {
-      read()
-      waitedMs()
-      trip()
-    }
-    class TaskSignals {
-      trip()
-      ask()
-      tripped()
-      halted()
-      wait()
-      resume()
-      answered()
-      answer()
-    }
-    class TaskSupervisorDeps {
-      <<interface>>
-    }
-    class TaskSupervisor {
-      start()
-      recover()
-      answer()
-      question()
-      waiting()
-      stop()
-      guide()
-    }
-    class TaskWork {
-      <<interface>>
-    }
-    class TaskWorkDeps {
-      <<interface>>
-    }
-    class TaskWorks {
-      of()
-      forget()
-      assembly()
+    class SubmitTool {
+      tool()
     }
     class ToolSteps {
       start()
       take()
     }
-    class AdLibraryTool {
-      tool()
+    class TurnPolicy {
     }
-    class DiscoverCompetitorsTool {
-      tool()
+    class UsageTotals {
+      tokens()
     }
-    class EvidenceSearchTool {
-      tool()
-    }
-    class ExcerptTool {
-      tool()
-    }
-    class FindProductTool {
-      tool()
-    }
-    class FinishTally {
-      <<interface>>
-      refuse()
-    }
-    class FinishTool {
-      tool()
-    }
-    class FetchRecord {
+    class LiveRun {
       <<interface>>
     }
-    class LedgerRows {
-      render()
+    class LiveRuns {
+      start()
+      has()
+      stop()
+      stopAll()
     }
-    class ReadLedgerTool {
-      tool()
+    class LlmModels {
+      openrouter()
     }
-    class WaitForTool {
-      tool()
+    class Pipeline {
+      run()
     }
-    class RecordTool {
-      tool()
-    }
-    class RetractTool {
-      tool()
-    }
-    class LedgerOptions {
+    class RunServices {
       <<interface>>
     }
-    class LedgerToolset {
-      build()
+    class RunContext {
+      kit()
+      agent()
+      emit()
+      settled()
     }
-    class LibraryTools {
-      index()
-      read()
-      forWorkspace()
+    class RunEvents {
+      emit()
+      subscribe()
+      flushed()
     }
-    class PageView {
+    class StageProgress {
+      state()
+      started()
+      ended()
+      snapshot()
+    }
+    class StageInput {
       <<interface>>
-      render()
     }
-    class PlainPage {
-      render()
+    class StageOutcome {
+      <<interface>>
     }
-    class NumberedPage {
-      render()
+    class Stage {
+      <<interface>>
+      run()
     }
-    class QuoteTool {
+    class ProductResolver {
+      resolve()
+      problems()
+    }
+    class RunVerdict {
+      <<interface>>
+    }
+    class RunEnd {
+      verdict()
+      end()
+    }
+    class RunLauncher {
+      chain()
+      resolve()
+      research()
+    }
+    class CompetitorProfiler {
+      profile()
+      problems()
+    }
+    class ProductBriefAgent {
+      brief()
+      citedUrls()
+      problems()
+    }
+    class ProductMarketStage {
+      run()
+    }
+    class AdSearchTool {
       tool()
     }
-    class ReadReviewsTool {
-      tool()
-    }
-    class BuiltTool {
+    class AgentKit {
       <<interface>>
     }
-    class ToolContext {
-      <<interface>>
-    }
-    class ToolRegistry {
-      build()
+    class Toolbox {
+      kit()
     }
     class TracedTool {
       wrap()
     }
-    class UseSourceTool {
-      tool()
+    class UrlLedger {
+      read()
+      saw()
+      unread()
+      unknown()
     }
     class WebFetchTool {
       tool()
@@ -2256,137 +581,29 @@ classDiagram
     class WebSearchTool {
       tool()
     }
-    class TurnBreakers {
-      refuse()
-    }
-    class UsageTotals {
-      empty()
-      tokens()
-      add()
-    }
-    class AdOutcomes {
-      link()
-      record()
-    }
-    class AdResultsWatch {
-      check()
-    }
-    class CompetitorAdsWatch {
-      check()
-      line()
-    }
-    class CuratorWatch {
-      check()
-      status()
-    }
-    class ReviewsWatch {
-      check()
-    }
-    class ScheduleWatch {
-      check()
-    }
-    class WatchDesk {
-      addBrand()
-      connect()
-      link()
-      draftAds()
-    }
-    class WatchSet {
-      build()
-    }
-    class Watch {
-      <<interface>>
-      check()
-    }
-    class Watchers {
-      kinds()
-      start()
-      stop()
-    }
-    class CriticTools {
-      readDraft()
-      recordVerdict()
-    }
-    class DraftDesk {
-      view()
-      edit()
-      approve()
-      reject()
-    }
-    class DraftDone {
-      problems()
-    }
-    class VerdictDone {
-      problems()
-    }
-    class DraftFlow {
-      write()
-    }
-    class DraftRunAssembly {
-      assemble()
-    }
-    class DraftWorks {
-      build()
-      check()
-      assembly()
-      playbook()
-    }
-    class WriterTools {
-      readInputs()
-      writeSection()
-      line()
-    }
   }
   namespace http {
     class AccountCommands {
       run()
     }
-    class AlwaysOnRoutes {
-      register()
+    class AppParts {
+      <<interface>>
     }
     class App {
-      listingSource()
       traceFile()
       close()
     }
     class AuthGate {
       register()
     }
-    class BrandRoutes {
-      register()
-    }
-    class CallStats {
-      of()
-    }
-    class CardRoutes {
-      register()
-    }
-    class ConfigRoute {
-      register()
-    }
-    class CorpusRoute {
-      register()
-    }
-    class CostRoute {
-      register()
-    }
-    class DraftRoutes {
-      register()
+    class ConfigRoutes {
+      router()
     }
     class EventStream {
-      register()
-    }
-    class FeedbackRoutes {
-      register()
+      open()
     }
     class Frontend {
       mount()
-    }
-    class JudgementRoutes {
-      register()
-    }
-    class LibraryRoutes {
-      register()
     }
     class LoginThrottle {
       retryAfterSeconds()
@@ -2394,39 +611,12 @@ classDiagram
       clear()
       clientOf()
     }
-    class MemoryRoutes {
-      register()
-    }
     class Passwords {
       hash()
       verify()
     }
-    class PlaybookRoutes {
-      register()
-    }
-    class ProductCostRoutes {
-      register()
-    }
-    class ProductRoutes {
-      register()
-    }
-    class ResearchApi {
-      router()
-    }
-    class ReviewAnalysisRoutes {
-      register()
-    }
-    class ReviewMiningRoutes {
-      register()
-    }
-    class RewordRoute {
-      register()
-    }
     class RunRoutes {
-      register()
-    }
-    class ScopeGuard {
-      register()
+      router()
     }
     class SecretPrompt {
       newPassword()
@@ -2437,38 +627,14 @@ classDiagram
       revoke()
       local()
     }
-    class TaskRoutes {
-      register()
-    }
     class TokenService {
       issue()
       verify()
     }
-    class TraceRoute {
-      register()
-    }
-    class WatchRoutes {
-      register()
-    }
-    class WorkspaceRoutes {
-      register()
-    }
-    class WorkspaceStream {
-      register()
-    }
   }
-  AmazonReviews --> ActorRunner
-  AmazonListingLookup --> ActorRunner
-  AmazonProducts --> ActorRunner
-  MeteredActorRunner --> ActorRunner
-  MeteredActorRunner --> ChargeMeter
-  TrustpilotReviews --> ActorRunner
   Crawl4ai --> Settings
   FallbackPageFetcher --> PageFetcher
-  OpenRouterGate --> Settings
-  FileMarkdown --> DocumentConverter
   Firecrawl --> Settings
-  MetaInsights --> Settings
   MeteredWebSearch --> WebSearch
   MeteredWebSearch --> ServicePrices
   MeteredWebSearch --> ChargeMeter
@@ -2478,409 +644,70 @@ classDiagram
   MeteredAdLibrary --> AdLibrary
   MeteredAdLibrary --> ServicePrices
   MeteredAdLibrary --> ChargeMeter
-  MeteredDiscovery --> CompetitorDiscovery
-  MeteredDiscovery --> ServicePrices
-  MeteredDiscovery --> ChargeMeter
   ParallelApi --> Settings
-  ParallelCompetitorDiscovery --> ParallelTask
-  ParallelExtract --> ParallelApi
   ParallelSearch --> ParallelApi
-  ParallelTask --> ParallelApi
-  PdfMarkdown --> MarkdownLayout
-  RunBilling --> OpenRouterPrices
   ServiceClients --> PageFetcher
   ServiceClients --> WebSearch
-  ServiceClients --> ActorRunner
-  ServiceClients --> EvidenceServices
-  ServiceClients --> CompetitorDiscovery
   ServiceClients --> AdLibrary
-  ServiceClients --> AdInsights
   AccountTable --> SqlDatabase
-  AdTable --> SqlDatabase
-  AlwaysOnTable --> SqlDatabase
-  BrandImageTable --> SqlDatabase
-  CallLog --> SqlDatabase
-  CardTable --> SqlDatabase
+  CallTable --> SqlDatabase
   ChargeTable --> SqlDatabase
-  PacketCheckLog --> SqlDatabase
-  CompetitorKinds --> SqlDatabase
-  DocumentTable --> SqlDatabase
-  DraftTable --> SqlDatabase
-  EventLog --> SqlDatabase
-  FeedbackTable --> SqlDatabase
-  FindingTable --> SqlDatabase
-  JudgementTable --> SqlDatabase
-  LessonTable --> SqlDatabase
-  MemoryTable --> SqlDatabase
-  PacketRowTable --> SqlDatabase
-  PlanTable --> SqlDatabase
-  PlaybookTable --> SqlDatabase
-  ProductBackfill --> SqlDatabase
-  ProductBackfill --> ProductTable
-  ProductBackfill --> PacketRowTable
-  SqlProductCatalog --> ProductTable
-  SqlProductCatalog --> RunTable
-  SqlProductCatalog --> PacketRowTable
-  ProductCostTable --> SqlDatabase
+  CompetitorTable --> SqlDatabase
+  EventTable --> SqlDatabase
+  Migrator --> SqlDatabase
+  Migrator --> Migration
   ProductTable --> SqlDatabase
-  ReviewAnalysisTable --> SqlDatabase
-  ReviewPullBackfill --> SqlDatabase
-  ReviewPullTable --> SqlDatabase
-  ReviewTable --> SqlDatabase
   RunTable --> SqlDatabase
-  StoreCopy --> SqlDatabase
-  SqlResearchStore --> StoreTables
-  StoreTables --> SqlDatabase
-  TargetListingTable --> SqlDatabase
-  WatchTable --> SqlDatabase
+  SqlResearchStore --> SqlDatabase
   ThrottledPageFetcher --> PageFetcher
   ThrottledPageFetcher --> ServiceQueue
   ThrottledWebSearch --> WebSearch
   ThrottledWebSearch --> ServiceQueue
-  ThrottledActorRunner --> ActorRunner
-  ThrottledActorRunner --> ServiceQueue
   ThrottledAdLibrary --> AdLibrary
   ThrottledAdLibrary --> ServiceQueue
   TrendtrackAds --> Settings
-  TrustpilotProfiles --> PageFetcher
-  AgentDriver --> ResearchStore
-  AgentDriver --> LiveRuns
-  AgentDriver --> RetryPolicy
-  AgentDriver --> ModelChain
-  AgentTeam --> RetryPolicy
-  AgentTeam --> ModelChain
-  AlwaysOnDesk --> ResearchStore
-  AlwaysOnDesk --> Watchers
-  AlwaysOnDesk --> WorkspaceSpend
-  AlwaysOnTools --> TaskCreation
-  AlwaysOnTools --> ScheduleDesk
-  ScheduleDesk --> ResearchStore
-  TaskCreation --> TaskSupervisor
-  TaskCreation --> PlanDesk
-  WorkspaceLimits --> ResearchStore
-  WorkspaceLimits --> WorkspaceSpend
-  WorkspaceSpend --> ResearchStore
+  AnalysisService --> ResearchStore
+  AnalysisService --> RunLauncher
+  AnalysisService --> LiveRuns
+  AnalysisService --> Pipeline
+  AgentRunner --> AgentRunnerDeps
   BilledCosts --> ResearchStore
-  BilledCosts --> LiveRuns
-  CustomerContract --> RunFindings
-  CustomerContract --> DoneCheck
-  CustomerTruthInputs --> ResearchStore
-  CustomerTruthRun --> ResearchAgentFactory
-  NodeContract --> RunFindings
-  ChampionContract --> RunFindings
-  TruthContract --> RunFindings
-  AgentEventRecorder --> LiveRuns
-  AgentEventRecorder --> ToolSteps
-  InvalidRunResettle --> ResearchStore
-  InvalidRunResettle --> LiveRuns
-  DistilWorks --> OpenRouterPrices
-  LessonChecks --> ResearchStore
-  LessonDesk --> ResearchStore
-  MemoryDesk --> ResearchStore
-  PlaybookDesk --> ResearchStore
-  PlaybookDesk --> TaskSupervisor
-  PlaybookScores --> ResearchStore
-  PlaybookShelf --> ResearchStore
-  ReviewCase --> ResearchStore
-  ReviewerTools --> ResearchStore
-  ReviewerTools --> LessonDesk
-  Reviewer --> ResearchStore
-  Reviewer --> PiHarness
-  Reviewer --> LessonDesk
-  LibraryIntake --> DocumentLibrary
-  LibraryIntake --> DocumentConverter
-  LimitClose --> RunFindings
-  LimitClose --> RowRepair
-  LimitClose --> DoneCheck
-  LimitClose --> DeliverableCheck
-  LiveRuns --> ResearchStore
-  MarketTruthInputs --> ResearchStore
-  MarketTruthInputs --> StageOneHandoff
-  MarketTruthRun --> OwnerReword
-  BrandPictureSearch --> ResearchStore
-  BrandPictureSearch --> BrandImageFinder
-  BrandResearch --> ResearchStore
-  BrandShelf --> ResearchStore
-  BrandShelf --> OperatorDesk
-  BrandShelf --> BrandImageFinder
-  CardDesk --> ResearchStore
-  CardDesk --> PlanBook
-  CardDesk --> TaskSupervisor
-  CardDesk --> CardResolvers
-  CardDesk --> TaskEvents
-  ChatReviews --> ResearchStore
-  ChatReviews --> ReviewAnalysisStarter
-  ChatStages --> ResearchStore
-  ChatStages --> PlanBook
-  ChatStages --> PlanStages
-  LibraryShelfTools --> DocumentLibrary
-  LibraryShelfTools --> PlaybookMaker
-  OperatorDesk --> PiHarness
-  OperatorDesk --> ResearchStore
-  OperatorDesk --> TaskSupervisor
-  OperatorDesk --> TaskEvents
-  OperatorTools --> ResearchStore
-  OperatorTools --> PlanDesk
-  OperatorTools --> TaskSupervisor
-  OperatorTools --> CardDesk
-  OperatorTools --> MemoryDesk
-  OperatorTools --> AlwaysOnTools
-  OperatorTools --> RunControlTools
-  OperatorTools --> LibraryShelfTools
-  OperatorTools --> StageTools
-  OwnerDesk --> PlanDesk
-  OwnerDesk --> OperatorDesk
-  OwnerDesk --> FeedbackBook
-  PlanDesk --> PlanBook
-  PlanDesk --> TaskSupervisor
-  PlanDesk --> CardDesk
-  PlanDesk --> FeedbackBook
-  PlanRelease --> ResearchStore
-  PlanRelease --> PlanBook
-  PlanRelease --> PlanDesk
-  PlanRelease --> TaskEvents
-  PlanStageOne --> ResearchStore
-  PlanStageOne --> LiveRuns
-  PlanStages --> TaskEvents
-  RunControlTools --> ResearchStore
-  RunControlTools --> TaskSupervisor
-  RunControlTools --> StageRunControl
-  StageBriefDesk --> ResearchStore
-  StageBriefDesk --> PlanDesk
-  StageBriefDesk --> ChatStages
-  StageTools --> BrandResearch
-  StageTools --> StageBriefDesk
-  StageTools --> ChatStages
-  StageTools --> ChatReviews
-  WorkReport --> ResearchStore
-  WorkReport --> TaskSupervisor
-  WorkspaceBoard --> ResearchStore
-  WorkspaceBoard --> TaskSupervisor
-  WorkspaceBoard --> AlwaysOnDesk
-  WorkspaceServices --> AdLibrary
-  WorkspaceServices --> AdInsights
-  WorkspaceServices --> StageRunControl
-  OperatorInputs --> FindingLedger
-  OwnerCosts --> ResearchStore
-  OwnerReword --> ResearchStore
-  OwnerReword --> OpenRouterPrices
-  PartClose --> RunFindings
-  PartClose --> DeliverableCheck
-  ModelPricing --> OpenRouterPrices
-  ProductTruthRunAssembly --> FindingLedger
-  ProductTruthRun --> ResearchAgentFactory
-  ProductTruthRun --> ProductTruthBrief
-  StageOneBriefing --> PromptBuilder
-  StageOneBriefing --> Judgement
-  ProductTruthBriefing --> ProductTruthPrompts
-  ProductTruthBriefing --> Judgement
-  MarketTruthBriefing --> MarketTruthPrompts
-  MarketTruthBriefing --> MarketInstructions
-  CustomerTruthBriefing --> CustomerTruthPrompts
-  CustomerTruthBriefing --> CustomerInstructions
-  ResearchAgentFactory --> ResearchStore
-  ResearchAgentFactory --> ToolRegistry
-  ResearchAgentFactory --> Corpus
-  IssueSlices --> IssueTally
-  NewIssueMerge --> StructuredAsk
-  ReviewAnalysisJob --> StructuredAsk
-  ReviewAnalyst --> ResearchStore
-  ReviewAnalyst --> Settings
-  ReviewAnalyst --> OpenRouterPrices
-  StructuredAsk --> ModelChain
-  ReviewFiling --> Corpus
-  ReviewFiling --> ReviewLedger
-  ReviewMiningJob --> ResearchStore
-  ReviewMiningJob --> LiveRuns
-  ReviewMiningJob --> Settings
-  ReviewMiningJob --> ActorRunner
-  ReviewMiningListings --> TargetListings
-  ReviewMiningListings --> AmazonListingSource
-  ReviewMiningListings --> TrustpilotProfiles
-  ReviewMiningRunAssembly --> ResearchStore
-  ReviewMiningRunAssembly --> LiveRuns
-  ReviewMiningRunAssembly --> ReviewLedger
-  ReviewMiningRunAssembly --> PullFailure
-  ReviewPuller --> PullEvents
-  ReviewReuse --> ReviewPullStore
-  RoleDone --> RunFindings
-  RoleDone --> DeliverableCheck
-  RoleDone --> DoneCheck
-  RowRepair --> FindingLedger
+  BilledCosts --> GenerationSource
+  RunMeter --> ChargeLedger
+  Pipeline --> Stage
+  RunContext --> Run
+  RunContext --> RunServices
+  RunContext --> ModelChain
+  RunEvents --> EventLog
+  StageProgress --> RunStore
+  StageProgress --> RunContext
   RunEnd --> ResearchStore
-  RunEnd --> LiveRuns
-  RunFindings --> FindingLedger
-  RunInputs --> ResearchStore
-  RunInputs --> LiveRuns
-  RunInputs --> StageOneHandoff
-  RunLauncher --> ResearchStore
+  RunEnd --> RunEvents
+  RunLauncher --> RunServices
   RunLauncher --> Settings
-  RunLauncher --> OpenRouterPrices
   RunLauncher --> LiveRuns
-  RunLauncher --> RetryPolicy
-  RunLauncher --> RunKinds
-  RunMeter --> ResearchStore
-  RunMeter --> LiveRuns
-  RunWrapUp --> ResearchStore
-  RunWrapUp --> LiveRuns
-  RunWrapUp --> StageOneListings
-  StageOneHandoff --> ResearchStore
-  StageOneListings --> TargetListings
-  StageOneListings --> ActorRunner
-  StageOneListings --> PageFetcher
-  StageOneParts --> FindingLedger
-  StageOneParts --> RoleSpec
-  StageOneRunAssembly --> FindingLedger
-  StageOneRunAssembly --> RoleSpec
-  ChampionRunAssembly --> FindingLedger
-  ResearchTasks --> ResearchTaskDeps
-  TaskCallLog --> ResearchStore
-  TaskCallLog --> OpenRouterPrices
-  TaskEnd --> TaskReadings
-  TaskExtensions --> TaskWorks
-  TaskExtensions --> TaskSignals
-  TaskExtensions --> TaskReadings
-  TaskExtensions --> TaskJudge
-  TaskExtensions --> TaskPause
-  TaskExtensions --> MemoryDesk
-  TaskExtensions --> WorkspaceLimits
-  TaskInputs --> FindingLedger
-  TaskIntake --> ResearchStore
-  TaskIntake --> Settings
-  TaskJudge --> PiHarness
-  TaskPause --> ResearchStore
-  TaskPause --> LiveRuns
-  TaskPause --> TaskSignals
-  TaskPause --> TaskEvents
-  TaskReadings --> ResearchStore
-  TaskReadings --> Corpus
-  TaskSupervisor --> TaskSupervisorDeps
-  TaskWorks --> TaskWorkDeps
-  AdLibraryTool --> AdLibrary
-  AdLibraryTool --> Corpus
-  DiscoverCompetitorsTool --> CompetitorDiscovery
-  DiscoverCompetitorsTool --> DiscoveryQuestion
-  DiscoverCompetitorsTool --> Corpus
-  EvidenceSearchTool --> WebSearch
-  EvidenceSearchTool --> Corpus
-  ExcerptTool --> RunFindings
-  ExcerptTool --> Corpus
-  FindProductTool --> AmazonProducts
-  FinishTool --> DoneCheck
-  FinishTool --> FinishTally
-  ReadLedgerTool --> RunFindings
-  WaitForTool --> RunFindings
-  WaitForTool --> AgentRoster
-  RecordTool --> RunFindings
-  RetractTool --> RunFindings
-  LedgerToolset --> LedgerOptions
-  LibraryTools --> DocumentLibrary
-  QuoteTool --> RunFindings
-  QuoteTool --> StoredRunReview
-  QuoteTool --> Corpus
-  ReadReviewsTool --> StoredRunReview
-  ToolRegistry --> ServiceClients
-  ToolRegistry --> Settings
-  UseSourceTool --> RunFindings
-  WebFetchTool --> Settings
+  RunLauncher --> Pipeline
+  RunLauncher --> ProductResolver
+  AdSearchTool --> AdLibrary
+  AdSearchTool --> UrlLedger
+  Toolbox --> ServiceClients
+  Toolbox --> Settings
   WebFetchTool --> PageFetcher
-  WebFetchTool --> Corpus
-  WebFetchTool --> FetchGate
-  WebFetchTool --> PageView
+  WebFetchTool --> UrlLedger
   WebSearchTool --> WebSearch
-  TurnBreakers --> BreakerLimits
-  AdOutcomes --> ResearchStore
-  AdResultsWatch --> ResearchStore
-  AdResultsWatch --> AdInsights
-  CompetitorAdsWatch --> ResearchStore
-  CompetitorAdsWatch --> AdLibrary
-  CompetitorAdsWatch --> WorkspaceLimits
-  CuratorWatch --> ResearchStore
-  ReviewsWatch --> ResearchStore
-  ScheduleWatch --> ResearchStore
-  WatchDesk --> ResearchStore
-  Watchers --> ResearchStore
-  Watchers --> PiHarness
-  Watchers --> Watch
-  CriticTools --> DraftBook
-  CriticTools --> FindingLedger
-  CriticTools --> LiveRuns
-  DraftDesk --> ResearchStore
-  DraftDone --> DraftBook
-  DraftDone --> FindingLedger
-  VerdictDone --> DraftBook
-  DraftFlow --> ResearchStore
-  DraftFlow --> TaskSupervisor
-  DraftFlow --> TaskEvents
-  DraftRunAssembly --> FindingLedger
-  DraftRunAssembly --> DoneCheck
-  DraftWorks --> OpenRouterPrices
-  WriterTools --> DraftBook
-  WriterTools --> FindingLedger
-  WriterTools --> LiveRuns
-  WriterTools --> Playbook
-  PacketError --> CheckProblem
-  FieldsCheck --> FieldsDeliverable
-  ListCheck --> ListDeliverable
-  PacketAssembly --> Finding
-  PerItemCheck --> PerItemDeliverable
-  ProductTruthAssembly --> Finding
-  ReviewAssembly --> ReviewLedgerSnapshot
-  ReviewMiningPacket --> ReviewLedgerSnapshot
-  ReviewMiningPacket --> PullFailure
-  RowBlame --> Finding
-  PacketValidator --> ReviewLedgerSnapshot
+  WebSearchTool --> UrlLedger
   AccountCommands --> AccountDirectory
-  AlwaysOnRoutes --> AlwaysOnDesk
-  AlwaysOnRoutes --> ScheduleDesk
-  App --> AmazonListingSource
+  App --> AppParts
   AuthGate --> Settings
   AuthGate --> AccountDirectory
-  BrandRoutes --> BrandShelf
-  BrandRoutes --> OwnerDesk
-  CardRoutes --> CardDesk
-  ConfigRoute --> Settings
-  CorpusRoute --> ResearchStore
-  CorpusRoute --> Settings
-  CostRoute --> ResearchStore
-  DraftRoutes --> DraftFlow
-  DraftRoutes --> DraftDesk
   EventStream --> ResearchStore
-  EventStream --> RunSupervisor
-  FeedbackRoutes --> ResearchStore
-  JudgementRoutes --> ResearchStore
-  LibraryRoutes --> DocumentLibrary
-  LibraryRoutes --> LibraryIntake
-  MemoryRoutes --> MemoryDesk
-  PlaybookRoutes --> PlaybookDesk
-  ProductCostRoutes --> ResearchStore
-  ProductRoutes --> ResearchStore
-  ResearchApi --> AmazonListingSource
-  ResearchApi --> WorkspaceServices
-  ReviewAnalysisRoutes --> ResearchStore
-  ReviewAnalysisRoutes --> RunSupervisor
-  ReviewAnalysisRoutes --> ReviewAnalyst
-  ReviewMiningRoutes --> StageOneHandoff
-  ReviewMiningRoutes --> Settings
-  ReviewMiningRoutes --> ReviewMiningListings
-  RewordRoute --> ResearchStore
-  RewordRoute --> RunSupervisor
+  EventStream --> RunEvents
   RunRoutes --> ResearchStore
-  RunRoutes --> RunSupervisor
-  RunRoutes --> StageOneHandoff
-  RunRoutes --> ReviewMiningListings
-  ScopeGuard --> ResearchStore
+  RunRoutes --> AnalysisService
+  RunRoutes --> RunEvents
+  RunRoutes --> TraceFile
   Sessions --> AccountDirectory
   Sessions --> Settings
-  TaskRoutes --> ResearchStore
-  TaskRoutes --> TaskSupervisor
-  TraceRoute --> TraceFile
-  WatchRoutes --> WatchDesk
-  WatchRoutes --> ResearchStore
-  WorkspaceRoutes --> OwnerDesk
-  WorkspaceRoutes --> PlanBook
-  WorkspaceStream --> OperatorDesk
-  WorkspaceStream --> WorkspaceBoard
   TraceFile --> TraceLimits
 ```
 
@@ -2888,384 +715,92 @@ classDiagram
 
 | Layer | Module | Classes |
 |---|---|---|
-| `adapters` | `adapters/apify/actors.ts` | Spend |
-| `adapters` | `adapters/apify/amazon-reviews.ts` | AmazonReviews |
-| `adapters` | `adapters/apify/band-filing.ts` | BandFiling |
-| `adapters` | `adapters/apify/fields.ts` | Field, ReviewKey |
-| `adapters` | `adapters/apify/listing-lookup.ts` | AmazonListingLookup |
-| `adapters` | `adapters/apify/products.ts` | AmazonProducts |
-| `adapters` | `adapters/apify/runner.ts` | ApifyCreditError, ActorRun, ActorRunner, MeteredActorRunner, ApifyActorRunner, ActorRunners |
-| `adapters` | `adapters/apify/trustpilot-reviews.ts` | TrustpilotReviews |
-| `adapters` | `adapters/apify/types.ts` | AmazonProduct |
-| `adapters` | `adapters/corpus.ts` | Corpus |
 | `adapters` | `adapters/crawl4ai.ts` | Crawl4aiPayload, Crawl4ai |
 | `adapters` | `adapters/fallback-fetcher.ts` | FallbackPageFetcher |
-| `adapters` | `adapters/fetch-gate.ts` | OpenRouterGate |
-| `adapters` | `adapters/file-markdown.ts` | FileMarkdown |
 | `adapters` | `adapters/firecrawl.ts` | FirecrawlPayload, Firecrawl |
-| `adapters` | `adapters/homepage-image.ts` | HomepageImage |
 | `adapters` | `adapters/http.ts` | Http |
-| `adapters` | `adapters/markdown-layout.ts` | PrintedLine, MarkdownLayout |
-| `adapters` | `adapters/meta-insights.ts` | InsightRow, MetaInsights |
-| `adapters` | `adapters/metered.ts` | MeteredWebSearch, MeteredPageFetcher, MeteredAdLibrary, MeteredDiscovery |
+| `adapters` | `adapters/metered.ts` | MeteredWebSearch, MeteredPageFetcher, MeteredAdLibrary |
 | `adapters` | `adapters/openrouter-generation.ts` | OpenRouterGeneration |
 | `adapters` | `adapters/openrouter-prices.ts` | OpenRouterPrices |
 | `adapters` | `adapters/parallel-api.ts` | ParallelApi |
-| `adapters` | `adapters/parallel-discovery.ts` | Basis, ParallelCompetitorDiscovery |
-| `adapters` | `adapters/parallel-extract.ts` | ExtractResult, ExtractError, ParallelExtract |
 | `adapters` | `adapters/parallel-search.ts` | ParallelUsage, ParallelResult, ParallelSearch |
-| `adapters` | `adapters/parallel-task.ts` | ParallelTask |
-| `adapters` | `adapters/pdf-markdown.ts` | TextPiece, PdfMarkdown |
 | `adapters` | `adapters/rate-limit-wait.ts` | RateLimitWait |
 | `adapters` | `adapters/rates.ts` | Rates, Pricing, Billed, Money |
-| `adapters` | `adapters/run-billing.ts` | RunBilling |
-| `adapters` | `adapters/service-clients.ts` | EvidenceServices, ServiceClients |
+| `adapters` | `adapters/service-clients.ts` | ServiceClients |
 | `adapters` | `adapters/service-queue.ts` | Waiter, ServiceQueue |
 | `adapters` | `adapters/store/account-table.ts` | AccountTable |
-| `adapters` | `adapters/store/ad-table.ts` | AdTable |
-| `adapters` | `adapters/store/always-on-table.ts` | AlwaysOnTable |
-| `adapters` | `adapters/store/brand-image-table.ts` | BrandImageTable |
-| `adapters` | `adapters/store/call-log.ts` | CallLog |
-| `adapters` | `adapters/store/card-table.ts` | CardTable |
+| `adapters` | `adapters/store/call-table.ts` | CallTable |
 | `adapters` | `adapters/store/charge-table.ts` | ChargeTable |
-| `adapters` | `adapters/store/check-log.ts` | PacketCheckLog |
-| `adapters` | `adapters/store/competitor-kinds.ts` | CompetitorKinds |
-| `adapters` | `adapters/store/document-table.ts` | DocumentTable |
-| `adapters` | `adapters/store/draft-table.ts` | DraftTable |
-| `adapters` | `adapters/store/event-log.ts` | EventLog |
-| `adapters` | `adapters/store/feedback-table.ts` | FeedbackTable |
-| `adapters` | `adapters/store/finding-table.ts` | FindingTable |
-| `adapters` | `adapters/store/judgement-table.ts` | JudgementTable |
-| `adapters` | `adapters/store/lesson-table.ts` | LessonTable |
-| `adapters` | `adapters/store/memory-table.ts` | MemoryTable |
-| `adapters` | `adapters/store/migrations.ts` | StoreMigrations |
-| `adapters` | `adapters/store/packet-row-table.ts` | PacketRowTable |
-| `adapters` | `adapters/store/plan-table.ts` | PlanTable |
-| `adapters` | `adapters/store/playbook-table.ts` | PlaybookTable |
+| `adapters` | `adapters/store/competitor-table.ts` | CompetitorTable |
+| `adapters` | `adapters/store/event-table.ts` | EventTable |
+| `adapters` | `adapters/store/migrator.ts` | Migrator |
 | `adapters` | `adapters/store/postgres-database.ts` | PostgresStatements, PostgresDatabase |
 | `adapters` | `adapters/store/postgres-dialect.ts` | PostgresDialect |
-| `adapters` | `adapters/store/product-backfill.ts` | ProductBackfill |
-| `adapters` | `adapters/store/product-catalog.ts` | SqlProductCatalog |
-| `adapters` | `adapters/store/product-cost-table.ts` | ProductCostTable |
 | `adapters` | `adapters/store/product-table.ts` | ProductTable |
-| `adapters` | `adapters/store/review-analysis-table.ts` | ReviewAnalysisTable |
-| `adapters` | `adapters/store/review-pull-backfill.ts` | ReviewPullBackfill |
-| `adapters` | `adapters/store/review-pull-table.ts` | ReviewPullTable |
-| `adapters` | `adapters/store/review-table.ts` | ReviewTable |
-| `adapters` | `adapters/store/rows.ts` | Rows |
-| `adapters` | `adapters/store/run-lock.ts` | RunLock |
 | `adapters` | `adapters/store/run-table.ts` | RunTable |
-| `adapters` | `adapters/store/schema.ts` | StoreSchema |
-| `adapters` | `adapters/store/scope-filter.ts` | ScopeFilter |
 | `adapters` | `adapters/store/sql-database.ts` | SqlDatabase |
-| `adapters` | `adapters/store/sqlite-database.ts` | SqliteStatements, SqliteDatabase |
-| `adapters` | `adapters/store/store-copy.ts` | CopiedTable, StoreCopy |
-| `adapters` | `adapters/store/store-database.ts` | StoreDatabase |
 | `adapters` | `adapters/store/store.ts` | SqlResearchStore |
-| `adapters` | `adapters/store/tables.ts` | StoreTables |
-| `adapters` | `adapters/store/target-listing-table.ts` | TargetListingTable |
-| `adapters` | `adapters/store/watch-table.ts` | WatchTable |
-| `adapters` | `adapters/throttled.ts` | ThrottledPageFetcher, ThrottledWebSearch, ThrottledActorRunner, ThrottledAdLibrary |
+| `adapters` | `adapters/store/text/migrations.ts` | Migration |
+| `adapters` | `adapters/throttled.ts` | ThrottledPageFetcher, ThrottledWebSearch, ThrottledAdLibrary |
 | `adapters` | `adapters/trendtrack-ads.ts` | TrendtrackAd, TrendtrackAds |
-| `adapters` | `adapters/trustpilot-profiles.ts` | TrustpilotProfiles |
-| `agent` | `agent/agent-driver.ts` | AgentOutcome, AgentDriver |
-| `agent` | `agent/agent-roster.ts` | AgentRoster |
-| `agent` | `agent/agent-team.ts` | TeamMember, AgentTeam |
-| `agent` | `agent/always/always-on-desk.ts` | AlwaysOnStatus, AlwaysOnDesk |
-| `agent` | `agent/always/always-on-tools.ts` | AlwaysOnTools |
-| `agent` | `agent/always/money-gate.ts` | MoneyGate |
-| `agent` | `agent/always/schedule-desk.ts` | ScheduleDesk |
-| `agent` | `agent/always/task-creation.ts` | TaskCreation |
-| `agent` | `agent/always/workspace-limits.ts` | WorkspaceLimits |
-| `agent` | `agent/always/workspace-spend.ts` | WorkspaceSpend |
-| `agent` | `agent/billed-costs.ts` | BilledCosts |
-| `agent` | `agent/built-agent.ts` | BuiltAgent |
-| `agent` | `agent/customer-contract.ts` | CustomerContract |
-| `agent` | `agent/customer-truth-inputs.ts` | CustomerEvidence, CustomerTruthInputs |
-| `agent` | `agent/customer-truth-run.ts` | CustomerTruthRun |
-| `agent` | `agent/done-check.ts` | DoneCheck, NodeContract, ChampionContract, TruthContract |
-| `agent` | `agent/errors.ts` | RunError, ApprovalNeeded |
-| `agent` | `agent/event-recorder.ts` | TurnEnd, AgentEventRecorder |
-| `agent` | `agent/fallback-models.ts` | FallbackModels |
-| `agent` | `agent/frames.ts` | EventFrame, Frames |
-| `agent` | `agent/invalid-run-resettle.ts` | InvalidRunResettle |
-| `agent` | `agent/learning/distil-works.ts` | DistilWorks |
-| `agent` | `agent/learning/lesson-checks.ts` | LessonChecks |
-| `agent` | `agent/learning/lesson-desk.ts` | LessonDesk |
-| `agent` | `agent/learning/lesson-text.ts` | LessonText |
-| `agent` | `agent/learning/memory-desk.ts` | MemoryDesk |
-| `agent` | `agent/learning/playbook-desk.ts` | PlaybookDesk |
-| `agent` | `agent/learning/playbook-scores.ts` | VersionScore, PlaybookReport, PlaybookScores |
-| `agent` | `agent/learning/playbook-shelf.ts` | PlaybookShelf |
-| `agent` | `agent/learning/review-case.ts` | ReviewCase |
-| `agent` | `agent/learning/reviewer-tools.ts` | ReviewerTools |
-| `agent` | `agent/learning/reviewer.ts` | Reviewer |
-| `agent` | `agent/library/library-intake.ts` | LiveConversion, LibraryIntake |
-| `agent` | `agent/limit-close.ts` | LimitClosed, LimitClose |
-| `agent` | `agent/listing-match.ts` | ListingMatch |
-| `agent` | `agent/live-runs.ts` | RunControl, Live, LiveRuns |
-| `agent` | `agent/llm-call-log.ts` | CallSequence, LlmCallLog |
-| `agent` | `agent/market-truth-inputs.ts` | MarketEvidence, MarketTruthInputs |
-| `agent` | `agent/market-truth-run.ts` | MarketTruthRun |
-| `agent` | `agent/model-chain.ts` | ModelChain |
-| `agent` | `agent/operator/brand-picture-search.ts` | BrandPictureSearch |
-| `agent` | `agent/operator/brand-research.ts` | StageState, BrandResearch |
-| `agent` | `agent/operator/brand-shelf.ts` | BrandShelf |
-| `agent` | `agent/operator/card-desk.ts` | CardResolvers, CardDesk |
-| `agent` | `agent/operator/chat-reviews.ts` | ReviewAnalysisStarter, ChatReviews |
-| `agent` | `agent/operator/chat-stages.ts` | LaterStageStart, ChatStages |
-| `agent` | `agent/operator/chat-view.ts` | ChatView |
-| `agent` | `agent/operator/library-shelf-tools.ts` | PlaybookMaker, LibraryShelfTools |
-| `agent` | `agent/operator/operator-act.ts` | OperatorAct |
-| `agent` | `agent/operator/operator-desk.ts` | OperatorDesk |
-| `agent` | `agent/operator/operator-tools.ts` | OperatorTools |
-| `agent` | `agent/operator/owner-desk.ts` | OwnerDesk |
-| `agent` | `agent/operator/plan-desk.ts` | PlanChange, PlanDesk |
-| `agent` | `agent/operator/plan-release.ts` | PlanRelease |
-| `agent` | `agent/operator/plan-stage-one.ts` | PlanStageOne |
-| `agent` | `agent/operator/plan-stages.ts` | PlanStages |
-| `agent` | `agent/operator/run-control-tools.ts` | StageRunControl, RunControlTools |
-| `agent` | `agent/operator/stage-brief-desk.ts` | StageProposal, StageBriefDesk |
-| `agent` | `agent/operator/stage-tools.ts` | StageTools |
-| `agent` | `agent/operator/work-report.ts` | WorkReport |
-| `agent` | `agent/operator/workspace-board.ts` | WorkspaceBoard |
-| `agent` | `agent/operator/workspace-services.ts` | WorkspaceServices |
-| `agent` | `agent/operator-inputs.ts` | OperatorInputs |
-| `agent` | `agent/owner-costs.ts` | OwnerCosts |
-| `agent` | `agent/owner-reword.ts` | OwnerReword |
-| `agent` | `agent/part-close.ts` | CloseReason, PartClose |
-| `agent` | `agent/pi-harness.ts` | PiHarness |
-| `agent` | `agent/pricing.ts` | ModelPricing |
-| `agent` | `agent/product-truth-run-assembly.ts` | ProductTruthRunAssembly |
-| `agent` | `agent/product-truth-run.ts` | ProductTruthBrief, ProductTruthRun |
-| `agent` | `agent/prompt/blocks.ts` | PromptBlocks |
-| `agent` | `agent/prompt/builder.ts` | AgentInstructions, PromptBuilder |
-| `agent` | `agent/prompt/contract-table.ts` | ContractTable |
-| `agent` | `agent/prompt/customer-builder.ts` | CustomerInstructions, CustomerTruthPrompts |
-| `agent` | `agent/prompt/customer-digest.ts` | CustomerDigest |
-| `agent` | `agent/prompt/deliverable-table.ts` | DeliverableTable |
-| `agent` | `agent/prompt/market-builder.ts` | MarketInstructions, MarketTruthPrompts |
-| `agent` | `agent/prompt/market-digest.ts` | MarketDigest |
-| `agent` | `agent/prompt/messages.ts` | AgentMessages |
-| `agent` | `agent/prompt/role-briefing.ts` | RoleBriefing, StageOneBriefing, ProductTruthBriefing, MarketTruthBriefing, CustomerTruthBriefing |
-| `agent` | `agent/prompt/stage-brief-template.ts` | StageBriefTemplate |
-| `agent` | `agent/prompt/task-briefing.ts` | TaskBriefing |
-| `agent` | `agent/prompt/truth-blocks.ts` | TruthBlocks |
-| `agent` | `agent/prompt/truth-builder.ts` | TruthInstructions, ProductTruthPrompts |
-| `agent` | `agent/research-agent-factory.ts` | RoleContext, ResearchAgentFactory |
-| `agent` | `agent/retry.ts` | RetryPolicy, Retries |
-| `agent` | `agent/review-analysis/analysis-prompts.ts` | AnalysisPrompts |
-| `agent` | `agent/review-analysis/issue-slices.ts` | IssueSlices |
-| `agent` | `agent/review-analysis/issue-tally.ts` | Mention, IssueTally |
-| `agent` | `agent/review-analysis/new-issue-merge.ts` | NewIssueMerge |
-| `agent` | `agent/review-analysis/review-analysis-job.ts` | ReviewAnalysisJob |
-| `agent` | `agent/review-analysis/review-analyst.ts` | ReviewAnalyst |
-| `agent` | `agent/review-analysis/review-cleaner.ts` | ReviewCleaner |
-| `agent` | `agent/review-analysis/review-sample.ts` | ReviewSample |
-| `agent` | `agent/review-analysis/structured-ask.ts` | StructuredAsk |
-| `agent` | `agent/review-filing.ts` | PullLabel, ReviewFiling |
-| `agent` | `agent/review-ledger.ts` | ReviewLedger |
-| `agent` | `agent/review-mining-job.ts` | MiningRequest, ReviewMiningJob |
-| `agent` | `agent/review-mining-listings.ts` | ReviewMiningListings |
-| `agent` | `agent/review-mining-plan.ts` | ReviewMiningPlanner |
-| `agent` | `agent/review-mining-run-assembly.ts` | ReviewMiningRunAssembly |
-| `agent` | `agent/review-puller.ts` | PullJob, PullEvents, ReviewPuller |
-| `agent` | `agent/review-reuse.ts` | ReviewReuse |
-| `agent` | `agent/role-checks.ts` | CheckedRun, RoleChecks |
-| `agent` | `agent/role-done.ts` | RoleDone |
-| `agent` | `agent/row-repair.ts` | RowRepair |
-| `agent` | `agent/run-assembly.ts` | Assembled, RunAssembly |
-| `agent` | `agent/run-end.ts` | RunEnd |
-| `agent` | `agent/run-findings.ts` | RunFindings |
-| `agent` | `agent/run-inputs.ts` | RunInputs |
-| `agent` | `agent/run-launcher.ts` | RunKinds, RunLauncher |
-| `agent` | `agent/run-meter.ts` | RunMeter |
-| `agent` | `agent/run-supervisor.ts` | RunSupervisor |
-| `agent` | `agent/run-wrap-up.ts` | RunWrapUp |
-| `agent` | `agent/stage-one-handoff.ts` | StageOneHandoff |
-| `agent` | `agent/stage-one-listings.ts` | StageOneListings |
-| `agent` | `agent/stage-one-parts.ts` | StageOneParts |
-| `agent` | `agent/stage-one-run-assembly.ts` | StageOneRunAssembly |
-| `agent` | `agent/stage-one-run.ts` | StageOneRun |
-| `agent` | `agent/stored-run-assembly.ts` | StoredRunAssembly |
-| `agent` | `agent/task/champion-run-assembly.ts` | ChampionRunAssembly |
-| `agent` | `agent/task/counted-tally.ts` | CountedTally |
-| `agent` | `agent/task/durable-tool.ts` | DurableTool |
-| `agent` | `agent/task/research-task.ts` | ResearchTaskDeps, ResearchTasks |
-| `agent` | `agent/task/task-call-log.ts` | TaskCallLog |
-| `agent` | `agent/task/task-end.ts` | TaskEnd |
-| `agent` | `agent/task/task-events.ts` | TaskEvents |
-| `agent` | `agent/task/task-extensions.ts` | TaskExtensions |
-| `agent` | `agent/task/task-inputs.ts` | TaskInputs |
-| `agent` | `agent/task/task-intake.ts` | TaskIntake |
-| `agent` | `agent/task/task-judge.ts` | Verdict, TaskJudge |
-| `agent` | `agent/task/task-pause.ts` | TaskPause |
-| `agent` | `agent/task/task-readings.ts` | TaskReadings |
-| `agent` | `agent/task/task-signals.ts` | TaskSignals |
-| `agent` | `agent/task/task-supervisor.ts` | TaskSupervisorDeps, TaskSupervisor |
-| `agent` | `agent/task/task-work.ts` | TaskWork, TaskWorkDeps, TaskWorks |
-| `agent` | `agent/tool-steps.ts` | ToolSteps |
-| `agent` | `agent/tools/ad-library-tool.ts` | AdLibraryTool |
-| `agent` | `agent/tools/discover-competitors-tool.ts` | DiscoverCompetitorsTool |
-| `agent` | `agent/tools/evidence-search-tool.ts` | EvidenceSearchTool |
-| `agent` | `agent/tools/excerpt-tool.ts` | ExcerptTool |
-| `agent` | `agent/tools/find-product-tool.ts` | FindProductTool |
-| `agent` | `agent/tools/finish-tool.ts` | FinishTally, FinishTool |
-| `agent` | `agent/tools/lanes.ts` | FetchRecord |
-| `agent` | `agent/tools/ledger-read-tools.ts` | LedgerRows, ReadLedgerTool, WaitForTool |
-| `agent` | `agent/tools/ledger-tools.ts` | RecordTool, RetractTool |
-| `agent` | `agent/tools/ledger-toolset.ts` | LedgerOptions, LedgerToolset |
-| `agent` | `agent/tools/library-tools.ts` | LibraryTools |
-| `agent` | `agent/tools/page-views.ts` | PageView, PlainPage, NumberedPage |
-| `agent` | `agent/tools/quote-tool.ts` | QuoteTool |
-| `agent` | `agent/tools/read-reviews-tool.ts` | ReadReviewsTool |
-| `agent` | `agent/tools/registry.ts` | BuiltTool, ToolContext, ToolRegistry |
+| `agent` | `agent/analysis-service.ts` | AnalysisService |
+| `agent` | `agent/kernel/agent-runner.ts` | AgentJob, AgentRunnerDeps, AgentRunner |
+| `agent` | `agent/kernel/billed-costs.ts` | BilledCosts |
+| `agent` | `agent/kernel/llm-call-log.ts` | CallSequence, LlmCallLog |
+| `agent` | `agent/kernel/model-chain.ts` | ModelChain |
+| `agent` | `agent/kernel/retry.ts` | RetryPolicy, Retries |
+| `agent` | `agent/kernel/run-meter.ts` | RunMeter |
+| `agent` | `agent/kernel/submit-tool.ts` | Submission, SubmitTool |
+| `agent` | `agent/kernel/tool-steps.ts` | ToolSteps |
+| `agent` | `agent/kernel/turn-policy.ts` | TurnPolicy |
+| `agent` | `agent/kernel/usage.ts` | UsageTotals |
+| `agent` | `agent/live-runs.ts` | LiveRun, LiveRuns |
+| `agent` | `agent/models.ts` | LlmModels |
+| `agent` | `agent/pipeline/pipeline.ts` | Pipeline |
+| `agent` | `agent/pipeline/run-context.ts` | RunServices, RunContext |
+| `agent` | `agent/pipeline/run-events.ts` | RunEvents |
+| `agent` | `agent/pipeline/stage-progress.ts` | StageProgress |
+| `agent` | `agent/pipeline/stage.ts` | StageInput, StageOutcome, Stage |
+| `agent` | `agent/resolve/product-resolver.ts` | ProductResolver |
+| `agent` | `agent/run-end.ts` | RunVerdict, RunEnd |
+| `agent` | `agent/run-launcher.ts` | RunLauncher |
+| `agent` | `agent/stages/product-market/competitor-profiler.ts` | CompetitorProfiler |
+| `agent` | `agent/stages/product-market/product-brief-agent.ts` | ProductBriefAgent |
+| `agent` | `agent/stages/product-market/product-market-stage.ts` | ProductMarketStage |
+| `agent` | `agent/tools/ad-search-tool.ts` | AdSearchTool |
+| `agent` | `agent/tools/toolbox.ts` | AgentKit, Toolbox |
 | `agent` | `agent/tools/traced-tool.ts` | TracedTool |
-| `agent` | `agent/tools/use-source-tool.ts` | UseSourceTool |
+| `agent` | `agent/tools/url-ledger.ts` | UrlLedger |
 | `agent` | `agent/tools/web-fetch-tool.ts` | WebFetchTool |
 | `agent` | `agent/tools/web-search-tool.ts` | WebSearchTool |
-| `agent` | `agent/turn-breakers.ts` | TurnBreakers |
-| `agent` | `agent/usage.ts` | UsageTotals |
-| `agent` | `agent/watch/ad-outcomes.ts` | AdOutcomes |
-| `agent` | `agent/watch/ad-results-watch.ts` | AdResultsWatch |
-| `agent` | `agent/watch/competitor-ads-watch.ts` | CompetitorAdsWatch |
-| `agent` | `agent/watch/curator-watch.ts` | CuratorWatch |
-| `agent` | `agent/watch/reviews-watch.ts` | ReviewsWatch |
-| `agent` | `agent/watch/schedule-watch.ts` | ScheduleWatch |
-| `agent` | `agent/watch/watch-desk.ts` | WatchDesk |
-| `agent` | `agent/watch/watch-set.ts` | WatchSet |
-| `agent` | `agent/watch/watchers.ts` | Watch, Watchers |
-| `agent` | `agent/write/critic-tools.ts` | CriticTools |
-| `agent` | `agent/write/draft-desk.ts` | DraftDesk |
-| `agent` | `agent/write/draft-done.ts` | DraftDone, VerdictDone |
-| `agent` | `agent/write/draft-flow.ts` | DraftFlow |
-| `agent` | `agent/write/draft-run-assembly.ts` | DraftRunAssembly |
-| `agent` | `agent/write/draft-works.ts` | DraftWorks |
-| `agent` | `agent/write/writer-tools.ts` | WriterTools |
 | `config` | `config/settings-shape.ts` | ServicePrices, Settings |
 | `config` | `config/settings.ts` | Env |
-| `domain` | `domain/accounts.ts` | Workspace, Account, AccountListing, Principal, Scope |
+| `domain` | `domain/accounts.ts` | Account, User, UserListing, Principal, Scope |
 | `domain` | `domain/ad-library.ts` | AdQuery, AdHit, AdPage |
-| `domain` | `domain/ad-results.ts` | AdAccount, AdInsight, AdResult, AdLink, AdInsights, AdBook, AdTotals, AdSums |
-| `domain` | `domain/always-on.ts` | AlwaysOn, AlwaysOnBook, Schedule, ScheduleBook, Schedules |
-| `domain` | `domain/brands.ts` | BrandChat, BrandFolder, BrandImage, PagePicture, BrandImageBook, BrandImageFinder, Brands |
-| `domain` | `domain/breakers.ts` | Trip, BreakerReadings, BreakerLimits, Breakers, RunStatuses |
-| `domain` | `domain/brief.ts` | Briefs |
-| `domain` | `domain/cards.ts` | Card, CardDraft, CardBook |
+| `domain` | `domain/analysis-input.ts` | Markets |
 | `domain` | `domain/charges.ts` | ChargeDraft, Charge, ChargeMeter, ServiceUse |
-| `domain` | `domain/chat.ts` | ChatMessage, TaskCard, Board |
-| `domain` | `domain/check-problem.ts` | RowRef, CheckProblem, CheckProblems |
-| `domain` | `domain/competitor-discovery.ts` | CompetitorCandidate, DiscoveryQuestion, DiscoveryReport, DiscoveryQuestions |
-| `domain` | `domain/contracts.ts` | Contracts |
-| `domain` | `domain/cost-report.ts` | CostCell, CostRow, CostReport |
-| `domain` | `domain/customer-deliverables.ts` | CustomerFields |
-| `domain` | `domain/customer-truth.ts` | Provenance |
-| `domain` | `domain/deliverable.ts` | FieldSpec, ItemPart, ItemNeed, FieldsDeliverable, ListDeliverable, OneMarked, PerItemDeliverable, Deliverables |
-| `domain` | `domain/drafts.ts` | DraftSection, Verdict, Draft, DraftBook, DraftView, DraftText |
-| `domain` | `domain/feedback.ts` | FeedbackTarget, Feedback, FeedbackDraft, FeedbackBook, FeedbackStrengths |
-| `domain` | `domain/findings.ts` | FindingDraft, Finding, Findings |
-| `domain` | `domain/harness.ts` | DurableHarness |
-| `domain` | `domain/lessons.ts` | Lesson, LessonDraft, LessonBook |
-| `domain` | `domain/library.ts` | LibraryDocument, ConvertedDocument, DocumentSection, DocumentLibrary, DocumentConverter, DocumentSections |
-| `domain` | `domain/logs.ts` | RunEvent, Judgement, PacketCheck, RunUpdate, LlmCallRecord, Generation, LlmCall |
-| `domain` | `domain/memory.ts` | MemoryEntry, MemoryWrite, MemoryBook |
-| `domain` | `domain/nodes.ts` | Stages |
-| `domain` | `domain/packet-rows.ts` | PacketRowSet, PacketRows |
-| `domain` | `domain/paragraphs.ts` | Paragraph, Paragraphs |
-| `domain` | `domain/plans.ts` | PlanTask, PlanStage, Plan, PlanBook |
-| `domain` | `domain/playbooks.ts` | PlaybookSection, PlaybookBody, Playbook, PlaybookBook |
-| `domain` | `domain/ports.ts` | ProductCatalog, AccountDirectory, AmazonListingSource, TargetListings, ChargeLedger, FindingLedger, PageFetcher, WebSearch, AdLibrary, CompetitorDiscovery, ResearchStore, GateVerdict, FetchGate, ReviewPullStore |
-| `domain` | `domain/primitives.ts` | PrimitiveSpec, Primitives |
-| `domain` | `domain/product-costs.ts` | ProductCosts, ProductCostBook |
-| `domain` | `domain/products.ts` | RunHead, Product, ProductSummary, ProductFolders |
-| `domain` | `domain/records.ts` | Clock, Ids, ResearchRun, RunDraft, RunSummary, Runs |
-| `domain` | `domain/reject-kinds.ts` | RejectKinds |
-| `domain` | `domain/relations.ts` | Relations |
-| `domain` | `domain/research-roles.ts` | RoleSpec, Roles |
-| `domain` | `domain/review-analysis.ts` | AnalysedReview, CleaningTally, IssueQuote, ProductIssue, ProductVoice, RankedIssue, IssueSlice, ReviewAnalysis |
-| `domain` | `domain/review-mining.ts` | BestsellerRank, AmazonListing, TrustpilotSummary, TargetListing |
-| `domain` | `domain/reviews.ts` | ReviewExcerpt, ReviewResult, LedgerPull, LedgerReview, ReviewLedgerSnapshot, StoredRunReview, StoredPull |
-| `domain` | `domain/role-records.ts` | RoleRecords |
-| `domain` | `domain/saved-plans.ts` | SavedTask, SavedPlans |
-| `domain` | `domain/service-report.ts` | ServicePart, ServiceReport, ServiceReports |
-| `domain` | `domain/stage-one-agents.ts` | StageOnePlan, StageOnePlans |
-| `domain` | `domain/watching.ts` | WatchedBrand, WorkspaceCharge, WatchBook |
+| `domain` | `domain/competitors.ts` | Competitor, CompetitorRelationship |
+| `domain` | `domain/ids.ts` | Clock, Ids |
+| `domain` | `domain/logs.ts` | RunEvent, LlmCallRecord, Generation, LlmCall |
+| `domain` | `domain/ports.ts` | PageFetcher, WebSearch, AdLibrary, GenerationSource, AccountDirectory, RunStore, ProductStore, CompetitorStore, EventLog, ChargeLedger, CallLog, ResearchStore |
+| `domain` | `domain/products.ts` | Product |
+| `domain` | `domain/runs.ts` | Run, RunUpdate |
+| `domain` | `domain/schemas.ts` | Schemas |
+| `domain` | `domain/service-report.ts` | ServicePart, ServiceReport |
+| `domain` | `domain/stages.ts` | StagePlan, StageState, Stages |
 | `domain` | `domain/web.ts` | SearchHit, SearchPage, SearchScope, FetchedPage, ServiceUnavailableError |
-| `domain` | `domain/workspace-books.ts` | WorkspaceBooks |
-| `extract` | `extract/brief-check.ts` | BriefCheck |
-| `extract` | `extract/buyer-stages.ts` | BuyerStages |
-| `extract` | `extract/champion-check.ts` | ChampionCheck |
-| `extract` | `extract/check.ts` | PacketContext, PacketCheck |
-| `extract` | `extract/citation-check.ts` | CitationCheck |
-| `extract` | `extract/competitor-check.ts` | CompetitorCheck |
-| `extract` | `extract/completeness-check.ts` | CompletenessCheck |
-| `extract` | `extract/contract-check.ts` | ContractGrounds, ContractCheck |
-| `extract` | `extract/cost-reports.ts` | CostReports |
-| `extract` | `extract/customer-picks.ts` | CustomerPicks |
-| `extract` | `extract/customer-truth-check.ts` | CustomerTruthCheck |
-| `extract` | `extract/deliverable-check.ts` | Missing, DeliverableCheck, DeliverableChecks |
-| `extract` | `extract/dose-bands.ts` | DoseBands |
-| `extract` | `extract/draft-check.ts` | DraftCheck |
-| `extract` | `extract/draft.ts` | PacketDraft |
-| `extract` | `extract/errors.ts` | PacketError |
-| `extract` | `extract/fields-check.ts` | FieldsCheck |
-| `extract` | `extract/finding-check.ts` | FindingCheck |
-| `extract` | `extract/latest-rows.ts` | LatestRows |
-| `extract` | `extract/list-check.ts` | ListCheck |
-| `extract` | `extract/market-check.ts` | MarketCheck |
-| `extract` | `extract/names.ts` | Names, BrandLabels |
-| `extract` | `extract/packet-assembly.ts` | PacketAssembly |
-| `extract` | `extract/per-item-check.ts` | Item, PerItemCheck |
-| `extract` | `extract/product-economics.ts` | ProductEconomics |
-| `extract` | `extract/product-truth-assembly.ts` | NodeReport, ProductTruthAssembly |
-| `extract` | `extract/review-assembly.ts` | ReviewAssembly |
-| `extract` | `extract/review-mining-offer.ts` | TrustpilotDomain, ReviewMiningOffer |
-| `extract` | `extract/review-mining-packet.ts` | PullFailure, ReviewMiningPacket |
-| `extract` | `extract/review-mining-roster.ts` | ReviewMiningRoster |
-| `extract` | `extract/reword-check.ts` | RewordCheck |
-| `extract` | `extract/row-blame.ts` | PacketSection, RowBlame |
-| `extract` | `extract/row-picks.ts` | RowPicks |
-| `extract` | `extract/scope-check.ts` | ScopeCheck |
-| `extract` | `extract/shared-actives.ts` | SharedActives |
-| `extract` | `extract/sophistication-stage.ts` | SophisticationStage |
-| `extract` | `extract/truth-citations.ts` | TruthCitations |
-| `extract` | `extract/validator.ts` | ZodProblems, PacketValidator |
 | `http` | `http/account-commands.ts` | AccountCommands |
-| `http` | `http/always-on-routes.ts` | AlwaysOnRoutes |
-| `http` | `http/app.ts` | App |
+| `http` | `http/app.ts` | AppParts, App |
 | `http` | `http/auth-gate.ts` | AuthGate |
-| `http` | `http/brand-routes.ts` | BrandRoutes |
-| `http` | `http/call-stats.ts` | CallStats |
-| `http` | `http/card-routes.ts` | CardRoutes |
-| `http` | `http/config-route.ts` | ConfigRoute |
-| `http` | `http/corpus-route.ts` | CorpusRoute |
-| `http` | `http/cost-route.ts` | CostRoute |
-| `http` | `http/draft-routes.ts` | DraftRoutes |
+| `http` | `http/config-routes.ts` | ConfigRoutes |
 | `http` | `http/event-stream.ts` | EventStream |
-| `http` | `http/feedback-routes.ts` | FeedbackRoutes |
 | `http` | `http/frontend.ts` | Frontend |
-| `http` | `http/judgement-routes.ts` | JudgementRoutes |
-| `http` | `http/library-routes.ts` | LibraryRoutes |
 | `http` | `http/login-throttle.ts` | LoginThrottle |
-| `http` | `http/memory-routes.ts` | MemoryRoutes |
 | `http` | `http/passwords.ts` | Passwords |
-| `http` | `http/playbook-routes.ts` | PlaybookRoutes |
-| `http` | `http/product-cost-routes.ts` | ProductCostRoutes |
-| `http` | `http/product-routes.ts` | ProductRoutes |
-| `http` | `http/research-api.ts` | ResearchApi |
-| `http` | `http/review-analysis-routes.ts` | ReviewAnalysisRoutes |
-| `http` | `http/review-mining-routes.ts` | ReviewMiningRoutes |
-| `http` | `http/reword-route.ts` | RewordRoute |
 | `http` | `http/run-routes.ts` | RunRoutes |
-| `http` | `http/scope-guard.ts` | ScopeGuard |
 | `http` | `http/secret-prompt.ts` | SecretPrompt |
 | `http` | `http/sessions.ts` | Sessions |
-| `http` | `http/task-routes.ts` | TaskRoutes |
 | `http` | `http/token-service.ts` | TokenService |
-| `http` | `http/trace-route.ts` | TraceRoute |
-| `http` | `http/watch-routes.ts` | WatchRoutes |
-| `http` | `http/workspace-routes.ts` | WorkspaceRoutes |
-| `http` | `http/workspace-stream.ts` | WorkspaceStream |
 | `trace` | `trace/trace-file.ts` | TraceLimits, TraceFile |
 | `trace` | `trace/trace-format.ts` | TraceFormat |
 | `trace` | `trace/trace.ts` | TraceSink, TraceStep, TraceScope, Trace |

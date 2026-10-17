@@ -4,9 +4,6 @@ import type {
   AdPage,
   AdQuery,
   ChargeMeter,
-  CompetitorDiscovery,
-  DiscoveryQuestion,
-  DiscoveryReport,
   FetchedPage,
   PageFetcher,
   SearchPage,
@@ -65,21 +62,5 @@ export class MeteredAdLibrary implements AdLibrary {
     const credits = page.credits ?? page.hits.length;
     await this.meter.charge({ service: "trendtrack", item: "ads", units: credits, usd: credits * this.prices.trendtrackUsdPerCredit, basis: "credits" });
     return page;
-  }
-}
-
-/** One Parallel Task run, charged at its processor's listed price; a processor with no listed price is charged as unpriced. */
-export class MeteredDiscovery implements CompetitorDiscovery {
-  constructor(
-    private readonly inner: CompetitorDiscovery,
-    private readonly prices: ServicePrices,
-    private readonly meter: ChargeMeter,
-  ) {}
-
-  async discover(question: DiscoveryQuestion, signal?: AbortSignal): Promise<DiscoveryReport> {
-    Trace.line(import.meta.url, "MeteredDiscovery.discover", { product: question.product });
-    const report = await this.inner.discover(question, signal);
-    await this.meter.charge({ service: "parallel", item: `task:${report.processor}`, units: 1, usd: this.prices.parallelTaskUsd[report.processor] ?? null, basis: "listed" });
-    return report;
   }
 }

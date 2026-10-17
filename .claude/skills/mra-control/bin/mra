@@ -121,64 +121,62 @@ disables login altogether, so you probably do not need this at all."
 
 cmd_run() {
   need curl "mra run"; need jq "mra run"
-  local brief="${1:-}" nodes="${2:-}"
-  [ -n "$brief" ] || die 'usage: mra run "<product or https://url>" [node,node]'
-  # A brief that is a URL belongs in brief.url, never in brief.product — the
-  # agent searching for a URL string as if it were a product name is a failure
-  # this app has already had.
+  local product="${1:-}"
+  [ -n "$product" ] || die 'usage: mra run "<product name or https://url>"   (MARKETS="US,GB" COMPETITORS="a;b")'
+  # A url goes in product_url, never product_name: the server refuses the
+  # second, because an agent searching for a url string comes back wrong.
   local payload
-  if [[ "$brief" =~ ^https?:// ]]; then
-    payload=$(jq -nc --arg u "$brief" '{brief:{product:"",url:$u}}')
+  if [[ "$product" =~ ^https?:// ]]; then
+    payload=$(jq -nc --arg u "$product" '{product_url:$u}')
   else
-    payload=$(jq -nc --arg p "$brief" '{brief:{product:$p}}')
+    payload=$(jq -nc --arg p "$product" '{product_name:$p}')
   fi
-  if [ -n "${MARKET:-}" ]; then
-    payload=$(printf '%s' "$payload" | jq -c --arg m "$MARKET" '.brief.market = $m')
-  fi
-  if [ -n "${INPUTS:-}" ]; then
-    payload=$(printf '%s' "$payload" | jq -c --argjson i "$INPUTS" '.inputs = $i') \
-      || die "INPUTS is not JSON: $INPUTS"
-  fi
-  if [ -n "$nodes" ]; then
-    payload=$(printf '%s' "$payload" | jq -c --arg n "$nodes" \
-      '.nodes = ($n | split(","))')
-  fi
+  payload=$(printf '%s' "$payload" | jq -c --arg m "${MARKETS:-US}" --arg c "${COMPETITORS:-}" \
+    '.markets = ($m | split(",")) | .known_competitors = ($c | split(";") | map(select(. != "")))')
   local out; out=$(api POST /api/research/runs "$payload")
-  printf '%s\n' "$out" | jq -e '.id' >/dev/null 2>&1 \
-    || die "start refused: $out"
-  printf '%s\n' "$out" | jq -r '"run \(.id)  status=\(.status)  nodes=\(.nodes|join(","))"'
-  printf '%s\n' "$out" | jq -r '.id' > "${TMPDIR:-/tmp}/mra-last-run"
+  printf '%s\n' "$out" | jq -e '.run.id' >/dev/null 2>&1 || die "start refused: $out"
+  printf '%s\n' "$out" | jq -r '"run \(.run.id)  status=\(.run.status)"'
+  printf '%s\n' "$out" | jq -r '.run.id' > "${TMPDIR:-/tmp}/mra-last-run"
+  echo "next: mra watch, then mra confirm once it is awaiting_confirmation"
+}
+
+cmd_confirm() {
+  need curl "mra confirm"; need jq "mra confirm"
+  local id="${1:-$(cat "${TMPDIR:-/tmp}/mra-last-run" 2>/dev/null || true)}"
+  [ -n "$id" ] || die "usage: mra confirm [runId]   (accepts the product and competitors exactly as resolved)"
+  local body; body=$(api GET "/api/research/runs/$id")
+  [ "$(jq -r .run.status <<<"$body")" = "awaiting_confirmation" ] || die "run $id is $(jq -r .run.status <<<"$body"), not awaiting_confirmation"
+  local payload; payload=$(jq -c '.run.resolution | {product_url: .product.url, competitors: [.competitors[] | {brand, product_name, url}]}' <<<"$body")
+  jq -r '"product: \(.product_url)", "competitors: \(.competitors | map(.brand) | join(", "))"' <<<"$payload"
+  local out; out=$(api POST "/api/research/runs/$id/confirm" "$payload")
+  jq -e '.run.status' >/dev/null 2>&1 <<<"$out" || die "confirm refused: $out"
+  jq -r '"run \(.run.id)  status=\(.run.status)"' <<<"$out"
 }
 
 cmd_watch() {
   need curl "mra watch"; need jq "mra watch"
   local id="${1:-$(cat "${TMPDIR:-/tmp}/mra-last-run" 2>/dev/null || true)}"
   [ -n "$id" ] || die "usage: mra watch <runId>   (or run one first)"
-  local status=""
+  local status="" body
   while :; do
-    local body; body=$(api GET "/api/research/runs/$id")
-    status=$(printf '%s' "$body" | jq -r '.status // "?"')
-    printf '\r%s  %s' "$id" "$status"
+    body=$(api GET "/api/research/runs/$id")
+    jq -e '.run' >/dev/null 2>&1 <<<"$body" || die "no run $id: $body"
+    status=$(printf '%s' "$body" | jq -r '.run.status')
+    printf '\r%s  %s   ' "$id" "$status"
     case "$status" in
-      running|queued|"?") sleep 5 ;;
-      *) echo; printf '%s' "$body" | jq '{status, error, counts, usage: (.usage|{totalTokens, cost: .cost.total, billed: .billed.total})}'; break ;;
+      resolving|running|stopping) sleep 5 ;;
+      *) echo; break ;;
     esac
   done
-  # `invalid` is not `failed`: the agent finished and produced something the
-  # schema refused. That is the most informative failure this app has, so say so.
-  [ "$status" = "succeeded" ] || echo "(status is $status — 'invalid' means the packet was rejected, not that the run crashed; see \`mra calls $id\`)"
-}
-
-cmd_task() {
-  need curl "mra task"; need jq "mra task"
-  local file="${1:-}"
-  [ -n "$file" ] && [ -f "$file" ] || die 'usage: mra task <task.json>   ({"brief": {...}, "contract": {...}}; see docs/tasks/)'
-  jq -e '.brief and .contract' "$file" >/dev/null 2>&1 || die "$file is not a task: it needs .brief and .contract"
-  local out; out=$(api POST /api/research/tasks "$(jq -c . "$file")")
-  printf '%s\n' "$out" | jq -e '.id' >/dev/null 2>&1 || die "task refused: $out"
-  printf '%s\n' "$out" | jq -r '"task run \(.id)  status=\(.status)  nodes=\(.nodes|join(","))"'
-  printf '%s\n' "$out" | jq -r '.id' > "${TMPDIR:-/tmp}/mra-last-run"
-  cmd_watch "$(printf '%s' "$out" | jq -r '.id')"
+  printf '%s' "$body" | jq '{status: .run.status, error: .run.error, cost_usd: .run.cost_usd,
+    stages: (.run.stage_status | with_entries(select(.value.status != "not_built")) | map_values({status, summary, error})),
+    competitors: [.competitors[] | {brand, relationship, form_factor}]}'
+  # `invalid` is not `failed`: an agent finished and submitted something its
+  # schema or code checks refused, which is the most informative failure here.
+  case "$status" in
+    invalid) echo "(invalid: an agent's submit was refused; see \`mra calls $id\`)" ;;
+    awaiting_confirmation) echo "(waiting for you: \`mra confirm $id\`, or confirm in the cockpit)" ;;
+  esac
 }
 
 cmd_calls() {
@@ -186,26 +184,7 @@ cmd_calls() {
   local id="${1:-$(cat "${TMPDIR:-/tmp}/mra-last-run" 2>/dev/null || true)}"
   [ -n "$id" ] || die "usage: mra calls <runId>"
   api GET "/api/research/runs/$id/calls" \
-    | jq '{totals, calls: [.calls[] | {seq, node, model, stopReason, tokens: .usage.totalTokens}]}'
-}
-
-cmd_library() {
-  need curl "mra library"; need jq "mra library"
-  local file="${1:-}" url="${BASE:-$LOCAL_URL}"
-  if [ -z "$file" ]; then
-    api GET "/api/research/library" | jq -r '.data[] | "\(.id)  \(.status)  \(.pages)p  \(.chars)c  \(.title)"'
-    return
-  fi
-  [ -f "$file" ] || die "no such file: $file"
-  local doc id
-  doc=$(curl -s -b "$JAR" -c "$JAR" -X POST "$url/api/research/library" -F "file=@$file;type=application/pdf")
-  id=$(jq -r '.id // empty' <<<"$doc")
-  [ -n "$id" ] || die "upload refused: $doc"
-  note "accepted $id ($(jq -r .status <<<"$doc")); following the conversion"
-  curl -s -N -b "$JAR" "$url/api/research/library/$id/events" | grep --line-buffered '^data: ' | sed -u 's/^data: //' \
-    | jq -rc 'if .kind == "page" then "page \(.page)/\(.pages)" else "\(.kind): \(.document.pages) pages, \(.document.chars) chars \(.document.error)" end'
-  note "sections, as library_read numbers them"
-  api GET "/api/research/library/$id" | jq -r .markdown | grep -E '^#{1,3} ' | head -40
+    | jq '[.calls[] | {seq, agent_id, model, stop_reason, error, tokens: .usage.totalTokens, billed_cost}]'
 }
 
 # --- the deploy ------------------------------------------------------------
@@ -248,23 +227,17 @@ mra — drive and inspect the research cockpit
 
   login                    session cookie (needs MRA_PASSWORD; usually
                            unnecessary locally, where login is disabled)
-  run "<brief>" [nodes]    start a run. A brief starting with http goes to
-                           brief.url, never brief.product. MARKET="US, UK"
-                           sets brief.market (unset: no market scope).
-                           nodes: product_data,competitors,category_data (stage 1);
-                           mechanism (stage 2, product truth — always runs
-                           all four of its nodes; needs a completed stage 1;
-                           INPUTS='{"landed_unit_cost":4.1,"currency":"USD"}'
-                           sets the operator's costs); review_mining (stage 3,
-                           needs product truth complete)
-  task <task.json>         start a durable task from a contract and follow it to
-                           its end ({"brief", "contract"}; examples in docs/tasks/)
-  watch [runId]            poll until the run settles, then print the totals
+  run "<product>"          start an analysis: a url goes to product_url, a name
+                           to product_name. MARKETS="US,GB" (default US),
+                           COMPETITORS="brand a;brand b". It resolves the
+                           product and proposes competitors, then waits.
+  confirm [runId]          accept the product and competitors as resolved and
+                           start the stages (the cockpit lets you edit them)
+  watch [runId]            poll until the run waits for you or ends, then print
+                           its stages and competitors
   calls [runId]            the LLM call log, one line per turn
   trace [runId] [file]     download the run's trace: one line per function
                            and per HTTP request, each tagged with its file
-  library [file.pdf]       upload a PDF to the library, stream its conversion,
-                           print its headings; with no file, list the library
 
   deployed                 what is actually live, and what is not yet shipped
 
@@ -280,11 +253,10 @@ case "${1:-help}" in
   health)   shift; cmd_health "$@" ;;
   login)    shift; cmd_login "$@" ;;
   run)      shift; cmd_run "$@" ;;
-  task)     shift; cmd_task "$@" ;;
+  confirm)  shift; cmd_confirm "$@" ;;
   watch)    shift; cmd_watch "$@" ;;
   calls)    shift; cmd_calls "$@" ;;
   trace)    shift; cmd_trace "$@" ;;
-  library)  shift; cmd_library "$@" ;;
   deployed) shift; cmd_deployed "$@" ;;
   help|-h|--help) cmd_help ;;
   *) die "unknown command '$1'. Try: mra help" ;;

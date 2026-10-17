@@ -1,29 +1,17 @@
-import { STAGE_ORDER, type StageNumber } from './api';
 import { useEffect, useState, type MouseEvent, type ReactNode } from 'react';
 
-export type Route = { page: 'home' } | { page: 'brand'; key: string; stage: { productId: string; n: StageNumber; tab: string } | null } | { page: 'logs'; runId: string } | { page: 'draft'; draftId: string };
+export type Route = { page: 'home' } | { page: 'run'; runId: string };
 
 export const paths = {
   home: () => '/',
-  brand: (key: string) => `/brands/${encodeURIComponent(key)}`,
-  stage: (key: string, productId: string, n: number, tab = '') => `/brands/${encodeURIComponent(key)}/products/${productId}/stages/${n}${tab ? `/${tab}` : ''}`,
-  draft: (draftId: string) => `/drafts/${draftId}`,
+  run: (runId: string) => `/runs/${runId}`,
 };
 
 const NAVIGATED = 'mra:navigated';
 
 export function parseRoute(pathname: string): Route {
-  const path = pathname.replace(/\/+$/, '') || '/';
-  const draft = path.match(/^\/drafts\/([0-9a-f]+)$/);
-  if (draft) return { page: 'draft', draftId: draft[1] };
-  const stage = path.match(/^\/brands\/([^/]+)\/products\/([0-9a-f]+)\/stages\/(\d+)(?:\/([a-z_]+))?$/);
-  const n = STAGE_ORDER.find((known) => known === Number(stage?.[3]));
-  if (stage && n) return { page: 'brand', key: decodeURIComponent(stage[1]), stage: { productId: stage[2], n, tab: stage[4] ?? '' } };
-  const brand = path.match(/^\/brands\/([^/]+)$/);
-  if (brand) return { page: 'brand', key: decodeURIComponent(brand[1]), stage: null };
-  const logs = path.match(/^\/runs\/([0-9a-f]+)\/logs$/);
-  if (logs) return { page: 'logs', runId: logs[1] };
-  return { page: 'home' };
+  const run = pathname.match(/^\/runs\/([0-9a-f]+)\/?$/);
+  return run ? { page: 'run', runId: run[1] } : { page: 'home' };
 }
 
 export function navigate(path: string) {
@@ -46,15 +34,7 @@ export function useRoute(): Route {
   return route;
 }
 
-export function Link({
-  to,
-  className,
-  children,
-}: {
-  to: string;
-  className?: string;
-  children: ReactNode;
-}) {
+export function Link({ to, className, children }: { to: string; className?: string; children: ReactNode }) {
   const follow = (e: MouseEvent<HTMLAnchorElement>) => {
     if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
     e.preventDefault();

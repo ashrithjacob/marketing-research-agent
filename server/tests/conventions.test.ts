@@ -43,7 +43,7 @@ function scaffold(): void {
     "  totalTokens?: number;",
     "}",
   ].join("\n"));
-  write("server/src/settings.ts", [
+  write("server/src/config/settings.ts", [
     "const a = process.env['MRA_MODEL'];",
     'export const keys = ["MRA_MODEL", "OPENROUTER_API_KEY"];',
   ].join("\n"));

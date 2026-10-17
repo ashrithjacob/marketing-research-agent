@@ -39,16 +39,13 @@ const TRACE_LAYER = "trace";
 
 /** A package may only be imported inside the layer that owns it. */
 const PACKAGE_OWNERS: Record<string, string> = {
-  "apify-client": "adapters",
-  "better-sqlite3": "adapters",
+  zod: "domain",
+  "zod/v4": "domain",
   pg: "adapters",
-  unpdf: "adapters",
   hono: "http",
   "@hono/node-server": "http",
   "@earendil-works/pi-agent-core": "agent",
   "@earendil-works/pi-ai": "agent",
-  "@earendil-works/pi-durable": "agent",
-  "@earendil-works/chord": "agent",
 };
 
 /**
@@ -62,7 +59,7 @@ const PACKAGE_OWNERS: Record<string, string> = {
 const TEXT_MODULE = /(^|[\\/])text[\\/]/;
 
 /** Entry points, which exist to wire concrete things together. */
-const WIRING = new Set(["main.ts", "hashpw.ts", "accounts.ts", "copy-store.ts"]);
+const WIRING = new Set(["main.ts", "hashpw.ts", "accounts.ts"]);
 
 /**
  * Modules written before the conversion were exempt while it was staged. The

@@ -1,108 +1,86 @@
 import { Hono, type Context, type Next } from "hono";
 
-import { LibraryIntake, RunSupervisor, ToolRegistry, WorkspaceServices, type PiHarness, ReviewAnalyst } from "../agent/index.js";
-import { FileMarkdown, HomepageImage, MarkdownLayout, PdfMarkdown, ServiceClients } from "../adapters/index.js";
-import { AmazonListingLookup } from "../adapters/apify/index.js";
-import { Env, type Settings } from "../config/index.js";
-import type { AmazonListingSource, BrandImageFinder, ResearchStore } from "../domain/index.js";
+import { OpenRouterPrices, ServiceClients } from "../adapters/index.js";
+import {
+  AnalysisService,
+  LiveRuns,
+  LlmModels,
+  Pipeline,
+  ProductMarketStage,
+  ProductResolver,
+  RunEvents,
+  RunLauncher,
+  Toolbox,
+  type LlmCatalogue,
+  type RunServices,
+} from "../agent/index.js";
+import type { Settings } from "../config/index.js";
+import type { GenerationSource, ResearchStore } from "../domain/index.js";
 import { Trace, TraceFile } from "../trace/index.js";
 
 import type { ApiEnv } from "./api-env.js";
 import { AuthGate } from "./auth-gate.js";
+import { ConfigRoutes } from "./config-routes.js";
 import { Frontend } from "./frontend.js";
-import { ResearchApi } from "./research-api.js";
+import { RunRoutes } from "./run-routes.js";
 
-/** The service: auth, the research routes, and the built SPA. */
+export interface AppParts {
+  settings: Settings;
+  traces: TraceFile;
+  store: ResearchStore;
+  services?: ServiceClients;
+  models?: LlmCatalogue;
+  generations?: GenerationSource;
+  pipeline?: Pipeline;
+}
+
+/** The service: auth, the analysis routes, and the built single-page app. Everything concrete is built here and nowhere else. */
 export class App {
   readonly fetch: Hono["fetch"];
-  readonly supervisor: RunSupervisor;
-  readonly intake: LibraryIntake;
-  readonly analyst: ReviewAnalyst;
-  readonly workspace: WorkspaceServices | null;
-  readonly store: ResearchStore;
-  readonly settings: Settings;
-  readonly traces: TraceFile;
+  readonly analyses: AnalysisService;
+  readonly live = new LiveRuns();
+  readonly prices: OpenRouterPrices;
 
-  constructor(overrides: {
-    settings?: Settings;
-    traces?: TraceFile;
-    store: ResearchStore;
-    supervisor?: RunSupervisor;
-    listingSource?: AmazonListingSource | null;
-    harness?: PiHarness;
-    brandImages?: BrandImageFinder;
-    services?: ServiceClients;
-  }) {
+  constructor(private readonly parts: AppParts) {
     Trace.line(import.meta.url, "App.constructor");
-    this.settings = overrides.settings ?? Env.settings();
-    this.traces = overrides.traces ?? App.traceFile(this.settings);
-    this.store = overrides.store;
-    const services = overrides.services ?? ServiceClients.forSettings(this.settings);
-    this.supervisor =
-      overrides.supervisor ?? new RunSupervisor({ store: this.store, settings: this.settings, services, ...(overrides.harness ? { models: overrides.harness.models } : {}) });
-    const { supervisor, store, settings } = this;
-    this.analyst = new ReviewAnalyst(store, settings, supervisor.models, supervisor.costs);
-    const stageRuns = {
-      analyst: this.analyst,
-      isLive: (runId: string) => supervisor.isLive(runId),
-      stop: (runId: string) => supervisor.stop(runId),
-      steer: async (runId: string, text: string) => {
-        Trace.line(import.meta.url, "App.constructor.steer", { runId });
-        const run = await store.getRun(runId);
-        if (run) await supervisor.steer(runId, await store.addJudgement(run.workspace_id, { kind: "custom", text, rejects_kinds: [] }));
-      },
+    const { settings, store } = parts;
+    this.prices = new OpenRouterPrices({ apiKey: settings.openrouterApiKey });
+    const pipeline = parts.pipeline ?? new Pipeline([new ProductMarketStage()]);
+    const events = new RunEvents(store.events);
+    const services: RunServices = {
+      store,
+      models: parts.models ?? LlmModels.openrouter(),
+      toolbox: new Toolbox(parts.services ?? ServiceClients.forSettings(settings), settings),
+      generations: parts.generations ?? this.prices,
+      events,
     };
-    this.workspace = overrides.harness
-      ? new WorkspaceServices({ store, runs: supervisor.live, settings, harness: overrides.harness, tools: new ToolRegistry(services, settings), costs: supervisor.costs, ads: services.ads, insights: services.insights, brandImages: overrides.brandImages ?? new HomepageImage(), stageRuns, start: (request, workspaceId) => supervisor.start(request, workspaceId) })
-      : null;
-
-    this.intake = new LibraryIntake(this.store.library, new FileMarkdown(new PdfMarkdown(new MarkdownLayout())));
+    const launcher = new RunLauncher(services, settings, this.live, pipeline, new ProductResolver());
+    this.analyses = new AnalysisService(store, launcher, this.live, pipeline, settings.model);
 
     const hono = new Hono<ApiEnv>();
     hono.use("*", (c, next) => this.request(c, next));
-    new AuthGate(this.settings, this.store.accounts).register(hono);
+    new AuthGate(settings, store.accounts).register(hono);
     hono.get("/api/health", (c) => c.json({ status: "ok" }));
-    hono.route(
-      "/api/research",
-      new ResearchApi({
-        store: this.store,
-        supervisor: this.supervisor,
-        intake: this.intake,
-        settings: this.settings,
-        traces: this.traces,
-        listingSource: overrides.listingSource !== undefined ? overrides.listingSource : App.listingSource(services),
-        pages: services.pages,
-        workspace: this.workspace,
-        analyst: this.analyst,
-      }).router(),
-    );
-    new Frontend(this.settings.staticDir).mount(hono);
+    hono.route("/api/research", new ConfigRoutes(settings.model, pipeline.built).router());
+    hono.route("/api/research", new RunRoutes(store, this.analyses, events, parts.traces).router());
+    new Frontend(settings.staticDir).mount(hono);
     this.fetch = hono.fetch;
+  }
+
+  static traceFile(settings: Settings): TraceFile {
+    Trace.line(import.meta.url, "App.traceFile");
+    return new TraceFile({ dir: settings.traceDir, maxBytes: settings.traceMaxMb * 1024 * 1024, keepDays: settings.traceKeepDays });
+  }
+
+  async close(): Promise<void> {
+    Trace.line(import.meta.url, "App.close");
+    await this.live.stopAll();
+    this.prices.stop();
+    await this.parts.store.close();
   }
 
   private async request(c: Context<ApiEnv>, next: Next): Promise<void> {
     Trace.line(import.meta.url, "App.request", { method: c.req.method, path: c.req.path });
     await next();
-  }
-
-  static listingSource(services: ServiceClients): AmazonListingSource | null {
-    Trace.line(import.meta.url, "App.listingSource");
-    return services.actors ? new AmazonListingLookup(services.actors) : null;
-  }
-
-  static traceFile(settings: Settings): TraceFile {
-    Trace.line(import.meta.url, "App.traceFile", { settings });
-    return new TraceFile({
-      dir: settings.traceDir,
-      maxBytes: settings.traceMaxMb * 1024 * 1024,
-      keepDays: settings.traceKeepDays,
-    });
-  }
-
-  async close(): Promise<void> {
-    Trace.line(import.meta.url, "App.close");
-    await this.supervisor.close();
-    await this.intake.drain();
-    await this.store.close();
   }
 }

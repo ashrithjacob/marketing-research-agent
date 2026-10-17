@@ -42,3 +42,15 @@ describe("MRA_BACKUP_MODELS", () => {
     expect(() => Env.settings()).toThrow(/repeats minimax\/minimax-m3/);
   });
 });
+
+describe("DATABASE_URL", () => {
+  it("is required: there is no SQLite file to fall back to", () => {
+    const url = process.env.DATABASE_URL;
+    delete process.env.DATABASE_URL;
+    try {
+      expect(() => Env.settings()).toThrow(/DATABASE_URL is not set/);
+    } finally {
+      process.env.DATABASE_URL = url;
+    }
+  });
+});

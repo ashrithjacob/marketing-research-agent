@@ -1,86 +1,56 @@
-import type { Hono } from "hono";
-import { streamSSE } from "hono/streaming";
-import type { SSEStreamingApi } from "hono/streaming";
+import type { Context } from "hono";
+import { streamSSE, type SSEStreamingApi } from "hono/streaming";
 
-import type { EventFrame, RunSupervisor } from "../agent/index.js";
-import type { ResearchStore } from "../domain/index.js";
-import type { ApiEnv } from "./api-env.js";
+import type { RunEvents } from "../agent/index.js";
+import { FINAL_RUN_STATUSES, type ResearchStore, type RunEvent } from "../domain/index.js";
 import { Trace } from "../trace/index.js";
 
-/** Replay from `after`, then follow live; subscribing before replaying closes the gap. */
+import type { ApiEnv } from "./api-env.js";
+
+/** Replays a run's stored events after `after`, then follows it live until it ends; subscribing before replaying closes the gap between the two. */
 export class EventStream {
+  static readonly KEEPALIVE_MS = 20_000;
+
   constructor(
     private readonly store: ResearchStore,
-    private readonly supervisor: RunSupervisor,
+    private readonly events: RunEvents,
   ) {}
 
-  register(api: Hono<ApiEnv>): void {
-    Trace.line(import.meta.url, "EventStream.register");
-    api.get("/runs/:runId/events", async (c) => {
-      const runId = c.req.param("runId");
-      if (!(await this.store.getRun(runId))) return c.json({ detail: "no such run" }, 404);
-      const after = Number(c.req.query("after") ?? 0);
-      const from = Number.isFinite(after) ? after : 0;
-      return streamSSE(c, async (stream) => this.follow(stream, runId, from));
-    });
+  open(c: Context<ApiEnv>, runId: string): Response {
+    Trace.line(import.meta.url, "EventStream.open", { runId });
+    const after = Number(c.req.query("after") ?? 0);
+    return streamSSE(c, (stream) => this.follow(stream, runId, Number.isFinite(after) ? after : 0));
   }
 
-  private async follow(stream: SSEStreamingApi, runId: string, from: number): Promise<void> {
-    Trace.line(import.meta.url, "EventStream.follow", { stream, runId, from });
-    const pending: Array<EventFrame | null> = [];
+  private async follow(stream: SSEStreamingApi, runId: string, after: number): Promise<void> {
+    Trace.line(import.meta.url, "EventStream.follow", { runId, after });
+    const pending: RunEvent[] = [];
     let wake: (() => void) | null = null;
-    const unsubscribe = this.supervisor.subscribe(runId, (frame) => {
-      pending.push(frame);
+    const unsubscribe = this.events.subscribe(runId, (event) => {
+      pending.push(event);
       wake?.();
     });
-
-    let last = from;
+    let last = after;
     try {
-      for (const event of await this.store.listEvents(runId, last)) {
-        last = event.id;
-        await stream.writeSSE({
-          event: "event",
-          data: JSON.stringify({
-            id: event.id,
-            kind: event.kind,
-            payload: event.payload,
-            created_at: event.created_at,
-          }),
-        });
-      }
-      if (!unsubscribe) {
-        await stream.writeSSE({ event: "end", data: JSON.stringify({ reason: "not live" }) });
-        return;
-      }
+      pending.unshift(...(await this.store.events.list(runId, after)));
       for (;;) {
-        if (pending.length === 0) {
-          const woken = await Promise.race([
-            new Promise<boolean>((r) => {
-              wake = () => r(true);
-            }),
-            new Promise<boolean>((r) => setTimeout(() => r(false), 20000)),
-          ]);
-          wake = null;
-          if (!woken) {
-            await stream.writeSSE({ event: "keepalive", data: "" });
-            continue;
-          }
+        for (let event = pending.shift(); event; event = pending.shift()) {
+          if (event.id <= last) continue;
+          last = event.id;
+          await stream.writeSSE({ event: "event", id: String(event.id), data: JSON.stringify(event) });
         }
-        const frame = pending.shift();
-        if (frame === undefined) continue;
-        if (frame === null) {
-          await stream.writeSSE({
-            event: "end",
-            data: JSON.stringify({ reason: "run finished" }),
-          });
-          return;
-        }
-        if (frame.id <= last) continue;
-        last = frame.id;
-        await stream.writeSSE({ event: "event", data: JSON.stringify(frame) });
+        const run = await this.store.runs.get(runId);
+        if (!run || (FINAL_RUN_STATUSES.has(run.status) && pending.length === 0)) break;
+        const woken = await new Promise<boolean>((resolve) => {
+          wake = () => resolve(true);
+          setTimeout(() => resolve(false), EventStream.KEEPALIVE_MS);
+        });
+        wake = null;
+        if (!woken) await stream.writeSSE({ event: "keepalive", data: "" });
       }
+      await stream.writeSSE({ event: "end", data: JSON.stringify({ reason: "run ended" }) });
     } finally {
-      unsubscribe?.();
+      unsubscribe();
     }
   }
 }

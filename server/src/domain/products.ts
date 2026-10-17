@@ -1,60 +1,52 @@
-import { RunStatuses } from "./breakers.js";
-import { Trace } from "../trace/index.js";
+import { z } from "zod/v4";
 
-export interface RunHead {
-  id: string;
-  product_id: string;
-  stage: number;
-  status: string;
-  created_at: string;
-}
+export const FORM_FACTORS = ["liquid_drops", "capsules", "tablets", "gummies", "powder", "tea", "spray", "syrup", "other"] as const;
+export type FormFactor = (typeof FORM_FACTORS)[number];
+
+const sourced = { source_url: z.url().describe("A page you fetched with web_fetch that shows this.") };
+
+export const PriceSchema = z.object({
+  amount: z.number().positive(),
+  currency: z.string().length(3).describe("ISO 4217, e.g. USD, EUR."),
+  ...sourced,
+});
+
+/** What stage 1 learns about the client's product, every fact tied to a page the agent read. */
+export const ProductBriefSchema = z.object({
+  brand: z.string().min(1),
+  name: z.string().min(1),
+  category: z.string().min(1).describe("A short category name, e.g. lung-support supplement."),
+  form_factor: z.enum(FORM_FACTORS).describe("Tinctures count as liquid_drops."),
+  key_active: z.string().min(1).describe("The one ingredient the product is sold on, as the label names it."),
+  price: PriceSchema.nullable(),
+  offer: z.object({
+    bundles: z.array(z.string()),
+    subscription: z.string().nullable(),
+    guarantee: z.string().nullable(),
+    ...sourced,
+  }),
+  ingredients: z
+    .array(z.object({ name: z.string().min(1), dose: z.number().nullable(), unit: z.string().nullable(), ...sourced }))
+    .min(1),
+  claims_on_page: z.array(z.object({ text: z.string().min(1).describe("The claim, word for word."), ...sourced })),
+});
+
+export type ProductBrief = z.infer<typeof ProductBriefSchema>;
+export type Price = z.infer<typeof PriceSchema>;
 
 export interface Product {
   id: string;
-  key: string;
-  label: string;
-  review_count: number;
+  account_id: string;
+  url: string;
+  brand: string;
+  name: string;
+  category: string;
+  form_factor: FormFactor | null;
+  key_active: string;
+  price: Price | null;
+  offer: ProductBrief["offer"] | null;
+  ingredients: ProductBrief["ingredients"];
+  claims_on_page: ProductBrief["claims_on_page"];
   created_at: string;
-}
-
-export interface ProductSummary extends Product {
-  run_count: number;
-  latest_at: string;
-  latest_status: string;
-  default_run_id: string;
-}
-
-/** One folder per stored product: its runs, and the run it opens on. */
-export class ProductFolders {
-  static summaries(products: readonly Product[], heads: readonly RunHead[]): ProductSummary[] {
-    Trace.line(import.meta.url, "ProductFolders.summaries", { products, heads });
-    return products
-      .flatMap((product) => {
-        const runs = ProductFolders.runsOf(heads, product.id);
-        const [newest] = runs;
-        if (!newest) return [];
-        return [
-          {
-            ...product,
-            run_count: runs.length,
-            latest_at: newest.created_at,
-            latest_status: newest.status,
-            default_run_id: (runs.find((r) => RunStatuses.delivered(r.status)) ?? newest).id,
-          },
-        ];
-      })
-      .sort((a, b) => b.latest_at.localeCompare(a.latest_at));
-  }
-
-  static runIds(heads: readonly RunHead[], productId: string): string[] {
-    Trace.line(import.meta.url, "ProductFolders.runIds", { heads, productId });
-    return ProductFolders.runsOf(heads, productId).map((head) => head.id);
-  }
-
-  private static runsOf(heads: readonly RunHead[], productId: string): RunHead[] {
-    Trace.line(import.meta.url, "ProductFolders.runsOf", { heads, productId });
-    return heads
-      .filter((head) => head.product_id === productId)
-      .sort((a, b) => b.created_at.localeCompare(a.created_at));
-  }
+  updated_at: string;
 }

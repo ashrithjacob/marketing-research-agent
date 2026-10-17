@@ -3,20 +3,17 @@
  * 2026-10-02: a persona page's ad names its brand only through
  * `content.landingPageDomain` ("Barbara Collins" → offer.tryhealora.com).
  */
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { Corpus } from "../src/adapters/corpus.js";
-import { TrendtrackAds } from "../src/adapters/trendtrack-ads.js";
-import { AdLibraryTool, ToolRegistry } from "../src/agent/tools/index.js";
-import { Roles } from "../src/domain/index.js";
 import { ServiceClients } from "../src/adapters/index.js";
+import { TrendtrackAds } from "../src/adapters/trendtrack-ads.js";
+import { Toolbox } from "../src/agent/index.js";
+import { AdSearchTool } from "../src/agent/tools/ad-search-tool.js";
+import { UrlLedger } from "../src/agent/tools/url-ledger.js";
 import { Env, type Settings } from "../src/config/index.js";
-import { ServiceUnavailableError, type AdPage } from "../src/domain/index.js";
-import { services, NoCharges } from "./fixtures.js";
+import { ServiceUnavailableError, type AdPage, type ChargeMeter } from "../src/domain/index.js";
+
+import { FakeWeb } from "./fakes.js";
 
 const settings = (overrides: Partial<Settings> = {}): Settings => ({
   ...Env.settings(),
@@ -63,31 +60,25 @@ describe("TrendtrackAds", () => {
   });
 });
 
-describe("ad_library_search", () => {
-  const dir = mkdtempSync(join(tmpdir(), "mra-ads-"));
-  afterEach(() => rmSync(dir, { recursive: true, force: true }));
+describe("ad_search", () => {
   const hit = { ad_id: "facebook_1", advertiser: "Barbara Collins", page_id: "99", landing_url: "https://offer.tryhealora.com/adv", landing_domain: "offer.tryhealora.com", first_seen: "2026-05-25", last_seen: "2026-07-14", status: "active", countries: ["GB"], body: "Dermatologists found remedy", ad_reach: 120000, page_reach_30d: 1682459, page_live_ads: 559 };
+  const meter: ChargeMeter = { charge: async () => undefined };
 
-  it("archives the search and every ad, so each ad is citable with its first_seen and the count is citable too", async () => {
+  it("searches in the run's countries, caps the count at 20, and lets the agent cite each ad's landing page", async () => {
     const ads = { search: vi.fn(async (): Promise<AdPage> => ({ hits: [hit], total: 4244 })) };
-    const result = await new AdLibraryTool(ads, new Corpus(dir), "run-1").tool().execute("1", { query: "skin fold rash", countries: ["us", "gb"], max_results: 99 });
+    const urls = new UrlLedger();
+    const result = await new AdSearchTool(ads, ["US", "GB"], urls).tool().execute("1", { query: "skin fold rash", max_results: 99 });
     expect(ads.search).toHaveBeenCalledWith({ terms: ["skin fold rash"], searchIn: "ad_copy", countries: ["US", "GB"], limit: 20 }, undefined);
-    const text = (result.content[0] as any).text as string;
-    expect(text).toMatch(/^4244 Meta ads in Trendtrack's index match "skin fold rash" in ad_copy, US, GB; 1 shown, by reach\. This search is archived as source_id sha256:/);
-    expect(text).toContain("1. Barbara Collins — lands on offer.tryhealora.com (active, first seen 2026-05-25");
-    expect(text).toMatch(/record_source it as kind "ad_library" with first_seen 2026-05-25/);
-    const [search, ad] = result.details.sources.map((id: string) => readFileSync(join(dir, "runs", "run-1", "sources", id.replace("sha256:", "")), "utf-8"));
-    expect(JSON.parse(search!).total).toBe(4244);
-    expect(ad).toContain("landing: https://offer.tryhealora.com/adv");
+    const text = (result.content[0] as { text: string }).text;
+    expect(text).toMatch(/^4244 ads match; 1 shown\./);
+    expect(text).toContain("1. Barbara Collins, lands on offer.tryhealora.com (active, first seen 2026-05-25");
+    expect(urls.unknown([hit.landing_url])).toEqual([]);
   });
 
-  it("is offered only to an agent allowed ads, and only when a Trendtrack key built the service", () => {
-    const base = settings();
-    const names = (svc: ServiceClients, role: "product" | "champion") =>
-      new ToolRegistry(svc, base).build(Roles.of(role).tools, { runId: "r", subject: "", market: "", discovery: null, meter: new NoCharges() }).map((built) => built.tool.name);
-    const withAds = new ServiceClients(services(base).pages, services(base).search, null, undefined, null, { search: async () => ({ hits: [], total: 0 }) });
-    expect(names(services(base), "product")).not.toContain("ad_library_search");
-    expect(names(withAds, "champion")).not.toContain("ad_library_search");
-    expect(names(withAds, "product")).toContain("ad_library_search");
+  it("is offered only when a Trendtrack key built the service", () => {
+    const web = new FakeWeb();
+    const names = (services: ServiceClients) => new Toolbox(services, settings()).kit(["web_search", "ad_search"], meter, ["US"]).tools.map((tool) => tool.name);
+    expect(names(new ServiceClients(web, web, null))).toEqual(["web_search"]);
+    expect(names(new ServiceClients(web, web, web))).toEqual(["web_search", "ad_search"]);
   });
 });

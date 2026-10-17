@@ -16,7 +16,8 @@ finding, ad writing, testing and reporting. The owner makes the judgement calls.
 **Narrowed 2026-10-16, by the customer:** the product is an avatar research
 tool for long-form statics. That means research, sophistication and awareness,
 review mining, and avatars sliced from reviews, ads and the web. Positioning
-and synthesis (outcome 4 below) are out. `docs/spec-avatar.md`.
+and synthesis (outcome 4 below) are out. `docs/spec.md` (the Avatar Strategist
+spec, 2026-10-17; `spec-avatar.md` was never written under that name).
 
 ## What "better than a human process" means here
 
@@ -47,9 +48,13 @@ the map of 1–4. The playbooks uploaded to the library are the method for 5.
 
 ## How it should work
 
-- **Always on.** Not a button that runs a stage and stops. A standing operator
-  per brand that watches for change, plans work, runs it, and comes to the owner
-  only for decisions. `docs/spec-always-on.md`.
+- ~~**Always on.**~~ *Deferred 2026-10-17 by `docs/spec.md`:* the MVP is a
+  single-run analysis; always-on monitoring is phase 3 there, gated on the
+  outcome loop. The operator, plans, tasks and watchers built for it were
+  deleted from the code (git history before `b6f45cc`), because the spec's data
+  model is what it should be rebuilt on. It was: a standing operator per brand
+  that watches for change, plans work, runs it, and comes to the owner only for
+  decisions.
 - **Evidence, never opinion.** Code checks what agents claim. A finding without
   a source is not a finding. `invalid` is information, not noise.
 - **The owner steers; the system learns.** Every correction, rejection and
@@ -61,7 +66,11 @@ the map of 1–4. The playbooks uploaded to the library are the method for 5.
   every unit of work reports progress live to the dashboard.
 - **Cost is billed, shown and bounded.** Every dollar spent is a measured
   charge, visible per agent, and money-spending work asks first.
-- **Chat starts the work.** *Changed 2026-10-15, superseding the bullet below:*
+- ~~**Chat starts the work.**~~ *Superseded 2026-10-17 by `docs/spec.md`:* a
+  form starts the work (a product url or name, markets, optional context), the
+  agent proposes the product and competitors, and the owner confirms them
+  before anything is spent on research. The chat was deleted with the operator.
+  It was: *Changed 2026-10-15, superseding the bullet below:*
   the app is one page, a chat beside the results. The owner names a product or
   pastes its page and asks; the operator starts the research. Only buttons and
   drafts are clickable, and a button is still the only way to approve anything

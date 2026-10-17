@@ -1,49 +1,26 @@
-import { Clock, type Charge, type ChargeLedger } from "../../domain/index.js";
+import type { Charge, ChargeLedger } from "../../domain/index.js";
 import { Trace } from "../../trace/index.js";
 
 import type { SqlDatabase } from "./sql-database.js";
 
-/** What each run paid for, one row per paid call, tagged with the agent whose tool made it; a new table, so no older database needs altering. */
+/** What each run paid for, one row per paid call, tagged with the agent whose tool made it. */
 export class ChargeTable implements ChargeLedger {
-  static readonly DDL = `
-CREATE TABLE IF NOT EXISTS research_charges (
-    id         INTEGER PRIMARY KEY AUTOINCREMENT,
-    run_id     TEXT NOT NULL REFERENCES research_runs(id) ON DELETE CASCADE,
-    agent_id   TEXT,
-    service    TEXT NOT NULL,
-    item       TEXT NOT NULL DEFAULT '',
-    units      REAL NOT NULL DEFAULT 0,
-    usd        REAL,
-    basis      TEXT NOT NULL,
-    created_at TEXT NOT NULL
-);
-CREATE INDEX IF NOT EXISTS research_charges_run ON research_charges(run_id);
-`;
-
   constructor(private readonly db: SqlDatabase) {}
 
   async add(charge: Omit<Charge, "created_at">): Promise<Charge> {
     Trace.line(import.meta.url, "ChargeTable.add", { runId: charge.run_id, agentId: charge.agent_id, service: charge.service });
-    const created_at = Clock.nowIso();
-    await this.db.run(
-      "INSERT INTO research_charges (run_id, agent_id, service, item, units, usd, basis, created_at) VALUES (?,?,?,?,?,?,?,?)",
-      [charge.run_id, charge.agent_id, charge.service, charge.item, charge.units, charge.usd, charge.basis, created_at],
-    );
-    return { ...charge, created_at };
+    return (await this.db.get<Charge>(
+      "INSERT INTO charges (run_id, agent_id, service, item, units, usd, basis) VALUES (?,?,?,?,?,?,?)" +
+        " RETURNING run_id, agent_id, service, item, units, usd, basis, created_at",
+      [charge.run_id, charge.agent_id, charge.service, charge.item, charge.units, charge.usd, charge.basis],
+    ))!;
   }
 
   async list(runId: string): Promise<Charge[]> {
     Trace.line(import.meta.url, "ChargeTable.list", { runId });
-    const rows = await this.db.all("SELECT * FROM research_charges WHERE run_id = ? ORDER BY id", [runId]);
-    return rows.map((row) => ({
-      run_id: row.run_id,
-      agent_id: row.agent_id ?? null,
-      service: row.service,
-      item: row.item,
-      units: row.units,
-      usd: row.usd ?? null,
-      basis: row.basis,
-      created_at: row.created_at,
-    }));
+    return this.db.all<Charge>(
+      "SELECT run_id, agent_id, service, item, units, usd, basis, created_at FROM charges WHERE run_id = ? ORDER BY id",
+      [runId],
+    );
   }
 }

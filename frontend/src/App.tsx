@@ -1,71 +1,53 @@
 import { useCallback, useEffect, useState } from 'react';
 
-import { api, type Session } from './api';
-import AlwaysOnSwitch from './AlwaysOnSwitch';
-import BrandPage from './BrandPage';
-import DraftPage from './DraftPage';
+import { auth, type Session } from './api';
 import HomePage from './HomePage';
 import Login from './Login';
-import LogsPage from './LogsPage';
 import { Link, paths, useRoute } from './route';
+import RunPage from './run/RunPage';
 
 export default function App() {
-  const [authed, setAuthed] = useState<boolean | null>(null);
-  const [who, setWho] = useState<Session | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
+  const [failed, setFailed] = useState(false);
   const [error, setError] = useState('');
   const route = useRoute();
 
-  const loadSession = useCallback(() => {
-    api
-      .session()
-      .then((s) => {
-        setWho(s);
-        setAuthed(s.authenticated);
-      })
-      .catch(() => setAuthed(false));
+  const load = useCallback(() => {
+    auth.session().then(setSession, () => setFailed(true));
   }, []);
+  useEffect(load, [load]);
 
-  useEffect(loadSession, [loadSession]);
-
-  if (authed === null) return <div className="boot">Loading…</div>;
-  if (!authed) return <Login onSuccess={loadSession} />;
-  if (route.page === 'logs') return <LogsPage runId={route.runId} />;
+  if (!session && !failed) return <div className="boot">Loading…</div>;
+  if (!session?.authenticated) return <Login onSuccess={load} />;
 
   return (
     <div className="app">
       <header>
         <Link to={paths.home()} className="brand">
-          marketing agent
+          Avatar Strategist
         </Link>
-        <div className="subject">
-          <AlwaysOnSwitch onError={setError} />
-          {who?.auth_required && (
-            <span className="chip" title="Signed in as, in workspace">
-              {who.user} · {who.workspace}
+        <div className="who">
+          {session.auth_required && (
+            <span className="chip">
+              {session.user} · {session.account}
             </span>
           )}
-          <button
-            className="ghost"
-            title="Sign out"
-            onClick={async () => {
-              await api.logout();
-              setAuthed(false);
-            }}
-          >
-            Sign out
-          </button>
+          {session.auth_required && (
+            <button className="ghost" onClick={() => auth.logout().then(() => setSession({ ...session, authenticated: false }))}>
+              Sign out
+            </button>
+          )}
         </div>
       </header>
-
       {error && (
         <div className="error banner" onClick={() => setError('')}>
           {error}
         </div>
       )}
-
-      {route.page === 'home' && <HomePage onError={setError} />}
-      {route.page === 'brand' && <BrandPage key={route.key} brandKey={route.key} stage={route.stage} onError={setError} />}
-      {route.page === 'draft' && <DraftPage draftId={route.draftId} onError={setError} />}
+      <main>
+        {route.page === 'home' && <HomePage onError={setError} />}
+        {route.page === 'run' && <RunPage key={route.runId} runId={route.runId} onError={setError} />}
+      </main>
     </div>
   );
 }

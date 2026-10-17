@@ -1,42 +1,43 @@
-import BrandTile from './BrandTile';
-import MemoryFolder from './MemoryFolder';
-import MemoryList from './MemoryList';
-import NewBrandTile from './NewBrandTile';
-import { Link, navigate, paths } from './route';
-import { useBrands } from './use-brands';
-import { useWorkspace } from './use-workspace';
+import { useEffect, useState } from 'react';
+
+import { runs, type Config, type Run } from './api';
+import NewAnalysis from './NewAnalysis';
+import { Link, paths } from './route';
+import { Money, StatusBadge } from './run/badges';
 
 export default function HomePage({ onError }: { onError: (message: string) => void }) {
-  const brands = useBrands(onError);
-  const { board } = useWorkspace('');
+  const [config, setConfig] = useState<Config | null>(null);
+  const [list, setList] = useState<Run[] | null>(null);
+
+  useEffect(() => {
+    runs.config().then(setConfig, (e: Error) => onError(e.message));
+    runs.list().then((r) => setList(r.runs), (e: Error) => onError(e.message));
+  }, [onError]);
+
   return (
-    <div className="brands-page">
-      <div className="brand-grid">
-        <NewBrandTile onError={onError} />
-        {brands?.map((brand) => (
-          <BrandTile key={brand.key} brand={brand} onOpen={() => navigate(paths.brand(brand.key))} />
-        ))}
-      </div>
-      {brands === null && <p className="muted small">Loading brands…</p>}
-      <div className="brands-below">
-        <MemoryFolder onError={onError} />
-        {board && <MemoryList entries={board.memory} onError={onError} />}
-        {board && board.drafts.length > 0 && (
-          <section className="side-box">
-            <h2>Drafts</h2>
-            <ul className="folder-list">
-              {board.drafts.map((draft) => (
-                <li key={draft.id}>
-                  <Link to={paths.draft(draft.id)} className="t">
-                    {draft.playbook.replace(/_/g, ' ')}, version {draft.version}
-                  </Link>
-                  <span className="muted small">{draft.status}</span>
-                </li>
-              ))}
-            </ul>
-          </section>
-        )}
-      </div>
+    <div className="home">
+      <section className="panel">
+        <h1>New analysis</h1>
+        <p className="dim">Give a product page or a product name. The agent finds the product and proposes competitors; you confirm them before any research is paid for.</p>
+        {config && <NewAnalysis markets={config.markets} onError={onError} />}
+      </section>
+      <section className="panel">
+        <h2>Analyses</h2>
+        {list === null && <p className="dim">Loading…</p>}
+        {list?.length === 0 && <p className="dim">None yet.</p>}
+        <ul className="runs">
+          {list?.map((run) => (
+            <li key={run.id}>
+              <Link to={paths.run(run.id)}>
+                <span className="title">{run.resolution?.product.name ?? run.input.product_name ?? run.input.product_url}</span>
+                <StatusBadge status={run.status} />
+                <span className="dim small">{new Date(run.created_at).toLocaleString()}</span>
+                <Money usd={run.cost_usd} />
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </section>
     </div>
   );
 }

@@ -7,19 +7,17 @@ import { createServer, get as httpGet, type Server } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { createModels } from "@earendil-works/pi-ai";
-import { fauxAssistantMessage, fauxProvider } from "@earendil-works/pi-ai/providers/faux";
 import ts from "typescript";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { SqlResearchStore } from "../src/adapters/index.js";
-import { RunSupervisor } from "../src/agent/index.js";
-import { Env } from "../src/config/index.js";
 import { App } from "../src/http/index.js";
 import { Trace, TraceFile, TraceFormat, WireTap, type TraceStep } from "../src/trace/index.js";
-import { minimalPacket, recorded } from "./fixtures.js";
+
+import { Faux, FakeWeb, NoBilling, TestSettings } from "./fakes.js";
+import { PAGES, PRODUCT_URL, RESOLUTION, SEARCH_HITS } from "./mullevia.js";
+import { PostgresStores } from "./postgres-stores.js";
+import { ScriptedAgents } from "./scripted-agents.js";
 import { TraceCoverage } from "./trace-coverage.js";
-import { SqliteStores } from "./sqlite-stores.js";
 
 let dir: string;
 let traces: TraceFile;
@@ -183,30 +181,34 @@ describe("the wire", () => {
 });
 
 describe("the download", () => {
-  it("serves a finished run's trace as an attachment, with the agent's own lines in it", async () => {
-    const settings = { ...Env.settings(), model: "faux-model", corpusPath: join(dir, "corpus"), staticDir: join(dir, "static"), appPasswordHash: "", traceDir: dir };
-    const store = await SqliteStores.open(join(dir, "research.db"));
-    const faux = fauxProvider({ provider: "openrouter", models: [{ id: "faux-model" }] });
-    const models = createModels();
-    models.setProvider(faux.provider);
-    const supervisor = new RunSupervisor({ store, settings, models, retry: { attempts: 1, baseMs: 0, capMs: 0 } });
-    const app = new App({ settings, store, supervisor, traces });
-    faux.setResponses(recorded(minimalPacket()));
-
+  it("serves a run's trace as an attachment, with the agent's own lines in it", async () => {
+    const pg = await PostgresStores.start();
+    const faux = new Faux();
+    faux.provider.setResponses(
+      new ScriptedAgents()
+        .on("Product url:", [ScriptedAgents.call("web_fetch", { url: PRODUCT_URL }), ScriptedAgents.call("web_search", { query: "x" }), ScriptedAgents.call("submit", RESOLUTION)])
+        .steps(),
+    );
+    const { settings } = TestSettings.make({ traceDir: dir });
+    const app = new App({ settings, traces, store: pg.store, services: new FakeWeb(PAGES, SEARCH_HITS).services(), models: faux.models, generations: new NoBilling() });
     const created = await app.fetch(new Request("http://test/api/research/runs", {
-      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ brief: { product: "MagnaCalm" } }),
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ product_url: PRODUCT_URL }),
     }));
-    const { id } = (await created.json()) as { id: string };
-    await app.supervisor.waitFor(id);
+    const { run } = (await created.json()) as { run: { id: string } };
+    for (let i = 0; i < 300; i++) {
+      const seen = (await (await app.fetch(new Request(`http://test/api/research/runs/${run.id}`))).json()) as { run: { status: string } };
+      if (seen.run.status !== "resolving") break;
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
 
-    const response = await app.fetch(new Request(`http://test/api/research/runs/${id}/trace`));
+    const response = await app.fetch(new Request(`http://test/api/research/runs/${run.id}/trace`));
     expect(response.status).toBe(200);
-    expect(response.headers.get("content-disposition")).toBe(`attachment; filename="run-${id}-trace.log"`);
+    expect(response.headers.get("content-disposition")).toBe(`attachment; filename="run-${run.id}-trace.log"`);
     const text = await response.text();
-    expect(text.split("\n")[0]).toContain(`run ${id} product=MagnaCalm`);
-    expect(text).toContain("[agent/research-agent-factory.ts] ResearchAgentFactory.build");
+    expect(text.split("\n")[0]).toContain(`run ${run.id} phase=resolve`);
+    expect(text).toContain("[agent/resolve/product-resolver.ts] ProductResolver.resolve");
     expect(text.trim().split("\n").every((line) => /\[[\w./-]+\.ts\]/.test(line))).toBe(true);
-    await app.close();
+    await pg.stop();
   });
 });
 

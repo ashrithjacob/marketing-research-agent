@@ -1,67 +1,13 @@
-import type { SourceKind } from "./vocabulary.js";
-import type { Generation, Judgement, LlmCall, LlmCallRecord, PacketCheck, RunEvent, RunUpdate } from "./logs.js";
-import type { Account, AccountListing, Scope, Workspace } from "./accounts.js";
-import type { ResearchRun, RunDraft } from "./records.js";
-import type { Product, RunHead } from "./products.js";
-import type { StoredPacketRows } from "./packet-rows.js";
-import type { ReviewAnalysis } from "./review-analysis.js";
-import type { AmazonListing, TargetListing } from "./review-mining.js";
-import type { ReviewLedgerSnapshot, ReviewPlatform, ReviewResult, StoredPull, StoredRunReview } from "./reviews.js";
-import type { Charge } from "./charges.js";
-import type { Finding, FindingDraft } from "./findings.js";
-import type { FetchedPage, SearchPage, SearchScope } from "./web.js";
-import type { DiscoveryQuestion, DiscoveryReport } from "./competitor-discovery.js";
+import type { Account, Scope, User, UserListing } from "./accounts.js";
 import type { AdPage, AdQuery } from "./ad-library.js";
-import type { DocumentLibrary } from "./library.js";
-import type { WorkspaceBooks } from "./workspace-books.js";
-
-/** Products and what their runs found, counted only over the runs a scope admits. */
-export interface ProductCatalog {
-  list(scope: Scope): Promise<Product[]>;
-  get(productId: string, scope: Scope): Promise<Product | null>;
-  byKey(key: string): Promise<Product | null>;
-  runHeads(scope: Scope): Promise<RunHead[]>;
-  packetRows(productId: string, scope: Scope): Promise<StoredPacketRows>;
-}
-
-/** Workspaces and the logins that belong to them. */
-export interface AccountDirectory {
-  addWorkspace(name: string): Promise<Workspace>;
-  workspace(id: string): Promise<Workspace | null>;
-  workspaceNamed(name: string): Promise<Workspace | null>;
-  addAccount(input: { username: string; passwordHash: string; workspaceId: string; isAdmin: boolean }): Promise<Account>;
-  get(accountId: string): Promise<Account | null>;
-  byUsername(username: string): Promise<Account | null>;
-  list(): Promise<AccountListing[]>;
-  setPassword(username: string, passwordHash: string): Promise<boolean>;
-  setDisabled(username: string, disabled: boolean): Promise<boolean>;
-  revokeSessions(accountId: string): Promise<void>;
-  seedAdmin(username: string, passwordHash: string): Promise<boolean>;
-}
-
-/** The best-selling Amazon listings for a search phrase in one Amazon store, most popular first, with traction details. */
-export interface AmazonListingSource {
-  lookup(query: string, marketplace: string, max: number, signal?: AbortSignal): Promise<AmazonListing[]>;
-}
-
-/** The Amazon listing looked up for each review-mining target, kept per stage-1 run so it is paid for once. */
-export interface TargetListings {
-  save(listing: TargetListing): Promise<void>;
-  list(sourceRunId: string): Promise<TargetListing[]>;
-}
-
-/** Every charge a run made, appended as each call returns. */
-export interface ChargeLedger {
-  add(charge: Omit<Charge, "created_at">): Promise<Charge>;
-  list(runId: string): Promise<Charge[]>;
-}
-
-/** What a run has found, one row per finding, written as it is found. Rows are retracted, never deleted. */
-export interface FindingLedger {
-  append(draft: FindingDraft): Promise<Finding>;
-  retract(runId: string, id: string, why: string): Promise<Finding | null>;
-  list(runId: string): Promise<Finding[]>;
-}
+import type { AnalysisInput } from "./analysis-input.js";
+import type { Charge } from "./charges.js";
+import type { Competitor, CompetitorPick, CompetitorProfile, Relationship } from "./competitors.js";
+import type { Generation, LlmCall, LlmCallRecord, RunEvent } from "./logs.js";
+import type { Product, ProductBrief } from "./products.js";
+import type { Run, RunUpdate } from "./runs.js";
+import type { StageStates } from "./stages.js";
+import type { FetchedPage, SearchPage, SearchScope } from "./web.js";
 
 /** Reads one page as text. Throws rather than returning an empty body. */
 export interface PageFetcher {
@@ -78,59 +24,73 @@ export interface AdLibrary {
   search(query: AdQuery, signal?: AbortSignal): Promise<AdPage>;
 }
 
-/** Names brands selling to a product's customer, from one research pass over the web. */
-export interface CompetitorDiscovery {
-  discover(question: DiscoveryQuestion, signal?: AbortSignal): Promise<DiscoveryReport>;
+/** What OpenRouter billed for one generation, looked up by its response id. */
+export interface GenerationSource {
+  readonly billable: boolean;
+  generation(id: string): Promise<Generation | null>;
 }
 
-export interface ResearchStore extends WorkspaceBooks {
-  readonly products: ProductCatalog;
-  readonly listings: TargetListings;
-  readonly findings: FindingLedger;
-  readonly charges: ChargeLedger;
-  readonly pulls: ReviewPullStore;
-  readonly accounts: AccountDirectory;
-  readonly library: DocumentLibrary;
-  createRun(input: RunDraft): Promise<ResearchRun>;
-  getRun(runId: string): Promise<ResearchRun | null>;
-  listRuns(scope: Scope, limit?: number): Promise<ResearchRun[]>;
+/** Client accounts and the logins that belong to them. */
+export interface AccountDirectory {
+  addAccount(name: string): Promise<Account>;
+  account(id: string): Promise<Account | null>;
+  accountNamed(name: string): Promise<Account | null>;
+  addUser(input: { username: string; passwordHash: string; accountId: string; isAdmin: boolean }): Promise<User>;
+  user(userId: string): Promise<User | null>;
+  byUsername(username: string): Promise<User | null>;
+  users(): Promise<UserListing[]>;
+  setPassword(username: string, passwordHash: string): Promise<boolean>;
+  setDisabled(username: string, disabled: boolean): Promise<boolean>;
+  revokeSessions(userId: string): Promise<void>;
+  seedAdmin(username: string, passwordHash: string): Promise<boolean>;
+}
+
+export interface RunStore {
+  create(input: { accountId: string; input: AnalysisInput; model: string; stages: StageStates }): Promise<Run>;
+  get(runId: string): Promise<Run | null>;
+  list(scope: Scope, limit?: number): Promise<Run[]>;
   updateRun(runId: string, fields: RunUpdate): Promise<void>;
-  addEvent(runId: string, kind: string, payload: Record<string, unknown>): Promise<RunEvent>;
-  listEvents(runId: string, afterId?: number): Promise<RunEvent[]>;
-  lastEventId(runId: string): Promise<number>;
-  listJudgements(scope: Scope, activeOnly?: boolean): Promise<Judgement[]>;
-  addJudgement(workspaceId: string, input: { kind: string; text: string; rejects_kinds: SourceKind[] }): Promise<Judgement>;
-  deleteJudgement(scope: Scope, judgementId: string): Promise<boolean>;
-  bumpJudgement(judgementId: string, by?: number): Promise<void>;
-  addPacketCheck(runId: string, valid: boolean, problems: readonly string[]): Promise<PacketCheck>;
-  listPacketChecks(runId: string): Promise<PacketCheck[]>;
-  addLlmCall(call: LlmCallRecord): Promise<LlmCall>;
-  setLlmCallGeneration(runId: string, responseId: string, generation: Generation): Promise<void>;
-  listLlmCalls(runId: string): Promise<LlmCall[]>;
-  saveRunReviews(runId: string, ledger: ReviewLedgerSnapshot): Promise<number>;
-  listRunReviews(runId: string): Promise<StoredRunReview[]>;
-  saveReviewAnalysis(analysis: ReviewAnalysis): Promise<void>;
-  getReviewAnalysis(runId: string): Promise<ReviewAnalysis | null>;
+  unfinished(): Promise<Run[]>;
+}
 
+/** One row per product per account, refreshed in place by every run that researches it. */
+export interface ProductStore {
+  upsert(accountId: string, url: string, name: string): Promise<Product>;
+  get(productId: string): Promise<Product | null>;
+  saveBrief(productId: string, brief: ProductBrief): Promise<Product>;
+}
+
+export interface CompetitorStore {
+  confirm(product: Product, picks: readonly CompetitorPick[]): Promise<Competitor[]>;
+  list(productId: string): Promise<Competitor[]>;
+  saveProfile(competitorId: string, profile: CompetitorProfile, relationship: Relationship): Promise<void>;
+}
+
+export interface EventLog {
+  add(runId: string, kind: string, payload: Record<string, unknown>): Promise<RunEvent>;
+  list(runId: string, afterId?: number): Promise<RunEvent[]>;
+}
+
+/** Every charge a run made, appended as each call returns. */
+export interface ChargeLedger {
+  add(charge: Omit<Charge, "created_at">): Promise<Charge>;
+  list(runId: string): Promise<Charge[]>;
+}
+
+/** Every LLM call, as sent and as answered; OpenRouter's billed cost is attached when it arrives. */
+export interface CallLog {
+  add(call: LlmCallRecord): Promise<LlmCall>;
+  setGeneration(runId: string, responseId: string, generation: Generation): Promise<void>;
+  list(runId: string): Promise<LlmCall[]>;
+}
+
+export interface ResearchStore {
+  readonly accounts: AccountDirectory;
+  readonly runs: RunStore;
+  readonly products: ProductStore;
+  readonly competitors: CompetitorStore;
+  readonly events: EventLog;
+  readonly charges: ChargeLedger;
+  readonly calls: CallLog;
   close(): Promise<void>;
-}
-
-export interface GateVerdict {
-  admit: boolean;
-  reason: string;
-  model: string;
-  ms: number;
-}
-
-/** A cheap pre-read filter over fetched bodies; a failing gate admits. */
-export interface FetchGate {
-  admit(input: { url: string; title: string; body: string; subject: string; market: string }): Promise<GateVerdict>;
-}
-
-/** Earlier pulls of a listing's star band, from any run in any workspace: reviews are public pages, so one paid pull serves everyone until it is too old. */
-export interface ReviewPullStore {
-  latest(platform: ReviewPlatform, listing: string, band: number | null, since: string): Promise<StoredPull | null>;
-  /** When any star band of a listing was last pulled; empty when never. */
-  newest(platform: ReviewPlatform, listing: string): Promise<string>;
-  save(platform: ReviewPlatform, listing: string, band: number | null, requested: number, result: ReviewResult): Promise<void>;
 }

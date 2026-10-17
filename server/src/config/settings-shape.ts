@@ -2,7 +2,6 @@
 export interface ServicePrices {
   parallelSearchUsd: number;
   parallelExtractUsd: number;
-  parallelTaskUsd: Readonly<Record<string, number>>;
   trendtrackUsdPerCredit: number;
   crawl4aiUsdPerPage: number;
   firecrawlUsdPerPage: number | null;
@@ -22,43 +21,22 @@ export interface Settings {
 
   firecrawlApiKey: string;
   firecrawlBaseUrl: string;
+  firecrawlConcurrency: number;
   crawl4aiApiKey: string;
   crawl4aiBaseUrl: string;
   crawl4aiConcurrency: number;
   parallelApiKey: string;
   parallelBaseUrl: string;
   parallelConcurrency: number;
-  discoveryProcessor: string;
-  discoveryTimeoutSeconds: number;
   trendtrackApiKey: string;
   trendtrackBaseUrl: string;
   trendtrackConcurrency: number;
-  metaAccessToken: string;
-  metaBaseUrl: string;
   webTimeoutSeconds: number;
   fetchCharLimit: number;
-  firecrawlConcurrency: number;
-  gateModel: string;
-  judgeModel: string;
-  gateCharLimit: number;
-  gateTimeoutSeconds: number;
   prices: ServicePrices;
 
-  apifyToken: string;
-  apifyMaxReviews: number;
-  apifyWaitSeconds: number;
-  apifyConcurrency: number;
-  apifyPullRetries: number;
-  reviewReuseDays: number;
-
-  corpusPath: string;
-  libraryMaxMb: number;
-
-  databasePath: string;
   databaseUrl: string;
   databaseConnections: number;
-  harnessPath: string;
-  taskMaxUsd: number;
   traceDir: string;
   traceKeepDays: number;
   traceMaxMb: number;

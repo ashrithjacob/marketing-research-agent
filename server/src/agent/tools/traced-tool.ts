@@ -1,6 +1,6 @@
 import type { AgentTool } from "@earendil-works/pi-agent-core";
 
-import type { ToolSteps } from "../tool-steps.js";
+import type { ToolSteps } from "../kernel/tool-steps.js";
 import { Trace } from "../../trace/index.js";
 
 /** Runs a tool inside its own trace scope, so every line and request it makes is kept against its call. */

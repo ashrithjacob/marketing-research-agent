@@ -47,7 +47,7 @@ export class AuthGate {
       return c.json({
         authenticated: true,
         user: principal.username,
-        workspace: (await this.accounts.workspace(principal.workspaceId))?.name ?? principal.workspaceId,
+        account: (await this.accounts.account(principal.accountId))?.name ?? principal.accountId,
         is_admin: principal.isAdmin,
         auth_required: this.sessions !== null,
       });

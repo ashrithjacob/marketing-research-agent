@@ -28,16 +28,7 @@ export class PostgresStatements implements SqlDatabase {
 
   async exec(script: string): Promise<void> {
     Trace.line(import.meta.url, "PostgresStatements.exec");
-    await this.target.query(PostgresDialect.script(script));
-  }
-
-  async columns(table: string): Promise<string[]> {
-    Trace.line(import.meta.url, "PostgresStatements.columns", { table });
-    const rows = await this.all<{ column_name: string }>(
-      "SELECT column_name FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = ?",
-      [table],
-    );
-    return rows.map((row) => row.column_name);
+    await this.target.query(script);
   }
 
   async transaction<T>(work: (tx: SqlDatabase) => Promise<T>): Promise<T> {
@@ -82,11 +73,6 @@ export class PostgresDatabase implements SqlDatabase {
   exec(script: string): Promise<void> {
     Trace.line(import.meta.url, "PostgresDatabase.exec");
     return this.statements.exec(script);
-  }
-
-  columns(table: string): Promise<string[]> {
-    Trace.line(import.meta.url, "PostgresDatabase.columns", { table });
-    return this.statements.columns(table);
   }
 
   async transaction<T>(work: (tx: SqlDatabase) => Promise<T>): Promise<T> {

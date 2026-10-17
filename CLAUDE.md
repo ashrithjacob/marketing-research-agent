@@ -12,21 +12,23 @@ deploy steps are about **agentchat**, a different app. Use the ones below.
 - Container `mra` (app and agent in one process), compose stack
   `~/mra-compose`, on its own `edge` network. Search is Parallel's cloud API.
 - The agent runs in-process through `pi-agent-core`. No hermes.
-- The store is SQLite (`research.db`) unless `DATABASE_URL` is set, then Postgres
-  on Neon (Frankfurt). One set of tables, two drivers (`adapters/store/`); the
-  move and the way back are in `../setup.md` §5a "The store".
-- Ops: `../setup.md` §5a. How a run works, end to end: `workings.md`. Why
-  stage 1 is four agents (champion, then product/competitors/category side by
-  side): `workings_stage1.md`.
-  What is on the screen and what it calls: `FEATURE_MAP.md`.
+- The store is Postgres with pgvector, always: `DATABASE_URL` is required. On
+  the VPS that is Neon (Frankfurt); locally `mra up` runs its own `mra-db`
+  container. The schema is a numbered list of migrations
+  (`adapters/store/text/migrations.ts`); a change is a new entry, never an edit.
+- Ops: `../setup.md` §5a (the VPS still runs the pre-rewrite code; "Pending"
+  there says what deploying this branch changes). How a run works, end to end:
+  `workings.md`. What is on the screen and what it calls: `FEATURE_MAP.md`.
 - Trendtrack's own API docs (auth, credits, errors, rate limits, time windows)
   are in `trendtrack/`, one resource per file under `trendtrack/api/`
   (`Ads.md`, `brandtrackers.md`, …). Read them before touching
   `adapters/trendtrack-ads.ts`; `trendtrack-api.md` is only the index.
 - The north star every change answers to: `docs/goal.md`, narrowed on
-  2026-10-16 to avatar research for long-form statics: `docs/spec-avatar.md`.
-  Every older spec was deleted on 2026-10-17 when the product's goal changed;
-  git history has them. Trust `setup.md` and the code.
+  2026-10-16 to avatar research for long-form statics: `docs/spec.md`, the
+  Avatar Strategist spec. Its seven stages are the code's seven stages
+  (`domain/stages.ts`); only stage 1 is built so far. Every older spec, and the
+  code they described (operator, plans, tasks, ledger roles), was deleted on
+  2026-10-17; git history before `b6f45cc` has them.
 
 ## The one command
 
@@ -73,20 +75,14 @@ is not the feature working: run it (`mra run`, `mra watch`), read the outcome,
 quote it. A healthy `/api/health` on the live site means the container is up —
 it does not mean your change is on it. Only `deploy/vps/deploy.sh` does that.
 
-**5. Never start a run that spends Apify money without asking first.** Apify is
-billed to the user per run. That covers any review-mining run (stage 3 since 2026-10-01; a code pipeline since
-2026-09-30: Amazon review pulls, Trustpilot where a target has no Amazon listing),
-and **every stage-1 run except a url brief without `competitors`**: its step-1
-`champion` agent calls `amazon_find_product` (`workings_stage1.md`). With
-`competitors` in scope that agent can call it too, and **when the run completes,
-code looks up the Amazon listing of the champion and every competitor
-automatically**, about $0.01 each.
-To see a change work, run a url brief on `product_data` and/or `category_data`
-(`mra run "https://…" product_data,category_data`), which skips the champion and
-only uses web search and page fetches. A genre brief runs the champion, even on
-`product_data` alone. If the change can only be seen
-through an Apify tool, ask first and say what the run will cost. One run is
-enough to verify something; don't rerun to polish.
+**5. Never start a run that spends money without asking first.** Every run
+spends: OpenRouter per token, Parallel per search, Firecrawl per page,
+TrendTrack per ad result. Nothing in the code calls Apify since the 2026-10-17
+rewrite; when stage 3 brings review collection back, a run that pulls paid
+reviews is billed to the user per review, and must be asked about with its
+estimated cost. Faux-model tests (`tests/analysis.test.ts`) are how a change is
+seen working without spending. One run is enough to verify something; don't
+rerun to polish.
 
 **6. Answer the question asked, and stop.** The work here is building the app
 and helping the user understand its code. A question gets its answer and the
@@ -110,14 +106,14 @@ every rule in that file at once.
 | `trace` | The run trace: `Trace`, its file sink, the wire tap | nothing |
 | `domain` | Types, zod schemas, `interface` ports. No I/O. | `trace` (owns `zod`) |
 | `config` | `Settings`, the only reader of `process.env` | `trace` |
-| `extract` | Packet parsing and validation. Pure. | `trace`, `domain` |
-| `adapters` | Apify, Firecrawl, Parallel, OpenRouter prices, the SQL store (SQLite or Postgres), corpus | `trace`, `domain`, `config` |
-| `agent` | Prompt building, tools, the run loop | `trace`, `domain`, `config`, `extract`, `adapters` |
+| `extract` | Pure checks over what agents produce; empty since the rewrite | `trace`, `domain` |
+| `adapters` | Firecrawl, Crawl4AI, Parallel, TrendTrack, OpenRouter prices, the Postgres store | `trace`, `domain`, `config` |
+| `agent` | The agent kernel (`AgentRunner`, `SubmitTool`), tools, the pipeline and its stages, the resolver | `trace`, `domain`, `config`, `extract`, `adapters` |
 | `http` | Routes, auth, app wiring | everything above |
 | `main.ts` | Entry point. Wiring only. | everything |
 
-Package ownership, enforced: `apify-client`, `better-sqlite3` and `pg` belong to
-`adapters`, `hono` to `http`, `pi-agent-core` and `pi-ai` to `agent`.
+Package ownership, enforced: `zod` belongs to `domain`, `pg` to `adapters`,
+`hono` to `http`, `pi-agent-core` and `pi-ai` to `agent`.
 
 The class diagram lives in `docs/class-diagram.md`. Regenerate it with
 `node server/scripts/class-diagram.mjs` whenever classes or relationships change.
@@ -129,7 +125,14 @@ The class diagram lives in `docs/class-diagram.md`. Regenerate it with
 - **One responsibility per class; modules stay under 150 lines.** If describing a
   class needs "and", split it.
 - **Boundaries are interfaces in `domain/ports.ts`; adapters implement them.**
-  The run loop depends on `ReviewSource`, never on `ApifyClient`.
+  An agent's tools depend on `WebSearch`, never on `ParallelSearch`.
+- **A stage is a class implementing `Stage`** (`agent/pipeline/stage.ts`),
+  registered in `http/app.ts`. The pipeline decides when it runs from
+  `STAGE_PLANS`; the stage never starts another stage.
+- **An agent ends only through `submit`.** Its schema is a zod schema in
+  `domain`; anything code can check about the answer (a source it never read, a
+  url it never met) is a `check` on the submission, never a sentence in the
+  prompt.
 - **Dependencies arrive through the constructor** and are held `private readonly`.
   No globals, no singletons, no `process.env` outside `config`.
 - **Composition over inheritance.** Inherit only to implement an interface.
@@ -193,13 +196,15 @@ that file rather than in this list.
 
 - **Server field names come from pi-ai and are camelCase** (`totalTokens`,
   `cacheRead`), while most of the rest of the API is honestly snake_case out of
-  SQLite. `frontend/src/api.ts` mirrors them by hand. One snake_case name there
+  Postgres. `frontend/src/api/types.ts` mirrors them by hand. One snake_case name there
   left the cockpit stuck on "Tokens —": the field was optional, so `tsc` never
   complained. *Enforced: every field the client declares must exist somewhere in
   `server/src`.*
-- **`CREATE TABLE IF NOT EXISTS` does not alter an existing table.** A new
-  column needs a migration, and the failure shows up at the first INSERT on the
-  VPS, not at startup. *Enforced: a column new since HEAD needs its ALTER TABLE.*
+- **A schema change is a new migration, never an edit to an applied one.**
+  `CREATE TABLE IF NOT EXISTS` does not alter an existing table, and an edited
+  migration never runs again on a database that recorded it. *Enforced at
+  start: `Migrator` keeps each migration's SHA-256 and refuses to start when an
+  applied one has changed (`tests/store.test.ts`).*
 - **`frontend/dist` is what deploys**, not `frontend/src`. *Enforced.*
 - **Docker's own iptables rules bypass ufw**, so a published port on the VPS is
   open to the internet whatever the firewall says. *Enforced: `expose:` there,
@@ -208,35 +213,38 @@ that file rather than in this list.
   both directions: no `process.env` elsewhere, and nothing handed to the
   container that settings.ts does not read.*
 - **A run reaches a final status only through `RunEnd`** (`agent/run-end.ts`),
-  which assembles the ledger and stores the packet before setting the status.
-  Writing `failed` or `cancelled` anywhere else hides what the run found.
+  which totals the run's charges into `cost_usd` before setting the status.
+  Writing `failed` or `cancelled` anywhere else leaves a run with no cost.
   *Enforced: `run-ends-in-one-place`.*
 
 Still only written down, because no rule catches them:
 
 - **What a run cost is billed, never calculated.** The LLM figure is OpenRouter's
-  `/generation`, which 404s for about 4s after a turn ends; every other service is
-  a `research_charges` row written as the call returns. pi-ai's own `usage.cost`
-  (list price × tokens) is stripped before anything is stored. See `workings.md` §2a.
+  `/generation`, which 404s for about 4s after a turn ends; every service is a
+  `charges` row written as the call returns. pi-ai's own `usage.cost` (list price
+  × tokens) is stripped before anything is stored. See `workings.md`.
 - **In tests, a text-only faux reply ends the agent loop after one turn.** For a
   multi-turn run, give the earlier turns a `fauxToolCall(...)` with
   `stopReason: "toolUse"`.
-- **A server restart kills live stage runs.** `recoverRunsKilledByRestart()` ends them
-  `failed` through `RunEnd`, which still shows the packet their rows make; any
-  billed-cost lookups still pending are lost. A run with a `contract` is a durable
-  task and is skipped: the harness resumes it (`workings.md` §2g).
-- **A URL in the brief belongs in `brief.url`, never `brief.product`.** An agent
-  handed `https://…` as a product name searches for that literal string and
-  comes back confidently wrong. This is the bug behind "why does it always go
-  for magnesium".
+- **A server restart kills live runs.** `AnalysisService.recover()` ends every
+  `resolving`, `running` or `stopping` run `failed` through `RunEnd`; any
+  billed-cost lookups still pending are lost. A run `awaiting_confirmation` is
+  untouched: nothing is running for it.
+- **A URL belongs in `product_url`, never `product_name`.** An agent handed
+  `https://…` as a product name searches for that literal string and comes back
+  confidently wrong. *Enforced: `AnalysisInputSchema` refuses it with a 422.*
+- **Concurrent agents share one faux script in tests.** Script by what each
+  agent's first instruction contains and its turn number (`tests/scripted-agents.ts`),
+  never by global call order, or the competitor agents interleave.
 - **`npm run hashpw` separates its hash with `:`, not `$`.** The value lands in a
   `.env` read by `docker compose`, which interpolates `$...` and would mangle it
   silently.
 - **A model never copies content by writing it out.** When a quote, a review,
   a finding or a draft moves from one place to another, the model names it by
-  id (`source_id`, `ref`, finding id, paragraph number) and code copies it.
-  Re-typed text costs output tokens and can change silently. The stage-1 `excerpt.text` still breaks this
-  until part 2.
+  id and code copies it. Re-typed text costs output tokens and can change
+  silently. Stage 1's `claims_on_page` text is copied from the page by the
+  model today; when reviews arrive (stage 3), quotes must be referenced by
+  review id.
 - **`invalid` is not `failed`.** `failed` is a crash; `invalid` means the agent
   finished and produced something the schema refused, which is the most
   informative failure this app has. Do not collapse them.
@@ -251,7 +259,6 @@ Still only written down, because no rule catches them:
 | Orientation | `.claude/hooks/session-brief.sh` | "is it running?", "is it deployed?" asked out loud |
 | Control | `.claude/skills/mra-control/` | improvised curl; claims that something works |
 | Memory | `FEATURE_MAP.md` | guessing at a screenshot |
-| Outcome | `.claude/skills/stage1-debug/` | debugging a run from what it produced, not from the code; how a run works consumer-side, with a measured trace |
 | House style | `.claude/skills/client-doc/` | the client-document rewrite loop |
 | Shape | `server/tests/architecture.test.ts` | layers, module size, comments, stray functions; the same rules reach `frontend/src` (250-line cap, fetch only in `api/`) |
 | Design | `.claude/skills/oop-design/` | guessing where a class goes |
