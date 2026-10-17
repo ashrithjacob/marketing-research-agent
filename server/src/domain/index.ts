@@ -1,5 +1,6 @@
 export * from "./accounts.js";
 export * from "./ad-library.js";
+export * from "./ads.js";
 export * from "./analysis-input.js";
 export * from "./charges.js";
 export * from "./competitors.js";
@@ -8,6 +9,7 @@ export type * from "./logs.js";
 export type * from "./ports.js";
 export * from "./products.js";
 export * from "./resolution.js";
+export * from "./reviews.js";
 export * from "./runs.js";
 export * from "./schemas.js";
 export type * from "./service-report.js";

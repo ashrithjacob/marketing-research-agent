@@ -35,6 +35,13 @@ export interface Settings {
   fetchCharLimit: number;
   prices: ServicePrices;
 
+  reviewsPerProduct: number;
+  reviewsPerBand: number;
+  wootDelayMs: number;
+  adsPerRun: number;
+  adMinCopyChars: number;
+  adsPerBrand: number;
+
   databaseUrl: string;
   databaseConnections: number;
   traceDir: string;

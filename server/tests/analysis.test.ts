@@ -3,12 +3,13 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import type { Message } from "@earendil-works/pi-ai";
 
-import type { Competitor, Product, Run } from "../src/domain/index.js";
+import { Pipeline, ProductMarketStage } from "../src/agent/index.js";
 import { App } from "../src/http/index.js";
 
 import { Faux, FakeWeb, NoBilling, TestSettings } from "./fakes.js";
 import { BRIEF, DROPS_URL, GUMMIES_URL, PAGES, PRODUCT_URL, Profiles, RESOLUTION, SEARCH_HITS, TEA_URL } from "./mullevia.js";
 import { PostgresStores } from "./postgres-stores.js";
+import { RunDriver } from "./run-driver.js";
 import { ScriptedAgents } from "./scripted-agents.js";
 
 const { call, text } = ScriptedAgents;
@@ -16,8 +17,7 @@ let pg: PostgresStores;
 let app: App;
 let faux: Faux;
 let web: FakeWeb;
-
-type View = { run: Run; product: Product | null; competitors: Competitor[] };
+let driver: RunDriver;
 
 beforeAll(async () => {
   pg = await PostgresStores.start();
@@ -31,28 +31,15 @@ beforeEach(() => {
   faux = new Faux();
   web = new FakeWeb(PAGES, SEARCH_HITS);
   const { settings, traces } = TestSettings.make();
-  app = new App({ settings, traces, store: pg.store, services: web.services(), models: faux.models, generations: new NoBilling() });
+  const pipeline = new Pipeline([new ProductMarketStage()]);
+  app = new App({ settings, traces, store: pg.store, services: web.services(), models: faux.models, generations: new NoBilling(), pipeline });
+  driver = new RunDriver(app);
 });
 
-const api = async (path: string, body?: unknown): Promise<Response> =>
-  app.fetch(new Request(`http://test/api/research${path}`, body === undefined ? {} : { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }));
-
-const view = async (runId: string): Promise<View> => (await (await api(`/runs/${runId}`)).json()) as View;
-
-const settle = async (runId: string, statuses: readonly string[]): Promise<View> => {
-  for (let i = 0; i < 400; i++) {
-    const seen = await view(runId);
-    if (statuses.includes(seen.run.status)) return seen;
-    await new Promise((resolve) => setTimeout(resolve, 10));
-  }
-  throw new Error(`run ${runId} never reached ${statuses.join("/")}: ${(await view(runId)).run.status}`);
-};
-
-const start = async (input: Record<string, unknown>): Promise<string> => {
-  const response = await api("/runs", input);
-  expect(response.status).toBe(201);
-  return ((await response.json()) as { run: Run }).run.id;
-};
+const api = (path: string, body?: unknown): Promise<Response> => driver.api(path, body);
+const view = (runId: string) => driver.view(runId);
+const settle = (runId: string, statuses: readonly string[]) => driver.settle(runId, statuses);
+const start = (input: Record<string, unknown>) => driver.start(input);
 
 const resolver = [call("web_fetch", { url: PRODUCT_URL }), call("web_search", { query: "mullein drops" }), call("submit", RESOLUTION)];
 const profile = (url: string, form: "liquid_drops" | "gummies" | "tea", has: boolean) => [call("web_fetch", { url }), call("submit", Profiles.of(url, form, has))];

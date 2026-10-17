@@ -1,6 +1,6 @@
 import type { Models } from "@earendil-works/pi-ai";
 
-import type { GenerationSource, ResearchStore, Run } from "../../domain/index.js";
+import type { ChargeMeter, GenerationSource, ResearchStore, Run } from "../../domain/index.js";
 import { Trace } from "../../trace/index.js";
 import { AgentRunner, type AgentJob, type AgentResult } from "../kernel/agent-runner.js";
 import { BilledCosts } from "../kernel/billed-costs.js";
@@ -56,7 +56,12 @@ export class RunContext {
 
   kit(agentId: string, tools: readonly ToolName[]): AgentKit {
     Trace.line(import.meta.url, "RunContext.kit", { agentId, tools });
-    return this.services.toolbox.kit(tools, new RunMeter(this.services.store.charges, this.run.id, agentId), this.run.input.markets);
+    return this.services.toolbox.kit(tools, this.meter(agentId), this.run.input.markets);
+  }
+
+  meter(agentId: string): ChargeMeter {
+    Trace.line(import.meta.url, "RunContext.meter", { agentId });
+    return new RunMeter(this.services.store.charges, this.run.id, agentId);
   }
 
   agent<T>(job: AgentJob<T>): Promise<AgentResult<T>> {

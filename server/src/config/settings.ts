@@ -98,6 +98,13 @@ export class Env {
         firecrawlUsdPerPage: Env.optionalNumber("MRA_FIRECRAWL_USD_PER_PAGE"),
       },
 
+      reviewsPerProduct: Env.number("MRA_REVIEWS_PER_PRODUCT", 500),
+      reviewsPerBand: Env.number("MRA_REVIEWS_PER_BAND", 100),
+      wootDelayMs: Env.number("MRA_WOOT_DELAY_MS", 2000),
+      adsPerRun: Env.number("MRA_ADS_PER_RUN", 150),
+      adMinCopyChars: Env.number("MRA_AD_MIN_COPY_CHARS", 2000),
+      adsPerBrand: Env.number("MRA_ADS_PER_BRAND", 15),
+
       databaseUrl: Env.required("DATABASE_URL"),
       databaseConnections: Env.number("MRA_DATABASE_CONNECTIONS", 5),
       traceDir: Env.text("MRA_TRACE_DIR", "/data/traces"),

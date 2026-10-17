@@ -55,7 +55,9 @@ competitors) and, while the run is not final, follows
 | Seven stage cards | `run/StageTracker.tsx` | `run.stage_status` against `GET /config`'s stages. `Not built yet` is greyed; a card shows the stage's summary and error |
 | Product brief: price, offer, ingredients, claims, each with a source link | `run/ProductBrief.tsx` | the `product` row, once stage 1's brief is accepted |
 | Competitors: Direct / Indirect / Context only | `run/Competitors.tsx` | `competitors[].relationship`, decided by code; "Not profiled yet" lists the ones without one |
-| Live activity | `run/Activity.tsx` | the last 30 events: tool calls, agents starting and ending, stage changes |
+| Reviews: one row per product and source (count, average), click a row for its reviews, lowest ratings first | `run/Reviews.tsx` | `GET /runs/:id/reviews` (coverage, and `?competitor=<id>&limit=` for a page) |
+| Competitor long-form statics: bucket filter, cards with image, signals, the reader's verdict and the full copy | `run/Ads.tsx` | `GET /runs/:id/ads` |
+| Live activity | `run/Activity.tsx` | the last 30 events: tool calls, agents starting and ending, reviews collected per product, stage changes |
 
 ## What failures look like
 
@@ -64,4 +66,6 @@ competitors) and, while the run is not final, follows
 | Status `Refused` and a banner naming a submit problem | An agent's submit was refused out, or it never submitted (`invalid`) | `mra calls <id>`: the last `submit` result lists the problems |
 | Stage card `Skipped`, "needs X, which did not complete" | A stage it depends on failed or was refused | that stage's own card |
 | Competitor under "Not profiled yet" with the stage completed | Its profiler agent did not get an accepted submit; the stage summary names why | the stage 1 card's summary |
+| A product with "0 new (review app … not supported yet, no Amazon listing …)" in the stage 3 card | Its store runs a review app other than Judge.me and it is not on Amazon | `docs/gaps.md` §9 |
+| Stage 4 `Failed`: "TRENDTRACK_API_KEY is not set" | No TrendTrack key in the container | `.env`, then `mra up` |
 | Stuck on `Finding the product` after a restart | It is not stuck: a restart ends live runs `failed` | refresh; the banner reads "the server restarted" |

@@ -26,7 +26,7 @@ deploy steps are about **agentchat**, a different app. Use the ones below.
 - The north star every change answers to: `docs/goal.md`, narrowed on
   2026-10-16 to avatar research for long-form statics: `docs/spec.md`, the
   Avatar Strategist spec. Its seven stages are the code's seven stages
-  (`domain/stages.ts`); only stage 1 is built so far. Every older spec, and the
+  (`domain/stages.ts`); stages 1, 3 and 4 are built. Every older spec, and the
   code they described (operator, plans, tasks, ledger roles), was deleted on
   2026-10-17; git history before `b6f45cc` has them.
 
@@ -107,7 +107,7 @@ every rule in that file at once.
 | `domain` | Types, zod schemas, `interface` ports. No I/O. | `trace` (owns `zod`) |
 | `config` | `Settings`, the only reader of `process.env` | `trace` |
 | `extract` | Pure checks over what agents produce; empty since the rewrite | `trace`, `domain` |
-| `adapters` | Firecrawl, Crawl4AI, Parallel, TrendTrack, OpenRouter prices, the Postgres store | `trace`, `domain`, `config` |
+| `adapters` | Firecrawl, Crawl4AI, Parallel, TrendTrack, Judge.me, Woot, Shopify store pages, OpenRouter prices, the Postgres store | `trace`, `domain`, `config` |
 | `agent` | The agent kernel (`AgentRunner`, `SubmitTool`), tools, the pipeline and its stages, the resolver | `trace`, `domain`, `config`, `extract`, `adapters` |
 | `http` | Routes, auth, app wiring | everything above |
 | `main.ts` | Entry point. Wiring only. | everything |

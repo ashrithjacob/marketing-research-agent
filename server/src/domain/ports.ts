@@ -1,5 +1,6 @@
 import type { Account, Scope, User, UserListing } from "./accounts.js";
-import type { AdPage, AdQuery } from "./ad-library.js";
+import type { AdHit, AdPage, AdQuery } from "./ad-library.js";
+import type { AdReading, ReadAd, StoredAd } from "./ads.js";
 import type { AnalysisInput } from "./analysis-input.js";
 import type { Charge } from "./charges.js";
 import type { Competitor, CompetitorPick, CompetitorProfile, Relationship } from "./competitors.js";
@@ -7,6 +8,7 @@ import type { Generation, LlmCall, LlmCallRecord, RunEvent } from "./logs.js";
 import type { Product, ProductBrief } from "./products.js";
 import type { Run, RunUpdate } from "./runs.js";
 import type { StageStates } from "./stages.js";
+import type { CollectedReview, ReviewCoverage, ReviewListing, ReviewSourceName, ReviewTarget, StorefrontFacts, StoredReview } from "./reviews.js";
 import type { FetchedPage, SearchPage, SearchScope } from "./web.js";
 
 /** Reads one page as text. Throws rather than returning an empty body. */
@@ -22,6 +24,17 @@ export interface WebSearch {
 /** Searches an index of Meta ads: who advertises, the copy, where each ad lands, when it ran. */
 export interface AdLibrary {
   search(query: AdQuery, signal?: AbortSignal): Promise<AdPage>;
+}
+
+/** One place reviews come from. Collects up to `limit` reviews of one listing, the text as written. */
+export interface ReviewSource {
+  readonly name: ReviewSourceName;
+  collect(listing: ReviewListing, limit: number, signal?: AbortSignal): Promise<CollectedReview[]>;
+}
+
+/** Reads a product page's store: its Shopify domain, product id and review apps; null when the page is not a Shopify product. */
+export interface Storefront {
+  inspect(url: string, signal?: AbortSignal): Promise<StorefrontFacts | null>;
 }
 
 /** What OpenRouter billed for one generation, looked up by its response id. */
@@ -55,7 +68,7 @@ export interface RunStore {
 
 /** One row per product per account, refreshed in place by every run that researches it. */
 export interface ProductStore {
-  upsert(accountId: string, url: string, name: string): Promise<Product>;
+  upsert(accountId: string, url: string, name: string, brand: string): Promise<Product>;
   get(productId: string): Promise<Product | null>;
   saveBrief(productId: string, brief: ProductBrief): Promise<Product>;
 }
@@ -64,6 +77,21 @@ export interface CompetitorStore {
   confirm(product: Product, picks: readonly CompetitorPick[]): Promise<Competitor[]>;
   list(productId: string): Promise<Competitor[]>;
   saveProfile(competitorId: string, profile: CompetitorProfile, relationship: Relationship): Promise<void>;
+}
+
+/** Reviews per target, stored once each: a review already held for that target is dropped on insert. */
+export interface ReviewStore {
+  save(accountId: string, target: ReviewTarget, reviews: readonly CollectedReview[]): Promise<number>;
+  recordSources(target: ReviewTarget, sources: { asins: readonly string[]; reviewApp: string | null }): Promise<void>;
+  coverage(productId: string): Promise<ReviewCoverage[]>;
+  list(productId: string, competitorId: string | null, limit: number, offset: number): Promise<StoredReview[]>;
+}
+
+/** Long-form statics found for a product's analysis, and what an agent read off each. */
+export interface AdStore {
+  save(accountId: string, productId: string, hits: readonly AdHit[], competitorByDomain: ReadonlyMap<string, string>): Promise<StoredAd[]>;
+  saveReading(adId: string, reading: AdReading): Promise<void>;
+  list(productId: string): Promise<ReadAd[]>;
 }
 
 export interface EventLog {
@@ -89,6 +117,8 @@ export interface ResearchStore {
   readonly runs: RunStore;
   readonly products: ProductStore;
   readonly competitors: CompetitorStore;
+  readonly reviews: ReviewStore;
+  readonly ads: AdStore;
   readonly events: EventLog;
   readonly charges: ChargeLedger;
   readonly calls: CallLog;

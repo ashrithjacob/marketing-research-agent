@@ -1,13 +1,17 @@
 import { Hono, type Context, type Next } from "hono";
 
-import { OpenRouterPrices, ServiceClients } from "../adapters/index.js";
+import { JudgemeReviews, OpenRouterPrices, ServiceClients, ShopifyStorefront, WootReviews } from "../adapters/index.js";
 import {
+  AmazonListingFinder,
   AnalysisService,
+  CompetitorAdStage,
   LiveRuns,
   LlmModels,
   Pipeline,
   ProductMarketStage,
   ProductResolver,
+  ReviewListings,
+  ReviewStage,
   RunEvents,
   RunLauncher,
   Toolbox,
@@ -21,6 +25,7 @@ import { Trace, TraceFile } from "../trace/index.js";
 import type { ApiEnv } from "./api-env.js";
 import { AuthGate } from "./auth-gate.js";
 import { ConfigRoutes } from "./config-routes.js";
+import { EvidenceRoutes } from "./evidence-routes.js";
 import { Frontend } from "./frontend.js";
 import { RunRoutes } from "./run-routes.js";
 
@@ -45,12 +50,13 @@ export class App {
     Trace.line(import.meta.url, "App.constructor");
     const { settings, store } = parts;
     this.prices = new OpenRouterPrices({ apiKey: settings.openrouterApiKey });
-    const pipeline = parts.pipeline ?? new Pipeline([new ProductMarketStage()]);
+    const clients = parts.services ?? ServiceClients.forSettings(settings);
+    const pipeline = parts.pipeline ?? App.pipeline(settings, clients);
     const events = new RunEvents(store.events);
     const services: RunServices = {
       store,
       models: parts.models ?? LlmModels.openrouter(),
-      toolbox: new Toolbox(parts.services ?? ServiceClients.forSettings(settings), settings),
+      toolbox: new Toolbox(clients, settings),
       generations: parts.generations ?? this.prices,
       events,
     };
@@ -63,8 +69,20 @@ export class App {
     hono.get("/api/health", (c) => c.json({ status: "ok" }));
     hono.route("/api/research", new ConfigRoutes(settings.model, pipeline.built).router());
     hono.route("/api/research", new RunRoutes(store, this.analyses, events, parts.traces).router());
+    hono.route("/api/research", new EvidenceRoutes(store, this.analyses).router());
     new Frontend(settings.staticDir).mount(hono);
     this.fetch = hono.fetch;
+  }
+
+  static pipeline(settings: Settings, clients: ServiceClients): Pipeline {
+    Trace.line(import.meta.url, "App.pipeline");
+    const sources = new Map([new JudgemeReviews(settings), new WootReviews(settings)].map((source) => [source.name, source] as const));
+    const limits = { maxAds: settings.adsPerRun, minCopyChars: settings.adMinCopyChars, maxAdsPerBrand: settings.adsPerBrand };
+    return new Pipeline([
+      new ProductMarketStage(),
+      new ReviewStage(new ReviewListings(new ShopifyStorefront(settings), new AmazonListingFinder()), sources, settings.reviewsPerProduct),
+      new CompetitorAdStage(clients.ads, settings.prices, limits),
+    ]);
   }
 
   static traceFile(settings: Settings): TraceFile {

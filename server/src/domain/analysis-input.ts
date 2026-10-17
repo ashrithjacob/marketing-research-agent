@@ -1,7 +1,7 @@
 import { z } from "zod/v4";
 import { Trace } from "../trace/index.js";
 
-export const MARKETS = ["US", "GB", "EU", "CA", "AU"] as const;
+export const MARKETS = ["US", "GB", "CA", "AU", "NZ", "EU"] as const;
 export type Market = (typeof MARKETS)[number];
 
 const LOOKS_LIKE_URL = /^(https?:\/\/|www\.)|\.[a-z]{2,}\//i;

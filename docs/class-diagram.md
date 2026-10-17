@@ -80,6 +80,12 @@ classDiagram
     class AdPage {
       <<interface>>
     }
+    class StoredAd {
+      <<interface>>
+    }
+    class ReadAd {
+      <<interface>>
+    }
     class Markets {
       countries()
     }
@@ -133,6 +139,14 @@ classDiagram
       <<interface>>
       search()
     }
+    class ReviewSource {
+      <<interface>>
+      collect()
+    }
+    class Storefront {
+      <<interface>>
+      inspect()
+    }
     class GenerationSource {
       <<interface>>
       generation()
@@ -168,6 +182,19 @@ classDiagram
       list()
       saveProfile()
     }
+    class ReviewStore {
+      <<interface>>
+      save()
+      recordSources()
+      coverage()
+      list()
+    }
+    class AdStore {
+      <<interface>>
+      save()
+      saveReading()
+      list()
+    }
     class EventLog {
       <<interface>>
       add()
@@ -190,6 +217,24 @@ classDiagram
     }
     class Product {
       <<interface>>
+    }
+    class CollectedReview {
+      <<interface>>
+    }
+    class ReviewTarget {
+      <<interface>>
+    }
+    class StoredReview {
+      <<interface>>
+    }
+    class ReviewCoverage {
+      <<interface>>
+    }
+    class StorefrontFacts {
+      <<interface>>
+    }
+    class Asins {
+      fromUrl()
     }
     class Run {
       <<interface>>
@@ -301,6 +346,9 @@ classDiagram
     class ParallelSearch {
       find()
     }
+    class PublicUrls {
+      assert()
+    }
     class RateLimitWait {
       askedMs()
       withMarginMs()
@@ -319,6 +367,31 @@ classDiagram
       perMillion()
       rates()
     }
+    class JudgemeReview {
+      <<interface>>
+    }
+    class JudgemePage {
+      <<interface>>
+    }
+    class JudgemeReviews {
+      collect()
+      review()
+    }
+    class ReviewText {
+      fromHtml()
+      decode()
+    }
+    class WootReview {
+      <<interface>>
+    }
+    class WootPage {
+      <<interface>>
+    }
+    class WootReviews {
+      collect()
+      review()
+      date()
+    }
     class ServiceClients {
       forSettings()
     }
@@ -327,6 +400,10 @@ classDiagram
     }
     class ServiceQueue {
       run()
+    }
+    class ShopifyStorefront {
+      inspect()
+      apps()
     }
     class AccountTable {
       addAccount()
@@ -337,6 +414,11 @@ classDiagram
       byUsername()
       users()
       setPassword()
+    }
+    class AdTable {
+      save()
+      saveReading()
+      list()
     }
     class CallTable {
       add()
@@ -385,6 +467,13 @@ classDiagram
       upsert()
       get()
       saveBrief()
+    }
+    class ReviewTable {
+      contentHash()
+      save()
+      recordSources()
+      coverage()
+      list()
     }
     class RunTable {
       create()
@@ -504,6 +593,7 @@ classDiagram
     }
     class RunContext {
       kit()
+      meter()
       agent()
       emit()
       settled()
@@ -545,6 +635,25 @@ classDiagram
       resolve()
       research()
     }
+    class AdKeywordsAgent {
+      pick()
+    }
+    class AdReader {
+      read()
+      problems()
+    }
+    class SweepPlan {
+      <<interface>>
+    }
+    class SweepLimits {
+      <<interface>>
+    }
+    class AdSweep {
+      sweep()
+    }
+    class CompetitorAdStage {
+      run()
+    }
     class CompetitorProfiler {
       profile()
       problems()
@@ -555,6 +664,19 @@ classDiagram
       problems()
     }
     class ProductMarketStage {
+      run()
+    }
+    class AmazonListingFinder {
+      find()
+      problems()
+    }
+    class TargetListings {
+      <<interface>>
+    }
+    class ReviewListings {
+      of()
+    }
+    class ReviewStage {
       run()
     }
     class AdSearchTool {
@@ -590,6 +712,7 @@ classDiagram
       <<interface>>
     }
     class App {
+      pipeline()
       traceFile()
       close()
     }
@@ -601,6 +724,9 @@ classDiagram
     }
     class EventStream {
       open()
+    }
+    class EvidenceRoutes {
+      router()
     }
     class Frontend {
       mount()
@@ -646,10 +772,14 @@ classDiagram
   MeteredAdLibrary --> ChargeMeter
   ParallelApi --> Settings
   ParallelSearch --> ParallelApi
+  JudgemeReviews --> Settings
+  WootReviews --> Settings
   ServiceClients --> PageFetcher
   ServiceClients --> WebSearch
   ServiceClients --> AdLibrary
+  ShopifyStorefront --> Settings
   AccountTable --> SqlDatabase
+  AdTable --> SqlDatabase
   CallTable --> SqlDatabase
   ChargeTable --> SqlDatabase
   CompetitorTable --> SqlDatabase
@@ -657,6 +787,7 @@ classDiagram
   Migrator --> SqlDatabase
   Migrator --> Migration
   ProductTable --> SqlDatabase
+  ReviewTable --> SqlDatabase
   RunTable --> SqlDatabase
   SqlResearchStore --> SqlDatabase
   ThrottledPageFetcher --> PageFetcher
@@ -688,6 +819,14 @@ classDiagram
   RunLauncher --> LiveRuns
   RunLauncher --> Pipeline
   RunLauncher --> ProductResolver
+  AdSweep --> AdLibrary
+  AdSweep --> SweepLimits
+  CompetitorAdStage --> AdLibrary
+  CompetitorAdStage --> ServicePrices
+  CompetitorAdStage --> SweepLimits
+  ReviewListings --> Storefront
+  ReviewListings --> AmazonListingFinder
+  ReviewStage --> ReviewListings
   AdSearchTool --> AdLibrary
   AdSearchTool --> UrlLedger
   Toolbox --> ServiceClients
@@ -702,6 +841,8 @@ classDiagram
   AuthGate --> AccountDirectory
   EventStream --> ResearchStore
   EventStream --> RunEvents
+  EvidenceRoutes --> ResearchStore
+  EvidenceRoutes --> AnalysisService
   RunRoutes --> ResearchStore
   RunRoutes --> AnalysisService
   RunRoutes --> RunEvents
@@ -724,11 +865,17 @@ classDiagram
 | `adapters` | `adapters/openrouter-prices.ts` | OpenRouterPrices |
 | `adapters` | `adapters/parallel-api.ts` | ParallelApi |
 | `adapters` | `adapters/parallel-search.ts` | ParallelUsage, ParallelResult, ParallelSearch |
+| `adapters` | `adapters/public-urls.ts` | PublicUrls |
 | `adapters` | `adapters/rate-limit-wait.ts` | RateLimitWait |
 | `adapters` | `adapters/rates.ts` | Rates, Pricing, Billed, Money |
+| `adapters` | `adapters/reviews/judgeme-reviews.ts` | JudgemeReview, JudgemePage, JudgemeReviews |
+| `adapters` | `adapters/reviews/review-text.ts` | ReviewText |
+| `adapters` | `adapters/reviews/woot-reviews.ts` | WootReview, WootPage, WootReviews |
 | `adapters` | `adapters/service-clients.ts` | ServiceClients |
 | `adapters` | `adapters/service-queue.ts` | Waiter, ServiceQueue |
+| `adapters` | `adapters/shopify-storefront.ts` | ShopifyStorefront |
 | `adapters` | `adapters/store/account-table.ts` | AccountTable |
+| `adapters` | `adapters/store/ad-table.ts` | AdTable |
 | `adapters` | `adapters/store/call-table.ts` | CallTable |
 | `adapters` | `adapters/store/charge-table.ts` | ChargeTable |
 | `adapters` | `adapters/store/competitor-table.ts` | CompetitorTable |
@@ -737,6 +884,7 @@ classDiagram
 | `adapters` | `adapters/store/postgres-database.ts` | PostgresStatements, PostgresDatabase |
 | `adapters` | `adapters/store/postgres-dialect.ts` | PostgresDialect |
 | `adapters` | `adapters/store/product-table.ts` | ProductTable |
+| `adapters` | `adapters/store/review-table.ts` | ReviewTable |
 | `adapters` | `adapters/store/run-table.ts` | RunTable |
 | `adapters` | `adapters/store/sql-database.ts` | SqlDatabase |
 | `adapters` | `adapters/store/store.ts` | SqlResearchStore |
@@ -764,9 +912,16 @@ classDiagram
 | `agent` | `agent/resolve/product-resolver.ts` | ProductResolver |
 | `agent` | `agent/run-end.ts` | RunVerdict, RunEnd |
 | `agent` | `agent/run-launcher.ts` | RunLauncher |
+| `agent` | `agent/stages/ads/ad-keywords-agent.ts` | AdKeywordsAgent |
+| `agent` | `agent/stages/ads/ad-reader.ts` | AdReader |
+| `agent` | `agent/stages/ads/ad-sweep.ts` | SweepPlan, SweepLimits, AdSweep |
+| `agent` | `agent/stages/ads/competitor-ad-stage.ts` | CompetitorAdStage |
 | `agent` | `agent/stages/product-market/competitor-profiler.ts` | CompetitorProfiler |
 | `agent` | `agent/stages/product-market/product-brief-agent.ts` | ProductBriefAgent |
 | `agent` | `agent/stages/product-market/product-market-stage.ts` | ProductMarketStage |
+| `agent` | `agent/stages/reviews/amazon-listing-finder.ts` | AmazonListingFinder |
+| `agent` | `agent/stages/reviews/review-listings.ts` | TargetListings, ReviewListings |
+| `agent` | `agent/stages/reviews/review-stage.ts` | ReviewStage |
 | `agent` | `agent/tools/ad-search-tool.ts` | AdSearchTool |
 | `agent` | `agent/tools/toolbox.ts` | AgentKit, Toolbox |
 | `agent` | `agent/tools/traced-tool.ts` | TracedTool |
@@ -777,13 +932,15 @@ classDiagram
 | `config` | `config/settings.ts` | Env |
 | `domain` | `domain/accounts.ts` | Account, User, UserListing, Principal, Scope |
 | `domain` | `domain/ad-library.ts` | AdQuery, AdHit, AdPage |
+| `domain` | `domain/ads.ts` | StoredAd, ReadAd |
 | `domain` | `domain/analysis-input.ts` | Markets |
 | `domain` | `domain/charges.ts` | ChargeDraft, Charge, ChargeMeter, ServiceUse |
 | `domain` | `domain/competitors.ts` | Competitor, CompetitorRelationship |
 | `domain` | `domain/ids.ts` | Clock, Ids |
 | `domain` | `domain/logs.ts` | RunEvent, LlmCallRecord, Generation, LlmCall |
-| `domain` | `domain/ports.ts` | PageFetcher, WebSearch, AdLibrary, GenerationSource, AccountDirectory, RunStore, ProductStore, CompetitorStore, EventLog, ChargeLedger, CallLog, ResearchStore |
+| `domain` | `domain/ports.ts` | PageFetcher, WebSearch, AdLibrary, ReviewSource, Storefront, GenerationSource, AccountDirectory, RunStore, ProductStore, CompetitorStore, ReviewStore, AdStore, EventLog, ChargeLedger, CallLog, ResearchStore |
 | `domain` | `domain/products.ts` | Product |
+| `domain` | `domain/reviews.ts` | CollectedReview, ReviewTarget, StoredReview, ReviewCoverage, StorefrontFacts, Asins |
 | `domain` | `domain/runs.ts` | Run, RunUpdate |
 | `domain` | `domain/schemas.ts` | Schemas |
 | `domain` | `domain/service-report.ts` | ServicePart, ServiceReport |
@@ -794,6 +951,7 @@ classDiagram
 | `http` | `http/auth-gate.ts` | AuthGate |
 | `http` | `http/config-routes.ts` | ConfigRoutes |
 | `http` | `http/event-stream.ts` | EventStream |
+| `http` | `http/evidence-routes.ts` | EvidenceRoutes |
 | `http` | `http/frontend.ts` | Frontend |
 | `http` | `http/login-throttle.ts` | LoginThrottle |
 | `http` | `http/passwords.ts` | Passwords |

@@ -12,12 +12,12 @@ export interface StagePlan {
   needs: readonly StageName[];
 }
 
-/** The seven stages of docs/spec.md and what each must wait for: the four research streams need nothing, avatars need all four. */
+/** The seven stages of docs/spec.md and what each must wait for. Stage 4 waits for stage 1, whose brief its keywords come from (spec, 2026-10-17); avatars need all four. */
 export const STAGE_PLANS: Readonly<Record<StageName, StagePlan>> = {
   product_market: { number: 1, title: "Product and market research", needs: [] },
   sophistication: { number: 2, title: "Market awareness and sophistication", needs: [] },
   reviews: { number: 3, title: "Review collection", needs: [] },
-  competitor_ads: { number: 4, title: "Competitor long-form static ads", needs: [] },
+  competitor_ads: { number: 4, title: "Competitor long-form static ads", needs: ["product_market"] },
   avatars: { number: 5, title: "Avatar and sub-avatar synthesis", needs: ["product_market", "sophistication", "reviews", "competitor_ads"] },
   gaps: { number: 6, title: "Gap detection", needs: ["avatars"] },
   generation: { number: 7, title: "Long-form static generation", needs: ["gaps"] },

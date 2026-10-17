@@ -43,10 +43,10 @@ describe("products and competitors", () => {
   it("keep one product row per account and url, and a reconfirmation demotes competitors left out", async () => {
     const { store } = pg;
     const client = await store.accounts.addAccount("store-test");
-    const first = await store.products.upsert(client.id, "https://x.example/p", "X");
-    const again = await store.products.upsert(client.id, "https://x.example/p", "X");
+    const first = await store.products.upsert(client.id, "https://x.example/p", "X", "");
+    const again = await store.products.upsert(client.id, "https://x.example/p", "X", "");
     expect(again.id).toBe(first.id);
-    expect((await store.products.upsert(ADMIN_ACCOUNT, "https://x.example/p", "X")).id).not.toBe(first.id);
+    expect((await store.products.upsert(ADMIN_ACCOUNT, "https://x.example/p", "X", "")).id).not.toBe(first.id);
 
     const a = { brand: "A", product_name: "A drops", url: "https://www.a.example/p" };
     const b = { brand: "B", product_name: "B drops", url: "https://b.example/p" };

@@ -41,7 +41,8 @@ export class AnalysisService {
     if (run.status !== "awaiting_confirmation") return { refused: [`the run is ${run.status}, not awaiting confirmation`] };
     const parsed = Schemas.parse(ConfirmationSchema, raw);
     if (!parsed.ok) return { refused: parsed.problems };
-    const product = await this.store.products.upsert(run.account_id, parsed.value.product_url, AnalysisService.productName(run, parsed.value));
+    const resolved = run.resolution?.product.url === parsed.value.product_url ? run.resolution.product.brand : "";
+    const product = await this.store.products.upsert(run.account_id, parsed.value.product_url, AnalysisService.productName(run, parsed.value), resolved);
     const competitors = await this.store.competitors.confirm(product, parsed.value.competitors);
     await this.store.runs.updateRun(run.id, { product_id: product.id, status: "running" });
     const started = (await this.store.runs.get(run.id))!;

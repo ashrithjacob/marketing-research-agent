@@ -1,0 +1,112 @@
+/** Stage 4: competitors' long-form image ads, found by domain and by keywords from the brief, read in batches by agents that judge each ad's bucket; code refuses a batch that skips an ad. */
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+
+import type { Message } from "@earendil-works/pi-ai";
+
+import { ServiceClients } from "../src/adapters/index.js";
+import { CompetitorAdStage, Pipeline, ProductMarketStage } from "../src/agent/index.js";
+import type { AdHit, AdLibrary, AdPage, AdQuery, ReadAd } from "../src/domain/index.js";
+import { App } from "../src/http/index.js";
+
+import { Faux, FakeWeb, NoBilling, TestSettings } from "./fakes.js";
+import { BRIEF, DROPS_URL, GUMMIES_URL, PAGES, PRODUCT_URL, Profiles, RESOLUTION, SEARCH_HITS } from "./mullevia.js";
+import { PostgresStores } from "./postgres-stores.js";
+import { RunDriver } from "./run-driver.js";
+import { ScriptedAgents } from "./scripted-agents.js";
+
+const { call } = ScriptedAgents;
+const LONG = "I could not stop coughing every morning. ".repeat(60);
+
+class FakeAds implements AdLibrary {
+  readonly queries: AdQuery[] = [];
+
+  async search(query: AdQuery): Promise<AdPage> {
+    this.queries.push(query);
+    const term = query.terms[0]!;
+    const hits = term === "lungclear.com"
+      ? [FakeAds.hit("lc1", "lungclear.com", 64, LONG), FakeAds.hit("lc2", "lungclear.com", 3, LONG), FakeAds.hit("short", "lungclear.com", 90, "Buy now")]
+      : Array.from({ length: 8 }, (_, i) => FakeAds.hit(`${term}-${i}`, `brand${i}.com`, 20 + i, LONG));
+    return { hits, total: hits.length, credits: hits.length };
+  }
+
+  static hit(id: string, domain: string, days: number, body: string): AdHit {
+    return {
+      ad_id: id, advertiser: domain, page_id: "1", landing_url: `https://${domain}/p`, landing_domain: domain, first_seen: "2026-08-01", last_seen: "", status: "active",
+      countries: ["US"], body, ad_reach: 1000, page_reach_30d: null, page_live_ads: null, days_running: days, duplicates: 2, reach_delta_7d: 10, reach_delta_30d: 50,
+      current_rank: 4, is_eu: false, media_url: `https://cdn.test/${id}.jpg`, thumbnail_url: null,
+    };
+  }
+}
+
+class Reader {
+  refused = "";
+  private first = true;
+
+  readonly respond = (messages: Message[]) => {
+    const prompt = JSON.stringify(messages.find((m) => m.role === "user")?.content ?? "");
+    const ids = [...prompt.matchAll(/<ad id=\\"([0-9a-f]+)\\">/g)].map((m) => m[1]!);
+    const last = messages.at(-1);
+    if (last?.role === "toolResult") this.refused = JSON.stringify(last.content);
+    const kept = this.first ? ids.slice(1) : ids;
+    this.first = false;
+    return call("submit", { ads: kept.map((ad_id) => Reader.reading(ad_id)) });
+  };
+
+  static reading(adId: string) {
+    return {
+      ad_id: adId, avatar: "Ex-smokers who still wake up coughing", claim_type: "mechanism", awareness: "problem_aware", mechanism: "clears trapped mucus", proof_types: ["testimonial"],
+      offer: null, objections_handled: [], emotion: "relief", risk_flags: [], bucket: "winning", bucket_why: "64 days running, duplicated",
+    };
+  }
+}
+
+let pg: PostgresStores;
+
+beforeAll(async () => {
+  pg = await PostgresStores.start();
+});
+
+afterAll(async () => {
+  await pg.stop();
+});
+
+describe("stage 4", () => {
+  it("waits for the brief, sweeps by competitor domain and keyword, keeps only long copy, and stores each ad with the bucket its reader judged", async () => {
+    const ads = new FakeAds();
+    const reader = new Reader();
+    const faux = new Faux();
+    faux.provider.setResponses(
+      new ScriptedAgents()
+        .on("Product url:", [call("web_fetch", { url: PRODUCT_URL }), call("web_search", { query: "x" }), call("submit", RESOLUTION)])
+        .on("Product page:", [call("web_fetch", { url: PRODUCT_URL }), call("submit", BRIEF)])
+        .on(`Its product page: ${DROPS_URL}`, [call("web_fetch", { url: DROPS_URL }), call("submit", Profiles.of(DROPS_URL, "liquid_drops", true))])
+        .on(`Its product page: ${GUMMIES_URL}`, [call("web_fetch", { url: GUMMIES_URL }), call("submit", Profiles.of(GUMMIES_URL, "gummies", true))])
+        .on("Category: lung-support supplement", [call("submit", { keywords: ["mullein", "morning cough"] })])
+        .on("<ad id=", [reader.respond, reader.respond])
+        .steps(),
+    );
+    const web = new FakeWeb(PAGES, SEARCH_HITS);
+    const limits = { maxAds: 12, minCopyChars: 2000, maxAdsPerBrand: 15 };
+    const pipeline = new Pipeline([new ProductMarketStage(), new CompetitorAdStage(ads, TestSettings.make().settings.prices, limits)]);
+    const { settings, traces } = TestSettings.make();
+    const app = new App({ settings, traces, store: pg.store, services: new ServiceClients(web, web, ads), models: faux.models, generations: new NoBilling(), pipeline });
+    const driver = new RunDriver(app);
+    const picks = RESOLUTION.competitors.slice(0, 2).map(({ why: _why, ...pick }) => pick);
+
+    const runId = await driver.start({ product_url: PRODUCT_URL });
+    const done = await driver.confirmAndFinish(runId, { product_url: PRODUCT_URL, competitors: picks });
+
+    expect(done.run.stage_status.competitor_ads).toMatchObject({ status: "completed", error: "" });
+    expect(ads.queries.slice(0, 4).map((q) => q.searchIn)).toEqual(["domain", "domain", "domain", "domain"]);
+    expect(ads.queries.find((q) => q.terms[0] === "lungclear.com")).toMatchObject({ sortBy: "longestRunning", longForm: { minCopyChars: 2000, maxAdsPerBrand: 15 } });
+    expect(ads.queries.some((q) => q.searchIn === "ad_copy" && q.terms[0] === "mullein")).toBe(true);
+    const { ads: stored } = await driver.json<{ ads: ReadAd[] }>(`/runs/${runId}/ads`);
+    expect(stored).toHaveLength(12);
+    expect(stored.map((ad) => ad.trendtrack_ad_id)).not.toContain("short");
+    const lungclear = done.competitors.find((c) => c.brand === "LungClear")!.id;
+    expect(stored.find((ad) => ad.trendtrack_ad_id === "lc1")).toMatchObject({ competitor_id: lungclear, days_running: 64, bucket: "winning", bucket_why: "64 days running, duplicated" });
+    expect(stored.every((ad) => ad.reading?.claim_type === "mechanism")).toBe(true);
+    expect(reader.refused).toContain("was given but not read");
+    expect(done.run.stage_status.competitor_ads.summary).toBe("12 long-form statics found (keywords: mullein, morning cough); 12 read.");
+  });
+});

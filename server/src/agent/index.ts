@@ -10,3 +10,7 @@ export * from "./resolve/product-resolver.js";
 export * from "./stages/product-market/product-market-stage.js";
 export * from "./tools/toolbox.js";
 export * from "./models.js";
+export * from "./stages/reviews/review-stage.js";
+export * from "./stages/reviews/review-listings.js";
+export * from "./stages/reviews/amazon-listing-finder.js";
+export * from "./stages/ads/competitor-ad-stage.js";

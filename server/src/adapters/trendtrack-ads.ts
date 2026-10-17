@@ -8,11 +8,15 @@ interface TrendtrackAd {
   id?: string;
   status?: string;
   firstSeenAt?: string;
-  lastSeenAt?: string;
+  lastSeenAt?: string | null;
+  daysRunning?: number;
+  media?: { type?: string; thumbnailUrl?: string; mediaUrl?: string };
   advertiser?: { name?: string; facebookPageId?: string; reach30d?: number; liveAdsCount?: number };
   content?: { body?: string; title?: string; landingPageUrl?: string; landingPageDomain?: string };
-  metrics?: { reach?: number };
+  metrics?: { reach?: number; duplicates?: number; reachDelta7d?: number; reachDelta30d?: number };
   audience?: { targetedCountries?: string[] };
+  rank?: { currentRank?: number };
+  flags?: { isEuAd?: boolean };
 }
 
 /** Trendtrack's index of Meta ads, `POST /v1/ads/query`; one credit per ad returned. No key, a refused key or no credit means it can answer nothing. */
@@ -34,6 +38,8 @@ export class TrendtrackAds implements AdLibrary {
       status: "all",
       platforms: ["facebook"],
       ...(query.countries.length > 0 ? { adCountries: { include: [...query.countries] } } : {}),
+      ...(query.longForm ? { mediaType: "image", minDescriptionLength: query.longForm.minCopyChars, maxAdsPerBrand: query.longForm.maxAdsPerBrand } : {}),
+      ...(query.page ? { page: query.page } : {}),
       limit: query.limit,
     };
     const response = await Http.withTimeout(
@@ -67,6 +73,14 @@ export class TrendtrackAds implements AdLibrary {
       ad_reach: ad.metrics?.reach ?? null,
       page_reach_30d: ad.advertiser?.reach30d ?? null,
       page_live_ads: ad.advertiser?.liveAdsCount ?? null,
+      days_running: ad.daysRunning ?? null,
+      duplicates: ad.metrics?.duplicates ?? null,
+      reach_delta_7d: ad.metrics?.reachDelta7d ?? null,
+      reach_delta_30d: ad.metrics?.reachDelta30d ?? null,
+      current_rank: ad.rank?.currentRank ?? null,
+      is_eu: ad.flags?.isEuAd ?? false,
+      media_url: ad.media?.mediaUrl || null,
+      thumbnail_url: ad.media?.thumbnailUrl || null,
     };
   }
 }

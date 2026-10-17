@@ -2,10 +2,12 @@ import { useEffect, useState } from 'react';
 
 import { FINAL_STATUSES, runs, type Config } from '../api';
 import Activity from './Activity';
+import Ads from './Ads';
 import { Money, StatusBadge } from './badges';
 import Competitors from './Competitors';
 import ConfirmPanel from './ConfirmPanel';
 import ProductBrief from './ProductBrief';
+import Reviews from './Reviews';
 import StageTracker from './StageTracker';
 import { useRun } from './use-run';
 
@@ -49,6 +51,8 @@ export default function RunPage({ runId, onError }: { runId: string; onError: (m
       <StageTracker stages={config.stages} states={run.stage_status} />
       {product && <ProductBrief product={product} />}
       {product && <Competitors product={product} competitors={competitors} />}
+      {product && <Reviews runId={runId} product={product} competitors={competitors} version={run.stage_status.reviews?.status ?? ''} onError={onError} />}
+      {product && <Ads runId={runId} version={run.stage_status.competitor_ads?.status ?? ''} onError={onError} />}
       <Activity events={events} />
     </div>
   );

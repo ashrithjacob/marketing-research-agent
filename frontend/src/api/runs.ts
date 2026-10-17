@@ -1,5 +1,5 @@
 import { request } from './client';
-import type { AnalysisInput, CompetitorPick, Config, Run, RunEvent, RunView } from './types';
+import type { AnalysisInput, CompetitorPick, Config, ReadAd, ReviewCoverage, Run, RunEvent, RunView, StoredReview } from './types';
 
 const base = '/api/research';
 
@@ -12,6 +12,9 @@ export const runs = {
     request<RunView>(`${base}/runs/${id}/confirm`, { method: 'POST', body: JSON.stringify({ product_url, competitors }) }),
   stop: (id: string) => request<{ ok: boolean }>(`${base}/runs/${id}/stop`, { method: 'POST' }),
   traceUrl: (id: string) => `${base}/runs/${id}/trace`,
+  reviews: (id: string, competitor: string | null, limit = 20) =>
+    request<{ coverage: ReviewCoverage[]; reviews: StoredReview[] }>(`${base}/runs/${id}/reviews?limit=${limit}${competitor ? `&competitor=${competitor}` : ''}`),
+  ads: (id: string) => request<{ ads: ReadAd[] }>(`${base}/runs/${id}/ads`),
   follow: (id: string, onEvent: (event: RunEvent) => void): (() => void) => {
     const source = new EventSource(`${base}/runs/${id}/events`, { withCredentials: true });
     source.addEventListener('event', (message) => onEvent(JSON.parse((message as MessageEvent<string>).data) as RunEvent));

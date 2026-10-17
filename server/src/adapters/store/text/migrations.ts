@@ -321,5 +321,32 @@ CREATE TABLE patterns (
 );
 `;
 
+const REVIEW_AND_AD_SOURCES = `
+ALTER TABLE products ADD COLUMN asin_list JSONB NOT NULL DEFAULT '[]', ADD COLUMN review_app TEXT;
+
+ALTER TABLE reviews ALTER COLUMN product_id SET NOT NULL;
+ALTER TABLE reviews DROP CONSTRAINT reviews_account_id_content_hash_key;
+ALTER TABLE reviews ADD CONSTRAINT reviews_target_content UNIQUE NULLS NOT DISTINCT (product_id, competitor_id, content_hash);
+ALTER TABLE reviews ADD COLUMN country TEXT;
+CREATE INDEX reviews_product ON reviews(product_id, competitor_id);
+
+ALTER TABLE ads DROP CONSTRAINT ads_account_id_trendtrack_ad_id_key;
+ALTER TABLE ads
+    ADD COLUMN product_id     TEXT NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+    ADD COLUMN advertiser     TEXT NOT NULL DEFAULT '',
+    ADD COLUMN landing_url    TEXT NOT NULL DEFAULT '',
+    ADD COLUMN landing_domain TEXT NOT NULL DEFAULT '',
+    ADD COLUMN status         TEXT NOT NULL DEFAULT '',
+    ADD COLUMN reach          BIGINT,
+    ADD COLUMN thumbnail_url  TEXT,
+    ADD COLUMN bucket_why     TEXT;
+ALTER TABLE ads ADD CONSTRAINT ads_product_ad UNIQUE (product_id, trendtrack_ad_id);
+
+ALTER TABLE ad_extractions ADD COLUMN offer TEXT;
+`;
+
 /** Applied in order, once each, recorded in schema_migrations. An applied migration is never edited: a change is a new entry at the end. */
-export const MIGRATIONS: readonly Migration[] = [{ id: 1, name: "avatar_schema", sql: AVATAR_SCHEMA }];
+export const MIGRATIONS: readonly Migration[] = [
+  { id: 1, name: "avatar_schema", sql: AVATAR_SCHEMA },
+  { id: 2, name: "review_and_ad_sources", sql: REVIEW_AND_AD_SOURCES },
+];

@@ -226,7 +226,9 @@ Reviews are the highest-weighted input. The target is 3,000–10,000 written rev
 
 Use pay-per-result actors, not compute-billed ones; Apify's cost problem is mostly compute billing, not per-review pricing. Avoid scraping sources that need a login.
 
-**Weighting rules** (applied in Stage 5)
+**Volume, 2026-10-17:** up to 500 reviews per product (the client's and each confirmed competitor's) while testing, not 3,000–10,000 per run. Sources in the order built: the store's Judge.me widget (public JSON, 30 per page), then Amazon through woot.com's review endpoint (Amazon-owned, no login, free; 100 per star band, bands 3, 1, 2, 4, 5), measured working on 2026-10-17 and already used by `review-crawler`. A small agent finds a competitor's Amazon listing when its page is not on Amazon. Apify, Trustpilot, the other review apps, ad comments, forums and YouTube are not built yet (`docs/gaps.md`).
+
+**Weighting rules** (applied in Stage 5). *Superseded 2026-10-17: no fixed weights in code for now. Stage 3 stores each review's raw signals (source, verified, date, helpful votes); stage 5's agent weighs them as it reads. The rules below are guidance for that agent, not a formula.*
 
 - Source tier: Shopify verified and Amazon verified at 1.0; Trustpilot and ad comments at 0.6; forums and YouTube at 0.3; reviews of indirect competitors carry an extra × 0.8, since format affects what buyers praise and complain about
 - Verified purchase × 1.0, unverified × 0.6
@@ -265,7 +267,7 @@ Add a **second pass for text-in-image statics:** some long-form statics put the 
 | Reach growth | `reachDelta7d` / `30d` | Medium (currently scaling) |
 | EU/UK reach | Meta-disclosed reach for EU-delivered ads | Medium; real data, but of the target markets only the UK is covered |
 
-Ads are bucketed into **winning** (top tercile of score), **testing** (under 14 days) and **dead** (stopped before 14 days).
+Ads are bucketed into **winning** (top tercile of score), **testing** (under 14 days) and **dead** (stopped before 14 days). *Superseded 2026-10-17: an agent reads each ad's observable signals (days running, duplicates, reach deltas, status, rank) and picks the bucket with a one-line reason; no fixed score or tercile in code for now. Stage 4 also waits for stage 1, because its ad-copy keywords come from the product brief.*
 
 **Per-ad extraction** (LLM, structured output): target avatar and sub-avatar, lead claim type (plain, bigger, mechanism, identity), awareness level of the opening, mechanism named, proof types, offer, objections handled, emotional driver, compliance risk flags. Each ad and its extraction are stored with the TrendTrack ad id and media link.
 
@@ -274,7 +276,7 @@ Ads are bucketed into **winning** (top tercile of score), **testing** (under 14 
 The agent builds one avatar taxonomy from reviews, then maps competitor ads onto it, so demand and supply are measured on the same axes.
 
 1. **Extract signals per review** (cheap LLM, structured output): who they are (situation, life stage, stated age or condition), pain, desired outcome, trigger moment, prior solutions tried, objections and doubts, result described, and verbatim phrases.
-2. **Cluster into avatars.** Embed the signals and cluster (e.g. HDBSCAN), then have a stronger model name and describe each cluster. Repeat inside large clusters to get sub-avatars (two levels maximum).
+2. **Cluster into avatars.** ~~Embed the signals and cluster (e.g. HDBSCAN), then have a stronger model name and describe each cluster.~~ *Superseded 2026-10-17: an agent reads the reviews in batches and forms the groups itself. It keeps a memory of the avatars and angles found so far, and updates it as each batch confirms, splits or merges them. No embeddings: grouping by meaning is judgement the agent does better than a distance.* Repeat inside large groups to get sub-avatars (two levels maximum).
 3. **Map ads onto the taxonomy.** Classify each long-form static from Stage 4 into the same avatars and sub-avatars.
 4. **Measure both sides.**
    - Demand share = weighted share of reviews in the avatar (Stage 3 weights)
@@ -286,11 +288,13 @@ The agent builds one avatar taxonomy from reviews, then maps competitor ads onto
 
 **Per-avatar card fields:** name and one-line description; demand share and review count; supply share and ad count; win rate; top pains, desires and objections with example quotes; awareness level; best-performing angle and mechanism among competitors; confidence (low, medium or high).
 
-**Minimum evidence:** an avatar needs at least 30 weighted reviews to be reported; smaller clusters go into an "emerging signals" list rather than the main analysis.
+**Minimum evidence** (*2026-10-17: guidance for the agent, not a fixed threshold in code*): an avatar needs at least 30 weighted reviews to be reported; smaller clusters go into an "emerging signals" list rather than the main analysis.
 
 ## Stage 6: Gap detection
 
 A gap is reported only when demand clearly exceeds supply and the evidence clears fixed thresholds. If nothing qualifies, the report says so plainly and points the user to the winning avatars instead.
+
+*2026-10-17: the thresholds below are guidance for an agent's judgement for now, not fixed rules in code; they are flexible until real runs show where they sit.*
 
 **Gap types**
 
@@ -459,3 +463,7 @@ Each phase starts only when the previous one passes its gate.
 - Models: the LLM for each task (high-volume extraction versus synthesis and copy) is set in the code's environment variables, so models can be swapped without code changes.
 - Brand constraints: pilot customers share permitted claims and brand voice before the first run; collected in onboarding.
 - Ad-account access: pilot customers grant read-only Meta ad-account access after the MVP, which starts the outcome loop (phase 2).
+- 2026-10-17, review volume: 500 reviews per product while testing (stage 3).
+- 2026-10-17, avatars: an agent reads, groups and keeps a memory of avatars and angles, updated as it reads; no embedding clusters (stage 5).
+- 2026-10-17, thresholds: ranking weights, review weights, ad buckets and gap thresholds are judged by an LLM for now, not fixed code.
+- 2026-10-17, product images: stored in Neon's object storage for now.

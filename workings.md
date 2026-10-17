@@ -83,6 +83,60 @@ profiled; the summary names any competitor that could not be. Not built yet in
 stage 1: ranking (it needs stages 3 and 4), product images and label reading,
 economics, market size, Scira.
 
+## Stage 3: reviews
+
+`ReviewStage` (`agent/stages/reviews/`) starts as soon as the user confirms;
+it needs nothing from stage 1. For the client's product and each confirmed
+competitor, three at a time:
+
+1. **Where its reviews are** (`ReviewListings`). An Amazon url gives the ASIN
+   (Amazon's ten-character product code) directly. Otherwise the server reads
+   the page itself (`ShopifyStorefront`, a plain request, no service): the
+   shop's `myshopify.com` domain, the product id from Shopify's public
+   `/products/<handle>.js`, and which review apps the theme loads. Judge.me is
+   read; any other app is noted as not supported. Then an agent
+   (`amazon_listing:<id>`, `web_search` only, 6 turns) looks for the same
+   product on Amazon; code accepts its url only if it appeared in a search
+   result and contains `/dp/` and an ASIN.
+2. **Collect** up to `MRA_REVIEWS_PER_PRODUCT` (500): Judge.me first
+   (`JudgemeReviews`, the widget's own public endpoint, 30 a page), then Amazon
+   to fill (`WootReviews`, woot.com's endpoint, 10 a page, star bands 3, 1, 2,
+   4, 5 at up to `MRA_REVIEWS_PER_BAND` (100) each, one request every
+   `MRA_WOOT_DELAY_MS` (2000)). Both are free. Text is kept as written, with
+   markup and entities decoded; reviewer names are never stored.
+3. **Store** (`ReviewTable`): one row per review per target. The content hash
+   (source, rating, body with case and spacing normalised) is unique per
+   product and competitor, so a rerun adds only what is new. The ASIN and
+   review app go on the product or competitor row.
+
+The stage completes when any review was stored; its summary has one line per
+product: how many were new, from which source, and why a source is missing.
+Measured 2026-10-17 against the real endpoints: Mullevia's Judge.me gave all 31
+reviews (stars 19/8/2/0/2, matching the widget's own histogram); Woot gave 25
+reviews of one ASIN in 12 s.
+
+## Stage 4: competitor long-form statics
+
+`CompetitorAdStage` (`agent/stages/ads/`) waits for stage 1.
+
+1. **Keywords**: an agent (`ad_keywords`, no tools) picks 2–6 words long ads in
+   the category would use, from the brief.
+2. **Sweep** (`AdSweep`, code): TrendTrack `POST /v1/ads/query` with
+   `mediaType: image`, `minDescriptionLength` `MRA_AD_MIN_COPY_CHARS` (2000),
+   `maxAdsPerBrand` `MRA_ADS_PER_BRAND` (15), `status: all` and the run's
+   markets as countries; each competitor's domain first, then each keyword, each
+   sorted by longest running and by 30-day reach growth, 20 a request, until
+   `MRA_ADS_PER_RUN` (150) ads. One TrendTrack credit per ad returned, charged
+   to the run.
+3. **Store** (`AdTable`), one row per ad per product, tied to a competitor when
+   its landing domain is that competitor's.
+4. **Read**: agents (`ad_reader:<n>`, no tools) take 8 ads at a time, three
+   batches at once, and record avatar, claim type, awareness, mechanism, proof,
+   offer, objections, emotion, risk flags, and a bucket (winning, testing, dead)
+   with the signals that decided it. No fixed score: the agent judges from days
+   running, duplicates, reach growth, status and rank. Code refuses a batch
+   that skips, invents or repeats an ad id.
+
 ## What a run costs, and where that is recorded
 
 Billed, never calculated. Every paid call writes a `charges` row as it

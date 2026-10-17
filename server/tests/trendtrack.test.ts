@@ -51,6 +51,18 @@ describe("TrendtrackAds", () => {
     expect(page.hits[0]).toMatchObject({ advertiser: "Barbara Collins", landing_domain: "offer.tryhealora.com", first_seen: "2026-05-25", countries: ["GB", "US"], page_live_ads: 559 });
   });
 
+  it("asks for long-form image ads with the spec's filters, page by page, and keeps the signals an ad is judged by", async () => {
+    const scaled = { ...persona, daysRunning: 64, media: { type: "image", mediaUrl: "https://cdn.test/ad.jpg", thumbnailUrl: "https://cdn.test/t.jpg" }, metrics: { reach: 120000, duplicates: 7, reachDelta7d: 900, reachDelta30d: 5200 }, rank: { currentRank: 3 }, flags: { isEuAd: true } };
+    const fetch = vi.fn(async () => json(200, { data: [scaled], pagination: { total: 1 } }));
+    vi.stubGlobal("fetch", fetch);
+    const page = await new TrendtrackAds(settings()).search({
+      terms: ["mullein.com"], searchIn: "domain", countries: ["US"], limit: 20, page: 2, sortBy: "longestRunning", longForm: { minCopyChars: 2000, maxAdsPerBrand: 15 },
+    });
+    const body = JSON.parse(String((fetch.mock.calls[0] as unknown as [string, RequestInit])[1].body));
+    expect(body).toMatchObject({ searchType: "domain", sortBy: "longestRunning", mediaType: "image", minDescriptionLength: 2000, maxAdsPerBrand: 15, page: 2, limit: 20 });
+    expect(page.hits[0]).toMatchObject({ days_running: 64, duplicates: 7, reach_delta_30d: 5200, current_rank: 3, is_eu: true, media_url: "https://cdn.test/ad.jpg" });
+  });
+
   it("can answer nothing without a key or credit, and fails only the request otherwise", async () => {
     await expect(new TrendtrackAds(settings({ trendtrackApiKey: "" })).search({ terms: ["x"], searchIn: "brand", countries: [], limit: 1 })).rejects.toBeInstanceOf(ServiceUnavailableError);
     vi.stubGlobal("fetch", vi.fn(async () => json(402, { message: "No credits" })));
@@ -61,7 +73,7 @@ describe("TrendtrackAds", () => {
 });
 
 describe("ad_search", () => {
-  const hit = { ad_id: "facebook_1", advertiser: "Barbara Collins", page_id: "99", landing_url: "https://offer.tryhealora.com/adv", landing_domain: "offer.tryhealora.com", first_seen: "2026-05-25", last_seen: "2026-07-14", status: "active", countries: ["GB"], body: "Dermatologists found remedy", ad_reach: 120000, page_reach_30d: 1682459, page_live_ads: 559 };
+  const hit = { ad_id: "facebook_1", advertiser: "Barbara Collins", page_id: "99", landing_url: "https://offer.tryhealora.com/adv", landing_domain: "offer.tryhealora.com", first_seen: "2026-05-25", last_seen: "2026-07-14", status: "active", countries: ["GB"], body: "Dermatologists found remedy", ad_reach: 120000, page_reach_30d: 1682459, page_live_ads: 559, days_running: 50, duplicates: 2, reach_delta_7d: null, reach_delta_30d: null, current_rank: null, is_eu: false, media_url: null, thumbnail_url: null };
   const meter: ChargeMeter = { charge: async () => undefined };
 
   it("searches in the run's countries, caps the count at 20, and lets the agent cite each ad's landing page", async () => {

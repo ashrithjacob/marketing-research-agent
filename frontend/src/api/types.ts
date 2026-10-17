@@ -110,3 +110,51 @@ export interface RunEvent {
   payload: Record<string, unknown>;
   created_at: string;
 }
+
+export interface ReviewCoverage {
+  competitor_id: string | null;
+  source: string;
+  reviews: number;
+  average_rating: number | null;
+}
+
+export interface StoredReview {
+  id: string;
+  competitor_id: string | null;
+  source: string;
+  rating: number;
+  title: string;
+  body: string;
+  review_date: string | null;
+  verified: boolean | null;
+  helpful_votes: number;
+}
+
+export interface AdReading {
+  avatar: string;
+  claim_type: string;
+  awareness: string;
+  mechanism: string | null;
+  proof_types: string[];
+  offer: string | null;
+  objections_handled: string[];
+  emotion: string;
+  risk_flags: string[];
+}
+
+export interface ReadAd {
+  id: string;
+  competitor_id: string | null;
+  advertiser: string;
+  landing_url: string;
+  landing_domain: string;
+  status: string;
+  copy: string;
+  media_url: string | null;
+  first_seen: string | null;
+  days_running: number | null;
+  duplicates: number | null;
+  bucket: 'winning' | 'testing' | 'dead' | null;
+  bucket_why: string | null;
+  reading: AdReading | null;
+}

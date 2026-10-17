@@ -6,12 +6,13 @@ import type { SqlDatabase } from "./sql-database.js";
 export class ProductTable implements ProductStore {
   constructor(private readonly db: SqlDatabase) {}
 
-  async upsert(accountId: string, url: string, name: string): Promise<Product> {
+  async upsert(accountId: string, url: string, name: string, brand: string): Promise<Product> {
     Trace.line(import.meta.url, "ProductTable.upsert", { accountId, url });
     const row = await this.db.get<{ id: string }>(
-      "INSERT INTO products (id, account_id, url, name) VALUES (?,?,?,?)" +
-        " ON CONFLICT (account_id, url) DO UPDATE SET updated_at = now() RETURNING id",
-      [Ids.next(), accountId, url, name],
+      "INSERT INTO products (id, account_id, url, name, brand) VALUES (?,?,?,?,?)" +
+        " ON CONFLICT (account_id, url) DO UPDATE SET brand = CASE WHEN products.brand = '' THEN EXCLUDED.brand ELSE products.brand END," +
+        " updated_at = now() RETURNING id",
+      [Ids.next(), accountId, url, name, brand],
     );
     return (await this.get(row!.id))!;
   }
