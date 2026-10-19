@@ -7,7 +7,7 @@ import { fauxProvider } from "@earendil-works/pi-ai/providers/faux";
 
 import { ServiceClients } from "../src/adapters/index.js";
 import type { Settings } from "../src/config/index.js";
-import type { AdLibrary, AdPage, FetchedPage, GenerationSource, PageFetcher, SearchPage, WebSearch } from "../src/domain/index.js";
+import type { AdLibrary, AdPage, BrandVisual, BrandVisuals, FetchedPage, GenerationSource, PageFetcher, SearchPage, WebSearch } from "../src/domain/index.js";
 import { TraceFile } from "../src/trace/index.js";
 
 export const FAUX_MODEL = "faux-model";
@@ -38,6 +38,16 @@ export class FakeWeb implements PageFetcher, WebSearch, AdLibrary {
 
   services(): ServiceClients {
     return new ServiceClients(this, this, this);
+  }
+}
+
+/** Every page has a picture at a predictable address, so a test can see where each one went; no network. */
+export class FakeVisuals implements BrandVisuals {
+  readonly asked: string[] = [];
+
+  async find(url: string): Promise<BrandVisual> {
+    this.asked.push(url);
+    return { image_url: `${url}#image`, logo_url: null };
   }
 }
 

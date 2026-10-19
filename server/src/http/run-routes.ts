@@ -70,6 +70,8 @@ export class RunRoutes {
     Trace.line(import.meta.url, "RunRoutes.view", { runId: run.id });
     const product = run.product_id ? await this.store.products.get(run.product_id) : null;
     const competitors = run.product_id ? (await this.store.competitors.list(run.product_id)).filter((competitor) => competitor.status === "confirmed") : [];
-    return { run, product, competitors };
+    const urls = [run.resolution?.product.url, ...(run.resolution?.alternatives ?? []).map((a) => a.url), ...(run.resolution?.competitors ?? []).map((c) => c.url), product?.url, ...competitors.map((c) => c.url)];
+    const visuals = Object.fromEntries(await this.store.visuals.get([...new Set(urls.filter((url): url is string => Boolean(url)))]));
+    return { run, product, competitors, visuals };
   }
 }

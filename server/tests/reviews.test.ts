@@ -6,7 +6,7 @@ import { AmazonListingFinder, Pipeline, ReviewListings, ReviewStage } from "../s
 import { Asins, type CollectedReview, type ReviewListing, type ReviewSource, type ReviewSourceName, type Storefront, type StorefrontFacts } from "../src/domain/index.js";
 import { App } from "../src/http/index.js";
 
-import { Faux, FakeWeb, NoBilling, TestSettings } from "./fakes.js";
+import { Faux, FakeWeb, NoBilling, FakeVisuals, TestSettings } from "./fakes.js";
 import { DROPS_URL, GUMMIES_URL, PAGES, PRODUCT_URL, RESOLUTION, SEARCH_HITS } from "./mullevia.js";
 import { PostgresStores } from "./postgres-stores.js";
 import { RunDriver } from "./run-driver.js";
@@ -63,6 +63,7 @@ describe("a store page", () => {
   it("gives an ASIN only for an Amazon product url", () => {
     expect(Asins.fromUrl("https://www.amazon.com/Mullein-Drops/dp/B0CDN5DNK1?th=1")).toBe("B0CDN5DNK1");
     expect(Asins.fromUrl("https://www.amazon.co.uk/gp/product/B0CDN5DNK1/")).toBe("B0CDN5DNK1");
+    expect(Asins.fromUrl("https://www.amazon.com/clp/B08LP4NG6M")).toBe("B08LP4NG6M");
     expect(Asins.fromUrl("https://notamazon.com/dp/B0CDN5DNK1")).toBeNull();
   });
 });
@@ -117,7 +118,7 @@ describe("stage 3", () => {
     const web = new FakeWeb(PAGES, [...SEARCH_HITS, { title: "LungClear on Amazon", url: amazonUrl, snippet: "" }]);
     const stage = new ReviewStage(new ReviewListings(new FakeStorefront(), new AmazonListingFinder()), new Map<ReviewSourceName, ReviewSource>([["judgeme", judgeme], ["amazon", amazon]]), 500);
     const { traces } = TestSettings.make();
-    const app = new App({ settings, traces, store: pg.store, services: web.services(), models: faux.models, generations: new NoBilling(), pipeline: new Pipeline([stage]) });
+    const app = new App({ settings, traces, store: pg.store, services: web.services(), models: faux.models, generations: new NoBilling(), visuals: new FakeVisuals(), pipeline: new Pipeline([stage]) });
     const driver = new RunDriver(app);
     const picks = RESOLUTION.competitors.slice(0, 2).map(({ why: _why, ...pick }) => pick);
 
@@ -150,7 +151,7 @@ describe("stage 3", () => {
     );
     const stage = new ReviewStage(new ReviewListings(new FakeStorefront(), new AmazonListingFinder()), new Map<ReviewSourceName, ReviewSource>([["judgeme", empty], ["amazon", amazon]]), 500);
     const { traces } = TestSettings.make();
-    const app = new App({ settings, traces, store: pg.store, services: new FakeWeb(PAGES, SEARCH_HITS).services(), models: faux.models, generations: new NoBilling(), pipeline: new Pipeline([stage]) });
+    const app = new App({ settings, traces, store: pg.store, services: new FakeWeb(PAGES, SEARCH_HITS).services(), models: faux.models, generations: new NoBilling(), visuals: new FakeVisuals(), pipeline: new Pipeline([stage]) });
     const driver = new RunDriver(app);
     const runId = await driver.start({ product_url: PRODUCT_URL });
     const done = await driver.confirmAndFinish(runId, { product_url: PRODUCT_URL, competitors: RESOLUTION.competitors.slice(0, 1).map(({ why: _why, ...pick }) => pick) });

@@ -13,7 +13,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { App } from "../src/http/index.js";
 import { Trace, TraceFile, TraceFormat, WireTap, type TraceStep } from "../src/trace/index.js";
 
-import { Faux, FakeWeb, NoBilling, TestSettings } from "./fakes.js";
+import { Faux, FakeWeb, NoBilling, FakeVisuals, TestSettings } from "./fakes.js";
 import { PAGES, PRODUCT_URL, RESOLUTION, SEARCH_HITS } from "./mullevia.js";
 import { PostgresStores } from "./postgres-stores.js";
 import { ScriptedAgents } from "./scripted-agents.js";
@@ -190,7 +190,7 @@ describe("the download", () => {
         .steps(),
     );
     const { settings } = TestSettings.make({ traceDir: dir });
-    const app = new App({ settings, traces, store: pg.store, services: new FakeWeb(PAGES, SEARCH_HITS).services(), models: faux.models, generations: new NoBilling() });
+    const app = new App({ settings, traces, store: pg.store, services: new FakeWeb(PAGES, SEARCH_HITS).services(), models: faux.models, generations: new NoBilling(), visuals: new FakeVisuals() });
     const created = await app.fetch(new Request("http://test/api/research/runs", {
       method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ product_url: PRODUCT_URL }),
     }));

@@ -1,6 +1,6 @@
 import { Hono, type Context, type Next } from "hono";
 
-import { JudgemeReviews, OpenRouterPrices, PageVisuals, PublicPage, ServiceClients, ShopifyStorefront, WootReviews } from "../adapters/index.js";
+import { CachedVisuals, JudgemeReviews, OpenRouterPrices, PageVisuals, PublicPage, ServiceClients, ShopifyStorefront, WootReviews } from "../adapters/index.js";
 import {
   AmazonListingFinder,
   AnalysisService,
@@ -12,6 +12,7 @@ import {
   Pipeline,
   ProductMarketStage,
   ProductResolver,
+  ResolutionVisuals,
   ReviewListings,
   ReviewStage,
   RunEvents,
@@ -21,7 +22,7 @@ import {
   type RunServices,
 } from "../agent/index.js";
 import type { Settings } from "../config/index.js";
-import type { GenerationSource, ResearchStore } from "../domain/index.js";
+import type { BrandVisuals, GenerationSource, ResearchStore } from "../domain/index.js";
 import { Trace, TraceFile } from "../trace/index.js";
 
 import type { ApiEnv } from "./api-env.js";
@@ -39,6 +40,7 @@ export interface AppParts {
   models?: LlmCatalogue;
   generations?: GenerationSource;
   pipeline?: Pipeline;
+  visuals?: BrandVisuals;
 }
 
 /** The service: auth, the analysis routes, and the built single-page app. Everything concrete is built here and nowhere else. */
@@ -53,7 +55,9 @@ export class App {
     const { settings, store } = parts;
     this.prices = new OpenRouterPrices({ apiKey: settings.openrouterApiKey });
     const clients = parts.services ?? ServiceClients.forSettings(settings);
-    const pipeline = parts.pipeline ?? App.pipeline(settings, clients);
+    const pages = new PublicPage(settings);
+    const visuals = new CachedVisuals(parts.visuals ?? new PageVisuals(pages), store.visuals);
+    const pipeline = parts.pipeline ?? App.pipeline(settings, clients, pages, visuals);
     const events = new RunEvents(store.events);
     const services: RunServices = {
       store,
@@ -62,7 +66,7 @@ export class App {
       generations: parts.generations ?? this.prices,
       events,
     };
-    const launcher = new RunLauncher(services, settings, this.live, pipeline, new ProductResolver());
+    const launcher = new RunLauncher(services, settings, this.live, pipeline, new ProductResolver(), new ResolutionVisuals(visuals));
     this.analyses = new AnalysisService(store, launcher, this.live, pipeline, settings.model);
 
     const hono = new Hono<ApiEnv>();
@@ -76,13 +80,12 @@ export class App {
     this.fetch = hono.fetch;
   }
 
-  static pipeline(settings: Settings, clients: ServiceClients): Pipeline {
+  static pipeline(settings: Settings, clients: ServiceClients, pages: PublicPage, visuals: BrandVisuals): Pipeline {
     Trace.line(import.meta.url, "App.pipeline");
     const sources = new Map([new JudgemeReviews(settings), new WootReviews(settings)].map((source) => [source.name, source] as const));
     const limits = { maxAds: settings.adsPerRun, minCopyChars: settings.adMinCopyChars, maxAdsPerBrand: settings.adsPerBrand };
-    const pages = new PublicPage(settings);
     return new Pipeline([
-      new ProductMarketStage(new BrandVisualsCollector(new PageVisuals(pages))),
+      new ProductMarketStage(new BrandVisualsCollector(visuals)),
       new ReviewStage(new ReviewListings(new ShopifyStorefront(pages), new AmazonListingFinder()), sources, settings.reviewsPerProduct),
       new CompetitorAdStage(clients.ads, settings.prices, limits),
       new AvatarStage(),

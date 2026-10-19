@@ -83,6 +83,12 @@ export interface AdStore {
   list(productId: string): Promise<ReadAd[]>;
 }
 
+/** Product shots and logos by page url, shared by every account: they are public pages, read once. */
+export interface BrandVisualCache {
+  get(urls: readonly string[]): Promise<Map<string, BrandVisual>>;
+  put(url: string, visual: BrandVisual): Promise<void>;
+}
+
 export interface EventLog {
   add(runId: string, kind: string, payload: Record<string, unknown>): Promise<RunEvent>;
   list(runId: string, afterId?: number): Promise<RunEvent[]>;
@@ -109,6 +115,7 @@ export interface ResearchStore {
   readonly reviews: ReviewStore;
   readonly ads: AdStore;
   readonly avatars: AvatarStore;
+  readonly visuals: BrandVisualCache;
   readonly events: EventLog;
   readonly charges: ChargeLedger;
   readonly calls: CallLog;

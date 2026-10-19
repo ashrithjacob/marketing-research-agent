@@ -11,6 +11,7 @@ import { EventTable } from "./event-table.js";
 import { Migrator } from "./migrator.js";
 import { ProductTable } from "./product-table.js";
 import { ReviewTable } from "./review-table.js";
+import { VisualTable } from "./visual-table.js";
 import { RunTable } from "./run-table.js";
 import type { SqlDatabase } from "./sql-database.js";
 
@@ -23,6 +24,7 @@ export class SqlResearchStore implements ResearchStore {
   readonly reviews: ReviewTable;
   readonly ads: AdTable;
   readonly avatars: AvatarTable;
+  readonly visuals: VisualTable;
   readonly events: EventTable;
   readonly charges: ChargeTable;
   readonly calls: CallTable;
@@ -36,6 +38,7 @@ export class SqlResearchStore implements ResearchStore {
     this.reviews = new ReviewTable(db);
     this.ads = new AdTable(db);
     this.avatars = new AvatarTable(db);
+    this.visuals = new VisualTable(db);
     this.events = new EventTable(db);
     this.charges = new ChargeTable(db);
     this.calls = new CallTable(db);

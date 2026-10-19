@@ -68,7 +68,7 @@ export const AmazonListingSchema = z.object({
 export type AmazonListing = z.infer<typeof AmazonListingSchema>;
 
 export class Asins {
-  private static readonly IN_PATH = /\/(?:dp|gp\/product|product-reviews)\/([A-Z0-9]{10})(?:[/?]|$)/;
+  private static readonly IN_PATH = /\/(?:dp|gp\/product|product-reviews|clp)\/([A-Z0-9]{10})(?:[/?]|$)/;
 
   static fromUrl(url: string): string | null {
     Trace.line(import.meta.url, "Asins.fromUrl", { url });

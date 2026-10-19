@@ -3,7 +3,7 @@ import { Trace } from "../trace/index.js";
 
 import type { PublicPage } from "./public-page.js";
 
-/** A brand's product shot and logo, read from its own page for free: the product image from Shopify's `/products/<handle>.js` or the page's og:image, the logo from its icon links or `/favicon.ico`. A page that cannot be read gives nulls. */
+/** A brand's product shot and logo, read from its own page for free: the product image from Shopify's `/products/<handle>.js`, the page's og:image, or Amazon's gallery image (`data-old-hires`, which its product pages carry instead of og:image; measured 2026-10-19), the logo from its icon links or `/favicon.ico`. A page that cannot be read gives nulls. */
 export class PageVisuals implements BrandVisuals {
   private static readonly ICON_RELS = ["apple-touch-icon", "apple-touch-icon-precomposed", "icon", "shortcut icon"];
 
@@ -26,7 +26,8 @@ export class PageVisuals implements BrandVisuals {
       const tag = PageVisuals.tags(html, "meta").find((attrs) => (attrs.property ?? attrs.name) === property && attrs.content);
       if (tag) return PageVisuals.absolute(tag.content!, base);
     }
-    return null;
+    const gallery = /data-old-hires="(https?:[^"]+)"/.exec(html)?.[1];
+    return gallery ? PageVisuals.absolute(gallery, base) : null;
   }
 
   static icon(html: string, base: string): string | null {

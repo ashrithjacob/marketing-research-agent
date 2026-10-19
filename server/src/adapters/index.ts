@@ -14,3 +14,4 @@ export * from "./reviews/judgeme-reviews.js";
 export * from "./reviews/woot-reviews.js";
 export * from "./public-page.js";
 export * from "./page-visuals.js";
+export * from "./cached-visuals.js";

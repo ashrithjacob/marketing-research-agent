@@ -6,7 +6,7 @@ import type { Message } from "@earendil-works/pi-ai";
 import { Pipeline, ProductMarketStage } from "../src/agent/index.js";
 import { App } from "../src/http/index.js";
 
-import { Faux, FakeWeb, NoBilling, TestSettings } from "./fakes.js";
+import { Faux, FakeWeb, NoBilling, FakeVisuals, TestSettings } from "./fakes.js";
 import { BRIEF, DROPS_URL, GUMMIES_URL, PAGES, PRODUCT_URL, Profiles, RESOLUTION, SEARCH_HITS, TEA_URL } from "./mullevia.js";
 import { PostgresStores } from "./postgres-stores.js";
 import { RunDriver } from "./run-driver.js";
@@ -32,7 +32,7 @@ beforeEach(() => {
   web = new FakeWeb(PAGES, SEARCH_HITS);
   const { settings, traces } = TestSettings.make();
   const pipeline = new Pipeline([new ProductMarketStage()]);
-  app = new App({ settings, traces, store: pg.store, services: web.services(), models: faux.models, generations: new NoBilling(), pipeline });
+  app = new App({ settings, traces, store: pg.store, services: web.services(), models: faux.models, generations: new NoBilling(), visuals: new FakeVisuals(), pipeline });
   driver = new RunDriver(app);
 });
 
@@ -61,6 +61,9 @@ describe("a run", () => {
     expect(waiting.run.resolution?.competitors.map((c) => c.brand)).toEqual(["LungClear", "Breathe", "Chest Tea"]);
     expect(waiting.run.stage_status.product_market.status).toBe("pending");
     expect(waiting.run.stage_status.reviews.status).toBe("not_built");
+    const { visuals } = (await (await api(`/runs/${runId}`)).json()) as { visuals: Record<string, { image_url: string | null }> };
+    expect(Object.keys(visuals).sort()).toEqual([PRODUCT_URL, DROPS_URL, GUMMIES_URL, TEA_URL].sort());
+    expect(visuals[DROPS_URL]?.image_url).toBe(`${DROPS_URL}#image`);
 
     expect((await api(`/runs/${runId}/confirm`, confirmation)).status).toBe(200);
     const done = await settle(runId, ["completed", "invalid", "failed"]);

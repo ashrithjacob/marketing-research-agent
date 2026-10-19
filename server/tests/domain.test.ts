@@ -40,4 +40,13 @@ describe("the resolver's checks", () => {
     urls.saw(RESOLUTION.competitors.map((c) => c.url));
     expect(ProductResolver.problems(RESOLUTION, urls)).toEqual([]);
   });
+
+  it("refuse an Amazon search page offered as a competitor's product page", () => {
+    const urls = new UrlLedger();
+    const search = "https://www.amazon.com/mullein-drops/s?k=mullein+drops";
+    const offered = { ...RESOLUTION, competitors: [...RESOLUTION.competitors, { brand: "X", product_name: "X drops", url: search, why: "x" }] };
+    urls.read(PRODUCT_URL);
+    urls.saw(offered.competitors.map((c) => c.url));
+    expect(ProductResolver.problems(offered, urls)).toEqual([`competitor url ${search} is an Amazon page but not a product page; use the listing's /dp/ url`]);
+  });
 });

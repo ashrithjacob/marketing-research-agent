@@ -223,3 +223,15 @@ p.pad { padding: 16px 20px; margin: 0; }
 button.link { background: none; border: 0; padding: 0 0 0 4px; color: var(--accent); font-size: 12px; }
 .stage p.clamped button.link { position: absolute; right: 0; bottom: 0; background: var(--panel); padding-left: 6px; }
 .banner { overflow-wrap: anywhere; }
+
+.pick-tiles { list-style: none; padding: 0; margin: 0 0 8px; display: grid; grid-template-columns: repeat(auto-fill, minmax(156px, 1fr)); gap: 12px; }
+.pick-tile { position: relative; display: grid; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); overflow: hidden; transition: border-color 0.15s, box-shadow 0.15s, opacity 0.15s; opacity: 0.55; }
+.pick-tile.selected { opacity: 1; border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.pick-tile:hover { box-shadow: var(--shadow-md); opacity: 1; }
+.pick-body { display: grid; gap: 4px; padding: 10px 10px 4px; text-align: left; background: none; border: 0; color: var(--ink); }
+.pick-image { position: relative; display: block; }
+.pick-image .brand-mark { width: 100% !important; height: auto !important; aspect-ratio: 1; }
+.pick-check { position: absolute; top: 6px; right: 6px; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-size: 13px; font-weight: 700; color: #fff; background: var(--accent); box-shadow: 0 0 0 2px var(--panel); }
+.pick-tile:not(.selected) .pick-check { background: var(--panel); border: 1px solid var(--line); }
+.pick-name { color: var(--dim); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.pick-link { padding: 0 10px 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

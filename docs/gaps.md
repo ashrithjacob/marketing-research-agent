@@ -41,6 +41,13 @@ rewrite is in git history before `b6f45cc`.
 8. **`claims_on_page` is re-typed by the model**, not copied by code from the
    page, against the rule that a model never copies content by writing it out.
 
+7c. **Competitors are not ordered by traction.** TrendTrack holds what is
+    needed (measured 2026-10-19): `GET /v1/lookup?q=<domain>` is free and gives
+    the shop id with monthly visits and active ads; `GET /v1/shops/{id}` (one
+    credit) adds `sales.estMonthlySales` (estimated 30-day revenue, USD) and
+    `unitsSold`, for shops its sales tracker follows. Amazon listings have no
+    TrendTrack shop.
+
 ## Stage 3
 
 9. **Review sources not built:** Apify (the paid fallback when Woot breaks),

@@ -9,7 +9,7 @@ import { AdSweep } from "../src/agent/stages/ads/ad-sweep.js";
 import type { AdHit, AdLibrary, AdPage, AdQuery, ReadAd } from "../src/domain/index.js";
 import { App } from "../src/http/index.js";
 
-import { Faux, FakeWeb, NoBilling, TestSettings } from "./fakes.js";
+import { Faux, FakeWeb, NoBilling, FakeVisuals, TestSettings } from "./fakes.js";
 import { BRIEF, DROPS_URL, GUMMIES_URL, PAGES, PRODUCT_URL, Profiles, RESOLUTION, SEARCH_HITS } from "./mullevia.js";
 import { PostgresStores } from "./postgres-stores.js";
 import { RunDriver } from "./run-driver.js";
@@ -98,7 +98,7 @@ describe("stage 4", () => {
     const limits = { maxAds: 12, minCopyChars: 2000, maxAdsPerBrand: 15 };
     const pipeline = new Pipeline([new ProductMarketStage(), new CompetitorAdStage(ads, TestSettings.make().settings.prices, limits)]);
     const { settings, traces } = TestSettings.make();
-    const app = new App({ settings, traces, store: pg.store, services: new ServiceClients(web, web, ads), models: faux.models, generations: new NoBilling(), pipeline });
+    const app = new App({ settings, traces, store: pg.store, services: new ServiceClients(web, web, ads), models: faux.models, generations: new NoBilling(), visuals: new FakeVisuals(), pipeline });
     const driver = new RunDriver(app);
     const picks = RESOLUTION.competitors.slice(0, 2).map(({ why: _why, ...pick }) => pick);
 

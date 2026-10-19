@@ -1,4 +1,4 @@
-import { ResolutionSchema, type AnalysisInput, type Resolution } from "../../domain/index.js";
+import { Asins, ResolutionSchema, type AnalysisInput, type Resolution } from "../../domain/index.js";
 import { Trace } from "../../trace/index.js";
 import type { AgentResult } from "../kernel/agent-runner.js";
 import type { RunContext } from "../pipeline/run-context.js";
@@ -33,6 +33,9 @@ export class ProductResolver {
     const competitorUrls = resolution.competitors.map((competitor) => competitor.url);
     for (const url of urls.unknown(competitorUrls)) problems.push(`competitor url ${url} did not appear in any search, ad or page you read; use a url you actually met`);
     if (competitorUrls.includes(resolution.product.url)) problems.push("the product itself is listed as a competitor");
+    for (const url of competitorUrls) {
+      if (/(^|\.)amazon\.[a-z.]+$/.test(new URL(url).hostname) && !Asins.fromUrl(url)) problems.push(`competitor url ${url} is an Amazon page but not a product page; use the listing's /dp/ url`);
+    }
     return problems;
   }
 

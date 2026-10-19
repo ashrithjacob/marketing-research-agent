@@ -101,10 +101,16 @@ export interface Competitor {
   logo_url: string | null;
 }
 
+export interface BrandVisual {
+  image_url: string | null;
+  logo_url: string | null;
+}
+
 export interface RunView {
   run: Run;
   product: Product | null;
   competitors: Competitor[];
+  visuals: Record<string, BrandVisual>;
 }
 
 export interface RunEvent {

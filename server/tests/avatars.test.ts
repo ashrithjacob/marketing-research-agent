@@ -7,7 +7,7 @@ import { AmazonListingFinder, AvatarStage, Pipeline, ReviewListings, ReviewStage
 import type { AdHit, CollectedReview, ReviewListing, ReviewSource, ReviewSourceName, StoredAvatar, Storefront, StorefrontFacts } from "../src/domain/index.js";
 import { App } from "../src/http/index.js";
 
-import { Faux, FakeWeb, NoBilling, TestSettings } from "./fakes.js";
+import { Faux, FakeWeb, NoBilling, FakeVisuals, TestSettings } from "./fakes.js";
 import { PAGES, PRODUCT_URL, RESOLUTION, SEARCH_HITS } from "./mullevia.js";
 import { PostgresStores } from "./postgres-stores.js";
 import { RunDriver } from "./run-driver.js";
@@ -99,7 +99,7 @@ describe("stage 5", () => {
     const sources = new Map<ReviewSourceName, ReviewSource>([["judgeme", new Reviews("judgeme", 90)]]);
     const pipeline = new Pipeline([new ReviewStage(new ReviewListings(new OneStore(), new AmazonListingFinder()), sources, 500), new AvatarStage()]);
     const { settings, traces } = TestSettings.make();
-    const app = new App({ settings, traces, store: pg.store, services: new FakeWeb(PAGES, SEARCH_HITS).services(), models: faux.models, generations: new NoBilling(), pipeline });
+    const app = new App({ settings, traces, store: pg.store, services: new FakeWeb(PAGES, SEARCH_HITS).services(), models: faux.models, generations: new NoBilling(), visuals: new FakeVisuals(), pipeline });
     const driver = new RunDriver(app);
 
     const runId = await driver.start({ product_url: PRODUCT_URL });

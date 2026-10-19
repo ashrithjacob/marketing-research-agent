@@ -8,6 +8,7 @@ import type { Pipeline } from "./pipeline/pipeline.js";
 import { RunContext, type RunServices } from "./pipeline/run-context.js";
 import { StageProgress } from "./pipeline/stage-progress.js";
 import type { ProductResolver } from "./resolve/product-resolver.js";
+import type { ResolutionVisuals } from "./resolve/resolution-visuals.js";
 import { RunEnd } from "./run-end.js";
 
 /** Runs a run's two phases in the background: resolving what the user typed, and, once they confirm, the stages. */
@@ -20,6 +21,7 @@ export class RunLauncher {
     private readonly live: LiveRuns,
     private readonly pipeline: Pipeline,
     private readonly resolver: ProductResolver,
+    private readonly visuals: ResolutionVisuals,
   ) {
     Trace.line(import.meta.url, "RunLauncher.constructor");
     this.runEnd = new RunEnd(services.store, services.events);
@@ -41,6 +43,8 @@ export class RunLauncher {
         const result = await this.resolver.resolve(context);
         await context.settled();
         if (result.status === "completed") {
+          const pictured = await this.visuals.collect(result.value, signal);
+          await context.emit("visuals.collected", { found: pictured });
           await this.services.store.runs.updateRun(run.id, { status: "awaiting_confirmation", resolution: result.value });
           await context.emit("run.resolved", { competitors: result.value.competitors.length });
           return;

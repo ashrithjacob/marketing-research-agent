@@ -5,7 +5,7 @@ import { Pipeline, RunEnd, type Stage, type StageInput, type StageOutcome } from
 import { Stages, type Run, type StageName } from "../src/domain/index.js";
 import { App } from "../src/http/index.js";
 
-import { Faux, FakeWeb, NoBilling, TestSettings } from "./fakes.js";
+import { Faux, FakeWeb, NoBilling, FakeVisuals, TestSettings } from "./fakes.js";
 import { PAGES, PRODUCT_URL, RESOLUTION, SEARCH_HITS } from "./mullevia.js";
 import { PostgresStores } from "./postgres-stores.js";
 import { ScriptedAgents } from "./scripted-agents.js";
@@ -54,7 +54,7 @@ describe("the pipeline", () => {
         .steps(),
     );
     const { settings, traces } = TestSettings.make();
-    const app = new App({ settings, traces, store: pg.store, services: new FakeWeb(PAGES, SEARCH_HITS).services(), models: faux.models, generations: new NoBilling(), pipeline });
+    const app = new App({ settings, traces, store: pg.store, services: new FakeWeb(PAGES, SEARCH_HITS).services(), models: faux.models, generations: new NoBilling(), visuals: new FakeVisuals(), pipeline });
     const post = (path: string, body: unknown) => app.fetch(new Request(`http://test/api/research${path}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }));
     const get = async (id: string) => ((await (await app.fetch(new Request(`http://test/api/research/runs/${id}`))).json()) as { run: Run }).run;
     const wait = async (id: string, statuses: string[]) => {

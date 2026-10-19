@@ -25,8 +25,11 @@ resolving ──▶ awaiting_confirmation ──(user confirms)──▶ running
    alternatives when only a name was given, and 3–15 competitors. Code refuses
    the submit if the product page was never read with `web_fetch`, or if any
    competitor url never appeared in a search result, an ad's landing page or a
-   page it read (`UrlLedger.unknown`). Accepted, the run waits at
-   `awaiting_confirmation`.
+   page it read (`UrlLedger.unknown`), or if an Amazon competitor url is not a
+   product page (a search page was proposed on 2026-10-19). Accepted, code reads
+   the product shot and logo of every proposed url for free
+   (`ResolutionVisuals`, cached by url in `brand_visuals`, which stage 1 then
+   reuses), and the run waits at `awaiting_confirmation`.
 3. **Confirm.** `POST /runs/:id/confirm` with the chosen product url and the
    competitors the user kept or added. The product row is upserted (one per
    account and url) and the picks are marked `confirmed`; any competitor of that

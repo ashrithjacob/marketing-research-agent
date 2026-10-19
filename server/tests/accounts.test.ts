@@ -4,7 +4,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { Stages, type Run } from "../src/domain/index.js";
 import { App, Passwords } from "../src/http/index.js";
 
-import { Faux, FakeWeb, NoBilling, TestSettings } from "./fakes.js";
+import { Faux, FakeWeb, NoBilling, FakeVisuals, TestSettings } from "./fakes.js";
 import { PostgresStores } from "./postgres-stores.js";
 
 let pg: PostgresStores;
@@ -13,7 +13,7 @@ let app: App;
 beforeAll(async () => {
   pg = await PostgresStores.start();
   const { settings, traces } = TestSettings.make({ appUser: "root", appPasswordHash: await Passwords.hash("root-password") });
-  app = new App({ settings, traces, store: pg.store, services: new FakeWeb().services(), models: new Faux().models, generations: new NoBilling() });
+  app = new App({ settings, traces, store: pg.store, services: new FakeWeb().services(), models: new Faux().models, generations: new NoBilling(), visuals: new FakeVisuals() });
 });
 
 afterAll(async () => {
