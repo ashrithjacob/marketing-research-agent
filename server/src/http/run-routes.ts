@@ -36,6 +36,12 @@ export class RunRoutes {
         return "refused" in confirmed ? c.json({ detail: confirmed.refused }, 422) : c.json(await this.view(confirmed));
       }),
     );
+    api.post("/runs/:runId/rerun", async (c) =>
+      this.withRun(c, async (run) => {
+        const rerun = await this.analyses.rerun(run);
+        return "refused" in rerun ? c.json({ detail: rerun.refused }, 409) : c.json(await this.view(rerun));
+      }),
+    );
     api.post("/runs/:runId/stop", async (c) =>
       this.withRun(c, async (run) => {
         await this.analyses.stop(run);

@@ -23,7 +23,8 @@ export default function StageTracker({ stages, states }: { stages: StageInfo[]; 
     <ol className="stages">
       {stages.map((stage) => {
         const state = states[stage.name];
-        const status = state?.status ?? (stage.built ? 'pending' : 'not_built');
+        const stored = state?.status ?? (stage.built ? 'pending' : 'not_built');
+        const status = stored === 'not_built' && stage.built ? 'never_run' : stored;
         return (
           <li key={stage.name} className={`stage status-${status}`}>
             <span className="n">{stage.number}</span>

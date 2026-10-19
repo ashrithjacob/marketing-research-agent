@@ -49,6 +49,17 @@ resolving ──▶ awaiting_confirmation ──(user confirms)──▶ running
    stopped → `cancelled`; any stage `failed` → `failed`; any `invalid` →
    `invalid`; otherwise `completed`.
 
+## Rerunning stages
+
+A finished run whose stages did not all complete offers to run them again
+(`POST /runs/:id/rerun`, the prompt on the run page, `mra rerun`).
+`Stages.rerun` keeps every completed stage as it is and sets every other built
+stage, including one built after the run, back to waiting; the pipeline counts
+a completed stage as done without running it, so only the rest run, in
+dependency order, with the run's confirmed product and competitors. The run
+ends through `RunEnd` as before; its cost is the total of all its charges, both
+attempts.
+
 ## How an agent ends
 
 Every agent is driven by `AgentRunner` (`agent/kernel/agent-runner.ts`) and

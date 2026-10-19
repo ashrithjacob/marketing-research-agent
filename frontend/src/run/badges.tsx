@@ -10,6 +10,7 @@ const LABELS: Record<string, string> = {
   pending: 'Waiting',
   skipped: 'Skipped',
   not_built: 'Not built yet',
+  never_run: 'Never run',
 };
 
 export function StatusBadge({ status }: { status: string }) {

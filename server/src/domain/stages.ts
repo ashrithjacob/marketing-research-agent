@@ -44,6 +44,24 @@ export class Stages {
     ) as StageStates;
   }
 
+  /** A run's stages set up to run again: what completed is kept, every other built stage waits to run, and a stage not built is marked so. */
+  static rerun(states: StageStates, built: readonly StageName[]): StageStates {
+    Trace.line(import.meta.url, "Stages.rerun", { built });
+    const blank = { started_at: "", ended_at: "", error: "", summary: "" };
+    return Object.fromEntries(
+      STAGE_NAMES.map((name) => {
+        const kept = states[name]?.status === "completed" && built.includes(name);
+        return [name, kept ? states[name] : { ...blank, status: built.includes(name) ? "pending" : "not_built" }];
+      }),
+    ) as StageStates;
+  }
+
+  /** The built stages a rerun would run: every one that did not complete. */
+  static unfinished(states: StageStates, built: readonly StageName[]): StageName[] {
+    Trace.line(import.meta.url, "Stages.unfinished", { built });
+    return built.filter((name) => states[name]?.status !== "completed");
+  }
+
   static ended(state: StageState): boolean {
     Trace.line(import.meta.url, "Stages.ended", { status: state.status });
     return Stages.ENDED.has(state.status);

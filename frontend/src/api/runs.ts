@@ -10,6 +10,7 @@ export const runs = {
   get: (id: string) => request<RunView>(`${base}/runs/${id}`),
   confirm: (id: string, product_url: string, competitors: CompetitorPick[]) =>
     request<RunView>(`${base}/runs/${id}/confirm`, { method: 'POST', body: JSON.stringify({ product_url, competitors }) }),
+  rerun: (id: string) => request<RunView>(`${base}/runs/${id}/rerun`, { method: 'POST' }),
   stop: (id: string) => request<{ ok: boolean }>(`${base}/runs/${id}/stop`, { method: 'POST' }),
   traceUrl: (id: string) => `${base}/runs/${id}/trace`,
   reviews: (id: string, competitor: string | null, limit = 20) =>

@@ -153,6 +153,15 @@ cmd_confirm() {
   jq -r '"run \(.run.id)  status=\(.run.status)"' <<<"$out"
 }
 
+cmd_rerun() {
+  need curl "mra rerun"; need jq "mra rerun"
+  local id="${1:-$(cat "${TMPDIR:-/tmp}/mra-last-run" 2>/dev/null || true)}"
+  [ -n "$id" ] || die "usage: mra rerun [runId]   (runs again every stage of a finished run that did not complete; spends money)"
+  local out; out=$(api POST "/api/research/runs/$id/rerun" '{}')
+  jq -e '.run.status' >/dev/null 2>&1 <<<"$out" || die "rerun refused: $out"
+  jq -r '"run \(.run.id)  status=\(.run.status)"' <<<"$out"
+}
+
 cmd_watch() {
   need curl "mra watch"; need jq "mra watch"
   local id="${1:-$(cat "${TMPDIR:-/tmp}/mra-last-run" 2>/dev/null || true)}"
@@ -233,6 +242,8 @@ mra — drive and inspect the research cockpit
                            product and proposes competitors, then waits.
   confirm [runId]          accept the product and competitors as resolved and
                            start the stages (the cockpit lets you edit them)
+  rerun [runId]            run again every stage of a finished run that did not
+                           complete, keeping the ones that did (spends money)
   watch [runId]            poll until the run waits for you or ends, then print
                            its stages and competitors
   calls [runId]            the LLM call log, one line per turn
@@ -254,6 +265,7 @@ case "${1:-help}" in
   login)    shift; cmd_login "$@" ;;
   run)      shift; cmd_run "$@" ;;
   confirm)  shift; cmd_confirm "$@" ;;
+  rerun)    shift; cmd_rerun "$@" ;;
   watch)    shift; cmd_watch "$@" ;;
   calls)    shift; cmd_calls "$@" ;;
   trace)    shift; cmd_trace "$@" ;;

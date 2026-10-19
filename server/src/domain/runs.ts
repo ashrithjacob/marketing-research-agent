@@ -31,7 +31,7 @@ export interface RunUpdate {
   stage_status?: StageStates;
   error?: string;
   cost_usd?: number | null;
-  ended_at?: string;
+  ended_at?: string | null;
 }
 
 /** A run as the list of analyses shows it: its product's look, its competitors' faces, and how much evidence it holds. */

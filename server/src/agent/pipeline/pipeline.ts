@@ -4,7 +4,7 @@ import { Trace } from "../../trace/index.js";
 import type { Stage, StageInput } from "./stage.js";
 import type { StageProgress } from "./stage-progress.js";
 
-/** Runs the built stages, each as soon as every stage it needs has completed; a stage whose input did not complete is skipped and says which. */
+/** Runs the built stages, each as soon as every stage it needs has completed; a stage already completed (a rerun keeps it) counts as done without running, and a stage whose input did not complete is skipped and says which. */
 export class Pipeline {
   private readonly stages: ReadonlyMap<StageName, Stage>;
 
@@ -33,6 +33,7 @@ export class Pipeline {
 
   private async runStage(name: StageName, input: StageInput, progress: StageProgress, finish: (name: StageName) => Promise<StageStatus>): Promise<StageStatus> {
     Trace.line(import.meta.url, "Pipeline.runStage", { name });
+    if (progress.state(name).status === "completed") return "completed";
     const needs = STAGE_PLANS[name].needs.filter((need) => this.stages.has(need));
     const results = await Promise.all(needs.map(async (need) => [need, await finish(need)] as const));
     const missing = results.filter(([, status]) => status !== "completed").map(([need]) => need);

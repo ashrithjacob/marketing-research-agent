@@ -1,4 +1,5 @@
 import {
+  FINAL_RUN_STATUSES,
   AnalysisInputSchema,
   ConfirmationSchema,
   Schemas,
@@ -48,6 +49,22 @@ export class AnalysisService {
     const started = (await this.store.runs.get(run.id))!;
     this.launcher.research(started, product, competitors);
     return started;
+  }
+
+  /** Runs again every built stage of a finished run that did not complete, keeping what did; refused while the run is still working or before it has a product. */
+  async rerun(run: Run): Promise<Run | Refused> {
+    Trace.line(import.meta.url, "AnalysisService.rerun", { runId: run.id, status: run.status });
+    if (!FINAL_RUN_STATUSES.has(run.status)) return { refused: [`the run is ${run.status}; only a finished run can rerun stages`] };
+    if (!run.product_id) return { refused: ["the run never got past confirmation, so it has no stages to rerun"] };
+    const stages = Stages.unfinished(run.stage_status, this.pipeline.built);
+    if (stages.length === 0) return { refused: ["every stage of this run completed; there is nothing to rerun"] };
+    const product = (await this.store.products.get(run.product_id))!;
+    const competitors = (await this.store.competitors.list(product.id)).filter((competitor) => competitor.status === "confirmed");
+    await this.store.runs.updateRun(run.id, { status: "running", error: "", ended_at: null, stage_status: Stages.rerun(run.stage_status, this.pipeline.built) });
+    const restarted = (await this.store.runs.get(run.id))!;
+    await this.store.events.add(run.id, "run.rerun", { stages });
+    this.launcher.research(restarted, product, competitors);
+    return restarted;
   }
 
   async stop(run: Run): Promise<void> {

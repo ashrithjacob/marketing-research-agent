@@ -8,6 +8,7 @@ import { App } from "../src/http/index.js";
 import { Faux, FakeWeb, NoBilling, FakeVisuals, TestSettings } from "./fakes.js";
 import { PAGES, PRODUCT_URL, RESOLUTION, SEARCH_HITS } from "./mullevia.js";
 import { PostgresStores } from "./postgres-stores.js";
+import { RunDriver } from "./run-driver.js";
 import { ScriptedAgents } from "./scripted-agents.js";
 
 class FakeStage implements Stage {
@@ -73,6 +74,47 @@ describe("the pipeline", () => {
     expect(ended.stage_status.gaps.status).toBe("not_built");
     expect(ended.status).toBe("failed");
     expect(ended.error).toBe("sophistication: sophistication broke");
+  });
+});
+
+class FlakyStage extends FakeStage {
+  private failed = false;
+
+  override async run(input: StageInput): Promise<StageOutcome> {
+    const outcome = await super.run(input);
+    if (this.failed) return { status: "completed", summary: "worked the second time", error: "" };
+    this.failed = true;
+    return { ...outcome, status: "failed", error: "TrendTrack said no" };
+  }
+}
+
+describe("a rerun", () => {
+  it("runs only the stages that did not complete, keeps the rest, and ends with the cost of both attempts", async () => {
+    const order: string[] = [];
+    const pipeline = new Pipeline([new FakeStage("product_market", "completed", order), new FlakyStage("competitor_ads", "completed", order), new FakeStage("avatars", "completed", order)]);
+    const faux = new Faux();
+    faux.provider.setResponses(
+      new ScriptedAgents()
+        .on("Product url:", [ScriptedAgents.call("web_fetch", { url: PRODUCT_URL }), ScriptedAgents.call("web_search", { query: "x" }), ScriptedAgents.call("submit", RESOLUTION)])
+        .steps(),
+    );
+    const { settings, traces } = TestSettings.make();
+    const app = new App({ settings, traces, store: pg.store, services: new FakeWeb(PAGES, SEARCH_HITS).services(), models: faux.models, generations: new NoBilling(), visuals: new FakeVisuals(), pipeline });
+    const driver = new RunDriver(app);
+    const runId = await driver.start({ product_url: PRODUCT_URL });
+    const first = await driver.confirmAndFinish(runId, { product_url: PRODUCT_URL, competitors: [{ brand: "A", product_name: "A", url: "https://a.example/p" }] });
+    expect(first.run.status).toBe("failed");
+    expect(first.run.stage_status.avatars.status).toBe("skipped");
+    expect(order.map((o) => o.split(":")[0])).toEqual(["product_market", "competitor_ads"]);
+
+    const rerun = await driver.api(`/runs/${runId}/rerun`, {});
+    expect(rerun.status).toBe(200);
+    const done = await driver.settle(runId, ["completed", "failed", "invalid"]);
+    expect(done.run.status).toBe("completed");
+    expect(done.run.error).toBe("");
+    expect(order.map((o) => o.split(":")[0])).toEqual(["product_market", "competitor_ads", "competitor_ads", "avatars"]);
+    expect(done.run.stage_status.competitor_ads.summary).toBe("worked the second time");
+    expect((await driver.api(`/runs/${runId}/rerun`, {})).status).toBe(409);
   });
 });
 

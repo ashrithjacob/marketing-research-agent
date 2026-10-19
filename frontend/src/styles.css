@@ -241,3 +241,13 @@ button.link { background: none; border: 0; padding: 0 0 0 4px; color: var(--acce
 .traction .label { font-size: 11px; color: var(--faint); }
 .pick-signals { color: var(--dim); }
 .competitor-row { grid-template-columns: 64px minmax(160px, 1.1fr) minmax(150px, 1.3fr) 80px 130px 60px 80px 150px; }
+
+.panel.rerun { border-color: #fecaca; background: #fffafa; }
+.panel.rerun h2 { color: var(--bad); }
+.rerun-list { list-style: none; padding: 0; margin: 8px 0 12px; display: grid; gap: 8px; }
+.rerun-list li { display: grid; grid-template-columns: 24px auto 1fr; gap: 4px 8px; align-items: center; }
+.rerun-list .n { font-family: var(--font-display); color: var(--faint); }
+.rerun-list strong { font-size: 14px; }
+.rerun-list .why { grid-column: 2 / -1; overflow-wrap: anywhere; }
+
+.badge.status-never_run { color: var(--warn); background: #fffbeb; }

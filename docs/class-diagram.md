@@ -223,6 +223,8 @@ classDiagram
     }
     class Stages {
       initial()
+      rerun()
+      unfinished()
       ended()
     }
     class AccountDirectory {
@@ -368,6 +370,10 @@ classDiagram
     }
     class AvatarTally {
       records()
+    }
+    class PriceCheck {
+      problems()
+      shown()
     }
   }
   namespace adapters {
@@ -635,6 +641,7 @@ classDiagram
     class AnalysisService {
       start()
       confirm()
+      rerun()
       stop()
       get()
       recover()
@@ -845,6 +852,7 @@ classDiagram
     }
     class UrlLedger {
       read()
+      textOf()
       saw()
       unread()
       unknown()
@@ -1143,6 +1151,7 @@ classDiagram
 | `extract` | `extract/avatar-memory-check.ts` | AvatarMemoryCheck |
 | `extract` | `extract/avatar-memory.ts` | AvatarMemoryBook |
 | `extract` | `extract/avatar-tally.ts` | AvatarTally |
+| `extract` | `extract/price-check.ts` | PriceCheck |
 | `http` | `http/account-commands.ts` | AccountCommands |
 | `http` | `http/app.ts` | AppParts, App |
 | `http` | `http/auth-gate.ts` | AuthGate |
