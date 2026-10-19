@@ -52,6 +52,8 @@ export interface Competitor {
   sources: string[];
   rank_score: number | null;
   rank_in_group: number | null;
+  image_url: string | null;
+  logo_url: string | null;
   created_at: string;
   updated_at: string;
 }

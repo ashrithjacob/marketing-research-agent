@@ -3,6 +3,7 @@ import { Trace } from "../../../trace/index.js";
 import type { RunContext } from "../../pipeline/run-context.js";
 import type { Stage, StageInput, StageOutcome } from "../../pipeline/stage.js";
 
+import type { BrandVisualsCollector } from "./brand-visuals-collector.js";
 import { CompetitorProfiler } from "./competitor-profiler.js";
 import { ProductBriefAgent } from "./product-brief-agent.js";
 
@@ -11,6 +12,7 @@ export class ProductMarketStage implements Stage {
   readonly name: StageName = "product_market";
 
   constructor(
+    private readonly visuals: BrandVisualsCollector | null = null,
     private readonly brief = new ProductBriefAgent(),
     private readonly profiler = new CompetitorProfiler(),
     private readonly concurrency = 4,
@@ -18,7 +20,7 @@ export class ProductMarketStage implements Stage {
 
   async run(input: StageInput): Promise<StageOutcome> {
     Trace.line(import.meta.url, "ProductMarketStage.run", { runId: input.context.run.id, competitors: input.competitors.length });
-    const result = await this.brief.brief(input.context, input.product);
+    const [result] = await Promise.all([this.brief.brief(input.context, input.product), this.visuals?.collect(input.context, input.product, input.competitors)]);
     if (result.status === "cancelled") return { status: "failed", summary: "", error: "stopped" };
     if (result.status === "failed") return { status: "failed", summary: "", error: `product brief: ${result.error}` };
     if (result.status === "invalid") return { status: "invalid", summary: "", error: `product brief refused: ${result.problems.join("; ")}` };

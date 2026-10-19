@@ -362,9 +362,15 @@ CREATE TABLE avatar_memories (
 );
 `;
 
+const BRAND_VISUALS = `
+ALTER TABLE products ADD COLUMN image_url TEXT, ADD COLUMN logo_url TEXT;
+ALTER TABLE competitors ADD COLUMN image_url TEXT, ADD COLUMN logo_url TEXT;
+`;
+
 /** Applied in order, once each, recorded in schema_migrations. An applied migration is never edited: a change is a new entry at the end. */
 export const MIGRATIONS: readonly Migration[] = [
   { id: 1, name: "avatar_schema", sql: AVATAR_SCHEMA },
   { id: 2, name: "review_and_ad_sources", sql: REVIEW_AND_AD_SOURCES },
   { id: 3, name: "avatar_memory", sql: AVATAR_MEMORY },
+  { id: 4, name: "brand_visuals", sql: BRAND_VISUALS },
 ];

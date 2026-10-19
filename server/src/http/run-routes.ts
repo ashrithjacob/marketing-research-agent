@@ -24,7 +24,7 @@ export class RunRoutes {
   router(): Hono<ApiEnv> {
     Trace.line(import.meta.url, "RunRoutes.router");
     const api = new Hono<ApiEnv>();
-    api.get("/runs", async (c) => c.json({ runs: await this.store.runs.list(Scope.forViewer(c.get("principal"))) }));
+    api.get("/runs", async (c) => c.json({ runs: await this.store.runs.summaries(Scope.forViewer(c.get("principal"))) }));
     api.post("/runs", async (c) => {
       const started = await this.analyses.start(c.get("principal").accountId, await c.req.json().catch(() => null));
       return "refused" in started ? c.json({ detail: started.refused }, 422) : c.json({ run: started }, 201);

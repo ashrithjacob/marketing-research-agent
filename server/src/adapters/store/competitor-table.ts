@@ -1,5 +1,6 @@
 import {
   CompetitorRelationship,
+  type BrandVisual,
   Ids,
   type Competitor,
   type CompetitorPick,
@@ -54,5 +55,10 @@ export class CompetitorTable implements CompetitorStore {
         competitorId,
       ],
     );
+  }
+
+  async saveVisual(competitorId: string, visual: BrandVisual): Promise<void> {
+    Trace.line(import.meta.url, "CompetitorTable.saveVisual", { competitorId, visual });
+    await this.db.run("UPDATE competitors SET image_url = COALESCE(?, image_url), logo_url = COALESCE(?, logo_url), updated_at = now() WHERE id = ?", [visual.image_url, visual.logo_url, competitorId]);
   }
 }

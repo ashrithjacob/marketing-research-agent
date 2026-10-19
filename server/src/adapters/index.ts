@@ -12,3 +12,5 @@ export * from "./shopify-storefront.js";
 export * from "./public-urls.js";
 export * from "./reviews/judgeme-reviews.js";
 export * from "./reviews/woot-reviews.js";
+export * from "./public-page.js";
+export * from "./page-visuals.js";

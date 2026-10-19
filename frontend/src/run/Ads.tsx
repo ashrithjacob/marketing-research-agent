@@ -1,15 +1,17 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 
-import { runs, type ReadAd } from '../api';
+import type { Competitor, ReadAd } from '../api';
+import BrandMark from '../BrandMark';
 
 const BUCKETS = ['winning', 'testing', 'dead'] as const;
 
-function AdCard({ ad }: { ad: ReadAd }) {
+function AdCard({ ad, logo }: { ad: ReadAd; logo: string | null }) {
   const [open, setOpen] = useState(false);
   return (
     <li className="ad">
       {ad.media_url && <img src={ad.media_url} alt="" loading="lazy" referrerPolicy="no-referrer" />}
       <div className="competitor-head">
+        <BrandMark name={ad.advertiser} src={logo} size={22} />
         <strong>{ad.advertiser}</strong>
         {ad.bucket && <span className={`badge bucket-${ad.bucket}`}>{ad.bucket}</span>}
       </div>
@@ -32,13 +34,12 @@ function AdCard({ ad }: { ad: ReadAd }) {
   );
 }
 
-export default function Ads({ runId, version, onError }: { runId: string; version: string; onError: (message: string) => void }) {
-  const [ads, setAds] = useState<ReadAd[]>([]);
+export default function Ads({ ads, competitors }: { ads: ReadAd[]; competitors: Competitor[] }) {
   const [bucket, setBucket] = useState<string>('all');
-
-  useEffect(() => {
-    runs.ads(runId).then((r) => setAds(r.ads), (e: Error) => onError(e.message));
-  }, [runId, version, onError]);
+  const logo = (ad: ReadAd) => {
+    const owner = competitors.find((c) => c.id === ad.competitor_id);
+    return owner?.logo_url ?? owner?.image_url ?? null;
+  };
 
   if (ads.length === 0) return null;
   const shown = bucket === 'all' ? ads : ads.filter((ad) => ad.bucket === bucket);
@@ -54,7 +55,7 @@ export default function Ads({ runId, version, onError }: { runId: string; versio
       </div>
       <ul className="cards ads">
         {shown.map((ad) => (
-          <AdCard key={ad.id} ad={ad} />
+          <AdCard key={ad.id} ad={ad} logo={logo(ad)} />
         ))}
       </ul>
     </section>

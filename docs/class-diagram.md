@@ -159,9 +159,66 @@ classDiagram
       <<interface>>
       inspect()
     }
+    class BrandVisuals {
+      <<interface>>
+      find()
+    }
     class GenerationSource {
       <<interface>>
       generation()
+    }
+    class BrandVisual {
+      <<interface>>
+    }
+    class Product {
+      <<interface>>
+    }
+    class CollectedReview {
+      <<interface>>
+    }
+    class ReviewTarget {
+      <<interface>>
+    }
+    class StoredReview {
+      <<interface>>
+    }
+    class ReviewCoverage {
+      <<interface>>
+    }
+    class StorefrontFacts {
+      <<interface>>
+    }
+    class Asins {
+      fromUrl()
+    }
+    class Run {
+      <<interface>>
+    }
+    class RunUpdate {
+      <<interface>>
+    }
+    class RunSummary {
+      <<interface>>
+    }
+    class Schemas {
+      json()
+      parse()
+    }
+    class ServicePart {
+      <<interface>>
+    }
+    class ServiceReport {
+      <<interface>>
+    }
+    class StagePlan {
+      <<interface>>
+    }
+    class StageState {
+      <<interface>>
+    }
+    class Stages {
+      initial()
+      ended()
     }
     class AccountDirectory {
       <<interface>>
@@ -179,6 +236,7 @@ classDiagram
       create()
       get()
       list()
+      summaries()
       updateRun()
       unfinished()
     }
@@ -187,12 +245,14 @@ classDiagram
       upsert()
       get()
       saveBrief()
+      saveVisual()
     }
     class CompetitorStore {
       <<interface>>
       confirm()
       list()
       saveProfile()
+      saveVisual()
     }
     class ReviewStore {
       <<interface>>
@@ -237,53 +297,6 @@ classDiagram
     class ResearchStore {
       <<interface>>
       close()
-    }
-    class Product {
-      <<interface>>
-    }
-    class CollectedReview {
-      <<interface>>
-    }
-    class ReviewTarget {
-      <<interface>>
-    }
-    class StoredReview {
-      <<interface>>
-    }
-    class ReviewCoverage {
-      <<interface>>
-    }
-    class StorefrontFacts {
-      <<interface>>
-    }
-    class Asins {
-      fromUrl()
-    }
-    class Run {
-      <<interface>>
-    }
-    class RunUpdate {
-      <<interface>>
-    }
-    class Schemas {
-      json()
-      parse()
-    }
-    class ServicePart {
-      <<interface>>
-    }
-    class ServiceReport {
-      <<interface>>
-    }
-    class StagePlan {
-      <<interface>>
-    }
-    class StageState {
-      <<interface>>
-    }
-    class Stages {
-      initial()
-      ended()
     }
     class SearchHit {
       <<interface>>
@@ -369,6 +382,11 @@ classDiagram
       generation()
       stop()
     }
+    class PageVisuals {
+      find()
+      meta()
+      icon()
+    }
     class ParallelApi {
       post()
       get()
@@ -381,6 +399,9 @@ classDiagram
     }
     class ParallelSearch {
       find()
+    }
+    class PublicPage {
+      text()
     }
     class PublicUrls {
       assert()
@@ -475,6 +496,7 @@ classDiagram
       confirm()
       list()
       saveProfile()
+      saveVisual()
     }
     class EventTable {
       add()
@@ -509,6 +531,7 @@ classDiagram
       upsert()
       get()
       saveBrief()
+      saveVisual()
     }
     class ReviewTable {
       contentHash()
@@ -522,6 +545,7 @@ classDiagram
       create()
       get()
       list()
+      summaries()
       updateRun()
       unfinished()
     }
@@ -719,6 +743,9 @@ classDiagram
     class ReviewOrder {
       batches()
     }
+    class BrandVisualsCollector {
+      collect()
+    }
     class CompetitorProfiler {
       profile()
       problems()
@@ -836,14 +863,16 @@ classDiagram
   MeteredAdLibrary --> AdLibrary
   MeteredAdLibrary --> ServicePrices
   MeteredAdLibrary --> ChargeMeter
+  PageVisuals --> PublicPage
   ParallelApi --> Settings
   ParallelSearch --> ParallelApi
+  PublicPage --> Settings
   JudgemeReviews --> Settings
   WootReviews --> Settings
   ServiceClients --> PageFetcher
   ServiceClients --> WebSearch
   ServiceClients --> AdLibrary
-  ShopifyStorefront --> Settings
+  ShopifyStorefront --> PublicPage
   AccountTable --> SqlDatabase
   AdTable --> SqlDatabase
   AvatarTable --> SqlDatabase
@@ -891,6 +920,8 @@ classDiagram
   CompetitorAdStage --> AdLibrary
   CompetitorAdStage --> ServicePrices
   CompetitorAdStage --> SweepLimits
+  BrandVisualsCollector --> BrandVisuals
+  ProductMarketStage --> BrandVisualsCollector
   ReviewListings --> Storefront
   ReviewListings --> AmazonListingFinder
   ReviewStage --> ReviewListings
@@ -930,8 +961,10 @@ classDiagram
 | `adapters` | `adapters/metered.ts` | MeteredWebSearch, MeteredPageFetcher, MeteredAdLibrary |
 | `adapters` | `adapters/openrouter-generation.ts` | OpenRouterGeneration |
 | `adapters` | `adapters/openrouter-prices.ts` | OpenRouterPrices |
+| `adapters` | `adapters/page-visuals.ts` | PageVisuals |
 | `adapters` | `adapters/parallel-api.ts` | ParallelApi |
 | `adapters` | `adapters/parallel-search.ts` | ParallelUsage, ParallelResult, ParallelSearch |
+| `adapters` | `adapters/public-page.ts` | PublicPage |
 | `adapters` | `adapters/public-urls.ts` | PublicUrls |
 | `adapters` | `adapters/rate-limit-wait.ts` | RateLimitWait |
 | `adapters` | `adapters/rates.ts` | Rates, Pricing, Billed, Money |
@@ -990,6 +1023,7 @@ classDiagram
 | `agent` | `agent/stages/avatars/avatar-stage.ts` | AvatarStage |
 | `agent` | `agent/stages/avatars/memory-view.ts` | MemoryView |
 | `agent` | `agent/stages/avatars/review-order.ts` | ReviewOrder |
+| `agent` | `agent/stages/product-market/brand-visuals-collector.ts` | BrandVisualsCollector |
 | `agent` | `agent/stages/product-market/competitor-profiler.ts` | CompetitorProfiler |
 | `agent` | `agent/stages/product-market/product-brief-agent.ts` | ProductBriefAgent |
 | `agent` | `agent/stages/product-market/product-market-stage.ts` | ProductMarketStage |
@@ -1013,13 +1047,14 @@ classDiagram
 | `domain` | `domain/competitors.ts` | Competitor, CompetitorRelationship |
 | `domain` | `domain/ids.ts` | Clock, Ids |
 | `domain` | `domain/logs.ts` | RunEvent, LlmCallRecord, Generation, LlmCall |
-| `domain` | `domain/ports.ts` | PageFetcher, WebSearch, AdLibrary, ReviewSource, Storefront, GenerationSource, AccountDirectory, RunStore, ProductStore, CompetitorStore, ReviewStore, AvatarStore, AvatarRecord, AdStore, EventLog, ChargeLedger, CallLog, ResearchStore |
-| `domain` | `domain/products.ts` | Product |
+| `domain` | `domain/ports.ts` | PageFetcher, WebSearch, AdLibrary, ReviewSource, Storefront, BrandVisuals, GenerationSource |
+| `domain` | `domain/products.ts` | BrandVisual, Product |
 | `domain` | `domain/reviews.ts` | CollectedReview, ReviewTarget, StoredReview, ReviewCoverage, StorefrontFacts, Asins |
-| `domain` | `domain/runs.ts` | Run, RunUpdate |
+| `domain` | `domain/runs.ts` | Run, RunUpdate, RunSummary |
 | `domain` | `domain/schemas.ts` | Schemas |
 | `domain` | `domain/service-report.ts` | ServicePart, ServiceReport |
 | `domain` | `domain/stages.ts` | StagePlan, StageState, Stages |
+| `domain` | `domain/store-ports.ts` | AccountDirectory, RunStore, ProductStore, CompetitorStore, ReviewStore, AvatarStore, AvatarRecord, AdStore, EventLog, ChargeLedger, CallLog, ResearchStore |
 | `domain` | `domain/web.ts` | SearchHit, SearchPage, SearchScope, FetchedPage, ServiceUnavailableError |
 | `extract` | `extract/avatar-memory-check.ts` | AvatarMemoryCheck |
 | `extract` | `extract/avatar-memory.ts` | AvatarMemoryBook |

@@ -31,6 +31,13 @@ rewrite is in git history before `b6f45cc`.
    Neon's object storage. `product_images` and `label_facts` exist and are
    empty.
 7. **No economics, market size or Scira evaluation.**
+7a. **A price can be read wrong.** Run `344caa7d` stored Ethale at 2246 USD:
+    the profiler most likely took a price in cents. Nothing checks a price
+    against the page; Shopify's `/products/<handle>.js` gives it in cents and
+    could.
+7b. **Pictures are hotlinked, not stored.** Product shots and logos are kept
+    as addresses on the brands' own sites; copying them into Neon storage comes
+    with label reading (6). A retailer url gives the retailer's logo.
 8. **`claims_on_page` is re-typed by the model**, not copied by code from the
    page, against the rule that a model never copies content by writing it out.
 
@@ -73,7 +80,9 @@ rewrite is in git history before `b6f45cc`.
 
 ## Verification
 
-14. **The rewrite's UI has not been seen in a browser.** The Chrome extension
-    was not connected on 2026-10-17; only the served bundle was checked.
+14. ~~**The rewrite's UI has not been seen in a browser.**~~ Seen on
+    2026-10-19 through headless Chrome (Playwright with `/usr/bin/google-chrome`,
+    from `review-crawler`'s environment), the Chrome extension still not
+    connected.
 15. **`check-conventions.mjs` hung once for over 100 s** on 2026-10-17 and was
     not reproduced; every later run took under 2 s.

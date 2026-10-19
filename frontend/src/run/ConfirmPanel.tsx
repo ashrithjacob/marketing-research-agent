@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 
 import { runs, type CompetitorPick, type Resolution } from '../api';
+import BrandMark, { domainOf } from '../BrandMark';
 import { Source } from './badges';
 
 export default function ConfirmPanel({ runId, resolution, onDone, onError }: { runId: string; resolution: Resolution; onDone: () => void; onError: (message: string) => void }) {
@@ -44,6 +45,7 @@ export default function ConfirmPanel({ runId, resolution, onDone, onError }: { r
       <ul className="chips">
         {picks.map((pick) => (
           <li key={pick.url} className="chip" title={why.get(pick.url) ?? 'added by you'}>
+            <BrandMark name={pick.brand} src={`https://${domainOf(pick.url)}/favicon.ico`} size={18} />
             <strong>{pick.brand}</strong> {pick.product_name} <Source url={pick.url} />
             <button className="ghost" aria-label={`Remove ${pick.brand}`} onClick={() => setPicks((now) => now.filter((p) => p.url !== pick.url))}>
               ×

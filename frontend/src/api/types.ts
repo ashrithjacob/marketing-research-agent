@@ -79,6 +79,8 @@ export interface Product {
   offer: { bundles: string[]; subscription: string | null; guarantee: string | null; source_url: string } | null;
   ingredients: { name: string; dose: number | null; unit: string | null; source_url: string }[];
   claims_on_page: { text: string; source_url: string }[];
+  image_url: string | null;
+  logo_url: string | null;
 }
 
 export interface Competitor {
@@ -95,6 +97,8 @@ export interface Competitor {
   price: Price | null;
   positioning: string;
   sources: string[];
+  image_url: string | null;
+  logo_url: string | null;
 }
 
 export interface RunView {
@@ -191,4 +195,12 @@ export interface AvatarQuote {
   rating: number;
   body: string;
   source: string;
+}
+
+export interface RunSummary extends Run {
+  product: { name: string; brand: string; image_url: string | null; logo_url: string | null } | null;
+  competitors: { brand: string; image_url: string | null; logo_url: string | null; relationship: Relationship | null }[];
+  review_count: number;
+  ad_count: number;
+  avatar_count: number;
 }

@@ -1,11 +1,11 @@
 import { request } from './client';
-import type { AnalysisInput, AvatarQuote, CompetitorPick, Config, ReadAd, ReviewCoverage, Run, RunEvent, RunView, StoredAvatar, StoredReview } from './types';
+import type { AnalysisInput, AvatarQuote, CompetitorPick, Config, ReadAd, ReviewCoverage, Run, RunEvent, RunSummary, RunView, StoredAvatar, StoredReview } from './types';
 
 const base = '/api/research';
 
 export const runs = {
   config: () => request<Config>(`${base}/config`),
-  list: () => request<{ runs: Run[] }>(`${base}/runs`),
+  list: () => request<{ runs: RunSummary[] }>(`${base}/runs`),
   start: (input: Partial<AnalysisInput>) => request<{ run: Run }>(`${base}/runs`, { method: 'POST', body: JSON.stringify(input) }),
   get: (id: string) => request<RunView>(`${base}/runs/${id}`),
   confirm: (id: string, product_url: string, competitors: CompetitorPick[]) =>

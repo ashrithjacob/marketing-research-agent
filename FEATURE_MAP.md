@@ -25,7 +25,7 @@ for any path that is not a file or `api/`.
 
 | URL | Page |
 |---|---|
-| `/` | New analysis and the list of analyses (`HomePage.tsx`) |
+| `/` | New analysis and the list of analyses, one row each with the product shot, competitors' logos and evidence counts (`HomePage.tsx`) |
 | `/runs/:runId` | One analysis (`run/RunPage.tsx`) |
 | anything else | The home page |
 
@@ -34,7 +34,7 @@ for any path that is not a file or `api/`.
 | Surface | Component | Calls |
 |---|---|---|
 | New analysis form: product url or name, markets, optional competitors, brand constraints, price and offer | `NewAnalysis.tsx` | `GET /api/research/config` (markets), `POST /api/research/runs` |
-| List of analyses, with status and cost | `HomePage.tsx` | `GET /api/research/runs` |
+| List of analyses: product shot, brand logo, domain, up to six competitor logos, review/ad/avatar counts, status, cost | `HomePage.tsx`, `BrandMark.tsx` | `GET /api/research/runs` (`RunSummary`: one query joins the product, competitors and counts) |
 
 The form decides url or name by shape; the server refuses a url sent as a name
 (422, shown in the red banner).
@@ -48,17 +48,19 @@ competitors) and, while the run is not final, follows
 
 | Surface | Component | Shows / calls |
 |---|---|---|
-| Header: title, markets, model, status, cost, Stop, Trace | `RunPage.tsx` | Stop: `POST /runs/:id/stop`. Trace: `GET /runs/:id/trace` (download) |
+| Header: product shot, logo, title, domain, markets, model; tiles for competitors, reviews, long-form ads, ingredients; status, cost, Stop, Trace | `run/RunHeader.tsx` | Stop: `POST /runs/:id/stop`. Trace: `GET /runs/:id/trace` (download) |
 | Red banner under the header | `RunPage.tsx` | `run.error`: why the run ended `invalid` or `failed` |
 | "Finding the product page…" | `RunPage.tsx` | status `resolving` |
 | Confirm panel: product choice, competitor chips (× removes, Add adds), "Research this product and N competitors" | `run/ConfirmPanel.tsx` | status `awaiting_confirmation`; `POST /runs/:id/confirm`. Hovering a chip shows why the resolver proposed it |
-| Seven stage cards | `run/StageTracker.tsx` | `run.stage_status` against `GET /config`'s stages. `Not built yet` is greyed; a card shows the stage's summary and error |
+| Seven stage cards | `run/StageTracker.tsx` | `run.stage_status` against `GET /config`'s stages. `Not built yet` is greyed; a card shows the stage's summary and error, folded to three lines behind "more" |
 | Product brief: price, offer, ingredients, claims, each with a source link | `run/ProductBrief.tsx` | the `product` row, once stage 1's brief is accepted |
 | Avatars: the demand-versus-supply map (up: share of reviews; right: share of competitor ads; size: reviews; colour: win rate, grey when no ads; hover for numbers), then one card per avatar with its lists, the competitors' best angle, up to four quotes and its sub-avatars | `run/Avatars.tsx`, `run/AvatarMap.tsx` | `GET /runs/:id/avatars`, loaded once stage 5 has completed |
-| Competitors: Direct / Indirect / Context only | `run/Competitors.tsx` | `competitors[].relationship`, decided by code; "Not profiled yet" lists the ones without one |
+| Competitors: Direct / Indirect / Context only, one row each with product shot, logo, form, domain, positioning, price, review count, ad count and up to three ad creatives | `run/Competitors.tsx` | `competitors[]` (relationship decided by code), with reviews and ads from `run/use-evidence.ts` |
 | Reviews: one row per product and source (count, average), click a row for its reviews, lowest ratings first | `run/Reviews.tsx` | `GET /runs/:id/reviews` (coverage, and `?competitor=<id>&limit=` for a page) |
 | Competitor long-form statics: bucket filter, cards with image, signals, the reader's verdict and the full copy | `run/Ads.tsx` | `GET /runs/:id/ads` |
 | Live activity | `run/Activity.tsx` | the last 30 events: tool calls, agents starting and ending, reviews collected per product, the avatar memory after each batch, stage changes |
+
+Pictures are addresses on the brands' own sites, read by stage 1 for free (`PageVisuals`: Shopify's `/products/<handle>.js` image or the page's og:image; the icon links or `/favicon.ico`). A brand whose picture fails to load shows a two-letter monogram (`BrandMark.tsx`). A competitor proposed by a retailer url (target.com) shows the retailer's icon as its logo.
 
 ## What failures look like
 

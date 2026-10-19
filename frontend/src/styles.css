@@ -161,3 +161,65 @@ label.check input { width: auto; }
 .avatar p { margin: 2px 0; }
 .quotes { list-style: none; padding: 0; margin: 6px 0 0; display: grid; gap: 4px; }
 .quotes li { border-left: 3px solid var(--line); padding-left: 8px; }
+
+.panel.flush { padding: 0; overflow: hidden; }
+.panel-head { display: flex; align-items: baseline; gap: 10px; padding: 16px 20px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.panel-head h2 { margin: 0; }
+.pad { padding: 0 20px; }
+p.pad { padding: 16px 20px; margin: 0; }
+.count-chip { font-size: 12px; font-weight: 600; background: var(--panel-2); border: 1px solid var(--line); border-radius: 6px; padding: 0 8px; color: var(--dim); }
+.hero-panel h1 { font-size: 30px; }
+.title-line { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
+.title-line h1 { margin: 0; }
+
+.brand-mark { flex: none; object-fit: cover; background: #fff; border: 1px solid var(--line); }
+.brand-mark.round { border-radius: 50%; }
+.brand-mark.square { border-radius: 10px; }
+.brand-mark.fallback { display: inline-grid; place-items: center; font-weight: 700; color: var(--dim); background: var(--panel-2); letter-spacing: 0.02em; }
+
+.run-rows { list-style: none; margin: 0; padding: 0; }
+.run-row { display: grid; grid-template-columns: 56px minmax(180px, 1.6fr) minmax(120px, 1fr) 70px 60px 70px 130px; gap: 16px; align-items: center; padding: 12px 20px; border-bottom: 1px solid var(--line); color: var(--ink); }
+.run-row:hover { background: var(--accent-soft); }
+.run-row-title { min-width: 0; }
+.run-row-title strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.run-row-end { display: grid; justify-items: end; gap: 4px; }
+.logo-stack { display: flex; align-items: center; }
+.logo-stack .brand-mark { margin-left: -6px; box-shadow: 0 0 0 2px var(--panel); }
+.logo-stack .brand-mark:first-child { margin-left: 0; }
+.logo-stack .more { font-size: 12px; color: var(--dim); margin-left: 6px; }
+.metric { display: grid; justify-items: start; line-height: 1.2; }
+.metric .value { font-weight: 600; font-size: 15px; }
+.metric .label { font-size: 11px; color: var(--faint); }
+
+.run-header { display: grid; grid-template-columns: 112px 1fr auto; gap: 20px; align-items: start; }
+.run-header-body { min-width: 0; }
+.run-header h1 { font-size: 24px; }
+.tiles { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px; }
+.tile { display: grid; min-width: 110px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel-2); line-height: 1.25; }
+.tile .value { font-size: 20px; font-weight: 700; }
+.tile .label { font-size: 12px; color: var(--dim); }
+.tile .note { font-size: 11px; color: var(--faint); }
+
+.competitor-rows { list-style: none; margin: 0 0 8px; padding: 0; }
+.competitor-row { display: grid; grid-template-columns: 64px minmax(160px, 1.2fr) minmax(160px, 1.4fr) 90px 60px 90px 150px; gap: 14px; align-items: center; padding: 10px 20px; border-top: 1px solid var(--line); }
+.competitor-row .who { min-width: 0; display: grid; gap: 2px; }
+.competitor-row .positioning { margin: 0; color: var(--dim); }
+.ad-strip { display: flex; gap: 4px; }
+.ad-strip img { width: 46px; height: 46px; object-fit: cover; border-radius: 6px; border: 1px solid var(--line); background: var(--panel-2); }
+
+@media (max-width: 900px) {
+  .run-row { grid-template-columns: 48px 1fr auto; }
+  .run-row .logo-stack, .run-row .metric { display: none; }
+  .run-header { grid-template-columns: 72px 1fr; }
+  .run-header > .brand-mark { width: 72px !important; height: 72px !important; }
+  .run-actions { grid-column: 1 / -1; }
+  .competitor-row { grid-template-columns: 48px 1fr; }
+  .competitor-row > :not(.brand-mark):not(.who) { grid-column: 2; }
+}
+
+.stages { align-items: start; }
+.stage p.clamped { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.stage p { position: relative; }
+button.link { background: none; border: 0; padding: 0 0 0 4px; color: var(--accent); font-size: 12px; }
+.stage p.clamped button.link { position: absolute; right: 0; bottom: 0; background: var(--panel); padding-left: 6px; }
+.banner { overflow-wrap: anywhere; }

@@ -124,7 +124,7 @@ The class diagram lives in `docs/class-diagram.md`. Regenerate it with
   `hashpw.ts`. A helper is a method, or a `static` on the class that needs it.
 - **One responsibility per class; modules stay under 150 lines.** If describing a
   class needs "and", split it.
-- **Boundaries are interfaces in `domain/ports.ts`; adapters implement them.**
+- **Boundaries are interfaces in `domain/ports.ts` (outside services) and `domain/store-ports.ts` (the store); adapters implement them.**
   An agent's tools depend on `WebSearch`, never on `ParallelSearch`.
 - **A stage is a class implementing `Stage`** (`agent/pipeline/stage.ts`),
   registered in `http/app.ts`. The pipeline decides when it runs from

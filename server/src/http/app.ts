@@ -1,10 +1,11 @@
 import { Hono, type Context, type Next } from "hono";
 
-import { JudgemeReviews, OpenRouterPrices, ServiceClients, ShopifyStorefront, WootReviews } from "../adapters/index.js";
+import { JudgemeReviews, OpenRouterPrices, PageVisuals, PublicPage, ServiceClients, ShopifyStorefront, WootReviews } from "../adapters/index.js";
 import {
   AmazonListingFinder,
   AnalysisService,
   AvatarStage,
+  BrandVisualsCollector,
   CompetitorAdStage,
   LiveRuns,
   LlmModels,
@@ -79,9 +80,10 @@ export class App {
     Trace.line(import.meta.url, "App.pipeline");
     const sources = new Map([new JudgemeReviews(settings), new WootReviews(settings)].map((source) => [source.name, source] as const));
     const limits = { maxAds: settings.adsPerRun, minCopyChars: settings.adMinCopyChars, maxAdsPerBrand: settings.adsPerBrand };
+    const pages = new PublicPage(settings);
     return new Pipeline([
-      new ProductMarketStage(),
-      new ReviewStage(new ReviewListings(new ShopifyStorefront(settings), new AmazonListingFinder()), sources, settings.reviewsPerProduct),
+      new ProductMarketStage(new BrandVisualsCollector(new PageVisuals(pages))),
+      new ReviewStage(new ReviewListings(new ShopifyStorefront(pages), new AmazonListingFinder()), sources, settings.reviewsPerProduct),
       new CompetitorAdStage(clients.ads, settings.prices, limits),
       new AvatarStage(),
     ]);

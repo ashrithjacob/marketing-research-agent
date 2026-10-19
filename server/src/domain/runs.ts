@@ -33,3 +33,12 @@ export interface RunUpdate {
   cost_usd?: number | null;
   ended_at?: string;
 }
+
+/** A run as the list of analyses shows it: its product's look, its competitors' faces, and how much evidence it holds. */
+export interface RunSummary extends Run {
+  product: { name: string; brand: string; image_url: string | null; logo_url: string | null } | null;
+  competitors: { brand: string; image_url: string | null; logo_url: string | null; relationship: string | null }[];
+  review_count: number;
+  ad_count: number;
+  avatar_count: number;
+}

@@ -55,6 +55,27 @@ describe("products and competitors", () => {
     expect((await store.competitors.list(first.id)).map((c) => [c.brand, c.status])).toEqual([["A", "proposed"], ["B", "confirmed"]]);
   });
 
+  it("summarise each run with its product's and competitors' pictures and its evidence counts", async () => {
+    const { store } = pg;
+    const account = await store.accounts.addAccount("summary-client");
+    const input = { product_url: "https://s.example/p", product_name: null, markets: ["US" as const], known_competitors: [], brand_constraints: "", price_offer: "" };
+    const run = await store.runs.create({ accountId: account.id, input, model: "m", stages: Stages.initial([]) });
+    const product = await store.products.upsert(account.id, "https://s.example/p", "Drops", "S");
+    await store.products.saveVisual(product.id, { image_url: "https://s.example/p.jpg", logo_url: null });
+    const [rival] = await store.competitors.confirm(product, [{ brand: "Rival", product_name: "R", url: "https://r.example/p" }]);
+    await store.competitors.saveVisual(rival!.id, { image_url: null, logo_url: "https://r.example/favicon.ico" });
+    await store.runs.updateRun(run.id, { product_id: product.id });
+    const [summary] = await store.runs.summaries(Scope.of(account.id));
+    expect(summary).toMatchObject({
+      id: run.id,
+      product: { name: "Drops", brand: "S", image_url: "https://s.example/p.jpg", logo_url: null },
+      competitors: [{ brand: "Rival", image_url: null, logo_url: "https://r.example/favicon.ico", relationship: null }],
+      review_count: 0,
+      ad_count: 0,
+      avatar_count: 0,
+    });
+  });
+
   it("list runs only for the account a scope admits", async () => {
     const { store } = pg;
     const other = await store.accounts.addAccount("other-client");

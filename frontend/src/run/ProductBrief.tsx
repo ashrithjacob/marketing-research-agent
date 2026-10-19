@@ -5,9 +5,7 @@ export default function ProductBrief({ product }: { product: Product }) {
   if (!product.key_active) return null;
   return (
     <section className="panel brief">
-      <h2>
-        {product.brand} {product.name}
-      </h2>
+      <h2>Product brief</h2>
       <p className="dim">
         {product.category} · {product.form_factor?.replace('_', ' ')} · key active: <strong>{product.key_active}</strong>
       </p>

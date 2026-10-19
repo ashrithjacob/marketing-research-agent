@@ -34,6 +34,12 @@ export const ProductBriefSchema = z.object({
 export type ProductBrief = z.infer<typeof ProductBriefSchema>;
 export type Price = z.infer<typeof PriceSchema>;
 
+/** What a brand looks like on screen: its product shot and its logo, as addresses on the brand's own site; null when the page offers none. */
+export interface BrandVisual {
+  image_url: string | null;
+  logo_url: string | null;
+}
+
 export interface Product {
   id: string;
   account_id: string;
@@ -47,6 +53,8 @@ export interface Product {
   offer: ProductBrief["offer"] | null;
   ingredients: ProductBrief["ingredients"];
   claims_on_page: ProductBrief["claims_on_page"];
+  image_url: string | null;
+  logo_url: string | null;
   created_at: string;
   updated_at: string;
 }

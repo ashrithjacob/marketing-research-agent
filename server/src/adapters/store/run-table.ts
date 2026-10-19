@@ -1,4 +1,4 @@
-import { Ids, type AnalysisInput, type Run, type RunStore, type RunUpdate, type Scope, type StageStates } from "../../domain/index.js";
+import { Ids, type AnalysisInput, type Run, type RunStore, type RunSummary, type RunUpdate, type Scope, type StageStates } from "../../domain/index.js";
 import { Trace } from "../../trace/index.js";
 
 import type { SqlDatabase, SqlValue } from "./sql-database.js";
@@ -34,6 +34,22 @@ export class RunTable implements RunStore {
         ? await this.db.all("SELECT * FROM runs ORDER BY created_at DESC LIMIT ?", [limit])
         : await this.db.all("SELECT * FROM runs WHERE account_id = ? ORDER BY created_at DESC LIMIT ?", [scope.accountId, limit]);
     return rows.map((row) => RunTable.run(row)!);
+  }
+
+  async summaries(scope: Scope, limit = 50): Promise<RunSummary[]> {
+    Trace.line(import.meta.url, "RunTable.summaries", { accountId: scope.accountId, limit });
+    const rows = await this.db.all(
+      "SELECT r.*," +
+        " CASE WHEN p.id IS NULL THEN NULL ELSE json_build_object('name', p.name, 'brand', p.brand, 'image_url', p.image_url, 'logo_url', p.logo_url) END AS product," +
+        " COALESCE((SELECT json_agg(json_build_object('brand', c.brand, 'image_url', c.image_url, 'logo_url', c.logo_url, 'relationship', c.relationship) ORDER BY c.brand)" +
+        "   FROM competitors c WHERE c.product_id = r.product_id AND c.status = 'confirmed'), '[]') AS competitors," +
+        " (SELECT COUNT(*) FROM reviews v WHERE v.product_id = r.product_id) AS review_count," +
+        " (SELECT COUNT(*) FROM ads a WHERE a.product_id = r.product_id) AS ad_count," +
+        " (SELECT COUNT(*) FROM avatars t WHERE t.run_id = r.id AND t.parent_id IS NULL) AS avatar_count" +
+        " FROM runs r LEFT JOIN products p ON p.id = r.product_id WHERE (?::text IS NULL OR r.account_id = ?) ORDER BY r.created_at DESC LIMIT ?",
+      [scope.accountId, scope.accountId, limit],
+    );
+    return rows.map((row) => ({ ...(RunTable.run(row) as RunSummary) }));
   }
 
   async updateRun(runId: string, fields: RunUpdate): Promise<void> {
