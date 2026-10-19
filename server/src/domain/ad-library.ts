@@ -12,7 +12,7 @@ export interface AdQuery {
   page?: number;
   sortBy?: AdSort;
   /** Long-form statics only: image ads whose copy is at least this many characters. */
-  longForm?: { minCopyChars: number; maxAdsPerBrand: number };
+  longForm?: { minCopyChars: number };
 }
 
 /** One Meta ad as an ad library indexed it: who ran it, where it sends people, when it ran, what it says. */

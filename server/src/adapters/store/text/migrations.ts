@@ -345,8 +345,26 @@ ALTER TABLE ads ADD CONSTRAINT ads_product_ad UNIQUE (product_id, trendtrack_ad_
 ALTER TABLE ad_extractions ADD COLUMN offer TEXT;
 `;
 
+const AVATAR_MEMORY = `
+ALTER TABLE avatars
+    ADD COLUMN key      TEXT NOT NULL,
+    ADD COLUMN standing TEXT NOT NULL DEFAULT 'avatar',
+    ADD COLUMN profile  JSONB NOT NULL DEFAULT '{}';
+ALTER TABLE avatars ADD CONSTRAINT avatars_run_key UNIQUE (run_id, key);
+CREATE INDEX avatar_members_item ON avatar_members(item_type, item_id);
+
+CREATE TABLE avatar_memories (
+    run_id     TEXT NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
+    batch      INTEGER NOT NULL,
+    memory     JSONB NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (run_id, batch)
+);
+`;
+
 /** Applied in order, once each, recorded in schema_migrations. An applied migration is never edited: a change is a new entry at the end. */
 export const MIGRATIONS: readonly Migration[] = [
   { id: 1, name: "avatar_schema", sql: AVATAR_SCHEMA },
   { id: 2, name: "review_and_ad_sources", sql: REVIEW_AND_AD_SOURCES },
+  { id: 3, name: "avatar_memory", sql: AVATAR_MEMORY },
 ];

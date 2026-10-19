@@ -137,6 +137,31 @@ describe("stage 3", () => {
     expect(breathe).toBeTruthy();
   });
 
+  it("records a store's review app only when that app returned reviews, and says when an installed one holds none", async () => {
+    const empty = new FakeSource("judgeme", 0);
+    const amazon = new FakeSource("amazon", 0);
+    const faux = new Faux();
+    faux.provider.setResponses(
+      new ScriptedAgents()
+        .on("Product url:", [ScriptedAgents.call("web_fetch", { url: PRODUCT_URL }), ScriptedAgents.call("web_search", { query: "x" }), ScriptedAgents.call("submit", RESOLUTION)])
+        .on("Product: Mullein Drops", [ScriptedAgents.call("submit", { amazon_url: null, why: "only on its own store" })])
+        .on("Product: LungClear", [ScriptedAgents.call("submit", { amazon_url: null, why: "not on Amazon" })])
+        .steps(),
+    );
+    const stage = new ReviewStage(new ReviewListings(new FakeStorefront(), new AmazonListingFinder()), new Map<ReviewSourceName, ReviewSource>([["judgeme", empty], ["amazon", amazon]]), 500);
+    const { traces } = TestSettings.make();
+    const app = new App({ settings, traces, store: pg.store, services: new FakeWeb(PAGES, SEARCH_HITS).services(), models: faux.models, generations: new NoBilling(), pipeline: new Pipeline([stage]) });
+    const driver = new RunDriver(app);
+    const runId = await driver.start({ product_url: PRODUCT_URL });
+    const done = await driver.confirmAndFinish(runId, { product_url: PRODUCT_URL, competitors: RESOLUTION.competitors.slice(0, 1).map(({ why: _why, ...pick }) => pick) });
+
+    expect(done.run.stage_status.reviews.status).toBe("invalid");
+    expect(done.run.stage_status.reviews.summary).toContain("Mullein Drops: 0 new (Judge.me is installed but holds no reviews for this product");
+    expect(done.product?.url).toBe(PRODUCT_URL);
+    const row = await pg.db.get<{ review_app: string | null }>("SELECT review_app FROM products WHERE id = ?", [done.product!.id]);
+    expect(row?.review_app).toBeNull();
+  });
+
   it("stores a review once per product, however often it is collected", async () => {
     const product = await pg.store.products.upsert("admin", "https://dedupe.example/p", "P", "");
     const target = { product_id: product.id, competitor_id: null, name: "P", url: product.url };

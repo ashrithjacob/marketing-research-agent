@@ -4,11 +4,10 @@ import type { RunContext } from "../../pipeline/run-context.js";
 
 import type { AmazonListingFinder } from "./amazon-listing-finder.js";
 
-/** Where one target's reviews can be read, and what was found out on the way. */
+/** Where one target's reviews might be read, and what was found out on the way. A listing is a candidate: a store can load an app's script without keeping its reviews there. */
 export interface TargetListings {
   listings: ReviewListing[];
   asins: string[];
-  reviewApp: string | null;
   notes: string[];
 }
 
@@ -23,12 +22,10 @@ export class ReviewListings {
     Trace.line(import.meta.url, "ReviewListings.of", { target: target.name });
     const notes: string[] = [];
     const listings: ReviewListing[] = [];
-    let reviewApp: string | null = null;
     const direct = Asins.fromUrl(target.url);
     if (!direct) {
       try {
         const store = await this.storefront.inspect(target.url, context.signal);
-        reviewApp = store?.review_apps[0] ?? null;
         if (store?.review_apps.includes("judgeme")) listings.push({ source: "judgeme", shop_domain: store.shop_domain, product_id: store.product_id });
         else if (store && store.review_apps.length > 0) notes.push(`review app ${store.review_apps.join("/")} not supported yet`);
       } catch (error) {
@@ -37,7 +34,7 @@ export class ReviewListings {
     }
     const asin = direct ?? (await this.found(context, target, brand, notes));
     if (asin) listings.push({ source: "amazon", asin });
-    return { listings, asins: asin ? [asin] : [], reviewApp: listings.some((l) => l.source === "judgeme") ? "judgeme" : reviewApp, notes };
+    return { listings, asins: asin ? [asin] : [], notes };
   }
 
   private async found(context: RunContext, target: ReviewTarget, brand: string, notes: string[]): Promise<string | null> {

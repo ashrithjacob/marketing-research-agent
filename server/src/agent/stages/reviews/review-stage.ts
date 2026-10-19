@@ -37,23 +37,30 @@ export class ReviewStage implements Stage {
   private async collect(context: RunContext, target: ReviewTarget, brand: string): Promise<{ saved: number; line: string }> {
     Trace.line(import.meta.url, "ReviewStage.collect", { target: target.name });
     const found = await this.listings.of(context, target, brand);
-    await context.store.reviews.recordSources(target, { asins: found.asins, reviewApp: found.reviewApp });
     const counts: string[] = [];
+    const answered: string[] = [];
     let collected: CollectedReview[] = [];
     for (const listing of found.listings) {
       if (collected.length >= this.perProduct || context.signal.aborted) break;
       try {
         const batch = await this.sources.get(listing.source)!.collect(listing, this.perProduct - collected.length, context.signal);
         collected = [...collected, ...batch];
-        counts.push(`${batch.length} ${listing.source}`);
+        if (batch.length > 0) answered.push(listing.source);
+        counts.push(batch.length > 0 ? `${batch.length} ${listing.source}` : ReviewStage.empty(listing.source));
       } catch (error) {
         counts.push(`${listing.source} failed: ${error instanceof Error ? error.message : String(error)}`);
       }
     }
+    await context.store.reviews.recordSources(target, { asins: found.asins, reviewApp: answered.includes("judgeme") ? "judgeme" : null });
     const saved = await context.store.reviews.save(context.run.account_id, target, collected);
     await context.emit("reviews.collected", { target: target.name, competitor_id: target.competitor_id, collected: collected.length, saved });
     const detail = [...counts, ...found.notes].join(", ") || "no review source found";
     return { saved, line: `${target.name}: ${saved} new (${detail})` };
+  }
+
+  static empty(source: ReviewSourceName): string {
+    Trace.line(import.meta.url, "ReviewStage.empty", { source });
+    return source === "judgeme" ? "Judge.me is installed but holds no reviews for this product" : "Amazon listing has no written reviews";
   }
 
   private static client(input: StageInput): ReviewTarget {

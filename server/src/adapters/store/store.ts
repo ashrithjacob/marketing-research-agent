@@ -3,6 +3,7 @@ import { Trace } from "../../trace/index.js";
 
 import { AccountTable } from "./account-table.js";
 import { AdTable } from "./ad-table.js";
+import { AvatarTable } from "./avatar-table.js";
 import { CallTable } from "./call-table.js";
 import { ChargeTable } from "./charge-table.js";
 import { CompetitorTable } from "./competitor-table.js";
@@ -21,6 +22,7 @@ export class SqlResearchStore implements ResearchStore {
   readonly competitors: CompetitorTable;
   readonly reviews: ReviewTable;
   readonly ads: AdTable;
+  readonly avatars: AvatarTable;
   readonly events: EventTable;
   readonly charges: ChargeTable;
   readonly calls: CallTable;
@@ -33,6 +35,7 @@ export class SqlResearchStore implements ResearchStore {
     this.competitors = new CompetitorTable(db);
     this.reviews = new ReviewTable(db);
     this.ads = new AdTable(db);
+    this.avatars = new AvatarTable(db);
     this.events = new EventTable(db);
     this.charges = new ChargeTable(db);
     this.calls = new CallTable(db);

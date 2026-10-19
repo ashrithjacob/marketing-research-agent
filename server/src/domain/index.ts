@@ -1,6 +1,7 @@
 export * from "./accounts.js";
 export * from "./ad-library.js";
 export * from "./ads.js";
+export * from "./avatars.js";
 export * from "./analysis-input.js";
 export * from "./charges.js";
 export * from "./competitors.js";

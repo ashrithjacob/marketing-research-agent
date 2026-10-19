@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { FINAL_STATUSES, runs, type Config } from '../api';
 import Activity from './Activity';
 import Ads from './Ads';
+import Avatars from './Avatars';
 import { Money, StatusBadge } from './badges';
 import Competitors from './Competitors';
 import ConfirmPanel from './ConfirmPanel';
@@ -50,6 +51,7 @@ export default function RunPage({ runId, onError }: { runId: string; onError: (m
       {run.status === 'awaiting_confirmation' && run.resolution && <ConfirmPanel runId={runId} resolution={run.resolution} onDone={reload} onError={onError} />}
       <StageTracker stages={config.stages} states={run.stage_status} />
       {product && <ProductBrief product={product} />}
+      {product && <Avatars runId={runId} version={run.stage_status.avatars?.status ?? ''} onError={onError} />}
       {product && <Competitors product={product} competitors={competitors} />}
       {product && <Reviews runId={runId} product={product} competitors={competitors} version={run.stage_status.reviews?.status ?? ''} onError={onError} />}
       {product && <Ads runId={runId} version={run.stage_status.competitor_ads?.status ?? ''} onError={onError} />}

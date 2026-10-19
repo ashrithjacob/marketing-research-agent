@@ -56,10 +56,11 @@ describe("TrendtrackAds", () => {
     const fetch = vi.fn(async () => json(200, { data: [scaled], pagination: { total: 1 } }));
     vi.stubGlobal("fetch", fetch);
     const page = await new TrendtrackAds(settings()).search({
-      terms: ["mullein.com"], searchIn: "domain", countries: ["US"], limit: 20, page: 2, sortBy: "longestRunning", longForm: { minCopyChars: 2000, maxAdsPerBrand: 15 },
+      terms: ["mullein.com"], searchIn: "domain", countries: ["US"], limit: 20, page: 2, sortBy: "longestRunning", longForm: { minCopyChars: 2000 },
     });
     const body = JSON.parse(String((fetch.mock.calls[0] as unknown as [string, RequestInit])[1].body));
-    expect(body).toMatchObject({ searchType: "domain", sortBy: "longestRunning", mediaType: "image", minDescriptionLength: 2000, maxAdsPerBrand: 15, page: 2, limit: 20 });
+    expect(body).toMatchObject({ searchType: "domain", sortBy: "longestRunning", mediaType: "image", minDescriptionLength: 2000, page: 2, limit: 20 });
+    expect(body).not.toHaveProperty("maxAdsPerBrand");
     expect(page.hits[0]).toMatchObject({ days_running: 64, duplicates: 7, reach_delta_30d: 5200, current_rank: 3, is_eu: true, media_url: "https://cdn.test/ad.jpg" });
   });
 

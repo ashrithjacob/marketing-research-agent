@@ -26,7 +26,7 @@ deploy steps are about **agentchat**, a different app. Use the ones below.
 - The north star every change answers to: `docs/goal.md`, narrowed on
   2026-10-16 to avatar research for long-form statics: `docs/spec.md`, the
   Avatar Strategist spec. Its seven stages are the code's seven stages
-  (`domain/stages.ts`); stages 1, 3 and 4 are built. Every older spec, and the
+  (`domain/stages.ts`); stages 1, 3, 4 and 5 are built. Every older spec, and the
   code they described (operator, plans, tasks, ledger roles), was deleted on
   2026-10-17; git history before `b6f45cc` has them.
 
@@ -106,7 +106,7 @@ every rule in that file at once.
 | `trace` | The run trace: `Trace`, its file sink, the wire tap | nothing |
 | `domain` | Types, zod schemas, `interface` ports. No I/O. | `trace` (owns `zod`) |
 | `config` | `Settings`, the only reader of `process.env` | `trace` |
-| `extract` | Pure checks over what agents produce; empty since the rewrite | `trace`, `domain` |
+| `extract` | Pure logic over what agents produce: the avatar memory's checks, how an update is applied, the tally | `trace`, `domain` |
 | `adapters` | Firecrawl, Crawl4AI, Parallel, TrendTrack, Judge.me, Woot, Shopify store pages, OpenRouter prices, the Postgres store | `trace`, `domain`, `config` |
 | `agent` | The agent kernel (`AgentRunner`, `SubmitTool`), tools, the pipeline and its stages, the resolver | `trace`, `domain`, `config`, `extract`, `adapters` |
 | `http` | Routes, auth, app wiring | everything above |
@@ -242,9 +242,8 @@ Still only written down, because no rule catches them:
 - **A model never copies content by writing it out.** When a quote, a review,
   a finding or a draft moves from one place to another, the model names it by
   id and code copies it. Re-typed text costs output tokens and can change
-  silently. Stage 1's `claims_on_page` text is copied from the page by the
-  model today; when reviews arrive (stage 3), quotes must be referenced by
-  review id.
+  silently. Stage 5 quotes reviews by id. Stage 1's `claims_on_page` text is
+  still copied from the page by the model (`docs/gaps.md`).
 - **`invalid` is not `failed`.** `failed` is a crash; `invalid` means the agent
   finished and produced something the schema refused, which is the most
   informative failure this app has. Do not collapse them.

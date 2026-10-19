@@ -89,6 +89,18 @@ classDiagram
     class Markets {
       countries()
     }
+    class AvatarProfile {
+      <<interface>>
+    }
+    class AvatarMemory {
+      <<interface>>
+    }
+    class StoredAvatar {
+      <<interface>>
+    }
+    class AvatarQuote {
+      <<interface>>
+    }
     class ChargeDraft {
       <<interface>>
     }
@@ -188,6 +200,17 @@ classDiagram
       recordSources()
       coverage()
       list()
+      all()
+    }
+    class AvatarStore {
+      <<interface>>
+      saveMemory()
+      saveAvatars()
+      list()
+      quotes()
+    }
+    class AvatarRecord {
+      <<interface>>
     }
     class AdStore {
       <<interface>>
@@ -293,6 +316,19 @@ classDiagram
       optionalNumber()
       flag()
       settings()
+    }
+  }
+  namespace extract {
+    class AvatarMemoryCheck {
+      problems()
+    }
+    class AvatarMemoryBook {
+      empty()
+      apply()
+      placeAds()
+    }
+    class AvatarTally {
+      records()
     }
   }
   namespace adapters {
@@ -420,6 +456,12 @@ classDiagram
       saveReading()
       list()
     }
+    class AvatarTable {
+      saveMemory()
+      saveAvatars()
+      list()
+      quotes()
+    }
     class CallTable {
       add()
       setGeneration()
@@ -473,6 +515,7 @@ classDiagram
       save()
       recordSources()
       coverage()
+      all()
       list()
     }
     class RunTable {
@@ -654,6 +697,28 @@ classDiagram
     class CompetitorAdStage {
       run()
     }
+    class AdPlacer {
+      place()
+      problems()
+    }
+    class AvatarJudge {
+      judge()
+      problems()
+    }
+    class AvatarReader {
+      read()
+    }
+    class AvatarStage {
+      run()
+    }
+    class MemoryView {
+      memory()
+      reviews()
+      ads()
+    }
+    class ReviewOrder {
+      batches()
+    }
     class CompetitorProfiler {
       profile()
       problems()
@@ -678,6 +743,7 @@ classDiagram
     }
     class ReviewStage {
       run()
+      empty()
     }
     class AdSearchTool {
       tool()
@@ -780,6 +846,7 @@ classDiagram
   ShopifyStorefront --> Settings
   AccountTable --> SqlDatabase
   AdTable --> SqlDatabase
+  AvatarTable --> SqlDatabase
   CallTable --> SqlDatabase
   ChargeTable --> SqlDatabase
   CompetitorTable --> SqlDatabase
@@ -876,6 +943,7 @@ classDiagram
 | `adapters` | `adapters/shopify-storefront.ts` | ShopifyStorefront |
 | `adapters` | `adapters/store/account-table.ts` | AccountTable |
 | `adapters` | `adapters/store/ad-table.ts` | AdTable |
+| `adapters` | `adapters/store/avatar-table.ts` | AvatarTable |
 | `adapters` | `adapters/store/call-table.ts` | CallTable |
 | `adapters` | `adapters/store/charge-table.ts` | ChargeTable |
 | `adapters` | `adapters/store/competitor-table.ts` | CompetitorTable |
@@ -916,6 +984,12 @@ classDiagram
 | `agent` | `agent/stages/ads/ad-reader.ts` | AdReader |
 | `agent` | `agent/stages/ads/ad-sweep.ts` | SweepPlan, SweepLimits, AdSweep |
 | `agent` | `agent/stages/ads/competitor-ad-stage.ts` | CompetitorAdStage |
+| `agent` | `agent/stages/avatars/ad-placer.ts` | AdPlacer |
+| `agent` | `agent/stages/avatars/avatar-judge.ts` | AvatarJudge |
+| `agent` | `agent/stages/avatars/avatar-reader.ts` | AvatarReader |
+| `agent` | `agent/stages/avatars/avatar-stage.ts` | AvatarStage |
+| `agent` | `agent/stages/avatars/memory-view.ts` | MemoryView |
+| `agent` | `agent/stages/avatars/review-order.ts` | ReviewOrder |
 | `agent` | `agent/stages/product-market/competitor-profiler.ts` | CompetitorProfiler |
 | `agent` | `agent/stages/product-market/product-brief-agent.ts` | ProductBriefAgent |
 | `agent` | `agent/stages/product-market/product-market-stage.ts` | ProductMarketStage |
@@ -934,11 +1008,12 @@ classDiagram
 | `domain` | `domain/ad-library.ts` | AdQuery, AdHit, AdPage |
 | `domain` | `domain/ads.ts` | StoredAd, ReadAd |
 | `domain` | `domain/analysis-input.ts` | Markets |
+| `domain` | `domain/avatars.ts` | AvatarProfile, AvatarMemory, StoredAvatar, AvatarQuote |
 | `domain` | `domain/charges.ts` | ChargeDraft, Charge, ChargeMeter, ServiceUse |
 | `domain` | `domain/competitors.ts` | Competitor, CompetitorRelationship |
 | `domain` | `domain/ids.ts` | Clock, Ids |
 | `domain` | `domain/logs.ts` | RunEvent, LlmCallRecord, Generation, LlmCall |
-| `domain` | `domain/ports.ts` | PageFetcher, WebSearch, AdLibrary, ReviewSource, Storefront, GenerationSource, AccountDirectory, RunStore, ProductStore, CompetitorStore, ReviewStore, AdStore, EventLog, ChargeLedger, CallLog, ResearchStore |
+| `domain` | `domain/ports.ts` | PageFetcher, WebSearch, AdLibrary, ReviewSource, Storefront, GenerationSource, AccountDirectory, RunStore, ProductStore, CompetitorStore, ReviewStore, AvatarStore, AvatarRecord, AdStore, EventLog, ChargeLedger, CallLog, ResearchStore |
 | `domain` | `domain/products.ts` | Product |
 | `domain` | `domain/reviews.ts` | CollectedReview, ReviewTarget, StoredReview, ReviewCoverage, StorefrontFacts, Asins |
 | `domain` | `domain/runs.ts` | Run, RunUpdate |
@@ -946,6 +1021,9 @@ classDiagram
 | `domain` | `domain/service-report.ts` | ServicePart, ServiceReport |
 | `domain` | `domain/stages.ts` | StagePlan, StageState, Stages |
 | `domain` | `domain/web.ts` | SearchHit, SearchPage, SearchScope, FetchedPage, ServiceUnavailableError |
+| `extract` | `extract/avatar-memory-check.ts` | AvatarMemoryCheck |
+| `extract` | `extract/avatar-memory.ts` | AvatarMemoryBook |
+| `extract` | `extract/avatar-tally.ts` | AvatarTally |
 | `http` | `http/account-commands.ts` | AccountCommands |
 | `http` | `http/app.ts` | AppParts, App |
 | `http` | `http/auth-gate.ts` | AuthGate |

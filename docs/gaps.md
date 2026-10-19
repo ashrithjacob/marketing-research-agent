@@ -43,6 +43,10 @@ rewrite is in git history before `b6f45cc`.
    stage summary.
 10. **Woot serves US Amazon only.** A run whose markets exclude the US still
     gets US reviews.
+11a. **Measured on run `344caa7d` (2026-10-19):** Betterbrand shows a
+    Trustpilot widget on its product page and Ethale shows "121 reviews" from an
+    app not identified yet; both load Judge.me's script without keeping reviews
+    there. Ethale got no reviews at all.
 11. **No incremental refresh.** A rerun fetches every page again; duplicates are
     dropped on insert, so only the fetching is wasted.
 
@@ -53,6 +57,19 @@ rewrite is in git history before `b6f45cc`.
 13. **No widening when a niche is thin.** The spec's fallback (adjacent
     categories, a 1,500-character threshold) is not built; a thin niche simply
     reports how few ads it found.
+
+## Stage 5
+
+16. **The memory is per run.** A second analysis of the same product starts from
+    an empty memory; the spec's segment memory (avatars carried across runs of
+    one product) and pattern memory (across accounts) are not built.
+17. **Stage 5 needs stage 4.** With no TrendTrack key, or a stage-4 failure, no
+    avatars are built at all, even though the reviews alone could build them.
+
+## Costs
+
+18. **Firecrawl pages are unpriced** while `MRA_FIRECRAWL_USD_PER_PAGE` is
+    unset: run `344caa7d` read 16 pages and counted them as unpriced charges.
 
 ## Verification
 

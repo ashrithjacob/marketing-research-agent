@@ -50,6 +50,15 @@ export class ReviewTable implements ReviewStore {
     );
   }
 
+  async all(productId: string): Promise<StoredReview[]> {
+    Trace.line(import.meta.url, "ReviewTable.all", { productId });
+    return this.db.all<StoredReview>(
+      "SELECT id, product_id, competitor_id, source, rating, title, body, to_char(review_date, 'YYYY-MM-DD') AS review_date, verified, helpful_votes, scraped_at" +
+        " FROM reviews WHERE product_id = ? ORDER BY id",
+      [productId],
+    );
+  }
+
   async list(productId: string, competitorId: string | null, limit: number, offset: number): Promise<StoredReview[]> {
     Trace.line(import.meta.url, "ReviewTable.list", { productId, competitorId, limit, offset });
     return this.db.all<StoredReview>(

@@ -1,6 +1,7 @@
 import type { Account, Scope, User, UserListing } from "./accounts.js";
 import type { AdHit, AdPage, AdQuery } from "./ad-library.js";
 import type { AdReading, ReadAd, StoredAd } from "./ads.js";
+import type { AvatarMemory, AvatarQuote, StoredAvatar } from "./avatars.js";
 import type { AnalysisInput } from "./analysis-input.js";
 import type { Charge } from "./charges.js";
 import type { Competitor, CompetitorPick, CompetitorProfile, Relationship } from "./competitors.js";
@@ -85,6 +86,24 @@ export interface ReviewStore {
   recordSources(target: ReviewTarget, sources: { asins: readonly string[]; reviewApp: string | null }): Promise<void>;
   coverage(productId: string): Promise<ReviewCoverage[]>;
   list(productId: string, competitorId: string | null, limit: number, offset: number): Promise<StoredReview[]>;
+  all(productId: string): Promise<StoredReview[]>;
+}
+
+/** The avatar memory as it grew, one snapshot per batch read, and the avatars a run settled on with the reviews, quotes and ads behind each. */
+export interface AvatarStore {
+  saveMemory(runId: string, memory: AvatarMemory): Promise<void>;
+  saveAvatars(runId: string, avatars: readonly AvatarRecord[]): Promise<void>;
+  list(runId: string): Promise<StoredAvatar[]>;
+  quotes(runId: string): Promise<AvatarQuote[]>;
+}
+
+/** One avatar to store, with the evidence ids it rests on; parents are named by key. */
+export interface AvatarRecord {
+  avatar: Omit<StoredAvatar, "id" | "run_id" | "parent_id">;
+  parent_key: string | null;
+  review_ids: readonly string[];
+  quote_ids: readonly string[];
+  ad_ids: readonly string[];
 }
 
 /** Long-form statics found for a product's analysis, and what an agent read off each. */
@@ -119,6 +138,7 @@ export interface ResearchStore {
   readonly competitors: CompetitorStore;
   readonly reviews: ReviewStore;
   readonly ads: AdStore;
+  readonly avatars: AvatarStore;
   readonly events: EventLog;
   readonly charges: ChargeLedger;
   readonly calls: CallLog;

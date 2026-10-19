@@ -38,7 +38,7 @@ export class TrendtrackAds implements AdLibrary {
       status: "all",
       platforms: ["facebook"],
       ...(query.countries.length > 0 ? { adCountries: { include: [...query.countries] } } : {}),
-      ...(query.longForm ? { mediaType: "image", minDescriptionLength: query.longForm.minCopyChars, maxAdsPerBrand: query.longForm.maxAdsPerBrand } : {}),
+      ...(query.longForm ? { mediaType: "image", minDescriptionLength: query.longForm.minCopyChars } : {}),
       ...(query.page ? { page: query.page } : {}),
       limit: query.limit,
     };

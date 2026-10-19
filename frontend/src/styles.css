@@ -143,3 +143,21 @@ label.check input { width: auto; }
 .badge.bucket-winning { background: #ecfdf5; color: var(--ok); }
 .badge.bucket-testing { background: var(--accent-soft); color: var(--accent); }
 .badge.bucket-dead { color: var(--faint); }
+
+.avatar-map { margin: 8px 0 16px; }
+.avatar-map figcaption { margin-bottom: 6px; }
+.avatar-map svg { width: 100%; max-width: 720px; height: auto; display: block; }
+.avatar-map .quadrant.gap { fill: var(--accent-soft); }
+.avatar-map .quadrant.proven { fill: #f8fafc; }
+.avatar-map .quadrant-label { font-size: 11px; fill: var(--faint); }
+.avatar-map .axis line, .avatar-map .axis-line { stroke: var(--line); stroke-width: 1; }
+.avatar-map .axis text { font-size: 11px; fill: var(--faint); }
+.avatar-map .axis-title { font-size: 12px; fill: var(--dim); }
+.avatar-map .bubble-label { font-size: 12px; fill: var(--ink); }
+.avatar-map .hit { fill: transparent; }
+.avatar-map .bubble:hover circle:not(.hit) { stroke: var(--ink); }
+.avatar { border: 1px solid var(--line); border-radius: 10px; padding: 12px; display: grid; gap: 4px; align-content: start; }
+.avatar.standing-emerging { opacity: 0.8; border-style: dashed; }
+.avatar p { margin: 2px 0; }
+.quotes { list-style: none; padding: 0; margin: 6px 0 0; display: grid; gap: 4px; }
+.quotes li { border-left: 3px solid var(--line); padding-left: 8px; }

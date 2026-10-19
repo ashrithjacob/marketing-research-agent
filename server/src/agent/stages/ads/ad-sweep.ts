@@ -13,7 +13,7 @@ export interface SweepLimits {
   maxAdsPerBrand: number;
 }
 
-/** Collects long-form image ads from an ad library: each competitor's own ads first, then the category by keyword, both by longest running and by 30-day reach growth, until the cap. */
+/** Collects long-form image ads from an ad library: each competitor's own ads first, then the category by keyword, both by longest running and by 30-day reach growth, until the cap. The per-brand cap is kept here: TrendTrack refuses `maxAdsPerBrand` above 1 (measured 2026-10-19). */
 export class AdSweep {
   static readonly PAGE_SIZE = 20;
   static readonly SORTS: readonly AdSort[] = ["longestRunning", "reachDelta30d"];
@@ -26,6 +26,7 @@ export class AdSweep {
   async sweep(plan: SweepPlan, signal?: AbortSignal): Promise<AdHit[]> {
     Trace.line(import.meta.url, "AdSweep.sweep", { domains: plan.domains.length, keywords: plan.keywords.length });
     const found = new Map<string, AdHit>();
+    const perBrand = new Map<string, number>();
     const queries = [
       ...plan.domains.map((domain) => ({ terms: [domain], searchIn: "domain" as const })),
       ...plan.keywords.map((keyword) => ({ terms: [keyword], searchIn: "ad_copy" as const })),
@@ -34,10 +35,19 @@ export class AdSweep {
       for (const sortBy of AdSweep.SORTS) {
         if (found.size >= this.limits.maxAds || signal?.aborted) return [...found.values()];
         const page = await this.ads.search(this.query(query.terms, query.searchIn, plan.countries, sortBy, found.size), signal);
-        for (const hit of page.hits) if (hit.body.length >= this.limits.minCopyChars && found.size < this.limits.maxAds) found.set(hit.ad_id, hit);
+        for (const hit of page.hits) this.keep(hit, found, perBrand);
       }
     }
     return [...found.values()];
+  }
+
+  private keep(hit: AdHit, found: Map<string, AdHit>, perBrand: Map<string, number>): void {
+    Trace.tick(import.meta.url, "AdSweep.keep");
+    const brand = (hit.landing_domain || hit.advertiser).replace(/^www\./, "").toLowerCase();
+    const held = perBrand.get(brand) ?? 0;
+    if (found.has(hit.ad_id) || hit.body.length < this.limits.minCopyChars || found.size >= this.limits.maxAds || held >= this.limits.maxAdsPerBrand) return;
+    found.set(hit.ad_id, hit);
+    perBrand.set(brand, held + 1);
   }
 
   private query(terms: string[], searchIn: AdQuery["searchIn"], countries: readonly string[], sortBy: AdSort, held: number): AdQuery {
@@ -48,7 +58,7 @@ export class AdSweep {
       countries,
       sortBy,
       limit: Math.min(AdSweep.PAGE_SIZE, this.limits.maxAds - held),
-      longForm: { minCopyChars: this.limits.minCopyChars, maxAdsPerBrand: this.limits.maxAdsPerBrand },
+      longForm: { minCopyChars: this.limits.minCopyChars },
     };
   }
 }

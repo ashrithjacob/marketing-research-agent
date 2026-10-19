@@ -6,7 +6,7 @@ import { Trace } from "../trace/index.js";
 
 import type { ApiEnv } from "./api-env.js";
 
-/** What a run's evidence stages stored for its product: review coverage and a page of reviews per target, and the long-form statics with their readings. */
+/** What a run's evidence stages stored: review coverage and a page of reviews per target, the long-form statics with their readings, and the avatars with their quotes. */
 export class EvidenceRoutes {
   static readonly MAX_PAGE = 100;
 
@@ -30,6 +30,12 @@ export class EvidenceRoutes {
       }),
     );
     api.get("/runs/:runId/ads", async (c) => this.withProduct(c, async (productId) => c.json({ ads: await this.store.ads.list(productId) })));
+    api.get("/runs/:runId/avatars", async (c) =>
+      this.withProduct(c, async () => {
+        const runId = c.req.param("runId") ?? "";
+        return c.json({ avatars: await this.store.avatars.list(runId), quotes: await this.store.avatars.quotes(runId) });
+      }),
+    );
     return api;
   }
 

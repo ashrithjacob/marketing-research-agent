@@ -5,6 +5,7 @@ import type { Message } from "@earendil-works/pi-ai";
 
 import { ServiceClients } from "../src/adapters/index.js";
 import { CompetitorAdStage, Pipeline, ProductMarketStage } from "../src/agent/index.js";
+import { AdSweep } from "../src/agent/stages/ads/ad-sweep.js";
 import type { AdHit, AdLibrary, AdPage, AdQuery, ReadAd } from "../src/domain/index.js";
 import { App } from "../src/http/index.js";
 
@@ -70,6 +71,14 @@ afterAll(async () => {
   await pg.stop();
 });
 
+describe("the sweep", () => {
+  it("keeps at most the per-brand cap of one brand's ads in code, because TrendTrack refuses maxAdsPerBrand above 1", async () => {
+    const flood: AdLibrary = { search: async () => ({ hits: Array.from({ length: 20 }, (_, i) => FakeAds.hit(`f${i}`, "www.flood.com", 30, LONG)), total: 20 }) };
+    const hits = await new AdSweep(flood, { maxAds: 100, minCopyChars: 2000, maxAdsPerBrand: 3 }).sweep({ domains: ["flood.com"], keywords: ["mullein"], countries: ["US"] });
+    expect(hits.map((hit) => hit.ad_id)).toEqual(["f0", "f1", "f2"]);
+  });
+});
+
 describe("stage 4", () => {
   it("waits for the brief, sweeps by competitor domain and keyword, keeps only long copy, and stores each ad with the bucket its reader judged", async () => {
     const ads = new FakeAds();
@@ -98,7 +107,7 @@ describe("stage 4", () => {
 
     expect(done.run.stage_status.competitor_ads).toMatchObject({ status: "completed", error: "" });
     expect(ads.queries.slice(0, 4).map((q) => q.searchIn)).toEqual(["domain", "domain", "domain", "domain"]);
-    expect(ads.queries.find((q) => q.terms[0] === "lungclear.com")).toMatchObject({ sortBy: "longestRunning", longForm: { minCopyChars: 2000, maxAdsPerBrand: 15 } });
+    expect(ads.queries.find((q) => q.terms[0] === "lungclear.com")).toMatchObject({ sortBy: "longestRunning", longForm: { minCopyChars: 2000 } });
     expect(ads.queries.some((q) => q.searchIn === "ad_copy" && q.terms[0] === "mullein")).toBe(true);
     const { ads: stored } = await driver.json<{ ads: ReadAd[] }>(`/runs/${runId}/ads`);
     expect(stored).toHaveLength(12);

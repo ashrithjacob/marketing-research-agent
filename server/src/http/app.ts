@@ -4,6 +4,7 @@ import { JudgemeReviews, OpenRouterPrices, ServiceClients, ShopifyStorefront, Wo
 import {
   AmazonListingFinder,
   AnalysisService,
+  AvatarStage,
   CompetitorAdStage,
   LiveRuns,
   LlmModels,
@@ -82,6 +83,7 @@ export class App {
       new ProductMarketStage(),
       new ReviewStage(new ReviewListings(new ShopifyStorefront(settings), new AmazonListingFinder()), sources, settings.reviewsPerProduct),
       new CompetitorAdStage(clients.ads, settings.prices, limits),
+      new AvatarStage(),
     ]);
   }
 

@@ -158,3 +158,37 @@ export interface ReadAd {
   bucket_why: string | null;
   reading: AdReading | null;
 }
+
+export interface StoredAvatar {
+  id: string;
+  parent_id: string | null;
+  key: string;
+  name: string;
+  description: string;
+  demand_share: number;
+  supply_share: number | null;
+  win_rate: number | null;
+  review_count: number;
+  ad_count: number;
+  awareness: string | null;
+  confidence: string | null;
+  standing: string;
+  profile: {
+    pains: string[];
+    desires: string[];
+    triggers: string[];
+    prior_solutions: string[];
+    objections: string[];
+    outcomes: string[];
+    angles: string[];
+    best_competitor_angle: string | null;
+  };
+}
+
+export interface AvatarQuote {
+  avatar_id: string;
+  review_id: string;
+  rating: number;
+  body: string;
+  source: string;
+}

@@ -137,6 +137,54 @@ reviews of one ASIN in 12 s.
    running, duplicates, reach growth, status and rank. Code refuses a batch
    that skips, invents or repeats an ad id.
 
+`AdSweep` caps each brand at `MRA_ADS_PER_BRAND` itself: TrendTrack's docs
+list `maxAdsPerBrand` as a number, but the API refuses anything but 1
+(`400 unsupported_filter`, run `344caa7d`, 2026-10-19).
+
+## Stage 5: avatars
+
+`AvatarStage` (`agent/stages/avatars/`) needs stages 1, 3 and 4 (and 2 once it
+exists). An agent builds the avatars by reading, not by clustering (spec,
+2026-10-17):
+
+1. **Read the reviews into a memory.** Every stored review of the analysis,
+   dealt round-robin across product and star rating (`ReviewOrder`) into
+   batches of 40, read one batch at a time (`avatar_reader:<n>`, no tools). Each
+   agent sees the memory so far (`MemoryView`: every avatar's key, description,
+   counts and lists) and the batch (review ids, stars, source, verified, date,
+   text), and submits a `MemoryUpdate`: create, revise (replace fields, which is
+   how lists get condensed), merge, assign every review to an avatar or none,
+   and quote reviews by id. `AvatarMemoryCheck` (`extract/`) refuses an unknown
+   key, a third level, a review left out, invented or assigned twice, or a quote
+   from a review assigned elsewhere; `AvatarMemoryBook` applies the rest, merges
+   last so everything moves with them. The memory is stored after every batch
+   (`avatar_memories`). A batch refused three times is left out and counted in
+   the summary.
+2. **Place the ads.** Stage 4's read ads, 15 at a time (`ad_placer:<n>`), each on
+   an avatar or none.
+3. **Judge.** One agent (`avatar_judge`) gives every avatar its awareness level,
+   confidence, standing (avatar or emerging) and the competitors' best angle on
+   it, with every count in front of it.
+4. **Count** (`AvatarTally`, code, no thresholds): a top-level avatar counts its
+   sub-avatars' reviews and ads too; demand share is its reviews over all
+   reviews assigned to any avatar; supply share is its ads over all placed ads;
+   win rate is its ads judged winning over its ads. Stored in `avatars`, with
+   reviews, quotes and ads in `avatar_members`.
+
+## The first real run, 2026-10-19
+
+Run `344caa7d`: Mullevia, US, five competitors. Resolving took about 2 minutes
+and proposed 11 competitors, of which 5 were kept. Stage 1 completed (5
+ingredients, 9 claims, 5 of 5 profiled; the capsules came out indirect, the
+four droppers direct). Stage 3 stored 874 reviews: Mullevia 38 (Judge.me),
+Betterbrand tincture 370 and capsules 312, Havasu 130 (its Amazon listing found
+from a Target url), OriginDrops 24, all Amazon through Woot, each fewer than 500
+because Woot's star bands ran out; Ethale 0 (its reviews are on an app this does
+not read). Stage 4 failed on `maxAdsPerBrand` (fixed above). Billed: $0.176, of
+which OpenRouter $0.043 over 44 calls, Parallel $0.115 (the Amazon listing
+finder's 20 searches were $0.10), TrendTrack $0.018; 16 Firecrawl pages are
+unpriced because `MRA_FIRECRAWL_USD_PER_PAGE` is not set.
+
 ## What a run costs, and where that is recorded
 
 Billed, never calculated. Every paid call writes a `charges` row as it
