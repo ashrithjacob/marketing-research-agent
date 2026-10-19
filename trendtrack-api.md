@@ -1,4 +1,7 @@
 ---
+title: API Reference
+description: Browse the generated endpoint reference grouped by the main Trendtrack Public API resources.
+---
 
 ## Measured against the live API (differs from the docs below)
 
@@ -8,10 +11,6 @@ Ours, not TrendTrack's. Each was seen on a real call; the docs in `trendtrack/ap
 - **`GET /v1/shops/{id}` costs 4 credits**, not one per returned resource (2026-10-19, `X-Credits-Used: 4`). One page of `/v1/shops/{id}/products` also cost 4 for 5 rows.
 - **`GET /v1/lookup` is free** as documented: no `X-Credits-Used` header came back.
 - **A shop's best-seller list can be empty while `catalog.productsCount` is not** (Mullevia: 6 products, `total: 0`).
-
-title: API Reference
-description: Browse the generated endpoint reference grouped by the main Trendtrack Public API resources.
----
 
 <Callout title="Resource-based navigation">
   Use the left sidebar to browse the API by resource area instead of
