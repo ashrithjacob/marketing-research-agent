@@ -14,7 +14,9 @@ export default function Traction({ traction }: { traction: ShopTraction | null }
       ? 'its only product'
       : traction.product_rank !== null
         ? `#${traction.product_rank} of ${traction.products_count} products`
-        : `not in the shop's top ${traction.ranked_within}`;
+        : traction.ranked_within === 0
+          ? `${traction.products_count ?? '?'} products, rank unknown`
+          : `not in the shop's top ${traction.ranked_within}`;
   return (
     <span className="traction" title={`TrendTrack sales tracker, last 30 days; ${range}. Sales are for the whole shop.`}>
       <span className="value">{sales !== null ? `${usd(sales)}/mo` : 'not tracked'}</span>

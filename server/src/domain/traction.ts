@@ -21,6 +21,7 @@ export interface ShopTraction {
   active_ads: number | null;
   products_count: number | null;
   product_rank: number | null;
+  /** How many of the shop's best-sellers TrendTrack listed; 0 when it has no list for the shop, so the rank is unknown rather than low. */
   ranked_within: number;
   single_product: boolean;
   fetched_at: string;

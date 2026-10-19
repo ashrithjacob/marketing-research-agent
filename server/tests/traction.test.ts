@@ -34,8 +34,14 @@ describe("TrendTrack shops", () => {
     vi.stubGlobal("fetch", fetch);
     const { traction, credits } = await new TrendtrackShops(settings).traction({ domain: "trybetterbrand.com", shop_id: "s1", monthly_visits: 1, active_ads: 1 }, "betterlungs®-mullein-chlorophyll");
     expect(credits).toBe(8);
-    expect(traction).toMatchObject({ monthly_sales_usd: 52737, monthly_sales_min_usd: 37819, units_sold: 1573, products_count: 23, product_rank: 1, ranked_within: 23, single_product: false, active_ads: 44 });
+    expect(traction).toMatchObject({ monthly_sales_usd: 52737, monthly_sales_min_usd: 37819, units_sold: 1573, products_count: 23, product_rank: 1, ranked_within: 2, single_product: false, active_ads: 44 });
     expect(String(fetch.mock.calls[1]![0])).toContain("sortBy=popularity");
+  });
+
+  it("says the rank is unknown, not low, when TrendTrack lists no best-sellers for a shop (Mullevia, 2026-10-19)", async () => {
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => (url.includes("/products?") ? json({ data: [], pagination: { total: 0 } }, 4) : json({ data: { catalog: { productsCount: 6 }, sales: { estMonthlySales: 48658 } } }, 4))));
+    const { traction } = await new TrendtrackShops(settings).traction({ domain: "mullevia.com", shop_id: "m", monthly_visits: 7629, active_ads: 0 }, "mullevia-mullein-drops");
+    expect(traction).toMatchObject({ products_count: 6, product_rank: null, ranked_within: 0 });
   });
 
   it("treats a one-product shop's sales as the product's, without paying for its product list", async () => {

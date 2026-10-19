@@ -30,7 +30,7 @@ export class TrendtrackShops implements ShopIntel {
     const shop = await this.get(`/v1/shops/${signals.shop_id}`, signal);
     const data = ((shop.body as { data?: TrendtrackShop }).data ?? shop.body) as TrendtrackShop;
     const count = data.catalog?.productsCount ?? null;
-    const ranked = count !== null && count > 1 && productHandle ? await this.rank(signals.shop_id, productHandle, signal) : { rank: null, credits: 0 };
+    const ranked = count !== null && count > 1 && productHandle ? await this.rank(signals.shop_id, productHandle, signal) : { rank: null, credits: 0, listed: 0 };
     return {
       credits: shop.credits + ranked.credits,
       traction: {
@@ -45,19 +45,19 @@ export class TrendtrackShops implements ShopIntel {
         active_ads: data.advertising?.activeAds ?? signals.active_ads,
         products_count: count,
         product_rank: count === 1 ? 1 : ranked.rank,
-        ranked_within: count === 1 ? 1 : Math.min(count ?? 0, TrendtrackShops.RANK_WINDOW),
+        ranked_within: count === 1 ? 1 : ranked.listed,
         single_product: count === 1,
         fetched_at: Clock.nowIso(),
       },
     };
   }
 
-  private async rank(shopId: string, handle: string, signal?: AbortSignal): Promise<{ rank: number | null; credits: number }> {
+  private async rank(shopId: string, handle: string, signal?: AbortSignal): Promise<{ rank: number | null; credits: number; listed: number }> {
     Trace.line(import.meta.url, "TrendtrackShops.rank", { shopId, handle });
     const page = await this.get(`/v1/shops/${shopId}/products?${new URLSearchParams({ sortBy: "popularity", limit: String(TrendtrackShops.RANK_WINDOW) })}`, signal);
     const rows = (page.body as { data?: Array<{ handle?: string; rank?: number }> }).data ?? [];
     const row = rows.find((product) => decodeURIComponent(product.handle ?? "").toLowerCase() === handle);
-    return { rank: row?.rank ?? null, credits: page.credits };
+    return { rank: row?.rank ?? null, credits: page.credits, listed: rows.length };
   }
 
   private async get(path: string, signal?: AbortSignal): Promise<{ body: unknown; credits: number }> {
