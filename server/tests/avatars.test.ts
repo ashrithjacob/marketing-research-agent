@@ -81,10 +81,13 @@ describe("stage 5", () => {
   it("reads every review in mixed batches into a memory of avatars, places the ads, judges each avatar, and stores the counts and quotes", async () => {
     const product = await pg.store.products.upsert("admin", PRODUCT_URL, "Mullein Drops", "Mullevia");
     const [winning, dead, sameBuyer] = await pg.store.ads.save("admin", product.id, [ad("w1"), ad("d1"), ad("b1")], new Map());
-    const reading = { avatar: "ex-smokers", claim_type: "identity" as const, awareness: "problem_aware" as const, mechanism: null, proof_types: [], offer: null, objections_handled: [], emotion: "relief", risk_flags: [], relation: "same_problem" as const, relation_why: "lungs" };
+    const reading = { avatar: "ex-smokers", claim_type: "identity" as const, awareness: "problem_aware" as const, mechanism: null, proof_types: [], offer: null, objections_handled: [], emotion: "relief", risk_flags: [] };
+    await pg.store.ads.saveRing(winning!.id, "same_problem", "lungs");
+    await pg.store.ads.saveRing(dead!.id, "direct_competitor", "same tincture");
+    await pg.store.ads.saveRing(sameBuyer!.id, "same_buyer", "joint pain, 50+");
     await pg.store.ads.saveReading(winning!.id, { ...reading, ad_id: winning!.id, bucket: "winning", bucket_why: "40 days" });
     await pg.store.ads.saveReading(dead!.id, { ...reading, ad_id: dead!.id, bucket: "dead", bucket_why: "stopped" });
-    await pg.store.ads.saveReading(sameBuyer!.id, { ...reading, ad_id: sameBuyer!.id, relation: "same_buyer", relation_why: "joint pain, 50+", bucket: "winning", bucket_why: "90 days" });
+    await pg.store.ads.saveReading(sameBuyer!.id, { ...reading, ad_id: sameBuyer!.id, bucket: "winning", bucket_why: "90 days" });
 
     const reader = new Reader();
     const faux = new Faux();

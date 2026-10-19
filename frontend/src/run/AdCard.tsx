@@ -25,7 +25,7 @@ export default function AdCard({ ad, logo }: { ad: ReadAd; logo: string | null }
         {audience && ` · ${audience}`}
       </div>
       {ad.bucket_why && <p className="small dim">{ad.bucket_why}</p>}
-      {ad.reading?.relation_why && <p className="small">{ad.reading.relation_why}</p>}
+      {ad.ring_why && <p className="small">{ad.ring_why}</p>}
       {ad.reading && (
         <p className="small">
           <strong>{ad.reading.claim_type}</strong>, {ad.reading.awareness.replace('_', ' ')} · {ad.reading.avatar}

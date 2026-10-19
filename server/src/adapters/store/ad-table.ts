@@ -1,4 +1,4 @@
-import { Ids, type AdHit, type AdReading, type AdStore, type ReadAd, type StoredAd } from "../../domain/index.js";
+import { Ids, type AdHit, type AdReading, type AdRing, type AdStore, type ReadAd, type StoredAd } from "../../domain/index.js";
 import { Trace } from "../../trace/index.js";
 
 import type { SqlDatabase } from "./sql-database.js";
@@ -34,21 +34,25 @@ export class AdTable implements AdStore {
     await this.db.transaction(async (tx) => {
       await tx.run("UPDATE ads SET bucket = ?, bucket_why = ? WHERE id = ?", [reading.bucket, reading.bucket_why, adId]);
       await tx.run(
-        "INSERT INTO ad_extractions (ad_id, avatar_label, claim_type, awareness, mechanism, proof_types, offer, objections_handled, emotion, risk_flags, relation, relation_why)" +
-          " VALUES (?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT (ad_id) DO UPDATE SET avatar_label = EXCLUDED.avatar_label, claim_type = EXCLUDED.claim_type," +
+        "INSERT INTO ad_extractions (ad_id, avatar_label, claim_type, awareness, mechanism, proof_types, offer, objections_handled, emotion, risk_flags)" +
+          " VALUES (?,?,?,?,?,?,?,?,?,?) ON CONFLICT (ad_id) DO UPDATE SET avatar_label = EXCLUDED.avatar_label, claim_type = EXCLUDED.claim_type," +
           " awareness = EXCLUDED.awareness, mechanism = EXCLUDED.mechanism, proof_types = EXCLUDED.proof_types, offer = EXCLUDED.offer," +
-          " objections_handled = EXCLUDED.objections_handled, emotion = EXCLUDED.emotion, risk_flags = EXCLUDED.risk_flags," +
-          " relation = EXCLUDED.relation, relation_why = EXCLUDED.relation_why",
+          " objections_handled = EXCLUDED.objections_handled, emotion = EXCLUDED.emotion, risk_flags = EXCLUDED.risk_flags",
         [adId, reading.avatar, reading.claim_type, reading.awareness, reading.mechanism, JSON.stringify(reading.proof_types), reading.offer,
-          JSON.stringify(reading.objections_handled), reading.emotion, JSON.stringify(reading.risk_flags), reading.relation, reading.relation_why],
+          JSON.stringify(reading.objections_handled), reading.emotion, JSON.stringify(reading.risk_flags)],
       );
     });
+  }
+
+  async saveRing(adId: string, ring: AdRing, why: string): Promise<void> {
+    Trace.line(import.meta.url, "AdTable.saveRing", { adId, ring });
+    await this.db.run("INSERT INTO ad_extractions (ad_id, relation, relation_why) VALUES (?,?,?) ON CONFLICT (ad_id) DO UPDATE SET relation = EXCLUDED.relation, relation_why = EXCLUDED.relation_why", [adId, ring, why]);
   }
 
   async list(productId: string): Promise<ReadAd[]> {
     Trace.line(import.meta.url, "AdTable.list", { productId });
     const rows = await this.db.all(
-      "SELECT a.*, to_char(a.first_seen, 'YYYY-MM-DD') AS first_seen, to_char(a.last_seen, 'YYYY-MM-DD') AS last_seen, e.ad_id AS read_id, e.avatar_label," +
+      "SELECT a.*, to_char(a.first_seen, 'YYYY-MM-DD') AS first_seen, to_char(a.last_seen, 'YYYY-MM-DD') AS last_seen, e.claim_type IS NOT NULL AS read, e.avatar_label," +
         " e.claim_type, e.awareness, e.mechanism, e.proof_types, e.offer, e.objections_handled, e.emotion, e.risk_flags, e.relation, e.relation_why" +
         " FROM ads a LEFT JOIN ad_extractions e ON e.ad_id = a.id WHERE a.product_id = ? ORDER BY a.days_running DESC NULLS LAST, a.id",
       [productId],
@@ -58,8 +62,8 @@ export class AdTable implements AdStore {
 
   private static ad(row: Record<string, any>): ReadAd {
     Trace.tick(import.meta.url, "AdTable.ad");
-    const { read_id, avatar_label, claim_type, awareness, mechanism, proof_types, offer, objections_handled, emotion, risk_flags, relation, relation_why, account_id: _account, image_text: _text, win_score: _score, ...ad } = row;
-    const reading = read_id ? { avatar: avatar_label, claim_type, awareness, mechanism, proof_types, offer, objections_handled, emotion, risk_flags, relation, relation_why } : null;
-    return { ...(ad as StoredAd), reading };
+    const { read, avatar_label, claim_type, awareness, mechanism, proof_types, offer, objections_handled, emotion, risk_flags, relation, relation_why, account_id: _account, image_text: _text, win_score: _score, ...ad } = row;
+    const reading = read ? { avatar: avatar_label, claim_type, awareness, mechanism, proof_types, offer, objections_handled, emotion, risk_flags } : null;
+    return { ...(ad as StoredAd), ring: relation ?? null, ring_why: relation_why ?? null, reading };
   }
 }

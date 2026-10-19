@@ -288,6 +288,7 @@ classDiagram
       <<interface>>
       save()
       saveReading()
+      saveRing()
       list()
     }
     class BrandVisualCache {
@@ -517,6 +518,7 @@ classDiagram
     class AdTable {
       save()
       saveReading()
+      saveRing()
       list()
     }
     class AvatarTable {
@@ -768,28 +770,24 @@ classDiagram
       resolve()
       research()
     }
-    class AdKeywordsAgent {
-      pick()
-      problems()
-    }
     class AdReader {
       read()
       problems()
     }
-    class AdStageSummary {
-      rings()
-    }
-    class SweepPlan {
+    class ScoutLimits {
       <<interface>>
     }
-    class SweepLimits {
-      <<interface>>
-    }
-    class AdSweep {
-      sweep()
+    class AdScout {
+      scout()
+      problems()
     }
     class CompetitorAdStage {
       run()
+      rings()
+    }
+    class ScoutLog {
+      record()
+      ad()
     }
     class AdPlacer {
       place()
@@ -847,6 +845,13 @@ classDiagram
     }
     class AdSearchTool {
       tool()
+    }
+    class ReadAdTool {
+      tool()
+    }
+    class SearchLongFormTool {
+      tool()
+      row()
     }
     class AgentKit {
       <<interface>>
@@ -1003,11 +1008,12 @@ classDiagram
   RunLauncher --> ProductResolver
   RunLauncher --> ResolutionVisuals
   RunLauncher --> ResolutionSignals
-  AdSweep --> AdLibrary
-  AdSweep --> SweepLimits
+  AdScout --> AdLibrary
+  AdScout --> ServicePrices
+  AdScout --> ScoutLimits
   CompetitorAdStage --> AdLibrary
   CompetitorAdStage --> ServicePrices
-  CompetitorAdStage --> SweepLimits
+  CompetitorAdStage --> ScoutLimits
   BrandVisualsCollector --> BrandVisuals
   ProductMarketStage --> BrandVisualsCollector
   ProductMarketStage --> ShopTractionCollector
@@ -1018,6 +1024,9 @@ classDiagram
   ReviewStage --> ReviewListings
   AdSearchTool --> AdLibrary
   AdSearchTool --> UrlLedger
+  ReadAdTool --> ScoutLog
+  SearchLongFormTool --> AdLibrary
+  SearchLongFormTool --> ScoutLog
   Toolbox --> ServiceClients
   Toolbox --> Settings
   WebFetchTool --> PageFetcher
@@ -1110,11 +1119,10 @@ classDiagram
 | `agent` | `agent/resolve/resolution-visuals.ts` | ResolutionVisuals |
 | `agent` | `agent/run-end.ts` | RunVerdict, RunEnd |
 | `agent` | `agent/run-launcher.ts` | RunLauncher |
-| `agent` | `agent/stages/ads/ad-keywords-agent.ts` | AdKeywordsAgent |
 | `agent` | `agent/stages/ads/ad-reader.ts` | AdReader |
-| `agent` | `agent/stages/ads/ad-stage-summary.ts` | AdStageSummary |
-| `agent` | `agent/stages/ads/ad-sweep.ts` | SweepPlan, SweepLimits, AdSweep |
+| `agent` | `agent/stages/ads/ad-scout.ts` | ScoutLimits, AdScout |
 | `agent` | `agent/stages/ads/competitor-ad-stage.ts` | CompetitorAdStage |
+| `agent` | `agent/stages/ads/scout-log.ts` | ScoutLog |
 | `agent` | `agent/stages/avatars/ad-placer.ts` | AdPlacer |
 | `agent` | `agent/stages/avatars/avatar-judge.ts` | AvatarJudge |
 | `agent` | `agent/stages/avatars/avatar-reader.ts` | AvatarReader |
@@ -1130,6 +1138,8 @@ classDiagram
 | `agent` | `agent/stages/reviews/review-listings.ts` | TargetListings, ReviewListings |
 | `agent` | `agent/stages/reviews/review-stage.ts` | ReviewStage |
 | `agent` | `agent/tools/ad-search-tool.ts` | AdSearchTool |
+| `agent` | `agent/tools/read-ad-tool.ts` | ReadAdTool |
+| `agent` | `agent/tools/search-long-form-tool.ts` | SearchLongFormTool |
 | `agent` | `agent/tools/toolbox.ts` | AgentKit, Toolbox |
 | `agent` | `agent/tools/traced-tool.ts` | TracedTool |
 | `agent` | `agent/tools/url-ledger.ts` | UrlLedger |

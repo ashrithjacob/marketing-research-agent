@@ -102,6 +102,7 @@ export class Env {
       reviewsPerBand: Env.number("MRA_REVIEWS_PER_BAND", 100),
       wootDelayMs: Env.number("MRA_WOOT_DELAY_MS", 2000),
       adsPerRun: Env.number("MRA_ADS_PER_RUN", 150),
+      adSearchesPerRun: Env.number("MRA_AD_SEARCHES_PER_RUN", 20),
       adMinCopyChars: Env.number("MRA_AD_MIN_COPY_CHARS", 2000),
       adsPerBrand: Env.number("MRA_ADS_PER_BRAND", 15),
 

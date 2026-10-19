@@ -101,6 +101,7 @@ export class TestSettings {
       reviewsPerBand: 100,
       wootDelayMs: 0,
       adsPerRun: 150,
+      adSearchesPerRun: 20,
       adMinCopyChars: 2000,
       adsPerBrand: 15,
       databaseUrl: "postgres://unused",

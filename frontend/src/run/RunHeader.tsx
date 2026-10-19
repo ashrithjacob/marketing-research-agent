@@ -17,8 +17,7 @@ export default function RunHeader({ run, product, competitors, coverage, ads, pi
   const brand = product?.brand || run.resolution?.product.brand || '';
   const url = product?.url ?? run.resolution?.product.url ?? run.input.product_url ?? '';
   const reviews = coverage.reduce((sum, row) => sum + Number(row.reviews), 0);
-  const studied = ads.filter((ad) => ad.reading?.relation !== 'unrelated');
-  const winning = studied.filter((ad) => ad.bucket === 'winning').length;
+  const winning = ads.filter((ad) => ad.bucket === 'winning').length;
   const stoppable = !FINAL_STATUSES.has(run.status) && run.status !== 'stopping';
   return (
     <section className="panel run-header">
@@ -39,7 +38,7 @@ export default function RunHeader({ run, product, competitors, coverage, ads, pi
         <div className="tiles">
           <Tile value={competitors.length} label="competitors" note={`${competitors.filter((c) => c.relationship === 'direct').length} direct`} />
           <Tile value={reviews} label="reviews" />
-          <Tile value={studied.length} label="long-form ads" note={studied.length > 0 ? `${winning} winning` : undefined} />
+          <Tile value={ads.length} label="long-form ads" note={ads.length > 0 ? `${winning} winning` : undefined} />
           <Tile value={product?.ingredients.length ?? 0} label="ingredients" />
         </div>
       </div>

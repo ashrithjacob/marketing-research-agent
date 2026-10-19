@@ -7,20 +7,33 @@ export const AWARENESS_LEVELS = ["unaware", "problem_aware", "solution_aware", "
 export const AD_BUCKETS = ["winning", "testing", "dead"] as const;
 export type AdBucket = (typeof AD_BUCKETS)[number];
 
-/** Which of the market's ads an ad is to the growth marketer studying it: one aimed at the same problem (any product), one aimed at the same buyer with another problem (a format to borrow), or noise. A competitor's own ad is known by its domain, so code decides that, not the reader. */
-export const AD_RELATIONS = ["same_problem", "same_buyer", "unrelated"] as const;
-export type AdRelation = (typeof AD_RELATIONS)[number];
+/** The rings a growth marketer studies a market's long-form ads in: a direct competitor's ad (the same product); an ad for the same problem from another product (the same buyer at the same moment of pain); an ad for another problem aimed at the same buyer (a format to borrow). The first two are supply for the client's avatars; the third is a playbook. */
+export const AD_RINGS = ["direct_competitor", "same_problem", "same_buyer"] as const;
+export type AdRing = (typeof AD_RINGS)[number];
 
-/** The searches that find a category's long-form ads, picked from the product brief: the key active by name, and the problem in phrases buyers use. */
-export const AdKeywordsSchema = z.object({
-  ingredient_terms: z.array(z.string().trim().min(3).max(40)).min(1).max(3).describe("The key active ingredient as ads name it, e.g. mullein, mullein leaf."),
-  problem_phrases: z
-    .array(z.string().trim().min(5).max(50))
-    .min(2)
-    .max(5)
-    .describe("The problem in the buyer's own words, each at least two words, e.g. smoker's cough, trapped mucus. Never a single generic word such as cough."),
+/** What the scout hands back: the ads worth studying, each in its ring with why, and the brands it found on the way. Ads are named by the TrendTrack id its searches returned. */
+export const ScoutReportSchema = z.object({
+  kept: z
+    .array(
+      z.object({
+        ad_id: z.string().min(1).describe("The ad's id exactly as search_ads returned it."),
+        ring: z.enum(AD_RINGS),
+        why: z.string().min(1).describe("One line: the problem it addresses, who it is aimed at, and why it is worth studying."),
+      }),
+    )
+    .min(1),
+  brands: z
+    .array(
+      z.object({
+        brand: z.string().min(1),
+        domain: z.string().min(3),
+        ring: z.enum(AD_RINGS),
+        why: z.string().min(1).describe("One line: what it sells and to whom."),
+      }),
+    )
+    .describe("Every brand you found worth studying, the confirmed competitors included."),
 });
-export type AdKeywords = z.infer<typeof AdKeywordsSchema>;
+export type ScoutReport = z.infer<typeof ScoutReportSchema>;
 
 /** What an agent reads off one ad. The bucket is its judgement from the ad's signals, with the reason. */
 export const AdReadingSchema = z.object({
@@ -34,8 +47,6 @@ export const AdReadingSchema = z.object({
   objections_handled: z.array(z.string()),
   emotion: z.string().min(1),
   risk_flags: z.array(z.string()).describe("Claims that look risky under FTC or Meta health rules, quoted short."),
-  relation: z.enum(AD_RELATIONS).describe("same_problem: it sells something for the client's problem (any product); same_buyer: another problem, but aimed at the client's buyer (age, situation, awareness), worth studying for its structure and hooks; unrelated: neither."),
-  relation_why: z.string().min(1).describe("One line: the problem it addresses and who it is aimed at."),
   bucket: z.enum(AD_BUCKETS).describe("winning: has run long or been duplicated, so it is likely profitable; testing: too new to tell; dead: stopped early."),
   bucket_why: z.string().min(1).describe("One line naming the signals that decided the bucket."),
 });
@@ -71,13 +82,15 @@ export interface StoredAd {
 }
 
 export interface ReadAd extends StoredAd {
+  ring: AdRing | null;
+  ring_why: string | null;
   reading: Omit<AdReading, "ad_id" | "bucket" | "bucket_why"> | null;
 }
 
-/** The ads that measure supply for the client's buyers: a competitor's own, or another product's aimed at the same problem. Same-buyer ads are a playbook, not supply. */
+/** The ads that measure supply for the client's buyers: a confirmed competitor's own, or one the scout put in the direct-competitor or same-problem ring. Same-buyer ads are a playbook, not supply. */
 export class AdRings {
   static isSupply(ad: ReadAd): boolean {
     Trace.tick(import.meta.url, "AdRings.isSupply");
-    return ad.competitor_id !== null || ad.reading?.relation === "same_problem";
+    return ad.competitor_id !== null || ad.ring === "direct_competitor" || ad.ring === "same_problem";
   }
 }

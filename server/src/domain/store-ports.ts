@@ -1,7 +1,7 @@
 import type { ShopSignals, ShopTraction } from "./traction.js";
 import type { Account, Scope, User, UserListing } from "./accounts.js";
 import type { AdHit } from "./ad-library.js";
-import type { AdReading, ReadAd, StoredAd } from "./ads.js";
+import type { AdReading, AdRing, ReadAd, StoredAd } from "./ads.js";
 import type { AvatarMemory, AvatarQuote, StoredAvatar } from "./avatars.js";
 import type { AnalysisInput } from "./analysis-input.js";
 import type { Charge } from "./charges.js";
@@ -83,6 +83,7 @@ export interface AvatarRecord {
 export interface AdStore {
   save(accountId: string, productId: string, hits: readonly AdHit[], competitorByDomain: ReadonlyMap<string, string>): Promise<StoredAd[]>;
   saveReading(adId: string, reading: AdReading): Promise<void>;
+  saveRing(adId: string, ring: AdRing, why: string): Promise<void>;
   list(productId: string): Promise<ReadAd[]>;
 }
 

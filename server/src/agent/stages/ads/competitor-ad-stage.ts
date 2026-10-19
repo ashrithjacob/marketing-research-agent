@@ -1,16 +1,14 @@
-import { MeteredAdLibrary } from "../../../adapters/index.js";
+import type { AdLibrary, AdRing, Product, ReadAd, StageName, StoredAd } from "../../../domain/index.js";
+import { CompetitorRelationship } from "../../../domain/index.js";
 import type { ServicePrices } from "../../../config/index.js";
-import { CompetitorRelationship, Markets, type AdLibrary, type Product, type StageName, type StoredAd } from "../../../domain/index.js";
 import { Trace } from "../../../trace/index.js";
 import type { RunContext } from "../../pipeline/run-context.js";
 import type { Stage, StageInput, StageOutcome } from "../../pipeline/stage.js";
 
-import { AdKeywordsAgent } from "./ad-keywords-agent.js";
 import { AdReader } from "./ad-reader.js";
-import { AdStageSummary } from "./ad-stage-summary.js";
-import { AdSweep, type SweepLimits, type SweepPage } from "./ad-sweep.js";
+import { AdScout, type ScoutLimits } from "./ad-scout.js";
 
-/** Stage 4: the market's long-form image ads, found by competitors' domains, the key active and the buyer's problem phrases, each read by an agent as a growth marketer would: which ring it belongs to (same problem, same buyer, unrelated) and how it is doing. */
+/** Stage 4: a scout agent studies the market's long-form ads in a growth marketer's rings and keeps the ones worth studying; each kept ad is then read for its avatar, claim, awareness and bucket. */
 export class CompetitorAdStage implements Stage {
   readonly name: StageName = "competitor_ads";
   static readonly BATCH = 8;
@@ -18,8 +16,7 @@ export class CompetitorAdStage implements Stage {
   constructor(
     private readonly ads: AdLibrary | null,
     private readonly prices: ServicePrices,
-    private readonly limits: SweepLimits,
-    private readonly keywords = new AdKeywordsAgent(),
+    private readonly limits: ScoutLimits,
     private readonly reader = new AdReader(),
     private readonly concurrency = 3,
   ) {}
@@ -30,24 +27,27 @@ export class CompetitorAdStage implements Stage {
     const { context } = input;
     const product = (await context.store.products.get(input.product.id))!;
     const competitors = (await context.store.competitors.list(product.id)).filter((c) => c.status === "confirmed");
-    const picked = await this.keywords.pick(context, product);
-    if (picked.status !== "completed") return { status: picked.status === "invalid" ? "invalid" : "failed", summary: "", error: `keywords: ${picked.status === "invalid" ? picked.problems.join("; ") : picked.status === "failed" ? picked.error : "stopped"}` };
-    const sweep = new AdSweep(new MeteredAdLibrary(this.ads, this.prices, context.meter(this.name)), this.limits);
-    const { ingredient_terms, problem_phrases } = picked.value;
-    const plan = { domains: competitors.map((c) => c.domain), ingredientTerms: ingredient_terms, problemPhrases: problem_phrases, countries: Markets.countries(context.run.input.markets) };
-    const pages: SweepPage[] = [];
-    const hits = await sweep.sweep(plan, context.signal, (page) => {
-      pages.push(page);
-      void context.emit("ads.searched", { ...page });
-    });
-    const returned = pages.reduce((sum, page) => sum + page.returned, 0);
+    const { result, log } = await new AdScout(this.ads, this.prices, this.limits).scout(context, product, competitors);
+    if (result.status !== "completed") {
+      const why = result.status === "invalid" ? result.problems.join("; ") : result.status === "failed" ? result.error : "stopped";
+      return { status: result.status === "invalid" ? "invalid" : "failed", summary: `${log.searched} searches, ${log.returned} ads returned`, error: `scout: ${why}` };
+    }
+    const report = result.value;
     const byDomain = new Map(competitors.map((c) => [CompetitorRelationship.domainOf(c.url), c.id]));
-    const stored = await context.store.ads.save(context.run.account_id, product.id, hits, byDomain);
+    const stored = await context.store.ads.save(context.run.account_id, product.id, report.kept.map((kept) => log.ad(kept.ad_id)!), byDomain);
+    const ringOf = new Map(report.kept.map((kept) => [kept.ad_id, kept]));
+    for (const ad of stored) await context.store.ads.saveRing(ad.id, ringOf.get(ad.trendtrack_ad_id)!.ring, ringOf.get(ad.trendtrack_ad_id)!.why);
+    await context.emit("ads.brands", { brands: report.brands });
     const unread = await this.readAll(context, product, stored);
-    const rings = AdStageSummary.rings(await context.store.ads.list(product.id));
-    const summary = `${stored.length} long-form statics kept of ${returned} returned by ${pages.length} searches (${[...ingredient_terms, ...problem_phrases].join(", ")}); ${stored.length - unread} read: ${rings}.`;
+    const summary = `${stored.length} ads kept of ${log.returned} seen in ${log.searched} searches, from ${report.brands.length} brands; ${CompetitorAdStage.rings(await context.store.ads.list(product.id))}; ${stored.length - unread} read.`;
     if (stored.length > 0 && unread === stored.length) return { status: "invalid", summary, error: "no batch of ads could be read" };
-    return { status: "completed", summary: unread > 0 ? `${summary} ${unread} could not be read.` : summary, error: "" };
+    return { status: "completed", summary, error: "" };
+  }
+
+  static rings(ads: readonly ReadAd[]): string {
+    Trace.line(import.meta.url, "CompetitorAdStage.rings", { ads: ads.length });
+    const count = (ring: AdRing) => ads.filter((ad) => ad.ring === ring).length;
+    return `${count("direct_competitor")} direct competitor, ${count("same_problem")} same problem, ${count("same_buyer")} same buyer`;
   }
 
   private async readAll(context: RunContext, product: Product, ads: readonly StoredAd[]): Promise<number> {

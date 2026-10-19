@@ -140,40 +140,46 @@ Measured 2026-10-17 against the real endpoints: Mullevia's Judge.me gave all 31
 reviews (stars 19/8/2/0/2, matching the widget's own histogram); Woot gave 25
 reviews of one ASIN in 12 s.
 
-## Stage 4: competitor long-form statics
+## Stage 4: the market's long-form statics
 
-`CompetitorAdStage` (`agent/stages/ads/`) waits for stage 1.
+`CompetitorAdStage` (`agent/stages/ads/`) waits for stage 1. Since
+2026-10-19 an agent decides which brands and ads matter; code only checks its
+work and keeps the books.
 
-1. **Searches**: an agent (`ad_keywords`, no tools) picks, from the brief,
-   1–3 ingredient terms and 2–5 problem phrases in the buyer's words. Code
-   refuses a list where no ingredient term contains a word of the key active,
-   or a problem phrase of one word ("cough" matched dental and pet ads on run
-   `344caa7d`).
-2. **Sweep** (`AdSweep`, code): each competitor's domain, then each ingredient
-   term, then each problem phrase, through TrendTrack `POST /v1/ads/query` with
-   `mediaType: image`, `minDescriptionLength` `MRA_AD_MIN_COPY_CHARS` (2000),
-   `maxAdsPerBrand` `MRA_ADS_PER_BRAND` (15), `status: all` and the run's
-   markets as countries; each competitor's domain first, then each keyword, each
-   sorted by longest running and by 7-day reach growth (the API refuses the 30-day sort, measured 2026-10-19), 20 a request, until
-   `MRA_ADS_PER_RUN` (150) ads. One TrendTrack credit per ad returned, charged
-   to the run.
-3. **Store** (`AdTable`), one row per ad per product, tied to a competitor when
-   its landing domain is that competitor's.
-4. **Read**: agents (`ad_reader:<n>`, no tools), framed as a growth marketer
-   told the client's product, take 8 ads at a time (each with its audience's age
-   range and gender from TrendTrack), three batches at once, and place each in
-   a ring: `same_problem` (any product for the client's problem: supply),
-   `same_buyer` (another problem, the client's buyer: a format to borrow, not
-   supply) or `unrelated`, with a reason. A competitor's own ad is known by its
-   domain. They also record avatar, claim type, awareness, mechanism, proof,
-   offer, objections, emotion, risk flags, and a bucket (winning, testing, dead)
-   with the signals that decided it. No fixed score: the agent judges from days
-   running, duplicates, reach growth, status and rank. Code refuses a batch
-   that skips, invents or repeats an ad id.
+1. **Scout** (`AdScout`, agent `ad_scout`, 40 turns), briefed as a growth
+   marketer with the client's product, claims and confirmed competitors, and
+   the three rings to study (`prompt/text/ad-scout.ts`): direct competitors
+   (same product), same problem (another product for the same buyer at the
+   same moment of pain) and same buyer (another problem, the same age, gender
+   and awareness: formats to borrow). Its tools:
+   - `search_ads` (`SearchLongFormTool`): TrendTrack `POST /v1/ads/query` for
+     image ads with `MRA_AD_MIN_COPY_CHARS` (2000) characters of copy in the
+     run's markets, by ad copy, brand or domain, sorted as it chooses (only
+     sorts the API accepts: `AD_SORTS`), 1–20 ads. Each result shows id,
+     advertiser, landing domain, days running, duplicates, reach and 7-day
+     growth, audience age and gender, opening lines. Every returned row is
+     billed to the run; the scout has `MRA_AD_SEARCHES_PER_RUN` (20) searches,
+     after which the tool refuses.
+   - `read_ad` (`ReadAdTool`): the full copy of an ad it has seen; free.
+   It discovers brands as it goes and submits the ads worth studying, each
+   with its ring and why, and the brands it found. Code refuses an ad no search
+   returned, an ad kept twice, more than `MRA_ADS_PER_RUN` (150), or more than
+   `MRA_ADS_PER_BRAND` (15) from one landing domain.
+2. **Store** (`AdTable`): the kept ads, linked to a confirmed competitor by
+   landing domain, each with the scout's ring and why (`ad_extractions.relation`).
+   The brands go in the `ads.brands` event.
+3. **Read**: agents (`ad_reader:<n>`, no tools), told the client's product,
+   take 8 kept ads at a time and record avatar, claim type, awareness,
+   mechanism, proof, offer, objections, emotion, risk flags and a bucket
+   (winning, testing, dead) with the signals that decided it. Code refuses a
+   batch that skips, invents or repeats an ad id.
 
-`AdSweep` caps each brand at `MRA_ADS_PER_BRAND` itself: TrendTrack's docs
-list `maxAdsPerBrand` as a number, but the API refuses anything but 1
-(`400 unsupported_filter`, run `344caa7d`, 2026-10-19).
+Stage 5 counts as supply only confirmed competitors' ads and ads the scout put
+in `direct_competitor` or `same_problem` (`AdRings.isSupply`).
+
+The code sweep before it (keywords from an agent, then fixed searches) was
+removed on 2026-10-19: on run `344caa7d` its one-word keywords pulled in dental
+and pet ads, and it paid for 540 rows to keep 150.
 
 ## Stage 5: avatars
 
