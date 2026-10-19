@@ -146,7 +146,7 @@ label.check input { width: auto; }
 
 .avatar-map { margin: 8px 0 16px; }
 .avatar-map figcaption { margin-bottom: 6px; }
-.avatar-map svg { width: 100%; max-width: 720px; height: auto; display: block; }
+.avatar-map svg { width: 100%; max-width: 860px; height: auto; display: block; }
 .avatar-map .quadrant.gap { fill: var(--accent-soft); }
 .avatar-map .quadrant.proven { fill: #f8fafc; }
 .avatar-map .quadrant-label { font-size: 11px; fill: var(--faint); }

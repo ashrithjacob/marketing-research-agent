@@ -1,8 +1,8 @@
 import type { StoredAvatar } from '../api';
 
-const W = 560;
-const H = 360;
-const PAD = { left: 52, right: 24, top: 20, bottom: 44 };
+const W = 720;
+const H = 380;
+const PAD = { left: 56, right: 40, top: 36, bottom: 44 };
 const RAMP = ['#c7d7fe', '#8fb0ff', '#4d7cff', '#0052ff'];
 const NO_ADS = '#cbd5e1';
 
@@ -34,8 +34,8 @@ export default function AvatarMap({ avatars }: { avatars: StoredAvatar[] }) {
       <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Avatars by demand share and supply share">
         <rect x={PAD.left} y={PAD.top} width={midX - PAD.left} height={midY - PAD.top} className="quadrant gap" />
         <rect x={midX} y={PAD.top} width={W - PAD.right - midX} height={midY - PAD.top} className="quadrant proven" />
-        <text x={PAD.left + 6} y={PAD.top + 14} className="quadrant-label">gap: demand, few ads</text>
-        <text x={W - PAD.right - 6} y={PAD.top + 14} textAnchor="end" className="quadrant-label">proven: demand and ads</text>
+        <text x={PAD.left + 4} y={PAD.top - 10} className="quadrant-label">gap: demand, few ads</text>
+        <text x={W - PAD.right - 4} y={PAD.top - 10} textAnchor="end" className="quadrant-label">proven: demand and ads</text>
         {ticks.map((t) => (
           <g key={t} className="axis">
             <line x1={x(t * maxX)} x2={x(t * maxX)} y1={H - PAD.bottom} y2={H - PAD.bottom + 4} />
@@ -52,11 +52,14 @@ export default function AvatarMap({ avatars }: { avatars: StoredAvatar[] }) {
           const r = 6 + 18 * Math.sqrt(avatar.review_count / maxReviews);
           const cx = x(avatar.supply_share ?? 0);
           const cy = y(avatar.demand_share);
+          const right = cx > (PAD.left + W - PAD.right) / 2;
           return (
             <g key={avatar.id} className="bubble">
               <circle cx={cx} cy={cy} r={r + 6} className="hit" />
               <circle cx={cx} cy={cy} r={r} fill={fill(avatar.win_rate)} stroke="#fff" strokeWidth={2} />
-              <text x={cx + r + 4} y={cy + 4} className="bubble-label">{avatar.name}</text>
+              <text x={right ? cx - r - 6 : cx + r + 6} y={cy + 4} textAnchor={right ? 'end' : 'start'} className="bubble-label">
+                {avatar.name}
+              </text>
               <title>
                 {`${avatar.name}\n${avatar.review_count} reviews (${pct(avatar.demand_share)} of demand)\n${avatar.ad_count} ads (${avatar.supply_share === null ? 'no ads read' : pct(avatar.supply_share)} of supply)\nwin rate ${avatar.win_rate === null ? '—' : pct(avatar.win_rate)}`}
               </title>
