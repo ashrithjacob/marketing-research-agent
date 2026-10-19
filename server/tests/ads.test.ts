@@ -128,7 +128,7 @@ describe("stage 4", () => {
     expect(stored.find((ad) => ad.trendtrack_ad_id === "lc1")).toMatchObject({ competitor_id: lungclear, days_running: 64, bucket: "winning", bucket_why: "64 days running, duplicated" });
     expect(stored.every((ad) => ad.reading?.claim_type === "mechanism")).toBe(true);
     expect(reader.refused).toContain("was given but not read");
-    expect(done.run.stage_status.competitor_ads.summary).toBe("12 long-form statics found (searched: mullein, morning cough, trapped mucus); 12 read: 2 from competitors, 5 same problem, 3 same buyer, 2 unrelated.");
+    expect(done.run.stage_status.competitor_ads.summary).toBe("12 long-form statics kept of 30 returned by 5 searches (mullein, morning cough, trapped mucus); 12 read: 2 from competitors, 5 same problem, 3 same buyer, 2 unrelated.");
     expect(keywordRefusal).toContain("no ingredient term names the key active (Mullein leaf extract)");
     expect(keywordRefusal).toContain('\\"cough\\" is one word');
     expect(stored.find((ad) => ad.trendtrack_ad_id === "lc1")?.audience).toEqual({ age_min: 45, age_max: 65, gender: "all" });

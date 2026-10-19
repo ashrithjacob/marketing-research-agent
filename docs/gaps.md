@@ -78,6 +78,13 @@ rewrite is in git history before `b6f45cc`.
     categories, a 1,500-character threshold) is not built; a thin niche simply
     reports how few ads it found.
 
+13a. **The sweep pays for rows it throws away.** The rerun of `344caa7d`
+    (2026-10-19) used 540 TrendTrack credits ($4.81) across 40 searches to keep
+    150 ads: every returned row is billed, including duplicates between the two
+    sorts and across terms, short copy and brands at their cap. Each search's
+    returned and kept counts are now recorded (`ads.searched` events, the stage
+    summary), so the next run shows which searches to cut.
+
 ## Stage 5
 
 16. **The memory is per run.** A second analysis of the same product starts from

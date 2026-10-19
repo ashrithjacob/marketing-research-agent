@@ -8,7 +8,7 @@ import type { Stage, StageInput, StageOutcome } from "../../pipeline/stage.js";
 import { AdKeywordsAgent } from "./ad-keywords-agent.js";
 import { AdReader } from "./ad-reader.js";
 import { AdStageSummary } from "./ad-stage-summary.js";
-import { AdSweep, type SweepLimits } from "./ad-sweep.js";
+import { AdSweep, type SweepLimits, type SweepPage } from "./ad-sweep.js";
 
 /** Stage 4: the market's long-form image ads, found by competitors' domains, the key active and the buyer's problem phrases, each read by an agent as a growth marketer would: which ring it belongs to (same problem, same buyer, unrelated) and how it is doing. */
 export class CompetitorAdStage implements Stage {
@@ -35,12 +35,17 @@ export class CompetitorAdStage implements Stage {
     const sweep = new AdSweep(new MeteredAdLibrary(this.ads, this.prices, context.meter(this.name)), this.limits);
     const { ingredient_terms, problem_phrases } = picked.value;
     const plan = { domains: competitors.map((c) => c.domain), ingredientTerms: ingredient_terms, problemPhrases: problem_phrases, countries: Markets.countries(context.run.input.markets) };
-    const hits = await sweep.sweep(plan, context.signal);
+    const pages: SweepPage[] = [];
+    const hits = await sweep.sweep(plan, context.signal, (page) => {
+      pages.push(page);
+      void context.emit("ads.searched", { ...page });
+    });
+    const returned = pages.reduce((sum, page) => sum + page.returned, 0);
     const byDomain = new Map(competitors.map((c) => [CompetitorRelationship.domainOf(c.url), c.id]));
     const stored = await context.store.ads.save(context.run.account_id, product.id, hits, byDomain);
     const unread = await this.readAll(context, product, stored);
     const rings = AdStageSummary.rings(await context.store.ads.list(product.id));
-    const summary = `${stored.length} long-form statics found (searched: ${[...ingredient_terms, ...problem_phrases].join(", ")}); ${stored.length - unread} read: ${rings}.`;
+    const summary = `${stored.length} long-form statics kept of ${returned} returned by ${pages.length} searches (${[...ingredient_terms, ...problem_phrases].join(", ")}); ${stored.length - unread} read: ${rings}.`;
     if (stored.length > 0 && unread === stored.length) return { status: "invalid", summary, error: "no batch of ads could be read" };
     return { status: "completed", summary: unread > 0 ? `${summary} ${unread} could not be read.` : summary, error: "" };
   }

@@ -8,6 +8,15 @@ export interface SweepPlan {
   countries: readonly string[];
 }
 
+/** One search the sweep made: how many rows TrendTrack returned (each one billed) and how many were kept. */
+export interface SweepPage {
+  terms: readonly string[];
+  searchIn: string;
+  sortBy: AdSort;
+  returned: number;
+  kept: number;
+}
+
 export interface SweepLimits {
   maxAds: number;
   minCopyChars: number;
@@ -24,7 +33,7 @@ export class AdSweep {
     private readonly limits: SweepLimits,
   ) {}
 
-  async sweep(plan: SweepPlan, signal?: AbortSignal): Promise<AdHit[]> {
+  async sweep(plan: SweepPlan, signal?: AbortSignal, onPage?: (page: SweepPage) => void): Promise<AdHit[]> {
     Trace.line(import.meta.url, "AdSweep.sweep", { domains: plan.domains.length, ingredients: plan.ingredientTerms.length, problems: plan.problemPhrases.length });
     const found = new Map<string, AdHit>();
     const perBrand = new Map<string, number>();
@@ -37,7 +46,9 @@ export class AdSweep {
       for (const sortBy of AdSweep.SORTS) {
         if (found.size >= this.limits.maxAds || signal?.aborted) return [...found.values()];
         const page = await this.ads.search(this.query(query.terms, query.searchIn, plan.countries, sortBy, found.size), signal);
+        const before = found.size;
         for (const hit of page.hits) this.keep(hit, found, perBrand);
+        onPage?.({ terms: query.terms, searchIn: query.searchIn, sortBy, returned: page.hits.length, kept: found.size - before });
       }
     }
     return [...found.values()];
