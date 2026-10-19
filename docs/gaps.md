@@ -31,10 +31,13 @@ rewrite is in git history before `b6f45cc`.
    Neon's object storage. `product_images` and `label_facts` exist and are
    empty.
 7. **No economics, market size or Scira evaluation.**
-7a. **A price can be read wrong.** Run `344caa7d` stored Ethale at 2246 USD:
-    the profiler most likely took a price in cents. Nothing checks a price
-    against the page; Shopify's `/products/<handle>.js` gives it in cents and
-    could.
+7a. ~~**A price can be read wrong.**~~ Run `344caa7d` stored Ethale at 2246
+    USD: the page showed "$22.46" (subscribe-and-save) beside "$29.95", and the
+    agent submitted 2246. Since 2026-10-19 a price is refused unless it appears
+    on the cited page as written (`PriceCheck`). Still open: which of two prices
+    on a page is the one-off one is the agent's judgement (the prompt says), not
+    checked; Shopify's `/products/<handle>.js` (29.95 for Ethale) could settle
+    it for Shopify stores. Run `344caa7d`'s row still says 2246.
 7b. **Pictures are hotlinked, not stored.** Product shots and logos are kept
     as addresses on the brands' own sites; copying them into Neon storage comes
     with label reading (6). A retailer url gives the retailer's logo.

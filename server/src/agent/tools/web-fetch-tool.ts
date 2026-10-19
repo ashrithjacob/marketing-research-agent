@@ -26,7 +26,7 @@ export class WebFetchTool {
       async execute(_id, params, signal) {
         Trace.line(import.meta.url, "WebFetchTool.tool.execute", { url: params.url });
         const { text, title } = await pages.scrape(params.url, signal);
-        urls.read(params.url);
+        urls.read(params.url, text);
         const cut = text.length > charLimit;
         const shown = cut ? `${text.slice(0, charLimit)}\n[cut at ${charLimit} of ${text.length} characters]` : text;
         return {

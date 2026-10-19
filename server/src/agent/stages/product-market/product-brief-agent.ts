@@ -1,4 +1,5 @@
 import { ProductBriefSchema, type AnalysisInput, type Product, type ProductBrief } from "../../../domain/index.js";
+import { PriceCheck } from "../../../extract/index.js";
 import { Trace } from "../../../trace/index.js";
 import type { AgentResult } from "../../kernel/agent-runner.js";
 import type { RunContext } from "../../pipeline/run-context.js";
@@ -35,7 +36,8 @@ export class ProductBriefAgent {
 
   static problems(brief: ProductBrief, urls: UrlLedger): string[] {
     Trace.line(import.meta.url, "ProductBriefAgent.problems");
-    return urls.unread(ProductBriefAgent.citedUrls(brief)).map((url) => `source_url ${url} was never read with web_fetch; read it or cite a page you did read`);
+    const unread = urls.unread(ProductBriefAgent.citedUrls(brief)).map((url) => `source_url ${url} was never read with web_fetch; read it or cite a page you did read`);
+    return [...unread, ...PriceCheck.problems(brief.price, (url) => urls.textOf(url), "price")];
   }
 
   private static instructions(product: Product, input: AnalysisInput): string {

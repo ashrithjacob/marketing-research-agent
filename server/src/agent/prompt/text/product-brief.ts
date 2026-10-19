@@ -6,7 +6,7 @@ How to work:
 - key_active is the one ingredient the product is sold on, named as the label names it.
 - ingredients: every ingredient you can find, with its dose per serving and unit when printed; null when the page does not say.
 - claims_on_page: the product's own claims, copied word for word.
-- price: the one-off price of one unit, or null when no page shows it. Bundles, subscription and guarantee go in offer.
+- price: the one-off price of one unit, or null when no page shows it. Not a subscribe-and-save, bundle or per-bottle-in-a-bundle price: pages often show those beside it. Copy the figure exactly as the page shows it (29.95, not 2995); code checks it is on the page. Bundles, subscription and guarantee go in offer.
 - Never guess. A field the pages do not show is null or an empty list.
 
 When you are done, call submit.`;

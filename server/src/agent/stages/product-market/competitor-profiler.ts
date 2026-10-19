@@ -1,4 +1,5 @@
 import { CompetitorProfileSchema, type Competitor, type CompetitorProfile, type Product } from "../../../domain/index.js";
+import { PriceCheck } from "../../../extract/index.js";
 import { Trace } from "../../../trace/index.js";
 import type { AgentResult } from "../../kernel/agent-runner.js";
 import type { RunContext } from "../../pipeline/run-context.js";
@@ -33,6 +34,7 @@ export class CompetitorProfiler {
     const cited = [...profile.sources, ...(profile.price ? [profile.price.source_url] : [])];
     const problems = urls.unread(cited).map((url) => `${url} was never read with web_fetch; read it or cite a page you did read`);
     if (profile.has_key_active && !profile.key_active_as_listed) problems.push("has_key_active is true but key_active_as_listed is empty: say how the page names it");
+    problems.push(...PriceCheck.problems(profile.price, (url) => urls.textOf(url), "price"));
     return problems;
   }
 }

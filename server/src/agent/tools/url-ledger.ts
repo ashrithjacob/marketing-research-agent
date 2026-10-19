@@ -1,13 +1,20 @@
 import { Trace } from "../../trace/index.js";
 
-/** The urls one agent read with web_fetch, and those it only saw in search or ad results, so code can refuse a url the agent never met. */
+/** The urls one agent read with web_fetch, with their text, and those it only saw in search or ad results, so code can refuse a url the agent never met or a figure no page it read shows. */
 export class UrlLedger {
   private readonly readUrls = new Set<string>();
+  private readonly texts = new Map<string, string>();
   private readonly seenUrls = new Set<string>();
 
-  read(url: string): void {
-    Trace.line(import.meta.url, "UrlLedger.read", { url });
+  read(url: string, text = ""): void {
+    Trace.line(import.meta.url, "UrlLedger.read", { url, chars: text.length });
     this.readUrls.add(UrlLedger.normal(url));
+    if (text) this.texts.set(UrlLedger.normal(url), `${this.texts.get(UrlLedger.normal(url)) ?? ""}\n${text}`);
+  }
+
+  textOf(url: string): string {
+    Trace.line(import.meta.url, "UrlLedger.textOf", { url });
+    return this.texts.get(UrlLedger.normal(url)) ?? "";
   }
 
   saw(urls: readonly string[]): void {
