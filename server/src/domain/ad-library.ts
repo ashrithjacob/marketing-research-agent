@@ -13,6 +13,8 @@ export interface AdQuery {
   sortBy?: AdSort;
   /** Long-form statics only: image ads whose copy is at least this many characters. */
   longForm?: { minCopyChars: number };
+  /** At most one ad per advertiser page. TrendTrack's `maxAdsPerBrand` accepts only 1 (400 unsupported_filter otherwise, measured 2026-10-19), so a cap above one is kept by the caller, never asked of the library. */
+  onePerBrand?: boolean;
 }
 
 /** One Meta ad as an ad library indexed it: who ran it, where it sends people, when it ran, what it says. */

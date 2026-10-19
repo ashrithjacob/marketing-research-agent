@@ -61,6 +61,8 @@ describe("TrendtrackAds", () => {
     const body = JSON.parse(String((fetch.mock.calls[0] as unknown as [string, RequestInit])[1].body));
     expect(body).toMatchObject({ searchType: "domain", sortBy: "longestRunning", mediaType: "image", minDescriptionLength: 2000, page: 2, limit: 20 });
     expect(body).not.toHaveProperty("maxAdsPerBrand");
+    await new TrendtrackAds(settings()).search({ terms: ["x"], searchIn: "ad_copy", countries: [], limit: 5, onePerBrand: true });
+    expect(JSON.parse(String((fetch.mock.calls[1] as unknown as [string, RequestInit])[1].body)).maxAdsPerBrand).toBe(1);
     expect(page.hits[0]).toMatchObject({ days_running: 64, duplicates: 7, reach_delta_30d: 5200, current_rank: 3, is_eu: true, media_url: "https://cdn.test/ad.jpg" });
   });
 
