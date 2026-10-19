@@ -150,7 +150,7 @@ reviews of one ASIN in 12 s.
    `mediaType: image`, `minDescriptionLength` `MRA_AD_MIN_COPY_CHARS` (2000),
    `maxAdsPerBrand` `MRA_ADS_PER_BRAND` (15), `status: all` and the run's
    markets as countries; each competitor's domain first, then each keyword, each
-   sorted by longest running and by 30-day reach growth, 20 a request, until
+   sorted by longest running and by 7-day reach growth (the API refuses the 30-day sort, measured 2026-10-19), 20 a request, until
    `MRA_ADS_PER_RUN` (150) ads. One TrendTrack credit per ad returned, charged
    to the run.
 3. **Store** (`AdTable`), one row per ad per product, tied to a competitor when

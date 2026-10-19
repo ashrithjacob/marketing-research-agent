@@ -13,10 +13,10 @@ export interface SweepLimits {
   maxAdsPerBrand: number;
 }
 
-/** Collects long-form image ads from an ad library: each competitor's own ads first, then the category by keyword, both by longest running and by 30-day reach growth, until the cap. The per-brand cap is kept here: TrendTrack refuses `maxAdsPerBrand` above 1 (measured 2026-10-19). */
+/** Collects long-form image ads from an ad library: each competitor's own ads first, then the category by keyword, both by longest running and by 7-day reach growth (TrendTrack refuses the 30-day sort), until the cap. The per-brand cap is kept here: TrendTrack refuses `maxAdsPerBrand` above 1 (measured 2026-10-19). */
 export class AdSweep {
   static readonly PAGE_SIZE = 20;
-  static readonly SORTS: readonly AdSort[] = ["longestRunning", "reachDelta30d"];
+  static readonly SORTS: readonly AdSort[] = ["longestRunning", "reachDelta7d"];
 
   constructor(
     private readonly ads: AdLibrary,

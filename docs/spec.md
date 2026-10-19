@@ -251,7 +251,7 @@ This stage measures supply: which avatars competitors target, and which of those
 | `category_ids` | Resolved first with `lookup_filter_ids` (`type=categories`, e.g. "health supplements") | Narrows to the niche |
 | `status` | `all` | Keep inactive ads for history and sophistication timeline |
 | `ad_countries` | e.g. `{include:["US","GB","CA","AU","NZ"]}`, with a US-only pass run first | Target markets |
-| `sort_by` | `longestRunning`, then a second pass with `reachDelta30d` | Proven winners plus current scalers |
+| `sort_by` | `longestRunning`, then a second pass with `reachDelta30d` (*2026-10-19: `reachDelta7d`; TrendTrack's API refuses the 30-day sort*) | Proven winners plus current scalers |
 | `max_ads_per_brand` | 15 | Avoids one brand flooding the sample |
 | `page` / `limit` | 20 per page, paginate | Results cap at 20 per call |
 

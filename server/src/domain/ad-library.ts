@@ -1,7 +1,8 @@
 export const AD_SEARCH_FIELDS = ["ad_copy", "brand", "domain"] as const;
 export type AdSearchField = (typeof AD_SEARCH_FIELDS)[number];
 
-export const AD_SORTS = ["reach", "newest", "longestRunning", "reachDelta30d"] as const;
+/** The sorts TrendTrack's ads query accepts with our filters, measured 2026-10-19; its docs also list reachDelta30d and reachDelta1d, which the API refuses (400 unsupported_filter). */
+export const AD_SORTS = ["reach", "newest", "longestRunning", "reachDelta7d", "mostDuplicates", "rankDelta30d"] as const;
 export type AdSort = (typeof AD_SORTS)[number];
 
 export interface AdQuery {

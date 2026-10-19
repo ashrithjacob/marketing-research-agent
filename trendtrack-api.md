@@ -8,6 +8,7 @@ description: Browse the generated endpoint reference grouped by the main Trendtr
 Ours, not TrendTrack's. Each was seen on a real call; the docs in `trendtrack/api/` say otherwise or nothing.
 
 - **`maxAdsPerBrand` on `POST /v1/ads/query` accepts only `1`** (2026-10-19). The docs type it as a number; `15` returns `400 unsupported_filter`, "maxAdsPerBrand only maps to page diversification when equal to 1". `AdQuery.onePerBrand` sends `1`; a cap above one is kept in our code (`AdSweep`).
+- **`sortBy` on `POST /v1/ads/query` refuses `reachDelta30d` and `reachDelta1d`** (2026-10-19, with `mediaType: image`, `minDescriptionLength: 2000`): `400 unsupported_filter`, "not representable on ads-search". Accepted: `longestRunning`, `reachDelta7d`, `reach`, `mostDuplicates`, `rankDelta30d`, `newest`, each 2 credits for a one-row page. `AD_SORTS` lists only these. `longestRunning` also narrows the results (3,403 against 11,169 for "mullein").
 - **`GET /v1/shops/{id}` costs 4 credits**, not one per returned resource (2026-10-19, `X-Credits-Used: 4`). One page of `/v1/shops/{id}/products` also cost 4 for 5 rows.
 - **`GET /v1/lookup` is free** as documented: no `X-Credits-Used` header came back.
 - **A shop's best-seller list can be empty while `catalog.productsCount` is not** (Mullevia: 6 products, `total: 0`).
