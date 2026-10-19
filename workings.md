@@ -144,9 +144,13 @@ reviews of one ASIN in 12 s.
 
 `CompetitorAdStage` (`agent/stages/ads/`) waits for stage 1.
 
-1. **Keywords**: an agent (`ad_keywords`, no tools) picks 2–6 words long ads in
-   the category would use, from the brief.
-2. **Sweep** (`AdSweep`, code): TrendTrack `POST /v1/ads/query` with
+1. **Searches**: an agent (`ad_keywords`, no tools) picks, from the brief,
+   1–3 ingredient terms and 2–5 problem phrases in the buyer's words. Code
+   refuses a list where no ingredient term contains a word of the key active,
+   or a problem phrase of one word ("cough" matched dental and pet ads on run
+   `344caa7d`).
+2. **Sweep** (`AdSweep`, code): each competitor's domain, then each ingredient
+   term, then each problem phrase, through TrendTrack `POST /v1/ads/query` with
    `mediaType: image`, `minDescriptionLength` `MRA_AD_MIN_COPY_CHARS` (2000),
    `maxAdsPerBrand` `MRA_ADS_PER_BRAND` (15), `status: all` and the run's
    markets as countries; each competitor's domain first, then each keyword, each
@@ -155,8 +159,13 @@ reviews of one ASIN in 12 s.
    to the run.
 3. **Store** (`AdTable`), one row per ad per product, tied to a competitor when
    its landing domain is that competitor's.
-4. **Read**: agents (`ad_reader:<n>`, no tools) take 8 ads at a time, three
-   batches at once, and record avatar, claim type, awareness, mechanism, proof,
+4. **Read**: agents (`ad_reader:<n>`, no tools), framed as a growth marketer
+   told the client's product, take 8 ads at a time (each with its audience's age
+   range and gender from TrendTrack), three batches at once, and place each in
+   a ring: `same_problem` (any product for the client's problem: supply),
+   `same_buyer` (another problem, the client's buyer: a format to borrow, not
+   supply) or `unrelated`, with a reason. A competitor's own ad is known by its
+   domain. They also record avatar, claim type, awareness, mechanism, proof,
    offer, objections, emotion, risk flags, and a bucket (winning, testing, dead)
    with the signals that decided it. No fixed score: the agent judges from days
    running, duplicates, reach growth, status and rank. Code refuses a batch
@@ -185,8 +194,9 @@ exists). An agent builds the avatars by reading, not by clustering (spec,
    last so everything moves with them. The memory is stored after every batch
    (`avatar_memories`). A batch refused three times is left out and counted in
    the summary.
-2. **Place the ads.** Stage 4's read ads, 15 at a time (`ad_placer:<n>`), each on
-   an avatar or none.
+2. **Place the ads.** Stage 4's supply ads only (a competitor's own, or
+   `same_problem`; `AdRings.isSupply`), 15 at a time (`ad_placer:<n>`), each on
+   an avatar or none. Same-buyer and unrelated ads never count as supply.
 3. **Judge.** One agent (`avatar_judge`) gives every avatar its awareness level,
    confidence, standing (avatar or emerging) and the competitors' best angle on
    it, with every count in front of it.

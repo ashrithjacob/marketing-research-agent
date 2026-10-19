@@ -86,6 +86,9 @@ classDiagram
     class ReadAd {
       <<interface>>
     }
+    class AdRings {
+      isSupply()
+    }
     class Markets {
       countries()
     }
@@ -767,10 +770,14 @@ classDiagram
     }
     class AdKeywordsAgent {
       pick()
+      problems()
     }
     class AdReader {
       read()
       problems()
+    }
+    class AdStageSummary {
+      rings()
     }
     class SweepPlan {
       <<interface>>
@@ -1105,6 +1112,7 @@ classDiagram
 | `agent` | `agent/run-launcher.ts` | RunLauncher |
 | `agent` | `agent/stages/ads/ad-keywords-agent.ts` | AdKeywordsAgent |
 | `agent` | `agent/stages/ads/ad-reader.ts` | AdReader |
+| `agent` | `agent/stages/ads/ad-stage-summary.ts` | AdStageSummary |
 | `agent` | `agent/stages/ads/ad-sweep.ts` | SweepPlan, SweepLimits, AdSweep |
 | `agent` | `agent/stages/ads/competitor-ad-stage.ts` | CompetitorAdStage |
 | `agent` | `agent/stages/avatars/ad-placer.ts` | AdPlacer |
@@ -1131,7 +1139,7 @@ classDiagram
 | `config` | `config/settings.ts` | Env |
 | `domain` | `domain/accounts.ts` | Account, User, UserListing, Principal, Scope |
 | `domain` | `domain/ad-library.ts` | AdQuery, AdHit, AdPage |
-| `domain` | `domain/ads.ts` | StoredAd, ReadAd |
+| `domain` | `domain/ads.ts` | StoredAd, ReadAd, AdRings |
 | `domain` | `domain/analysis-input.ts` | Markets |
 | `domain` | `domain/avatars.ts` | AvatarProfile, AvatarMemory, StoredAvatar, AvatarQuote |
 | `domain` | `domain/charges.ts` | ChargeDraft, Charge, ChargeMeter, ServiceUse |

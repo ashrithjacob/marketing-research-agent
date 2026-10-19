@@ -14,7 +14,7 @@ interface TrendtrackAd {
   advertiser?: { name?: string; facebookPageId?: string; reach30d?: number; liveAdsCount?: number };
   content?: { body?: string; title?: string; landingPageUrl?: string; landingPageDomain?: string };
   metrics?: { reach?: number; duplicates?: number; reachDelta7d?: number; reachDelta30d?: number };
-  audience?: { targetedCountries?: string[] };
+  audience?: { targetedCountries?: string[]; ageMin?: number; ageMax?: number; gender?: string };
   rank?: { currentRank?: number };
   flags?: { isEuAd?: boolean };
 }
@@ -82,6 +82,9 @@ export class TrendtrackAds implements AdLibrary {
       is_eu: ad.flags?.isEuAd ?? false,
       media_url: ad.media?.mediaUrl || null,
       thumbnail_url: ad.media?.thumbnailUrl || null,
+      age_min: ad.audience?.ageMin ?? null,
+      age_max: ad.audience?.ageMax ?? null,
+      gender: ad.audience?.gender ?? null,
     };
   }
 }

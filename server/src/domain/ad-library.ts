@@ -41,6 +41,9 @@ export interface AdHit {
   is_eu: boolean;
   media_url: string | null;
   thumbnail_url: string | null;
+  age_min: number | null;
+  age_max: number | null;
+  gender: string | null;
 }
 
 export interface AdPage {

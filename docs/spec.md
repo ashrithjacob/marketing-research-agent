@@ -467,3 +467,4 @@ Each phase starts only when the previous one passes its gate.
 - 2026-10-17, avatars: an agent reads, groups and keeps a memory of avatars and angles, updated as it reads; no embedding clusters (stage 5).
 - 2026-10-17, thresholds: ranking weights, review weights, ad buckets and gap thresholds are judged by an LLM for now, not fixed code.
 - 2026-10-17, product images: stored in Neon's object storage for now.
+- 2026-10-19, which ads stage 4 studies: as a growth marketer would, in rings. Competitors' own ads; ads for the same problem from any product (counted as supply for the avatars); ads for another problem aimed at the same buyer (kept as formats to borrow, not supply); anything else is dropped. The reader places each ad, with its audience's age and gender in view. Category searches must name the key active or use the buyer's problem phrases of two words or more, after single words such as "cough" pulled dental and pet ads into run `344caa7d`.

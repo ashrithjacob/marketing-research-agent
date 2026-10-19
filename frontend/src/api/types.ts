@@ -177,6 +177,8 @@ export interface AdReading {
   objections_handled: string[];
   emotion: string;
   risk_flags: string[];
+  relation: 'same_problem' | 'same_buyer' | 'unrelated' | null;
+  relation_why: string | null;
 }
 
 export interface ReadAd {
@@ -193,6 +195,7 @@ export interface ReadAd {
   duplicates: number | null;
   bucket: 'winning' | 'testing' | 'dead' | null;
   bucket_why: string | null;
+  audience: { age_min: number | null; age_max: number | null; gender: string | null } | null;
   reading: AdReading | null;
 }
 

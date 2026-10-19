@@ -64,7 +64,7 @@ class Reader {
 const ad = (id: string): AdHit => ({
   ad_id: id, advertiser: "LungClear", page_id: "1", landing_url: "https://lungclear.com/p", landing_domain: "lungclear.com", first_seen: "2026-08-01", last_seen: "", status: "active",
   countries: ["US"], body: "Still coughing after you quit? ".repeat(80), ad_reach: 10, page_reach_30d: null, page_live_ads: null, days_running: 40, duplicates: 3,
-  reach_delta_7d: null, reach_delta_30d: null, current_rank: null, is_eu: false, media_url: null, thumbnail_url: null,
+  reach_delta_7d: null, reach_delta_30d: null, current_rank: null, is_eu: false, media_url: null, thumbnail_url: null, age_min: null, age_max: null, gender: null,
 });
 
 let pg: PostgresStores;
@@ -80,10 +80,11 @@ afterAll(async () => {
 describe("stage 5", () => {
   it("reads every review in mixed batches into a memory of avatars, places the ads, judges each avatar, and stores the counts and quotes", async () => {
     const product = await pg.store.products.upsert("admin", PRODUCT_URL, "Mullein Drops", "Mullevia");
-    const [winning, dead] = await pg.store.ads.save("admin", product.id, [ad("w1"), ad("d1")], new Map());
-    const reading = { avatar: "ex-smokers", claim_type: "identity" as const, awareness: "problem_aware" as const, mechanism: null, proof_types: [], offer: null, objections_handled: [], emotion: "relief", risk_flags: [] };
+    const [winning, dead, sameBuyer] = await pg.store.ads.save("admin", product.id, [ad("w1"), ad("d1"), ad("b1")], new Map());
+    const reading = { avatar: "ex-smokers", claim_type: "identity" as const, awareness: "problem_aware" as const, mechanism: null, proof_types: [], offer: null, objections_handled: [], emotion: "relief", risk_flags: [], relation: "same_problem" as const, relation_why: "lungs" };
     await pg.store.ads.saveReading(winning!.id, { ...reading, ad_id: winning!.id, bucket: "winning", bucket_why: "40 days" });
     await pg.store.ads.saveReading(dead!.id, { ...reading, ad_id: dead!.id, bucket: "dead", bucket_why: "stopped" });
+    await pg.store.ads.saveReading(sameBuyer!.id, { ...reading, ad_id: sameBuyer!.id, relation: "same_buyer", relation_why: "joint pain, 50+", bucket: "winning", bucket_why: "90 days" });
 
     const reader = new Reader();
     const faux = new Faux();
@@ -108,7 +109,7 @@ describe("stage 5", () => {
     expect(done.run.stage_status.avatars).toMatchObject({ status: "completed", error: "" });
     expect(reader.batches).toBe(3);
     expect(reader.refusal).toContain("1 review(s) in this batch are not assigned");
-    expect(done.run.stage_status.avatars.summary).toBe("2 avatars and 0 sub-avatars from 90 reviews (90 assigned, 0 about no buyer); 2 of 2 competitor ads placed.");
+    expect(done.run.stage_status.avatars.summary).toBe("2 avatars and 0 sub-avatars from 90 reviews (90 assigned, 0 about no buyer); 2 of 2 competitor and same-problem ads placed.");
     const { avatars, quotes } = await driver.json<{ avatars: StoredAvatar[]; quotes: { avatar_id: string; rating: number }[] }>(`/runs/${runId}/avatars`);
     const byKey = Object.fromEntries(avatars.map((avatar) => [avatar.key, avatar]));
     expect(byKey.ex_smokers).toMatchObject({ review_count: 54, demand_share: 0.6, supply_share: 1, win_rate: 0.5, standing: "avatar", confidence: "medium" });

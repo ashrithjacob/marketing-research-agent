@@ -1,4 +1,4 @@
-import type { AvatarMemory, ReadAd, StageName, StoredReview } from "../../../domain/index.js";
+import { AdRings, type AvatarMemory, type ReadAd, type StageName, type StoredReview } from "../../../domain/index.js";
 import { AvatarMemoryBook, AvatarTally } from "../../../extract/index.js";
 import { Trace } from "../../../trace/index.js";
 import type { RunContext } from "../../pipeline/run-context.js";
@@ -30,7 +30,7 @@ export class AvatarStage implements Stage {
     const about = `The client's product: ${product.brand} ${product.name}${product.category ? `, a ${product.category}` : ""}${product.key_active ? ` sold on ${product.key_active}` : ""}.`;
     const { memory: read, skipped } = await this.readReviews(context, reviews, about);
     if (read.avatars.length === 0) return { status: "invalid", summary: "", error: `no avatar came out of ${reviews.length} reviews; ${skipped} batch(es) refused` };
-    const ads = (await context.store.ads.list(product.id)).filter((ad) => ad.reading !== null);
+    const ads = (await context.store.ads.list(product.id)).filter((ad) => ad.reading !== null && AdRings.isSupply(ad));
     const placed = await this.placeAds(context, read, ads);
     const verdicts = await this.judge.judge(context, placed, ads);
     await context.store.avatars.saveAvatars(context.run.id, AvatarTally.records(placed, verdicts.status === "completed" ? verdicts.value : null, ads));
@@ -39,7 +39,7 @@ export class AvatarStage implements Stage {
     const adsPlaced = placed.avatars.reduce((sum, avatar) => sum + avatar.ad_ids.length, 0);
     const summary =
       `${placed.avatars.length - subs} avatars and ${subs} sub-avatars from ${reviews.length} reviews (${assigned} assigned, ${placed.unassigned_review_ids.length} about no buyer${skipped ? `, ${skipped} batch(es) refused and left out` : ""}); ` +
-      `${adsPlaced} of ${ads.length} competitor ads placed.${verdicts.status === "completed" ? "" : " Verdicts missing: every avatar is marked emerging."}`;
+      `${adsPlaced} of ${ads.length} competitor and same-problem ads placed.${verdicts.status === "completed" ? "" : " Verdicts missing: every avatar is marked emerging."}`;
     return { status: "completed", summary, error: "" };
   }
 

@@ -3,7 +3,8 @@ import { Trace } from "../../../trace/index.js";
 
 export interface SweepPlan {
   domains: readonly string[];
-  keywords: readonly string[];
+  ingredientTerms: readonly string[];
+  problemPhrases: readonly string[];
   countries: readonly string[];
 }
 
@@ -13,7 +14,7 @@ export interface SweepLimits {
   maxAdsPerBrand: number;
 }
 
-/** Collects long-form image ads from an ad library: each competitor's own ads first, then the category by keyword, both by longest running and by 7-day reach growth (TrendTrack refuses the 30-day sort), until the cap. The per-brand cap is kept here: TrendTrack refuses `maxAdsPerBrand` above 1 (measured 2026-10-19). */
+/** Collects long-form image ads from an ad library: each competitor's own ads first, then ads naming the key active, then ads naming the problem in the buyer's words, both by longest running and by 7-day reach growth (TrendTrack refuses the 30-day sort), until the cap. The per-brand cap is kept here: TrendTrack refuses `maxAdsPerBrand` above 1 (measured 2026-10-19). */
 export class AdSweep {
   static readonly PAGE_SIZE = 20;
   static readonly SORTS: readonly AdSort[] = ["longestRunning", "reachDelta7d"];
@@ -24,12 +25,13 @@ export class AdSweep {
   ) {}
 
   async sweep(plan: SweepPlan, signal?: AbortSignal): Promise<AdHit[]> {
-    Trace.line(import.meta.url, "AdSweep.sweep", { domains: plan.domains.length, keywords: plan.keywords.length });
+    Trace.line(import.meta.url, "AdSweep.sweep", { domains: plan.domains.length, ingredients: plan.ingredientTerms.length, problems: plan.problemPhrases.length });
     const found = new Map<string, AdHit>();
     const perBrand = new Map<string, number>();
     const queries = [
       ...plan.domains.map((domain) => ({ terms: [domain], searchIn: "domain" as const })),
-      ...plan.keywords.map((keyword) => ({ terms: [keyword], searchIn: "ad_copy" as const })),
+      ...plan.ingredientTerms.map((term) => ({ terms: [term], searchIn: "ad_copy" as const })),
+      ...plan.problemPhrases.map((phrase) => ({ terms: [phrase], searchIn: "ad_copy" as const })),
     ];
     for (const query of queries) {
       for (const sortBy of AdSweep.SORTS) {

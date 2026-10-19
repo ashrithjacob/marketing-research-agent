@@ -388,6 +388,11 @@ CREATE TABLE shop_signals (
 );
 `;
 
+const AD_RINGS = `
+ALTER TABLE ad_extractions ADD COLUMN relation TEXT, ADD COLUMN relation_why TEXT;
+ALTER TABLE ads ADD COLUMN audience JSONB;
+`;
+
 /** Applied in order, once each, recorded in schema_migrations. An applied migration is never edited: a change is a new entry at the end. */
 export const MIGRATIONS: readonly Migration[] = [
   { id: 1, name: "avatar_schema", sql: AVATAR_SCHEMA },
@@ -396,4 +401,5 @@ export const MIGRATIONS: readonly Migration[] = [
   { id: 4, name: "brand_visuals", sql: BRAND_VISUALS },
   { id: 5, name: "brand_visual_cache", sql: BRAND_VISUAL_CACHE },
   { id: 6, name: "shop_traction", sql: SHOP_TRACTION },
+  { id: 7, name: "ad_rings", sql: AD_RINGS },
 ];

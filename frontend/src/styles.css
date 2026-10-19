@@ -251,3 +251,6 @@ button.link { background: none; border: 0; padding: 0 0 0 4px; color: var(--acce
 .rerun-list .why { grid-column: 2 / -1; overflow-wrap: anywhere; }
 
 .badge.status-never_run { color: var(--warn); background: #fffbeb; }
+
+.ring { margin-bottom: 12px; }
+.ring h3 { text-transform: none; letter-spacing: 0; font-size: 15px; color: var(--ink); }
