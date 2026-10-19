@@ -15,3 +15,4 @@ export * from "./reviews/woot-reviews.js";
 export * from "./public-page.js";
 export * from "./page-visuals.js";
 export * from "./cached-visuals.js";
+export * from "./trendtrack-shops.js";

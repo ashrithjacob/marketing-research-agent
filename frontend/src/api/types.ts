@@ -81,6 +81,7 @@ export interface Product {
   claims_on_page: { text: string; source_url: string }[];
   image_url: string | null;
   logo_url: string | null;
+  traction: ShopTraction | null;
 }
 
 export interface Competitor {
@@ -99,6 +100,31 @@ export interface Competitor {
   sources: string[];
   image_url: string | null;
   logo_url: string | null;
+  traction: ShopTraction | null;
+}
+
+export interface ShopSignals {
+  domain: string;
+  shop_id: string;
+  monthly_visits: number | null;
+  active_ads: number | null;
+}
+
+export interface ShopTraction {
+  shop_id: string;
+  domain: string;
+  monthly_sales_usd: number | null;
+  monthly_sales_min_usd: number | null;
+  monthly_sales_max_usd: number | null;
+  units_sold: number | null;
+  monthly_visits: number | null;
+  visits_growth_30d: number | null;
+  active_ads: number | null;
+  products_count: number | null;
+  product_rank: number | null;
+  ranked_within: number;
+  single_product: boolean;
+  fetched_at: string;
 }
 
 export interface BrandVisual {
@@ -111,6 +137,7 @@ export interface RunView {
   product: Product | null;
   competitors: Competitor[];
   visuals: Record<string, BrandVisual>;
+  signals: Record<string, ShopSignals>;
 }
 
 export interface RunEvent {

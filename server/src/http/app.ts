@@ -12,9 +12,11 @@ import {
   Pipeline,
   ProductMarketStage,
   ProductResolver,
+  ResolutionSignals,
   ResolutionVisuals,
   ReviewListings,
   ReviewStage,
+  ShopTractionCollector,
   RunEvents,
   RunLauncher,
   Toolbox,
@@ -66,7 +68,7 @@ export class App {
       generations: parts.generations ?? this.prices,
       events,
     };
-    const launcher = new RunLauncher(services, settings, this.live, pipeline, new ProductResolver(), new ResolutionVisuals(visuals));
+    const launcher = new RunLauncher(services, settings, this.live, pipeline, new ProductResolver(), new ResolutionVisuals(visuals), new ResolutionSignals(clients.shops, store.signals));
     this.analyses = new AnalysisService(store, launcher, this.live, pipeline, settings.model);
 
     const hono = new Hono<ApiEnv>();
@@ -85,7 +87,7 @@ export class App {
     const sources = new Map([new JudgemeReviews(settings), new WootReviews(settings)].map((source) => [source.name, source] as const));
     const limits = { maxAds: settings.adsPerRun, minCopyChars: settings.adMinCopyChars, maxAdsPerBrand: settings.adsPerBrand };
     return new Pipeline([
-      new ProductMarketStage(new BrandVisualsCollector(visuals)),
+      new ProductMarketStage(new BrandVisualsCollector(visuals), new ShopTractionCollector(clients.shops, settings.prices)),
       new ReviewStage(new ReviewListings(new ShopifyStorefront(pages), new AmazonListingFinder()), sources, settings.reviewsPerProduct),
       new CompetitorAdStage(clients.ads, settings.prices, limits),
       new AvatarStage(),

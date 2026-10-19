@@ -1,3 +1,4 @@
+import type { ShopSignals, ShopTraction } from "./traction.js";
 import type { Account, Scope, User, UserListing } from "./accounts.js";
 import type { AdHit } from "./ad-library.js";
 import type { AdReading, ReadAd, StoredAd } from "./ads.js";
@@ -41,6 +42,7 @@ export interface ProductStore {
   get(productId: string): Promise<Product | null>;
   saveBrief(productId: string, brief: ProductBrief): Promise<Product>;
   saveVisual(productId: string, visual: BrandVisual): Promise<void>;
+  saveTraction(productId: string, traction: ShopTraction): Promise<void>;
 }
 
 export interface CompetitorStore {
@@ -48,6 +50,7 @@ export interface CompetitorStore {
   list(productId: string): Promise<Competitor[]>;
   saveProfile(competitorId: string, profile: CompetitorProfile, relationship: Relationship): Promise<void>;
   saveVisual(competitorId: string, visual: BrandVisual): Promise<void>;
+  saveTraction(competitorId: string, traction: ShopTraction): Promise<void>;
 }
 
 /** Reviews per target, stored once each: a review already held for that target is dropped on insert. */
@@ -89,6 +92,12 @@ export interface BrandVisualCache {
   put(url: string, visual: BrandVisual): Promise<void>;
 }
 
+/** TrendTrack's free lookup per shop domain, shared by every account. */
+export interface ShopSignalCache {
+  get(domains: readonly string[]): Promise<Map<string, ShopSignals>>;
+  put(signals: ShopSignals): Promise<void>;
+}
+
 export interface EventLog {
   add(runId: string, kind: string, payload: Record<string, unknown>): Promise<RunEvent>;
   list(runId: string, afterId?: number): Promise<RunEvent[]>;
@@ -116,6 +125,7 @@ export interface ResearchStore {
   readonly ads: AdStore;
   readonly avatars: AvatarStore;
   readonly visuals: BrandVisualCache;
+  readonly signals: ShopSignalCache;
   readonly events: EventLog;
   readonly charges: ChargeLedger;
   readonly calls: CallLog;

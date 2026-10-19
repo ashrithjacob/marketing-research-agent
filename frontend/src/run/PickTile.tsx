@@ -1,7 +1,8 @@
-import type { BrandVisual } from '../api';
+import type { BrandVisual, ShopSignals } from '../api';
 import BrandMark, { domainOf } from '../BrandMark';
+import { compact } from '../format';
 
-export default function PickTile({ brand, name, url, visual, selected, note, onToggle }: { brand: string; name: string; url: string; visual: BrandVisual | undefined; selected: boolean; note?: string; onToggle: () => void }) {
+export default function PickTile({ brand, name, url, visual, signals, selected, note, onToggle }: { brand: string; name: string; url: string; visual: BrandVisual | undefined; signals?: ShopSignals; selected: boolean; note?: string; onToggle: () => void }) {
   return (
     <li className={`pick-tile ${selected ? 'selected' : ''}`} title={note}>
       <button className="pick-body" onClick={onToggle} aria-pressed={selected}>
@@ -14,6 +15,11 @@ export default function PickTile({ brand, name, url, visual, selected, note, onT
           <strong>{brand}</strong>
         </span>
         <span className="pick-name small">{name}</span>
+        {signals && (
+          <span className="pick-signals small">
+            {signals.monthly_visits !== null && <strong>{compact(signals.monthly_visits)}</strong>} visits/mo · {signals.active_ads ?? 0} ads
+          </span>
+        )}
       </button>
       <a className="pick-link small" href={url} target="_blank" rel="noreferrer noopener" onClick={(e) => e.stopPropagation()}>
         {domainOf(url)} ↗

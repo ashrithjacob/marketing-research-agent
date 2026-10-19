@@ -17,3 +17,5 @@ export * from "./stages/ads/competitor-ad-stage.js";
 export * from "./stages/avatars/avatar-stage.js";
 export * from "./stages/product-market/brand-visuals-collector.js";
 export * from "./resolve/resolution-visuals.js";
+export * from "./resolve/resolution-signals.js";
+export * from "./stages/product-market/shop-traction-collector.js";

@@ -1,12 +1,15 @@
 import { useState, type FormEvent } from 'react';
 
-import { runs, type BrandVisual, type CompetitorPick, type Resolution } from '../api';
+import { runs, type BrandVisual, type CompetitorPick, type Resolution, type ShopSignals } from '../api';
+import { domainOf } from '../BrandMark';
 import PickTile from './PickTile';
 
-export default function ConfirmPanel({ runId, resolution, visuals, onDone, onError }: { runId: string; resolution: Resolution; visuals: Record<string, BrandVisual>; onDone: () => void; onError: (message: string) => void }) {
+export default function ConfirmPanel({ runId, resolution, visuals, signals, onDone, onError }: { runId: string; resolution: Resolution; visuals: Record<string, BrandVisual>; signals: Record<string, ShopSignals>; onDone: () => void; onError: (message: string) => void }) {
   const candidates = [{ name: resolution.product.name, url: resolution.product.url, brand: resolution.product.brand }, ...resolution.alternatives.map((a) => ({ ...a, brand: a.name }))];
   const [productUrl, setProductUrl] = useState(resolution.product.url);
-  const [offered, setOffered] = useState<(CompetitorPick & { why: string })[]>(resolution.competitors);
+  const shopOf = (url: string) => (/\/products\//.test(url) ? signals[domainOf(url)] : undefined);
+  const visits = (url: string) => shopOf(url)?.monthly_visits ?? -1;
+  const [offered, setOffered] = useState<(CompetitorPick & { why: string })[]>(() => [...resolution.competitors].sort((a, b) => visits(b.url) - visits(a.url)));
   const [chosen, setChosen] = useState<Set<string>>(() => new Set(resolution.competitors.map((c) => c.url)));
   const [adding, setAdding] = useState<CompetitorPick>({ brand: '', product_name: '', url: '' });
   const [busy, setBusy] = useState(false);
@@ -53,9 +56,10 @@ export default function ConfirmPanel({ runId, resolution, visuals, onDone, onErr
       <h3>
         Competitors to research ({chosen.size} of {offered.length})
       </h3>
+      <p className="dim small">Ordered by monthly visits to their own shops (TrendTrack, free lookup). Amazon and other marketplace listings have no shop and come last.</p>
       <ul className="pick-tiles">
         {offered.map((c) => (
-          <PickTile key={c.url} brand={c.brand} name={c.product_name} url={c.url} visual={visuals[c.url]} selected={chosen.has(c.url)} note={c.why} onToggle={() => toggle(c.url)} />
+          <PickTile key={c.url} brand={c.brand} name={c.product_name} url={c.url} visual={visuals[c.url]} signals={shopOf(c.url)} selected={chosen.has(c.url)} note={c.why} onToggle={() => toggle(c.url)} />
         ))}
       </ul>
       <form className="add-competitor" onSubmit={add}>

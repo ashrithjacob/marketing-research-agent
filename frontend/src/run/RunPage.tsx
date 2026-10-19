@@ -31,7 +31,7 @@ export default function RunPage({ runId, onError }: { runId: string; onError: (m
       <RunHeader run={run} product={product} competitors={competitors} coverage={coverage} ads={ads} picture={view.visuals[run.resolution?.product.url ?? run.input.product_url ?? '']} onStop={() => runs.stop(runId).then(reload, (e: Error) => onError(e.message))} />
       {run.error && <div className="error banner">{run.error}</div>}
       {run.status === 'resolving' && <p className="panel dim">Finding the product page and proposing competitors…</p>}
-      {run.status === 'awaiting_confirmation' && run.resolution && <ConfirmPanel runId={runId} resolution={run.resolution} visuals={view.visuals} onDone={reload} onError={onError} />}
+      {run.status === 'awaiting_confirmation' && run.resolution && <ConfirmPanel runId={runId} resolution={run.resolution} visuals={view.visuals} signals={view.signals} onDone={reload} onError={onError} />}
       <StageTracker stages={config.stages} states={run.stage_status} />
       {product && <Avatars runId={runId} version={run.stage_status.avatars?.status ?? ''} onError={onError} />}
       {product && <Competitors product={product} competitors={competitors} coverage={coverage} ads={ads} />}

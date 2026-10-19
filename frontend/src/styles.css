@@ -235,3 +235,9 @@ button.link { background: none; border: 0; padding: 0 0 0 4px; color: var(--acce
 .pick-tile:not(.selected) .pick-check { background: var(--panel); border: 1px solid var(--line); }
 .pick-name { color: var(--dim); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .pick-link { padding: 0 10px 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.traction { display: grid; line-height: 1.25; }
+.traction .value { font-weight: 600; font-size: 15px; }
+.traction .label { font-size: 11px; color: var(--faint); }
+.pick-signals { color: var(--dim); }
+.competitor-row { grid-template-columns: 64px minmax(160px, 1.1fr) minmax(150px, 1.3fr) 80px 130px 60px 80px 150px; }

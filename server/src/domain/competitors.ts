@@ -1,5 +1,7 @@
 import { z } from "zod/v4";
 
+import type { ShopTraction } from "./traction.js";
+
 import { Trace } from "../trace/index.js";
 
 import { FORM_FACTORS, PriceSchema, type FormFactor, type Price } from "./products.js";
@@ -54,6 +56,7 @@ export interface Competitor {
   rank_in_group: number | null;
   image_url: string | null;
   logo_url: string | null;
+  traction: ShopTraction | null;
   created_at: string;
   updated_at: string;
 }

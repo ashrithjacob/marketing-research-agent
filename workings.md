@@ -29,7 +29,11 @@ resolving ──▶ awaiting_confirmation ──(user confirms)──▶ running
    product page (a search page was proposed on 2026-10-19). Accepted, code reads
    the product shot and logo of every proposed url for free
    (`ResolutionVisuals`, cached by url in `brand_visuals`, which stage 1 then
-   reuses), and the run waits at `awaiting_confirmation`.
+   reuses), and, for every proposed Shopify product page, looks up its
+   TrendTrack shop for free (`ResolutionSignals`: monthly visits, active ads,
+   cached by domain in `shop_signals`; a marketplace listing is skipped so it
+   never inherits the marketplace's traffic). The run waits at
+   `awaiting_confirmation`.
 3. **Confirm.** `POST /runs/:id/confirm` with the chosen product url and the
    competitors the user kept or added. The product row is upserted (one per
    account and url) and the picks are marked `confirmed`; any competitor of that
@@ -77,7 +81,14 @@ problem numbered; after 3 refusals the agent is stopped (`SubmitTool`).
    (`competitor:<domain>`), 15 turns each, four at a time. Each submits a
    `CompetitorProfile`: platform, form factor, `has_key_active`, how the page
    names the key active, price, positioning, sources it read.
-3. **Classification is code, not the agent** (`CompetitorRelationship.classify`):
+3. **Shop traction**, beside the brief (`ShopTractionCollector`): for the
+   client and each confirmed competitor on a Shopify product page, TrendTrack's
+   `GET /v1/shops/{id}` (estimated 30-day revenue for the whole shop, its range,
+   units, visits, products count; 4 credits) and, when the shop sells more than
+   one product, one page of `/products?sortBy=popularity` to find the product's
+   best-seller rank (4 credits). A one-product shop's sales are the product's.
+   Failures are reported in the `traction.collected` event, not hidden.
+4. **Classification is code, not the agent** (`CompetitorRelationship.classify`):
    no key active → `other`; same form factor as the client → `direct`; else
    `indirect`. The agent only reports what the page shows.
 

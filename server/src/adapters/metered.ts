@@ -8,6 +8,9 @@ import type {
   PageFetcher,
   SearchPage,
   SearchScope,
+  ShopIntel,
+  ShopSignals,
+  ShopTraction,
   WebSearch,
 } from "../domain/index.js";
 import { Trace } from "../trace/index.js";
@@ -62,5 +65,26 @@ export class MeteredAdLibrary implements AdLibrary {
     const credits = page.credits ?? page.hits.length;
     await this.meter.charge({ service: "trendtrack", item: "ads", units: credits, usd: credits * this.prices.trendtrackUsdPerCredit, basis: "credits" });
     return page;
+  }
+}
+
+/** TrendTrack's shop data, each paid call charged in the credits its header reports; the lookup is free. */
+export class MeteredShopIntel implements ShopIntel {
+  constructor(
+    private readonly inner: ShopIntel,
+    private readonly prices: ServicePrices,
+    private readonly meter: ChargeMeter,
+  ) {}
+
+  lookup(domain: string, signal?: AbortSignal): Promise<ShopSignals | null> {
+    Trace.line(import.meta.url, "MeteredShopIntel.lookup", { domain });
+    return this.inner.lookup(domain, signal);
+  }
+
+  async traction(signals: ShopSignals, productHandle: string | null, signal?: AbortSignal): Promise<{ traction: ShopTraction; credits: number }> {
+    Trace.line(import.meta.url, "MeteredShopIntel.traction", { shop: signals.shop_id });
+    const result = await this.inner.traction(signals, productHandle, signal);
+    await this.meter.charge({ service: "trendtrack", item: "shop", units: result.credits, usd: result.credits * this.prices.trendtrackUsdPerCredit, basis: "credits" });
+    return result;
   }
 }

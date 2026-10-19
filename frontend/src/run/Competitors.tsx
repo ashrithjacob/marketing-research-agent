@@ -1,6 +1,7 @@
 import type { Competitor, Product, ReadAd, Relationship, ReviewCoverage } from '../api';
 import BrandMark, { domainOf } from '../BrandMark';
 import { Source } from './badges';
+import Traction, { salesOf } from './Traction';
 
 const GROUPS: { key: Relationship; title: string; note: string }[] = [
   { key: 'direct', title: 'Direct', note: 'same key active, same form' },
@@ -30,6 +31,7 @@ function Row({ competitor, reviews, ads }: { competitor: Competitor; reviews: nu
         <span className="value">{competitor.price ? `${competitor.price.amount} ${competitor.price.currency}` : '—'}</span>
         <span className="label">price</span>
       </div>
+      <Traction traction={competitor.traction} />
       <div className="metric">
         <span className="value">{reviews}</span>
         <span className="label">reviews</span>
@@ -55,10 +57,10 @@ export default function Competitors({ product, competitors, coverage, ads }: { p
     <section className="panel flush">
       <div className="panel-head">
         <h2>Competitors</h2>
-        <span className="dim small">Classified by code from each product page, against {product.key_active || 'the key active'} in {product.form_factor?.replace('_', ' ') ?? 'its form'}.</span>
+        <span className="dim small">Classified by code from each product page, against {product.key_active || 'the key active'} in {product.form_factor?.replace('_', ' ') ?? 'its form'}. Ordered by TrendTrack's estimated monthly sales; Amazon listings have none.</span>
       </div>
       {GROUPS.map((group) => {
-        const members = competitors.filter((c) => c.relationship === group.key);
+        const members = competitors.filter((c) => c.relationship === group.key).sort((a, b) => salesOf(b.traction) - salesOf(a.traction) || (b.traction?.monthly_visits ?? -1) - (a.traction?.monthly_visits ?? -1));
         if (members.length === 0) return null;
         return (
           <div key={group.key} className="group">

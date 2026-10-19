@@ -1,5 +1,7 @@
 import { z } from "zod/v4";
 
+import type { ShopTraction } from "./traction.js";
+
 export const FORM_FACTORS = ["liquid_drops", "capsules", "tablets", "gummies", "powder", "tea", "spray", "syrup", "other"] as const;
 export type FormFactor = (typeof FORM_FACTORS)[number];
 
@@ -55,6 +57,7 @@ export interface Product {
   claims_on_page: ProductBrief["claims_on_page"];
   image_url: string | null;
   logo_url: string | null;
+  traction: ShopTraction | null;
   created_at: string;
   updated_at: string;
 }

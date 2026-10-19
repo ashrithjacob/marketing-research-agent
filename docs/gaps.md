@@ -41,12 +41,15 @@ rewrite is in git history before `b6f45cc`.
 8. **`claims_on_page` is re-typed by the model**, not copied by code from the
    page, against the rule that a model never copies content by writing it out.
 
-7c. **Competitors are not ordered by traction.** TrendTrack holds what is
-    needed (measured 2026-10-19): `GET /v1/lookup?q=<domain>` is free and gives
-    the shop id with monthly visits and active ads; `GET /v1/shops/{id}` (one
-    credit) adds `sales.estMonthlySales` (estimated 30-day revenue, USD) and
-    `unitsSold`, for shops its sales tracker follows. Amazon listings have no
-    TrendTrack shop.
+7c. **Traction is shop-wide, and missing for marketplace listings.** Built
+    2026-10-19: the free lookup orders the confirmation tiles by monthly visits,
+    and stage 1 stores each Shopify shop's estimated monthly sales with the
+    product's best-seller rank (8 credits a shop, measured). TrendTrack has no
+    per-product sales; a share of the shop estimated from rank would rest on an
+    assumed curve (12–27% for #1 of 23 under two plausible ones), so none is
+    shown. Amazon listings have no shop: their "bought in past month", rating
+    count and Best Sellers Rank are on the product page (free) or from Apify,
+    and are not read yet.
 
 ## Stage 3
 

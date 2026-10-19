@@ -1,3 +1,4 @@
+import type { ShopSignals, ShopTraction } from "./traction.js";
 import type { AdPage, AdQuery } from "./ad-library.js";
 import type { Generation } from "./logs.js";
 import type { BrandVisual } from "./products.js";
@@ -33,6 +34,12 @@ export interface Storefront {
 /** Reads a product page for how the brand looks: its product shot and its logo. Never throws: a page it cannot read gives nulls. */
 export interface BrandVisuals {
   find(url: string, signal?: AbortSignal): Promise<BrandVisual>;
+}
+
+/** TrendTrack's shop data: a free lookup by domain, and the paid sales record with a product's best-seller rank. */
+export interface ShopIntel {
+  lookup(domain: string, signal?: AbortSignal): Promise<ShopSignals | null>;
+  traction(signals: ShopSignals, productHandle: string | null, signal?: AbortSignal): Promise<{ traction: ShopTraction; credits: number }>;
 }
 
 /** What OpenRouter billed for one generation, looked up by its response id. */

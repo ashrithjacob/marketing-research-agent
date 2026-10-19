@@ -376,6 +376,18 @@ CREATE TABLE brand_visuals (
 );
 `;
 
+const SHOP_TRACTION = `
+ALTER TABLE products ADD COLUMN traction JSONB;
+ALTER TABLE competitors ADD COLUMN traction JSONB;
+CREATE TABLE shop_signals (
+    domain         TEXT PRIMARY KEY,
+    shop_id        TEXT NOT NULL,
+    monthly_visits BIGINT,
+    active_ads     INTEGER,
+    fetched_at     TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+`;
+
 /** Applied in order, once each, recorded in schema_migrations. An applied migration is never edited: a change is a new entry at the end. */
 export const MIGRATIONS: readonly Migration[] = [
   { id: 1, name: "avatar_schema", sql: AVATAR_SCHEMA },
@@ -383,4 +395,5 @@ export const MIGRATIONS: readonly Migration[] = [
   { id: 3, name: "avatar_memory", sql: AVATAR_MEMORY },
   { id: 4, name: "brand_visuals", sql: BRAND_VISUALS },
   { id: 5, name: "brand_visual_cache", sql: BRAND_VISUAL_CACHE },
+  { id: 6, name: "shop_traction", sql: SHOP_TRACTION },
 ];

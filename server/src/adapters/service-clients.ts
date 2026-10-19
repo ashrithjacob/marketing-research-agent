@@ -1,5 +1,5 @@
 import type { Settings } from "../config/index.js";
-import type { AdLibrary, PageFetcher, WebSearch } from "../domain/index.js";
+import type { AdLibrary, PageFetcher, ShopIntel, WebSearch } from "../domain/index.js";
 import { Trace } from "../trace/index.js";
 
 import { Crawl4ai } from "./crawl4ai.js";
@@ -10,6 +10,7 @@ import { ParallelSearch } from "./parallel-search.js";
 import { ServiceQueue } from "./service-queue.js";
 import { ThrottledAdLibrary, ThrottledPageFetcher, ThrottledWebSearch } from "./throttled.js";
 import { TrendtrackAds } from "./trendtrack-ads.js";
+import { TrendtrackShops } from "./trendtrack-shops.js";
 
 /** The outside services every run shares, one queue each, built once per process because the limits are per account. */
 export class ServiceClients {
@@ -17,6 +18,7 @@ export class ServiceClients {
     readonly pages: PageFetcher,
     readonly search: WebSearch,
     readonly ads: AdLibrary | null,
+    readonly shops: ShopIntel | null = null,
   ) {}
 
   static forSettings(settings: Settings): ServiceClients {
@@ -25,6 +27,7 @@ export class ServiceClients {
       ServiceClients.pageChain(settings),
       new ThrottledWebSearch(new ParallelSearch(new ParallelApi(settings)), new ServiceQueue("parallel", settings.parallelConcurrency)),
       settings.trendtrackApiKey ? new ThrottledAdLibrary(new TrendtrackAds(settings), new ServiceQueue("trendtrack", settings.trendtrackConcurrency)) : null,
+      settings.trendtrackApiKey ? new TrendtrackShops(settings) : null,
     );
   }
 

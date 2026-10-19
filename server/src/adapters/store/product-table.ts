@@ -1,4 +1,4 @@
-import { Ids, type BrandVisual, type Product, type ProductBrief, type ProductStore } from "../../domain/index.js";
+import { Ids, type BrandVisual, type Product, type ProductBrief, type ProductStore, type ShopTraction } from "../../domain/index.js";
 import { Trace } from "../../trace/index.js";
 
 import type { SqlDatabase } from "./sql-database.js";
@@ -46,5 +46,10 @@ export class ProductTable implements ProductStore {
   async saveVisual(productId: string, visual: BrandVisual): Promise<void> {
     Trace.line(import.meta.url, "ProductTable.saveVisual", { productId, visual });
     await this.db.run("UPDATE products SET image_url = COALESCE(?, image_url), logo_url = COALESCE(?, logo_url), updated_at = now() WHERE id = ?", [visual.image_url, visual.logo_url, productId]);
+  }
+
+  async saveTraction(productId: string, traction: ShopTraction): Promise<void> {
+    Trace.line(import.meta.url, "ProductTable.saveTraction", { productId, shop: traction.shop_id });
+    await this.db.run("UPDATE products SET traction = ?, updated_at = now() WHERE id = ?", [JSON.stringify(traction), productId]);
   }
 }

@@ -1,7 +1,7 @@
 import { Hono, type Context } from "hono";
 
 import type { AnalysisService, RunEvents } from "../agent/index.js";
-import { Scope, type ResearchStore, type Run } from "../domain/index.js";
+import { CompetitorRelationship, Scope, type ResearchStore, type Run } from "../domain/index.js";
 import { Trace, type TraceFile } from "../trace/index.js";
 
 import type { ApiEnv } from "./api-env.js";
@@ -71,7 +71,9 @@ export class RunRoutes {
     const product = run.product_id ? await this.store.products.get(run.product_id) : null;
     const competitors = run.product_id ? (await this.store.competitors.list(run.product_id)).filter((competitor) => competitor.status === "confirmed") : [];
     const urls = [run.resolution?.product.url, ...(run.resolution?.alternatives ?? []).map((a) => a.url), ...(run.resolution?.competitors ?? []).map((c) => c.url), product?.url, ...competitors.map((c) => c.url)];
-    const visuals = Object.fromEntries(await this.store.visuals.get([...new Set(urls.filter((url): url is string => Boolean(url)))]));
-    return { run, product, competitors, visuals };
+    const known = [...new Set(urls.filter((url): url is string => Boolean(url)))];
+    const visuals = Object.fromEntries(await this.store.visuals.get(known));
+    const signals = Object.fromEntries(await this.store.signals.get([...new Set(known.map((url) => CompetitorRelationship.domainOf(url)))]));
+    return { run, product, competitors, visuals, signals };
   }
 }

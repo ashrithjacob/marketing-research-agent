@@ -163,6 +163,11 @@ classDiagram
       <<interface>>
       find()
     }
+    class ShopIntel {
+      <<interface>>
+      lookup()
+      traction()
+    }
     class GenerationSource {
       <<interface>>
       generation()
@@ -246,6 +251,7 @@ classDiagram
       get()
       saveBrief()
       saveVisual()
+      saveTraction()
     }
     class CompetitorStore {
       <<interface>>
@@ -253,6 +259,7 @@ classDiagram
       list()
       saveProfile()
       saveVisual()
+      saveTraction()
     }
     class ReviewStore {
       <<interface>>
@@ -278,6 +285,16 @@ classDiagram
       saveReading()
       list()
     }
+    class BrandVisualCache {
+      <<interface>>
+      get()
+      put()
+    }
+    class ShopSignalCache {
+      <<interface>>
+      get()
+      put()
+    }
     class EventLog {
       <<interface>>
       add()
@@ -297,6 +314,15 @@ classDiagram
     class ResearchStore {
       <<interface>>
       close()
+    }
+    class ShopSignals {
+      <<interface>>
+    }
+    class ShopTraction {
+      <<interface>>
+    }
+    class ShopHandles {
+      fromUrl()
     }
     class SearchHit {
       <<interface>>
@@ -345,6 +371,9 @@ classDiagram
     }
   }
   namespace adapters {
+    class CachedVisuals {
+      find()
+    }
     class Crawl4aiPayload {
       <<interface>>
     }
@@ -371,6 +400,10 @@ classDiagram
     }
     class MeteredAdLibrary {
       search()
+    }
+    class MeteredShopIntel {
+      lookup()
+      traction()
     }
     class OpenRouterGeneration {
       parse()
@@ -497,6 +530,7 @@ classDiagram
       list()
       saveProfile()
       saveVisual()
+      saveTraction()
     }
     class EventTable {
       add()
@@ -532,6 +566,7 @@ classDiagram
       get()
       saveBrief()
       saveVisual()
+      saveTraction()
     }
     class ReviewTable {
       contentHash()
@@ -549,6 +584,10 @@ classDiagram
       updateRun()
       unfinished()
     }
+    class SignalTable {
+      get()
+      put()
+    }
     class SqlDatabase {
       <<interface>>
       all()
@@ -565,6 +604,10 @@ classDiagram
     class Migration {
       <<interface>>
     }
+    class VisualTable {
+      get()
+      put()
+    }
     class ThrottledPageFetcher {
       scrape()
     }
@@ -579,6 +622,13 @@ classDiagram
     }
     class TrendtrackAds {
       search()
+    }
+    class TrendtrackShop {
+      <<interface>>
+    }
+    class TrendtrackShops {
+      lookup()
+      traction()
     }
   }
   namespace agent {
@@ -690,6 +740,12 @@ classDiagram
       resolve()
       problems()
     }
+    class ResolutionSignals {
+      collect()
+    }
+    class ResolutionVisuals {
+      collect()
+    }
     class RunVerdict {
       <<interface>>
     }
@@ -757,6 +813,9 @@ classDiagram
     }
     class ProductMarketStage {
       run()
+    }
+    class ShopTractionCollector {
+      collect()
     }
     class AmazonListingFinder {
       find()
@@ -851,6 +910,8 @@ classDiagram
       verify()
     }
   }
+  CachedVisuals --> BrandVisuals
+  CachedVisuals --> BrandVisualCache
   Crawl4ai --> Settings
   FallbackPageFetcher --> PageFetcher
   Firecrawl --> Settings
@@ -863,6 +924,9 @@ classDiagram
   MeteredAdLibrary --> AdLibrary
   MeteredAdLibrary --> ServicePrices
   MeteredAdLibrary --> ChargeMeter
+  MeteredShopIntel --> ShopIntel
+  MeteredShopIntel --> ServicePrices
+  MeteredShopIntel --> ChargeMeter
   PageVisuals --> PublicPage
   ParallelApi --> Settings
   ParallelSearch --> ParallelApi
@@ -872,6 +936,7 @@ classDiagram
   ServiceClients --> PageFetcher
   ServiceClients --> WebSearch
   ServiceClients --> AdLibrary
+  ServiceClients --> ShopIntel
   ShopifyStorefront --> PublicPage
   AccountTable --> SqlDatabase
   AdTable --> SqlDatabase
@@ -885,7 +950,9 @@ classDiagram
   ProductTable --> SqlDatabase
   ReviewTable --> SqlDatabase
   RunTable --> SqlDatabase
+  SignalTable --> SqlDatabase
   SqlResearchStore --> SqlDatabase
+  VisualTable --> SqlDatabase
   ThrottledPageFetcher --> PageFetcher
   ThrottledPageFetcher --> ServiceQueue
   ThrottledWebSearch --> WebSearch
@@ -893,6 +960,7 @@ classDiagram
   ThrottledAdLibrary --> AdLibrary
   ThrottledAdLibrary --> ServiceQueue
   TrendtrackAds --> Settings
+  TrendtrackShops --> Settings
   AnalysisService --> ResearchStore
   AnalysisService --> RunLauncher
   AnalysisService --> LiveRuns
@@ -908,6 +976,9 @@ classDiagram
   RunEvents --> EventLog
   StageProgress --> RunStore
   StageProgress --> RunContext
+  ResolutionSignals --> ShopIntel
+  ResolutionSignals --> ShopSignalCache
+  ResolutionVisuals --> BrandVisuals
   RunEnd --> ResearchStore
   RunEnd --> RunEvents
   RunLauncher --> RunServices
@@ -915,6 +986,8 @@ classDiagram
   RunLauncher --> LiveRuns
   RunLauncher --> Pipeline
   RunLauncher --> ProductResolver
+  RunLauncher --> ResolutionVisuals
+  RunLauncher --> ResolutionSignals
   AdSweep --> AdLibrary
   AdSweep --> SweepLimits
   CompetitorAdStage --> AdLibrary
@@ -922,6 +995,9 @@ classDiagram
   CompetitorAdStage --> SweepLimits
   BrandVisualsCollector --> BrandVisuals
   ProductMarketStage --> BrandVisualsCollector
+  ProductMarketStage --> ShopTractionCollector
+  ShopTractionCollector --> ShopIntel
+  ShopTractionCollector --> ServicePrices
   ReviewListings --> Storefront
   ReviewListings --> AmazonListingFinder
   ReviewStage --> ReviewListings
@@ -954,11 +1030,12 @@ classDiagram
 
 | Layer | Module | Classes |
 |---|---|---|
+| `adapters` | `adapters/cached-visuals.ts` | CachedVisuals |
 | `adapters` | `adapters/crawl4ai.ts` | Crawl4aiPayload, Crawl4ai |
 | `adapters` | `adapters/fallback-fetcher.ts` | FallbackPageFetcher |
 | `adapters` | `adapters/firecrawl.ts` | FirecrawlPayload, Firecrawl |
 | `adapters` | `adapters/http.ts` | Http |
-| `adapters` | `adapters/metered.ts` | MeteredWebSearch, MeteredPageFetcher, MeteredAdLibrary |
+| `adapters` | `adapters/metered.ts` | MeteredWebSearch, MeteredPageFetcher, MeteredAdLibrary, MeteredShopIntel |
 | `adapters` | `adapters/openrouter-generation.ts` | OpenRouterGeneration |
 | `adapters` | `adapters/openrouter-prices.ts` | OpenRouterPrices |
 | `adapters` | `adapters/page-visuals.ts` | PageVisuals |
@@ -987,11 +1064,14 @@ classDiagram
 | `adapters` | `adapters/store/product-table.ts` | ProductTable |
 | `adapters` | `adapters/store/review-table.ts` | ReviewTable |
 | `adapters` | `adapters/store/run-table.ts` | RunTable |
+| `adapters` | `adapters/store/signal-table.ts` | SignalTable |
 | `adapters` | `adapters/store/sql-database.ts` | SqlDatabase |
 | `adapters` | `adapters/store/store.ts` | SqlResearchStore |
 | `adapters` | `adapters/store/text/migrations.ts` | Migration |
+| `adapters` | `adapters/store/visual-table.ts` | VisualTable |
 | `adapters` | `adapters/throttled.ts` | ThrottledPageFetcher, ThrottledWebSearch, ThrottledAdLibrary |
 | `adapters` | `adapters/trendtrack-ads.ts` | TrendtrackAd, TrendtrackAds |
+| `adapters` | `adapters/trendtrack-shops.ts` | TrendtrackShop, TrendtrackShops |
 | `agent` | `agent/analysis-service.ts` | AnalysisService |
 | `agent` | `agent/kernel/agent-runner.ts` | AgentJob, AgentRunnerDeps, AgentRunner |
 | `agent` | `agent/kernel/billed-costs.ts` | BilledCosts |
@@ -1011,6 +1091,8 @@ classDiagram
 | `agent` | `agent/pipeline/stage-progress.ts` | StageProgress |
 | `agent` | `agent/pipeline/stage.ts` | StageInput, StageOutcome, Stage |
 | `agent` | `agent/resolve/product-resolver.ts` | ProductResolver |
+| `agent` | `agent/resolve/resolution-signals.ts` | ResolutionSignals |
+| `agent` | `agent/resolve/resolution-visuals.ts` | ResolutionVisuals |
 | `agent` | `agent/run-end.ts` | RunVerdict, RunEnd |
 | `agent` | `agent/run-launcher.ts` | RunLauncher |
 | `agent` | `agent/stages/ads/ad-keywords-agent.ts` | AdKeywordsAgent |
@@ -1027,6 +1109,7 @@ classDiagram
 | `agent` | `agent/stages/product-market/competitor-profiler.ts` | CompetitorProfiler |
 | `agent` | `agent/stages/product-market/product-brief-agent.ts` | ProductBriefAgent |
 | `agent` | `agent/stages/product-market/product-market-stage.ts` | ProductMarketStage |
+| `agent` | `agent/stages/product-market/shop-traction-collector.ts` | ShopTractionCollector |
 | `agent` | `agent/stages/reviews/amazon-listing-finder.ts` | AmazonListingFinder |
 | `agent` | `agent/stages/reviews/review-listings.ts` | TargetListings, ReviewListings |
 | `agent` | `agent/stages/reviews/review-stage.ts` | ReviewStage |
@@ -1047,14 +1130,15 @@ classDiagram
 | `domain` | `domain/competitors.ts` | Competitor, CompetitorRelationship |
 | `domain` | `domain/ids.ts` | Clock, Ids |
 | `domain` | `domain/logs.ts` | RunEvent, LlmCallRecord, Generation, LlmCall |
-| `domain` | `domain/ports.ts` | PageFetcher, WebSearch, AdLibrary, ReviewSource, Storefront, BrandVisuals, GenerationSource |
+| `domain` | `domain/ports.ts` | PageFetcher, WebSearch, AdLibrary, ReviewSource, Storefront, BrandVisuals, ShopIntel, GenerationSource |
 | `domain` | `domain/products.ts` | BrandVisual, Product |
 | `domain` | `domain/reviews.ts` | CollectedReview, ReviewTarget, StoredReview, ReviewCoverage, StorefrontFacts, Asins |
 | `domain` | `domain/runs.ts` | Run, RunUpdate, RunSummary |
 | `domain` | `domain/schemas.ts` | Schemas |
 | `domain` | `domain/service-report.ts` | ServicePart, ServiceReport |
 | `domain` | `domain/stages.ts` | StagePlan, StageState, Stages |
-| `domain` | `domain/store-ports.ts` | AccountDirectory, RunStore, ProductStore, CompetitorStore, ReviewStore, AvatarStore, AvatarRecord, AdStore, EventLog, ChargeLedger, CallLog, ResearchStore |
+| `domain` | `domain/store-ports.ts` | AccountDirectory, RunStore, ProductStore, CompetitorStore, ReviewStore, AvatarStore, AvatarRecord, AdStore, BrandVisualCache, ShopSignalCache, EventLog, ChargeLedger, CallLog, ResearchStore |
+| `domain` | `domain/traction.ts` | ShopSignals, ShopTraction, ShopHandles |
 | `domain` | `domain/web.ts` | SearchHit, SearchPage, SearchScope, FetchedPage, ServiceUnavailableError |
 | `extract` | `extract/avatar-memory-check.ts` | AvatarMemoryCheck |
 | `extract` | `extract/avatar-memory.ts` | AvatarMemoryBook |

@@ -1,6 +1,7 @@
 import {
   CompetitorRelationship,
   type BrandVisual,
+  type ShopTraction,
   Ids,
   type Competitor,
   type CompetitorPick,
@@ -60,5 +61,10 @@ export class CompetitorTable implements CompetitorStore {
   async saveVisual(competitorId: string, visual: BrandVisual): Promise<void> {
     Trace.line(import.meta.url, "CompetitorTable.saveVisual", { competitorId, visual });
     await this.db.run("UPDATE competitors SET image_url = COALESCE(?, image_url), logo_url = COALESCE(?, logo_url), updated_at = now() WHERE id = ?", [visual.image_url, visual.logo_url, competitorId]);
+  }
+
+  async saveTraction(competitorId: string, traction: ShopTraction): Promise<void> {
+    Trace.line(import.meta.url, "CompetitorTable.saveTraction", { competitorId, shop: traction.shop_id });
+    await this.db.run("UPDATE competitors SET traction = ?, updated_at = now() WHERE id = ?", [JSON.stringify(traction), competitorId]);
   }
 }

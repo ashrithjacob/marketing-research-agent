@@ -13,6 +13,7 @@ function describe(event: RunEvent): string | null {
   if (event.kind === 'stage.changed') return `stage ${p.stage}: ${p.status}`;
   if (event.kind === 'reviews.collected') return `reviews: ${p.target}, ${p.collected} collected, ${p.saved} new`;
   if (event.kind === 'avatars.memory') return `avatars after batch ${p.batch}: ${(p.avatars as { key: string; reviews: number }[]).map((a) => `${a.key} ${a.reviews}`).join(', ')}`;
+  if (event.kind === 'traction.collected') return `shop traction: ${p.found} of ${p.of}${(p.failures as string[] | undefined)?.length ? `, failed: ${(p.failures as string[]).join('; ')}` : ''}`;
   if (event.kind === 'run.resolved') return `resolved, ${p.competitors} competitors proposed`;
   if (event.kind === 'run.ended') return `run ${p.status}`;
   return null;
