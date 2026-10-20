@@ -1,17 +1,17 @@
 import { useEffect, useState, type MouseEvent, type ReactNode } from 'react';
 
-export type Route = { page: 'home' } | { page: 'run'; runId: string };
+export type Route = { page: 'home' } | { page: 'run'; runId: string; section: string | null };
 
 export const paths = {
   home: () => '/',
-  run: (runId: string) => `/runs/${runId}`,
+  run: (runId: string, section: string | null = null) => `/runs/${runId}${section ? `/${section}` : ''}`,
 };
 
 const NAVIGATED = 'mra:navigated';
 
 export function parseRoute(pathname: string): Route {
-  const run = pathname.match(/^\/runs\/([0-9a-f]+)\/?$/);
-  return run ? { page: 'run', runId: run[1] } : { page: 'home' };
+  const run = pathname.match(/^\/runs\/([0-9a-f]+)(?:\/([a-z_]+))?\/?$/);
+  return run ? { page: 'run', runId: run[1], section: run[2] ?? null } : { page: 'home' };
 }
 
 export function navigate(path: string) {

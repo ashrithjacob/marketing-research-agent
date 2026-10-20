@@ -54,7 +54,8 @@ cmd_check() {
   fi
   # The build writes dist. Re-run the convention checks so a stale dist that
   # the build has just refreshed is reported as needing a commit, not missed.
-  node "$REPO/server/scripts/check-conventions.mjs" >/dev/null || failed=1
+  local conventions
+  conventions=$(node "$REPO/server/scripts/check-conventions.mjs" 2>&1) || { echo "$conventions"; failed=1; }
   if [ "$failed" -eq 0 ]; then
     note "clean"
   else

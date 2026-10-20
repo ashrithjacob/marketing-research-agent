@@ -26,8 +26,19 @@ for any path that is not a file or `api/`.
 | URL | Page |
 |---|---|
 | `/` | New analysis and the list of analyses, one row each with the product shot, competitors' logos and evidence counts (`HomePage.tsx`) |
-| `/runs/:runId` | One analysis (`run/RunPage.tsx`) |
+| `/runs/:runId` | One analysis, its overview (`run/RunPage.tsx`) |
+| `/runs/:runId/product`, `/reviews`, `/ads`, `/avatars` | One stage of that analysis: stages 1, 3, 4 and 5 (`STAGE_SECTIONS` in `run/RunNav.tsx`) |
 | anything else | The home page |
+
+## The sidebar (`Shell.tsx`, `run/RunNav.tsx`)
+
+Dark, on every page, like TrendTrack's. Brand and **Analyses** (the home page);
+on a run, the product's shot and name, **Overview**, and one item per built
+stage with its number, a count (competitors, reviews, ads) and a status dot
+(green completed, blue running, red failed or invalid, amber skipped,
+cancelled or waiting). A stage appears there once it is built. The signed-in
+user and Sign out sit at the bottom when login is on. Below 900px it becomes
+a scrolling bar across the top.
 
 ## Home (`HomePage.tsx`)
 
@@ -40,6 +51,11 @@ The form decides url or name by shape; the server refuses a url sent as a name
 (422, shown in the red banner).
 
 ## One analysis (`run/RunPage.tsx`)
+
+Overview shows the header, the rerun prompt, the confirm panel, the seven
+stage cards and live activity. A stage's page shows the header, that stage's
+card, and its section: Product & market (brief and competitors), Reviews,
+Long-form ads, Avatars.
 
 The page loads `GET /api/research/runs/:id` (the run, its product, its confirmed
 competitors) and, while the run is not final, follows
