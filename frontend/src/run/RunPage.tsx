@@ -10,7 +10,7 @@ import ProductBrief from './ProductBrief';
 import RerunPrompt from './RerunPrompt';
 import Reviews from './Reviews';
 import RunHeader from './RunHeader';
-import StageTracker from './StageTracker';
+import StagesPanel from './StagesPanel';
 import { useEvidence } from './use-evidence';
 import { useRun } from './use-run';
 
@@ -34,7 +34,7 @@ export default function RunPage({ runId, onError }: { runId: string; onError: (m
       {run.error && !run.product_id && <div className="error banner">{run.error}</div>}
       {run.status === 'resolving' && <p className="panel dim">Finding the product page and proposing competitors…</p>}
       {run.status === 'awaiting_confirmation' && run.resolution && <ConfirmPanel runId={runId} resolution={run.resolution} visuals={view.visuals} signals={view.signals} onDone={reload} onError={onError} />}
-      <StageTracker stages={config.stages} states={run.stage_status} />
+      <StagesPanel run={run} stages={config.stages} onDone={reload} onError={onError} />
       {product && <Avatars runId={runId} version={run.stage_status.avatars?.status ?? ''} onError={onError} />}
       {product && <Competitors product={product} competitors={competitors} coverage={coverage} ads={ads} />}
       {product && <ProductBrief product={product} />}

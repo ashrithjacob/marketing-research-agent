@@ -38,7 +38,7 @@ export class RunRoutes {
     );
     api.post("/runs/:runId/rerun", async (c) =>
       this.withRun(c, async (run) => {
-        const rerun = await this.analyses.rerun(run);
+        const rerun = await this.analyses.rerun(run, await c.req.json().catch(() => null));
         return "refused" in rerun ? c.json({ detail: rerun.refused }, 409) : c.json(await this.view(rerun));
       }),
     );

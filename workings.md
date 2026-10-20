@@ -51,14 +51,26 @@ resolving ──▶ awaiting_confirmation ──(user confirms)──▶ running
 
 ## Rerunning stages
 
-A finished run whose stages did not all complete offers to run them again
-(`POST /runs/:id/rerun`, the prompt on the run page, `mra rerun`).
-`Stages.rerun` keeps every completed stage as it is and sets every other built
-stage, including one built after the run, back to waiting; the pipeline counts
-a completed stage as done without running it, so only the rest run, in
-dependency order, with the run's confirmed product and competitors. The run
-ends through `RunEnd` as before; its cost is the total of all its charges, both
-attempts.
+Any stage of a finished run can be run again, or all of them
+(`POST /runs/:id/rerun` with `{stages}`, the Rerun buttons on the stage cards
+and "Rerun all stages" on the run page, `mra rerun <id> <stage>…`). A finished
+run whose stages did not all complete also offers to run just those (the
+prompt on the run page; the request without `stages`).
+
+`Stages.toRerun` decides what runs: the chosen stages, every built stage that
+uses one of them however indirectly (`Stages.downstream`, from `STAGE_PLANS`
+needs: rerunning stage 4 reruns stage 5, stage 1 reruns 4 and 5), and every
+stage that did not complete. `/config` lists each stage's downstream set as
+`reruns`, so the page shows what a click will run before anything is spent.
+`Stages.rerun` sets those back to waiting and keeps every other stage as it
+is; the pipeline counts a completed stage as done without running it. The run
+ends through `RunEnd` as before; its cost is the total of all its charges,
+every attempt.
+
+What a rerun replaces: stage 1 overwrites the brief and the profiles; stage 3
+adds only reviews it has not stored (they belong to the product); stage 4
+deletes its run's ads before the scout starts (`AdTable.clear`, ads belong to
+the run since migration 8); stage 5 replaces its run's avatars.
 
 ## How an agent ends
 

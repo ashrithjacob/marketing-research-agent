@@ -116,6 +116,7 @@ describe("stage 4", () => {
   it("lets the scout search, read and keep ads in rings, refuses an ad it never saw, then reads every kept ad", async () => {
     const ads = new FakeAds();
     let refusal = "";
+    let scouts = 0;
     const keep = [
       { ad_id: "lc1", ring: "direct_competitor", why: "LungClear's own tincture, 64 days" },
       { ad_id: "mullein-0", ring: "same_problem", why: "lung tea for smokers, 45+" },
@@ -139,7 +140,8 @@ describe("stage 4", () => {
           call("submit", { kept: [...keep, { ad_id: "ghost-9", ring: "same_problem", why: "x" }], brands }),
           (messages) => {
             refusal = JSON.stringify(messages.at(-1)?.content ?? "");
-            return call("submit", { kept: keep, brands });
+            scouts += 1;
+            return call("submit", { kept: scouts === 1 ? keep : keep.slice(0, 1), brands });
           },
         ])
         .on("<ad id=", [readAll])
@@ -169,5 +171,12 @@ describe("stage 4", () => {
     expect(stored.every((ad) => ad.reading?.claim_type === "mechanism")).toBe(true);
     const { charges } = await driver.json<{ charges: { service: string; agent_id: string; units: number }[] }>(`/runs/${runId}/charges`);
     expect(charges.filter((c) => c.service === "trendtrack").map((c) => [c.agent_id, c.units])).toEqual([["ad_scout", 2], ["ad_scout", 4], ["ad_scout", 4], ["ad_scout", 1]]);
+
+    expect((await driver.api(`/runs/${runId}/rerun`, { stages: ["competitor_ads"] })).status).toBe(200);
+    const again = await driver.settle(runId, ["completed", "failed", "invalid"]);
+    expect(again.run.stage_status.product_market).toEqual(done.run.stage_status.product_market);
+    expect(again.run.stage_status.competitor_ads.summary).toMatch(/^1 ads kept of 7 seen/);
+    const { ads: replaced } = await driver.json<{ ads: ReadAd[] }>(`/runs/${runId}/ads`);
+    expect(replaced.map((ad) => ad.trendtrack_ad_id)).toEqual(["lc1"]);
   });
 });

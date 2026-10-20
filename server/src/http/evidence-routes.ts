@@ -29,7 +29,7 @@ export class EvidenceRoutes {
         });
       }),
     );
-    api.get("/runs/:runId/ads", async (c) => this.withProduct(c, async (productId) => c.json({ ads: await this.store.ads.list(productId) })));
+    api.get("/runs/:runId/ads", async (c) => this.withProduct(c, async () => c.json({ ads: await this.store.ads.list(c.req.param("runId") ?? "") })));
     api.get("/runs/:runId/avatars", async (c) =>
       this.withProduct(c, async () => {
         const runId = c.req.param("runId") ?? "";

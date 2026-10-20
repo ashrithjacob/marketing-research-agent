@@ -393,6 +393,16 @@ ALTER TABLE ad_extractions ADD COLUMN relation TEXT, ADD COLUMN relation_why TEX
 ALTER TABLE ads ADD COLUMN audience JSONB;
 `;
 
+const ADS_PER_RUN = `
+ALTER TABLE ads ADD COLUMN run_id TEXT REFERENCES runs(id) ON DELETE CASCADE;
+UPDATE ads SET run_id = (SELECT r.id FROM runs r WHERE r.product_id = ads.product_id ORDER BY r.created_at DESC LIMIT 1);
+DELETE FROM ads WHERE run_id IS NULL;
+ALTER TABLE ads ALTER COLUMN run_id SET NOT NULL;
+ALTER TABLE ads DROP CONSTRAINT ads_product_ad;
+ALTER TABLE ads ADD CONSTRAINT ads_run_ad UNIQUE (run_id, trendtrack_ad_id);
+CREATE INDEX ads_run ON ads(run_id);
+`;
+
 /** Applied in order, once each, recorded in schema_migrations. An applied migration is never edited: a change is a new entry at the end. */
 export const MIGRATIONS: readonly Migration[] = [
   { id: 1, name: "avatar_schema", sql: AVATAR_SCHEMA },
@@ -402,4 +412,5 @@ export const MIGRATIONS: readonly Migration[] = [
   { id: 5, name: "brand_visual_cache", sql: BRAND_VISUAL_CACHE },
   { id: 6, name: "shop_traction", sql: SHOP_TRACTION },
   { id: 7, name: "ad_rings", sql: AD_RINGS },
+  { id: 8, name: "ads_per_run", sql: ADS_PER_RUN },
 ];

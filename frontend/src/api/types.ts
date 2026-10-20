@@ -16,6 +16,7 @@ export interface StageInfo {
   title: string;
   needs: string[];
   built: boolean;
+  reruns: string[];
 }
 
 export interface Config {

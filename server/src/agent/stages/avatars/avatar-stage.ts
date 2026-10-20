@@ -30,7 +30,7 @@ export class AvatarStage implements Stage {
     const about = `The client's product: ${product.brand} ${product.name}${product.category ? `, a ${product.category}` : ""}${product.key_active ? ` sold on ${product.key_active}` : ""}.`;
     const { memory: read, skipped } = await this.readReviews(context, reviews, about);
     if (read.avatars.length === 0) return { status: "invalid", summary: "", error: `no avatar came out of ${reviews.length} reviews; ${skipped} batch(es) refused` };
-    const ads = (await context.store.ads.list(product.id)).filter((ad) => ad.reading !== null && AdRings.isSupply(ad));
+    const ads = (await context.store.ads.list(context.run.id)).filter((ad) => ad.reading !== null && AdRings.isSupply(ad));
     const placed = await this.placeAds(context, read, ads);
     const verdicts = await this.judge.judge(context, placed, ads);
     await context.store.avatars.saveAvatars(context.run.id, AvatarTally.records(placed, verdicts.status === "completed" ? verdicts.value : null, ads));

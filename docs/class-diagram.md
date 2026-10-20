@@ -241,6 +241,8 @@ classDiagram
       initial()
       rerun()
       unfinished()
+      downstream()
+      toRerun()
       ended()
     }
     class AccountDirectory {
@@ -299,6 +301,7 @@ classDiagram
     }
     class AdStore {
       <<interface>>
+      clear()
       save()
       saveReading()
       saveRing()
@@ -532,6 +535,7 @@ classDiagram
       setPassword()
     }
     class AdTable {
+      clear()
       save()
       saveReading()
       saveRing()

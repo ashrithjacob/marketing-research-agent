@@ -28,6 +28,7 @@ export class CompetitorAdStage implements Stage {
     const { context } = input;
     const product = (await context.store.products.get(input.product.id))!;
     const competitors = (await context.store.competitors.list(product.id)).filter((c) => c.status === "confirmed");
+    await context.store.ads.clear(context.run.id);
     const { result, log } = await new AdScout(this.ads, this.shops, this.prices, this.limits).scout(context, product, competitors);
     if (result.status !== "completed") {
       const why = result.status === "invalid" ? result.problems.join("; ") : result.status === "failed" ? result.error : "stopped";
@@ -35,12 +36,12 @@ export class CompetitorAdStage implements Stage {
     }
     const report = result.value;
     const byDomain = new Map(competitors.map((c) => [CompetitorRelationship.domainOf(c.url), c.id]));
-    const stored = await context.store.ads.save(context.run.account_id, product.id, report.kept.map((kept) => log.ad(kept.ad_id)!), byDomain);
+    const stored = await context.store.ads.save(context.run.account_id, context.run.id, product.id, report.kept.map((kept) => log.ad(kept.ad_id)!), byDomain);
     const ringOf = new Map(report.kept.map((kept) => [kept.ad_id, kept]));
     for (const ad of stored) await context.store.ads.saveRing(ad.id, ringOf.get(ad.trendtrack_ad_id)!.ring, ringOf.get(ad.trendtrack_ad_id)!.why);
     await context.emit("ads.brands", { brands: report.brands });
     const unread = await this.readAll(context, product, stored);
-    const summary = `${stored.length} ads kept of ${log.returned} seen in ${log.searched} searches (${log.shopsSeen} trending shops looked at), from ${report.brands.length} brands; ${CompetitorAdStage.rings(await context.store.ads.list(product.id))}; ${stored.length - unread} read.`;
+    const summary = `${stored.length} ads kept of ${log.returned} seen in ${log.searched} searches (${log.shopsSeen} trending shops looked at), from ${report.brands.length} brands; ${CompetitorAdStage.rings(await context.store.ads.list(context.run.id))}; ${stored.length - unread} read.`;
     if (stored.length > 0 && unread === stored.length) return { status: "invalid", summary, error: "no batch of ads could be read" };
     return { status: "completed", summary, error: "" };
   }

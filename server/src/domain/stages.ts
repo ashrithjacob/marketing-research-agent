@@ -1,3 +1,5 @@
+import { z } from "zod/v4";
+
 import { Trace } from "../trace/index.js";
 
 export const STAGE_NAMES = ["product_market", "sophistication", "reviews", "competitor_ads", "avatars", "gaps", "generation"] as const;
@@ -44,22 +46,44 @@ export class Stages {
     ) as StageStates;
   }
 
-  /** A run's stages set up to run again: what completed is kept, every other built stage waits to run, and a stage not built is marked so. */
-  static rerun(states: StageStates, built: readonly StageName[]): StageStates {
-    Trace.line(import.meta.url, "Stages.rerun", { built });
+  /** A run's stages set up to run again: each stage in `rerunning` waits to run, every other built stage keeps its state, and a stage not built is marked so. */
+  static rerun(states: StageStates, built: readonly StageName[], rerunning: readonly StageName[]): StageStates {
+    Trace.line(import.meta.url, "Stages.rerun", { built, rerunning });
     const blank = { started_at: "", ended_at: "", error: "", summary: "" };
     return Object.fromEntries(
       STAGE_NAMES.map((name) => {
-        const kept = states[name]?.status === "completed" && built.includes(name);
-        return [name, kept ? states[name] : { ...blank, status: built.includes(name) ? "pending" : "not_built" }];
+        if (!built.includes(name)) return [name, { ...blank, status: "not_built" }];
+        return [name, rerunning.includes(name) || !states[name] ? { ...blank, status: "pending" } : states[name]];
       }),
     ) as StageStates;
   }
 
-  /** The built stages a rerun would run: every one that did not complete. */
+  /** The built stages that did not complete. */
   static unfinished(states: StageStates, built: readonly StageName[]): StageName[] {
     Trace.line(import.meta.url, "Stages.unfinished", { built });
     return built.filter((name) => states[name]?.status !== "completed");
+  }
+
+  /** A stage and every built stage that uses it, however indirectly: what has to run again when it does, because their input changes. */
+  static downstream(name: StageName, built: readonly StageName[]): StageName[] {
+    Trace.line(import.meta.url, "Stages.downstream", { name });
+    const reached = new Set<StageName>([name]);
+    for (let grew = true; grew; ) {
+      grew = false;
+      for (const other of built) {
+        if (reached.has(other) || !STAGE_PLANS[other].needs.some((need) => reached.has(need))) continue;
+        reached.add(other);
+        grew = true;
+      }
+    }
+    return STAGE_NAMES.filter((stage) => reached.has(stage) && built.includes(stage));
+  }
+
+  /** What a rerun of the chosen stages runs: each of them and everything downstream, plus every stage that did not complete; with nothing chosen, only the stages that did not complete. */
+  static toRerun(states: StageStates, built: readonly StageName[], chosen: readonly StageName[]): StageName[] {
+    Trace.line(import.meta.url, "Stages.toRerun", { chosen });
+    const picked = new Set([...Stages.unfinished(states, built), ...chosen.flatMap((name) => Stages.downstream(name, built))]);
+    return STAGE_NAMES.filter((name) => picked.has(name));
   }
 
   static ended(state: StageState): boolean {
@@ -67,3 +91,7 @@ export class Stages {
     return Stages.ENDED.has(state.status);
   }
 }
+
+/** A rerun request: the stages to run again; none means every stage that did not complete. */
+export const RerunRequestSchema = z.object({ stages: z.array(z.enum(STAGE_NAMES)).default([]) });
+export type RerunRequest = z.infer<typeof RerunRequestSchema>;

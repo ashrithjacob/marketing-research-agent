@@ -115,6 +115,35 @@ describe("a rerun", () => {
     expect(order.map((o) => o.split(":")[0])).toEqual(["product_market", "competitor_ads", "competitor_ads", "avatars"]);
     expect(done.run.stage_status.competitor_ads.summary).toBe("worked the second time");
     expect((await driver.api(`/runs/${runId}/rerun`, {})).status).toBe(409);
+    expect((await driver.api(`/runs/${runId}/rerun`, { stages: ["gaps"] })).status).toBe(409);
+
+    const chosen = await driver.api(`/runs/${runId}/rerun`, { stages: ["competitor_ads"] });
+    expect(chosen.status).toBe(200);
+    const again = await driver.settle(runId, ["completed", "failed", "invalid"]);
+    expect(again.run.status).toBe("completed");
+    expect(again.run.stage_status.product_market).toEqual(done.run.stage_status.product_market);
+    expect(order.map((o) => o.split(":")[0])).toEqual(["product_market", "competitor_ads", "competitor_ads", "avatars", "competitor_ads", "avatars"]);
+
+    await driver.api(`/runs/${runId}/rerun`, { stages: ["product_market", "competitor_ads", "avatars"] });
+    await driver.settle(runId, ["completed", "failed", "invalid"]);
+    expect(order.slice(6).map((o) => o.split(":")[0]).sort()).toEqual(["avatars", "competitor_ads", "product_market"]);
+  });
+});
+
+describe("what a rerun runs", () => {
+  it("is the chosen stages, every built stage downstream of them, and any stage that did not complete", () => {
+    const built = ["product_market", "reviews", "competitor_ads", "avatars"] as const;
+    expect(Stages.downstream("product_market", built)).toEqual(["product_market", "competitor_ads", "avatars"]);
+    expect(Stages.downstream("reviews", built)).toEqual(["reviews", "avatars"]);
+    expect(Stages.downstream("avatars", built)).toEqual(["avatars"]);
+    const states = Stages.initial([...built]);
+    for (const name of built) states[name].status = "completed";
+    expect(Stages.toRerun(states, built, [])).toEqual([]);
+    expect(Stages.toRerun(states, built, ["reviews"])).toEqual(["reviews", "avatars"]);
+    states.competitor_ads.status = "failed";
+    expect(Stages.toRerun(states, built, ["reviews"])).toEqual(["reviews", "competitor_ads", "avatars"]);
+    const reset = Stages.rerun(states, built, ["reviews", "avatars"]);
+    expect([reset.product_market.status, reset.reviews.status, reset.avatars.status, reset.gaps.status]).toEqual(["completed", "pending", "pending", "not_built"]);
   });
 });
 

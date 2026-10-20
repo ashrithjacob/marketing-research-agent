@@ -57,6 +57,7 @@ export type AdReadings = z.infer<typeof AdReadingsSchema>;
 
 export interface StoredAd {
   id: string;
+  run_id: string;
   product_id: string;
   competitor_id: string | null;
   trendtrack_ad_id: string;

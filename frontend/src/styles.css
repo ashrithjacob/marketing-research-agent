@@ -243,6 +243,11 @@ button.link { background: none; border: 0; padding: 0 0 0 4px; color: var(--acce
 .competitor-row { grid-template-columns: 64px minmax(160px, 1.1fr) minmax(150px, 1.3fr) 80px 130px 60px 80px 150px; }
 
 .panel.rerun { border-color: #fecaca; background: #fffafa; }
+.stages-bar { display: flex; justify-content: flex-end; margin: 0 0 6px; }
+.stage-rerun { margin-left: auto; font-size: 12px; font-weight: 500; }
+.panel.rerun-confirm { border-color: #c7d7fe; background: #f7f9ff; }
+.panel.rerun-confirm p { margin: 0 0 8px; }
+.panel.rerun-confirm .row { display: flex; gap: 8px; }
 .panel.rerun h2 { color: var(--bad); }
 .rerun-list { list-style: none; padding: 0; margin: 8px 0 12px; display: grid; gap: 8px; }
 .rerun-list li { display: grid; grid-template-columns: 24px auto 1fr; gap: 4px 8px; align-items: center; }

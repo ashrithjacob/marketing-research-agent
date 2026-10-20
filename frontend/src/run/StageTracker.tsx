@@ -18,7 +18,7 @@ function Clamped({ text, className }: { text: string; className: string }) {
   );
 }
 
-export default function StageTracker({ stages, states }: { stages: StageInfo[]; states: Record<string, StageState> }) {
+export default function StageTracker({ stages, states, onRerun }: { stages: StageInfo[]; states: Record<string, StageState>; onRerun?: (stage: StageInfo) => void }) {
   return (
     <ol className="stages">
       {stages.map((stage) => {
@@ -31,6 +31,11 @@ export default function StageTracker({ stages, states }: { stages: StageInfo[]; 
             <div>
               <div className="stage-title">
                 {stage.title} <StatusBadge status={status} />
+                {onRerun && stage.built && (
+                  <button className="link stage-rerun" onClick={() => onRerun(stage)}>
+                    Rerun
+                  </button>
+                )}
               </div>
               {state?.summary && <Clamped text={state.summary} className="" />}
               {state?.error && <Clamped text={state.error} className="error" />}

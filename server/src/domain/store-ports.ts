@@ -81,10 +81,11 @@ export interface AvatarRecord {
 
 /** Long-form statics found for a product's analysis, and what an agent read off each. */
 export interface AdStore {
-  save(accountId: string, productId: string, hits: readonly AdHit[], competitorByDomain: ReadonlyMap<string, string>): Promise<StoredAd[]>;
+  clear(runId: string): Promise<void>;
+  save(accountId: string, runId: string, productId: string, hits: readonly AdHit[], competitorByDomain: ReadonlyMap<string, string>): Promise<StoredAd[]>;
   saveReading(adId: string, reading: AdReading): Promise<void>;
   saveRing(adId: string, ring: AdRing, why: string): Promise<void>;
-  list(productId: string): Promise<ReadAd[]>;
+  list(runId: string): Promise<ReadAd[]>;
 }
 
 /** Product shots and logos by page url, shared by every account: they are public pages, read once. */

@@ -44,7 +44,7 @@ export class RunTable implements RunStore {
         " COALESCE((SELECT json_agg(json_build_object('brand', c.brand, 'image_url', c.image_url, 'logo_url', c.logo_url, 'relationship', c.relationship) ORDER BY c.brand)" +
         "   FROM competitors c WHERE c.product_id = r.product_id AND c.status = 'confirmed'), '[]') AS competitors," +
         " (SELECT COUNT(*) FROM reviews v WHERE v.product_id = r.product_id) AS review_count," +
-        " (SELECT COUNT(*) FROM ads a WHERE a.product_id = r.product_id) AS ad_count," +
+        " (SELECT COUNT(*) FROM ads a WHERE a.run_id = r.id) AS ad_count," +
         " (SELECT COUNT(*) FROM avatars t WHERE t.run_id = r.id AND t.parent_id IS NULL) AS avatar_count" +
         " FROM runs r LEFT JOIN products p ON p.id = r.product_id WHERE (?::text IS NULL OR r.account_id = ?) ORDER BY r.created_at DESC LIMIT ?",
       [scope.accountId, scope.accountId, limit],

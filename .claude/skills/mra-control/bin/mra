@@ -156,8 +156,10 @@ cmd_confirm() {
 cmd_rerun() {
   need curl "mra rerun"; need jq "mra rerun"
   local id="${1:-$(cat "${TMPDIR:-/tmp}/mra-last-run" 2>/dev/null || true)}"
-  [ -n "$id" ] || die "usage: mra rerun [runId]   (runs again every stage of a finished run that did not complete; spends money)"
-  local out; out=$(api POST "/api/research/runs/$id/rerun" '{}')
+  [ -n "$id" ] || die "usage: mra rerun [runId] [stage...]   (runs again the named stages and what uses them, or with none every stage that did not complete; spends money)"
+  shift || true
+  local stages; stages=$(printf '%s\n' "$@" | jq -R . | jq -sc 'map(select(. != ""))')
+  local out; out=$(api POST "/api/research/runs/$id/rerun" "{\"stages\":$stages}")
   jq -e '.run.status' >/dev/null 2>&1 <<<"$out" || die "rerun refused: $out"
   jq -r '"run \(.run.id)  status=\(.run.status)"' <<<"$out"
 }
@@ -242,8 +244,10 @@ mra — drive and inspect the research cockpit
                            product and proposes competitors, then waits.
   confirm [runId]          accept the product and competitors as resolved and
                            start the stages (the cockpit lets you edit them)
-  rerun [runId]            run again every stage of a finished run that did not
-                           complete, keeping the ones that did (spends money)
+  rerun [runId] [stage...] run again the named stages (product_market, reviews,
+                           competitor_ads, avatars) and every stage that uses
+                           them; with none, every stage that did not complete.
+                           Other stages are kept (spends money)
   watch [runId]            poll until the run waits for you or ends, then print
                            its stages and competitors
   calls [runId]            the LLM call log, one line per turn

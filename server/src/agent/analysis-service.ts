@@ -2,6 +2,7 @@ import {
   FINAL_RUN_STATUSES,
   AnalysisInputSchema,
   ConfirmationSchema,
+  RerunRequestSchema,
   Schemas,
   Stages,
   type Confirmation,
@@ -52,15 +53,20 @@ export class AnalysisService {
   }
 
   /** Runs again every built stage of a finished run that did not complete, keeping what did; refused while the run is still working or before it has a product. */
-  async rerun(run: Run): Promise<Run | Refused> {
+  async rerun(run: Run, raw: unknown): Promise<Run | Refused> {
     Trace.line(import.meta.url, "AnalysisService.rerun", { runId: run.id, status: run.status });
     if (!FINAL_RUN_STATUSES.has(run.status)) return { refused: [`the run is ${run.status}; only a finished run can rerun stages`] };
     if (!run.product_id) return { refused: ["the run never got past confirmation, so it has no stages to rerun"] };
-    const stages = Stages.unfinished(run.stage_status, this.pipeline.built);
-    if (stages.length === 0) return { refused: ["every stage of this run completed; there is nothing to rerun"] };
+    const parsed = Schemas.parse(RerunRequestSchema, raw ?? {});
+    if (!parsed.ok) return { refused: parsed.problems };
+    const built = this.pipeline.built;
+    const unbuilt = parsed.value.stages.filter((name) => !built.includes(name));
+    if (unbuilt.length > 0) return { refused: [`${unbuilt.join(", ")} is not built yet, so it cannot run`] };
+    const stages = Stages.toRerun(run.stage_status, built, parsed.value.stages);
+    if (stages.length === 0) return { refused: ["every stage of this run completed; choose the stages to rerun"] };
     const product = (await this.store.products.get(run.product_id))!;
     const competitors = (await this.store.competitors.list(product.id)).filter((competitor) => competitor.status === "confirmed");
-    await this.store.runs.updateRun(run.id, { status: "running", error: "", ended_at: null, stage_status: Stages.rerun(run.stage_status, this.pipeline.built) });
+    await this.store.runs.updateRun(run.id, { status: "running", error: "", ended_at: null, stage_status: Stages.rerun(run.stage_status, built, stages) });
     const restarted = (await this.store.runs.get(run.id))!;
     await this.store.events.add(run.id, "run.rerun", { stages });
     this.launcher.research(restarted, product, competitors);

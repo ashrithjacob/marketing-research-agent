@@ -89,13 +89,13 @@ rewrite is in git history before `b6f45cc`.
 
 ## Stage 5
 
-15a. **Ads belong to the product, not the run.** Stage 5 reads every ad stored
-    for the product, so a rerun's avatars include ads kept by earlier attempts:
-    run `344caa7d`'s rerun placed ads from 207 stored, of which its own sweep
-    kept 150. Ads, like avatars, need a run id.
-15b. **A completed stage cannot be rerun.** Rerunning keeps completed stages;
-    there is no way to rerun stage 4 alone with the scout on a run whose stage 4
-    completed with the old sweep.
+15a. *Closed 2026-10-20.* Ads belonged to the product, not the run, so a
+    rerun's avatars included ads kept by earlier attempts (run `344caa7d`
+    placed ads from 207 stored, of which its own sweep kept 150). Migration 8
+    gives each ad its run; stage 4 clears its run's ads before scouting. The
+    207 already stored were given to the latest run of their product.
+15b. *Closed 2026-10-20.* A completed stage could not be rerun. Any stage can
+    now be rerun with the stages that use it (`Stages.toRerun`).
 
 16. **The memory is per run.** A second analysis of the same product starts from
     an empty memory; the spec's segment memory (avatars carried across runs of
