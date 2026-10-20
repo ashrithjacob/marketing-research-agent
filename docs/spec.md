@@ -207,6 +207,8 @@ The agent scores the market on Eugene Schwartz's five sophistication stages and 
 
 **Output:** sophistication stage and awareness level, each with a confidence score, evidence links, and a timeline chart of claim types over time. The single source text for the framework is Schwartz's *Breakthrough Advertising*; the rubric above is its working summary.
 
+*2026-10-20: the tools for this stage, its place in the pipeline (after stages 1, 3 and 4, with the per-avatar part in stage 5's judge) and what each source costs are proposed in `spec-stage2.md`. Awareness becomes a distribution per avatar per channel, not one level for the market.*
+
 ## Stage 3: Review collection
 
 Reviews are the highest-weighted input. The target is 3,000–10,000 written reviews across 5–15 competitors, collected once, stored, and refreshed incrementally. Expected cost for a full run: roughly $10–40, because the cheapest sources (Shopify review widgets) are nearly free.
