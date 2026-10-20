@@ -26,7 +26,7 @@ rewrite is in git history before `b6f45cc`.
 ## Stage 1
 
 5. **No ranking.** The spec's 0–100 ranking within direct and indirect groups
-   needs stages 3 and 4; `competitors.rank_score` stays null.
+   needs stages 2 and 3; `competitors.rank_score` stays null.
 6. **No product images or label reading.** Decided 2026-10-17: images go in
    Neon's object storage. `product_images` and `label_facts` exist and are
    empty.
@@ -54,7 +54,7 @@ rewrite is in git history before `b6f45cc`.
     count and Best Sellers Rank are on the product page (free) or from Apify,
     and are not read yet.
 
-## Stage 3
+## Stage 2
 
 9. **Review sources not built:** Apify (the paid fallback when Woot breaks),
    Trustpilot, the Shopify review apps other than Judge.me (Yotpo, Okendo,
@@ -70,7 +70,7 @@ rewrite is in git history before `b6f45cc`.
 11. **No incremental refresh.** A rerun fetches every page again; duplicates are
     dropped on insert, so only the fetching is wasted.
 
-## Stage 4
+## Stage 3
 
 12. **No text-in-image pass.** The spec's second sweep for short-copy image ads
     with long on-image text (vision OCR) is not built.
@@ -92,7 +92,7 @@ rewrite is in git history before `b6f45cc`.
 15a. *Closed 2026-10-20.* Ads belonged to the product, not the run, so a
     rerun's avatars included ads kept by earlier attempts (run `344caa7d`
     placed ads from 207 stored, of which its own sweep kept 150). Migration 8
-    gives each ad its run; stage 4 clears its run's ads before scouting. The
+    gives each ad its run; stage 3 clears its run's ads before scouting. The
     207 already stored were given to the latest run of their product.
 15b. *Closed 2026-10-20.* A completed stage could not be rerun. Any stage can
     now be rerun with the stages that use it (`Stages.toRerun`).
@@ -100,7 +100,7 @@ rewrite is in git history before `b6f45cc`.
 16. **The memory is per run.** A second analysis of the same product starts from
     an empty memory; the spec's segment memory (avatars carried across runs of
     one product) and pattern memory (across accounts) are not built.
-17. **Stage 5 needs stage 4.** With no TrendTrack key, or a stage-4 failure, no
+17. **Stage 5 needs stage 3.** With no TrendTrack key, or a stage-3 failure, no
     avatars are built at all, even though the reviews alone could build them.
 
 ## Costs

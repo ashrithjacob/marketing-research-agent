@@ -3,7 +3,7 @@ import { Trace } from "../../trace/index.js";
 
 import type { SqlDatabase } from "./sql-database.js";
 
-/** The long-form statics one run's scout kept, one row per ad per run, and the reading an agent made of each. A rerun of stage 4 clears its run's ads first. */
+/** The long-form statics one run's scout kept, one row per ad per run, and the reading an agent made of each. A rerun of stage 3 clears its run's ads first. */
 export class AdTable implements AdStore {
   constructor(private readonly db: SqlDatabase) {}
 

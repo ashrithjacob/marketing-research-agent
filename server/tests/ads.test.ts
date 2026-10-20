@@ -1,4 +1,4 @@
-/** Stage 4: a scout agent studies the market's long-form ads with search_ads, read_ad and find_trending_shops, discovering brands as it goes, and keeps ads in a growth marketer's rings; code refuses an ad it never saw and holds the budget; each kept ad is then read. */
+/** Stage 3: a scout agent studies the market's long-form ads with search_ads, read_ad and find_trending_shops, discovering brands as it goes, and keeps ads in a growth marketer's rings; code refuses an ad it never saw and holds the budget; each kept ad is then read. */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import type { Message } from "@earendil-works/pi-ai";
@@ -112,7 +112,7 @@ afterAll(async () => {
   await pg.stop();
 });
 
-describe("stage 4", () => {
+describe("stage 3", () => {
   it("lets the scout search, read and keep ads in rings, refuses an ad it never saw, then reads every kept ad", async () => {
     const ads = new FakeAds();
     let refusal = "";

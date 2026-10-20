@@ -55,7 +55,7 @@ export const MemoryUpdateSchema = z.object({
 });
 export type MemoryUpdate = z.infer<typeof MemoryUpdateSchema>;
 
-/** Where each ad from stage 4 lands on the avatars. */
+/** Where each ad from stage 3 lands on the avatars. */
 export const AdPlacementSchema = z.object({
   place: z.array(z.object({ ad_id: z.string().min(1), avatar: Key.nullable().describe("null when the ad targets none of the avatars.") })),
 });

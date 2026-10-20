@@ -2,7 +2,7 @@ import { z } from "zod/v4";
 
 import { Trace } from "../trace/index.js";
 
-export const STAGE_NAMES = ["product_market", "sophistication", "reviews", "competitor_ads", "avatars", "gaps", "generation"] as const;
+export const STAGE_NAMES = ["product_market", "reviews", "competitor_ads", "sophistication", "avatars", "gaps", "generation"] as const;
 export type StageName = (typeof STAGE_NAMES)[number];
 
 export const STAGE_STATUSES = ["pending", "running", "completed", "invalid", "failed", "cancelled", "skipped", "not_built"] as const;
@@ -14,12 +14,12 @@ export interface StagePlan {
   needs: readonly StageName[];
 }
 
-/** The seven stages of docs/spec.md and what each must wait for. Stage 4 waits for stage 1, whose brief its keywords come from (spec, 2026-10-17); avatars need all four. */
+/** The seven stages of docs/spec.md and what each must wait for. Stage 3 waits for stage 1, whose brief and competitors brief its scout; stage 4 reads the market off stages 1 to 3 (docs/spec-stage4.md); avatars need all four. */
 export const STAGE_PLANS: Readonly<Record<StageName, StagePlan>> = {
   product_market: { number: 1, title: "Product and market research", needs: [] },
-  sophistication: { number: 2, title: "Market awareness and sophistication", needs: [] },
-  reviews: { number: 3, title: "Review collection", needs: [] },
-  competitor_ads: { number: 4, title: "Competitor long-form static ads", needs: ["product_market"] },
+  reviews: { number: 2, title: "Review collection", needs: [] },
+  competitor_ads: { number: 3, title: "Competitor long-form static ads", needs: ["product_market"] },
+  sophistication: { number: 4, title: "Market awareness and sophistication", needs: ["product_market", "reviews", "competitor_ads"] },
   avatars: { number: 5, title: "Avatar and sub-avatar synthesis", needs: ["product_market", "sophistication", "reviews", "competitor_ads"] },
   gaps: { number: 6, title: "Gap detection", needs: ["avatars"] },
   generation: { number: 7, title: "Long-form static generation", needs: ["gaps"] },

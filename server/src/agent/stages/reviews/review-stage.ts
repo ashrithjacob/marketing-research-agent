@@ -5,7 +5,7 @@ import type { Stage, StageInput, StageOutcome } from "../../pipeline/stage.js";
 
 import type { ReviewListings } from "./review-listings.js";
 
-/** Stage 3: up to the per-product limit of reviews for the client's product and every confirmed competitor, from each listing in turn until the limit is met. */
+/** Stage 2: up to the per-product limit of reviews for the client's product and every confirmed competitor, from each listing in turn until the limit is met. */
 export class ReviewStage implements Stage {
   readonly name: StageName = "reviews";
 

@@ -1,4 +1,4 @@
-/** Stage 3: reviews from a store's Judge.me widget and from Amazon through Woot, up to the per-product limit, stored once per product; the response shapes are the ones measured on 2026-10-17. */
+/** Stage 2: reviews from a store's Judge.me widget and from Amazon through Woot, up to the per-product limit, stored once per product; the response shapes are the ones measured on 2026-10-17. */
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { JudgemeReviews, PublicUrls, ShopifyStorefront, WootReviews } from "../src/adapters/index.js";
@@ -93,7 +93,7 @@ class FakeSource implements ReviewSource {
   }
 }
 
-describe("stage 3", () => {
+describe("stage 2", () => {
   let pg: PostgresStores;
   beforeAll(async () => {
     pg = await PostgresStores.start();

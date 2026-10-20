@@ -8,7 +8,7 @@ import type { Stage, StageInput, StageOutcome } from "../../pipeline/stage.js";
 import { AdReader } from "./ad-reader.js";
 import { AdScout, type ScoutLimits } from "./ad-scout.js";
 
-/** Stage 4: a scout agent studies the market's long-form ads in a growth marketer's rings and keeps the ones worth studying; each kept ad is then read for its avatar, claim, awareness and bucket. */
+/** Stage 3: a scout agent studies the market's long-form ads in a growth marketer's rings and keeps the ones worth studying; each kept ad is then read for its avatar, claim, awareness and bucket. */
 export class CompetitorAdStage implements Stage {
   readonly name: StageName = "competitor_ads";
   static readonly BATCH = 8;

@@ -59,7 +59,7 @@ prompt on the run page; the request without `stages`).
 
 `Stages.toRerun` decides what runs: the chosen stages, every built stage that
 uses one of them however indirectly (`Stages.downstream`, from `STAGE_PLANS`
-needs: rerunning stage 4 reruns stage 5, stage 1 reruns 4 and 5), and every
+needs: rerunning stage 3 reruns stage 5, stage 1 reruns 3 and 5), and every
 stage that did not complete. `/config` lists each stage's downstream set as
 `reruns`, so the page shows what a click will run before anything is spent.
 `Stages.rerun` sets those back to waiting and keeps every other stage as it
@@ -67,8 +67,8 @@ is; the pipeline counts a completed stage as done without running it. The run
 ends through `RunEnd` as before; its cost is the total of all its charges,
 every attempt.
 
-What a rerun replaces: stage 1 overwrites the brief and the profiles; stage 3
-adds only reviews it has not stored (they belong to the product); stage 4
+What a rerun replaces: stage 1 overwrites the brief and the profiles; stage 2
+adds only reviews it has not stored (they belong to the product); stage 3
 deletes its run's ads before the scout starts (`AdTable.clear`, ads belong to
 the run since migration 8); stage 5 replaces its run's avatars.
 
@@ -117,10 +117,10 @@ problem numbered; after 3 refusals the agent is stopped (`SubmitTool`).
 
 The stage completes when the brief is accepted and at least one competitor is
 profiled; the summary names any competitor that could not be. Not built yet in
-stage 1: ranking (it needs stages 3 and 4), product images and label reading,
+stage 1: ranking (it needs stages 2 and 3), product images and label reading,
 economics, market size, Scira.
 
-## Stage 3: reviews
+## Stage 2: reviews
 
 `ReviewStage` (`agent/stages/reviews/`) starts as soon as the user confirms;
 it needs nothing from stage 1. For the client's product and each confirmed
@@ -152,7 +152,7 @@ Measured 2026-10-17 against the real endpoints: Mullevia's Judge.me gave all 31
 reviews (stars 19/8/2/0/2, matching the widget's own histogram); Woot gave 25
 reviews of one ASIN in 12 s.
 
-## Stage 4: the market's long-form statics
+## Stage 3: the market's long-form statics
 
 `CompetitorAdStage` (`agent/stages/ads/`) waits for stage 1. Since
 2026-10-19 an agent decides which brands and ads matter; code only checks its
@@ -205,7 +205,7 @@ and pet ads, and it paid for 540 rows to keep 150.
 
 ## Stage 5: avatars
 
-`AvatarStage` (`agent/stages/avatars/`) needs stages 1, 3 and 4 (and 2 once it
+`AvatarStage` (`agent/stages/avatars/`) needs stages 1, 2 and 3 (and 4 once it
 exists). An agent builds the avatars by reading, not by clustering (spec,
 2026-10-17):
 
@@ -222,7 +222,7 @@ exists). An agent builds the avatars by reading, not by clustering (spec,
    last so everything moves with them. The memory is stored after every batch
    (`avatar_memories`). A batch refused three times is left out and counted in
    the summary.
-2. **Place the ads.** Stage 4's supply ads only (a competitor's own, or
+2. **Place the ads.** Stage 3's supply ads only (a competitor's own, or
    `same_problem`; `AdRings.isSupply`), 15 at a time (`ad_placer:<n>`), each on
    an avatar or none. Same-buyer and unrelated ads never count as supply.
 3. **Judge.** One agent (`avatar_judge`) gives every avatar its awareness level,
@@ -239,11 +239,11 @@ exists). An agent builds the avatars by reading, not by clustering (spec,
 Run `344caa7d`: Mullevia, US, five competitors. Resolving took about 2 minutes
 and proposed 11 competitors, of which 5 were kept. Stage 1 completed (5
 ingredients, 9 claims, 5 of 5 profiled; the capsules came out indirect, the
-four droppers direct). Stage 3 stored 874 reviews: Mullevia 38 (Judge.me),
+four droppers direct). Stage 2 stored 874 reviews: Mullevia 38 (Judge.me),
 Betterbrand tincture 370 and capsules 312, Havasu 130 (its Amazon listing found
 from a Target url), OriginDrops 24, all Amazon through Woot, each fewer than 500
 because Woot's star bands ran out; Ethale 0 (its reviews are on an app this does
-not read). Stage 4 failed on `maxAdsPerBrand` (fixed above). Billed: $0.176, of
+not read). Stage 3 failed on `maxAdsPerBrand` (fixed above). Billed: $0.176, of
 which OpenRouter $0.043 over 44 calls, Parallel $0.115 (the Amazon listing
 finder's 20 searches were $0.10), TrendTrack $0.018; 16 Firecrawl pages are
 unpriced because `MRA_FIRECRAWL_USD_PER_PAGE` is not set.

@@ -27,7 +27,7 @@ for any path that is not a file or `api/`.
 |---|---|
 | `/` | New analysis and the list of analyses, one row each with the product shot, competitors' logos and evidence counts (`HomePage.tsx`) |
 | `/runs/:runId` | One analysis, its overview (`run/RunPage.tsx`) |
-| `/runs/:runId/product`, `/reviews`, `/ads`, `/avatars` | One stage of that analysis: stages 1, 3, 4 and 5 (`STAGE_SECTIONS` in `run/RunNav.tsx`) |
+| `/runs/:runId/product`, `/reviews`, `/ads`, `/avatars` | One stage of that analysis: stages 1, 2, 3 and 5 (`STAGE_SECTIONS` in `run/RunNav.tsx`) |
 | anything else | The home page |
 
 ## The sidebar (`Shell.tsx`, `run/RunNav.tsx`)
@@ -87,8 +87,8 @@ Pictures are addresses on the brands' own sites, read by stage 1 for free (`Page
 | Status `Refused` and a banner naming a submit problem | An agent's submit was refused out, or it never submitted (`invalid`) | `mra calls <id>`: the last `submit` result lists the problems |
 | Stage card `Skipped`, "needs X, which did not complete" | A stage it depends on failed or was refused | that stage's own card |
 | Competitor under "Not profiled yet" with the stage completed | Its profiler agent did not get an accepted submit; the stage summary names why | the stage 1 card's summary |
-| A product with "0 new (review app … not supported yet, no Amazon listing …)" in the stage 3 card | Its store runs a review app other than Judge.me and it is not on Amazon | `docs/gaps.md` §9 |
-| Stage 4 `Failed`: "TRENDTRACK_API_KEY is not set" | No TrendTrack key in the container | `.env`, then `mra up` |
-| Stage 5 `Skipped`, "needs competitor_ads, which did not complete" | Stage 5 waits for stages 1, 3 and 4; one of them failed | that stage's card |
+| A product with "0 new (review app … not supported yet, no Amazon listing …)" in the stage 2 card | Its store runs a review app other than Judge.me and it is not on Amazon | `docs/gaps.md` §9 |
+| Stage 3 `Failed`: "TRENDTRACK_API_KEY is not set" | No TrendTrack key in the container | `.env`, then `mra up` |
+| Stage 5 `Skipped`, "needs competitor_ads, which did not complete" | Stage 5 waits for stages 1, 2 and 3; one of them failed | that stage's card |
 | An avatar card with a dashed border and "emerging" | The judge found its evidence too thin to act on yet | its review count and confidence on the card |
 | Stuck on `Finding the product` after a restart | It is not stuck: a restart ends live runs `failed` | refresh; the banner reads "the server restarted" |

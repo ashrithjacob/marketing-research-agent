@@ -73,7 +73,7 @@ The user gives one required input and optional context; the agent resolves the r
 
 &#91;embedded content: MVP pipeline · 7 stages, 4 inputs merge into one avatar map\]
 
-Four research streams run in parallel; reviews (demand) and competitor long-form statics (supply) are the core, product and sophistication research add context. They merge into one avatar map, which drives winning-avatar and gap briefs, then generated ads and the report. Everything is stored for the learning layer.
+Four research streams run in parallel; reviews (demand) and competitor long-form statics (supply) are the core, product and sophistication research add context. *Changed 2026-10-20: three streams run in parallel (product and market, reviews, competitor ads); market awareness and sophistication, renumbered stage 4, reads all three and runs after them, because sophistication is read off competitor ads (`spec-stage4.md`).* They merge into one avatar map, which drives winning-avatar and gap briefs, then generated ads and the report. Everything is stored for the learning layer.
 
 ## Stage 1: Product and market research
 
@@ -141,9 +141,9 @@ Every competitor is classified as direct or indirect, then ranked within its gro
 
 | Signal | Source | Weight |
 | --- | --- | --- |
-| Winning long-form statics (count and win score) | Stage 4 | 25% |
+| Winning long-form statics (count and win score) | Stage 3 | 25% |
 | Total active Meta ads and ad longevity | TrendTrack | 20% |
-| Review volume and rating | Stage 3, Amazon, Shopify widgets | 20% |
+| Review volume and rating | Stage 2, Amazon, Shopify widgets | 20% |
 | Estimated store traffic and revenue (labelled estimate) | TrendTrack | 15% |
 | Amazon best-seller rank in category | Amazon listing | 10% |
 | EU/UK reach (real disclosed data, where available) | Meta transparency data via TrendTrack | 10% |
@@ -154,7 +154,7 @@ Signals are normalised within the group; a missing signal is dropped and the rem
 
 ### Deep research engine: Scira (evaluation)
 
-Scira is tested as the deep-research engine for Stage 1 and Stage 2 alongside Parallel; the winner on a fixed test set becomes the default.
+Scira is tested as the deep-research engine for Stage 1 and Stage 4 alongside Parallel; the winner on a fixed test set becomes the default.
 
 **What Scira is:** an open-source AI search engine (formerly MiniPerplx) built on the Vercel AI SDK, with an "Extreme" mode that runs an LLM-driven deep research agent with multi-step planning and code execution ([GitHub](https://github.com/zaidmukaddam/scira/wiki)). Extreme searches use Exa or Parallel for content extraction, with Firecrawl as fallback, and every answer carries its sources ([docs](https://mintlify.com/zaidmukaddam/scira/how-it-works)).
 
@@ -180,36 +180,7 @@ Score each provider (Scira Extreme, Parallel, own pipeline) on factual accuracy 
 
 **Licence decision:** Scira is used as unmodified upstream code, self-hosted as a separate internal service that only the agent calls. Customers never interact with Scira directly, and its code is not merged into the product. This keeps the AGPL-3.0 licence listed on its GitHub repository from applying to the product's own code. Configuration (API keys, provider choice) stays in environment variables; any change Scira cannot support through configuration is built in the product's own wrapper, not in a fork. Pin the Scira version and record it with each research result.
 
-## Stage 2: Market awareness and sophistication
-
-The agent scores the market on Eugene Schwartz's five sophistication stages and five awareness levels, from evidence rather than judgement. Each score shows its evidence and a confidence level.
-
-**Sophistication rubric** (how far claims have escalated in the market)
-
-| Stage | What the market looks like | Evidence the agent looks for | Example (lung-support supplement) |
-| --- | --- | --- | --- |
-| 1. First to market | Simple direct claim works | Few competitors, plain benefit claims | "Mullein supports your lungs" |
-| 2. Bigger claim | Competitors enlarge the same claim | Claims stacked with numbers, speed, strength | "Clear your lungs in 7 days" |
-| 3. Mechanism | A new "how it works" wins | Ads explain a reason why | "Dissolves trapped mucus at the source" |
-| 4. Mechanism war | Competing mechanisms, each made bigger | Several named mechanisms, ingredient stacks, "5 superherbs" | Multiple brands with rival mechanisms |
-| 5. Identification | Buyers tired of claims; identity and story win | Story-led, founder, "people like you" ads outperform claim ads | "For ex-smokers who still wake up wheezing" |
-
-**Awareness rubric** (how much the typical buyer knows), scored from the share of each type across ad openings, search queries and review language: unaware, problem-aware, solution-aware, product-aware, most aware.
-
-**Best sources, in order of value**
-
-1. **Competitor ad history (TrendTrack).** Pull active *and* inactive ads with `status=all` and date windows (`created_before` / `created_after`) to see how claims escalated over 1–3 years. Classify each ad's lead claim as plain, bigger, mechanism or identity. This is the strongest single signal of stage.
-2. **Competitor landing pages over time (Wayback Machine, via Firecrawl).** Headline and mechanism changes across snapshots show the escalation path.
-3. **Amazon listings for the category.** Titles and bullet points of the top 30–50 listings show how crowded and inflated claims are.
-4. **Review language (your Stage 3 data).** Phrases like "I've tried everything", "skeptical at first" or naming rival products indicate a sophisticated, claim-weary market. Mentions of first discovery indicate low awareness.
-5. **Search demand mix (Google Trends, SearXNG results).** The share of problem queries ("chest congestion after quitting smoking") versus solution queries ("mullein drops") versus brand queries indicates awareness.
-6. **Forums (Reddit, health communities).** How people describe the problem and what they have already tried.
-
-**Output:** sophistication stage and awareness level, each with a confidence score, evidence links, and a timeline chart of claim types over time. The single source text for the framework is Schwartz's *Breakthrough Advertising*; the rubric above is its working summary.
-
-*2026-10-20: the tools for this stage, its place in the pipeline (after stages 1, 3 and 4, with the per-avatar part in stage 5's judge) and what each source costs are proposed in `spec-stage2.md`. Awareness becomes a distribution per avatar per channel, not one level for the market.*
-
-## Stage 3: Review collection
+## Stage 2: Review collection
 
 Reviews are the highest-weighted input. The target is 3,000–10,000 written reviews across 5–15 competitors, collected once, stored, and refreshed incrementally. Expected cost for a full run: roughly $10–40, because the cheapest sources (Shopify review widgets) are nearly free.
 
@@ -230,7 +201,7 @@ Use pay-per-result actors, not compute-billed ones; Apify's cost problem is most
 
 **Volume, 2026-10-17:** up to 500 reviews per product (the client's and each confirmed competitor's) while testing, not 3,000–10,000 per run. Sources in the order built: the store's Judge.me widget (public JSON, 30 per page), then Amazon through woot.com's review endpoint (Amazon-owned, no login, free; 100 per star band, bands 3, 1, 2, 4, 5), measured working on 2026-10-17 and already used by `review-crawler`. A small agent finds a competitor's Amazon listing when its page is not on Amazon. Apify, Trustpilot, the other review apps, ad comments, forums and YouTube are not built yet (`docs/gaps.md`).
 
-**Weighting rules** (applied in Stage 5). *Superseded 2026-10-17: no fixed weights in code for now. Stage 3 stores each review's raw signals (source, verified, date, helpful votes); stage 5's agent weighs them as it reads. The rules below are guidance for that agent, not a formula.*
+**Weighting rules** (applied in Stage 5). *Superseded 2026-10-17: no fixed weights in code for now. Stage 2 stores each review's raw signals (source, verified, date, helpful votes); stage 5's agent weighs them as it reads. The rules below are guidance for that agent, not a formula.*
 
 - Source tier: Shopify verified and Amazon verified at 1.0; Trustpilot and ad comments at 0.6; forums and YouTube at 0.3; reviews of indirect competitors carry an extra × 0.8, since format affects what buyers praise and complain about
 - Verified purchase × 1.0, unverified × 0.6
@@ -239,7 +210,7 @@ Use pay-per-result actors, not compute-billed ones; Apify's cost problem is most
 
 **Storage:** every review is written to the database with its scrape date, review date, source, product, rating, text, verified flag, helpful votes and a content hash for deduplication. Reviewer details are minimised: a pseudonymous reviewer id plus coarse attributes when stated publicly (country, self-reported age or condition mentioned in the text). Names are not stored. Refresh runs fetch only reviews newer than the last scrape.
 
-## Stage 4: Competitor long-form static ads
+## Stage 3: Competitor long-form static ads
 
 This stage measures supply: which avatars competitors target, and which of those ads are winning. TrendTrack's `search_ads` supports the filters needed directly.
 
@@ -269,9 +240,38 @@ Add a **second pass for text-in-image statics:** some long-form statics put the 
 | Reach growth | `reachDelta7d` / `30d` | Medium (currently scaling) |
 | EU/UK reach | Meta-disclosed reach for EU-delivered ads | Medium; real data, but of the target markets only the UK is covered |
 
-Ads are bucketed into **winning** (top tercile of score), **testing** (under 14 days) and **dead** (stopped before 14 days). *Superseded 2026-10-17: an agent reads each ad's observable signals (days running, duplicates, reach deltas, status, rank) and picks the bucket with a one-line reason; no fixed score or tercile in code for now. Stage 4 also waits for stage 1, because its ad-copy keywords come from the product brief.*
+Ads are bucketed into **winning** (top tercile of score), **testing** (under 14 days) and **dead** (stopped before 14 days). *Superseded 2026-10-17: an agent reads each ad's observable signals (days running, duplicates, reach deltas, status, rank) and picks the bucket with a one-line reason; no fixed score or tercile in code for now. Stage 3 also waits for stage 1, because its ad-copy keywords come from the product brief.*
 
 **Per-ad extraction** (LLM, structured output): target avatar and sub-avatar, lead claim type (plain, bigger, mechanism, identity), awareness level of the opening, mechanism named, proof types, offer, objections handled, emotional driver, compliance risk flags. Each ad and its extraction are stored with the TrendTrack ad id and media link.
+
+## Stage 4: Market awareness and sophistication
+
+The agent scores the market on Eugene Schwartz's five sophistication stages and five awareness levels, from evidence rather than judgement. Each score shows its evidence and a confidence level.
+
+**Sophistication rubric** (how far claims have escalated in the market)
+
+| Stage | What the market looks like | Evidence the agent looks for | Example (lung-support supplement) |
+| --- | --- | --- | --- |
+| 1. First to market | Simple direct claim works | Few competitors, plain benefit claims | "Mullein supports your lungs" |
+| 2. Bigger claim | Competitors enlarge the same claim | Claims stacked with numbers, speed, strength | "Clear your lungs in 7 days" |
+| 3. Mechanism | A new "how it works" wins | Ads explain a reason why | "Dissolves trapped mucus at the source" |
+| 4. Mechanism war | Competing mechanisms, each made bigger | Several named mechanisms, ingredient stacks, "5 superherbs" | Multiple brands with rival mechanisms |
+| 5. Identification | Buyers tired of claims; identity and story win | Story-led, founder, "people like you" ads outperform claim ads | "For ex-smokers who still wake up wheezing" |
+
+**Awareness rubric** (how much the typical buyer knows), scored from the share of each type across ad openings, search queries and review language: unaware, problem-aware, solution-aware, product-aware, most aware.
+
+**Best sources, in order of value**
+
+1. **Competitor ad history (TrendTrack).** Pull active *and* inactive ads with `status=all` and date windows (`created_before` / `created_after`) to see how claims escalated over 1–3 years. Classify each ad's lead claim as plain, bigger, mechanism or identity. This is the strongest single signal of stage.
+2. **Competitor landing pages over time (Wayback Machine, via Firecrawl).** Headline and mechanism changes across snapshots show the escalation path.
+3. **Amazon listings for the category.** Titles and bullet points of the top 30–50 listings show how crowded and inflated claims are.
+4. **Review language (your Stage 2 data).** Phrases like "I've tried everything", "skeptical at first" or naming rival products indicate a sophisticated, claim-weary market. Mentions of first discovery indicate low awareness.
+5. **Search demand mix (Google Trends, SearXNG results).** The share of problem queries ("chest congestion after quitting smoking") versus solution queries ("mullein drops") versus brand queries indicates awareness.
+6. **Forums (Reddit, health communities).** How people describe the problem and what they have already tried.
+
+**Output:** sophistication stage and awareness level, each with a confidence score, evidence links, and a timeline chart of claim types over time. The single source text for the framework is Schwartz's *Breakthrough Advertising*; the rubric above is its working summary.
+
+*2026-10-20: the tools for this stage, its place in the pipeline (after stages 1, 2 and 3, with the per-avatar part in stage 5's judge) and what each source costs are proposed in `spec-stage4.md`. Awareness becomes a distribution per avatar per channel, not one level for the market.*
 
 ## Stage 5: Avatar and sub-avatar synthesis
 
@@ -279,12 +279,12 @@ The agent builds one avatar taxonomy from reviews, then maps competitor ads onto
 
 1. **Extract signals per review** (cheap LLM, structured output): who they are (situation, life stage, stated age or condition), pain, desired outcome, trigger moment, prior solutions tried, objections and doubts, result described, and verbatim phrases.
 2. **Cluster into avatars.** ~~Embed the signals and cluster (e.g. HDBSCAN), then have a stronger model name and describe each cluster.~~ *Superseded 2026-10-17: an agent reads the reviews in batches and forms the groups itself. It keeps a memory of the avatars and angles found so far, and updates it as each batch confirms, splits or merges them. No embeddings: grouping by meaning is judgement the agent does better than a distance.* Repeat inside large groups to get sub-avatars (two levels maximum).
-3. **Map ads onto the taxonomy.** Classify each long-form static from Stage 4 into the same avatars and sub-avatars.
+3. **Map ads onto the taxonomy.** Classify each long-form static from Stage 3 into the same avatars and sub-avatars.
 4. **Measure both sides.**
-   - Demand share = weighted share of reviews in the avatar (Stage 3 weights)
+   - Demand share = weighted share of reviews in the avatar (Stage 2 weights)
    - Supply share = share of long-form statics targeting the avatar, weighted by winning score
    - Win rate = share of that avatar's ads in the winning bucket
-5. **Attach market context:** awareness level and sophistication evidence per avatar (Stage 2), plus product facts and permitted claims (Stage 1).
+5. **Attach market context:** awareness level and sophistication evidence per avatar (Stage 4), plus product facts and permitted claims (Stage 1).
 
 **What counts as "targeting that is doing well":** an avatar with a high win rate **and** meaningful demand share. Winning ads on an avatar with little review support are flagged as possibly budget-driven rather than resonance-driven.
 
@@ -380,11 +380,11 @@ Postgres with pgvector holds everything; raw scraped payloads go to object stora
 | `runs` | id, product\_id, started\_at, stage\_status (json), cost\_usd | One per analysis |
 | `reviews` | id, competitor\_id, source, source\_review\_id, content\_hash, rating, title, body, review\_date, scraped\_at, verified, helpful\_votes, reviewer\_pseudo\_id, reviewer\_attrs (json), weight | Deduplicated by content\_hash; incremental refresh by review\_date |
 | `review_signals` | review\_id, who, pain, desire, trigger, prior\_solutions, objections, outcome, quotes (json), embedding | Stage 5 extraction |
-| `ads` | id, competitor\_id, trendtrack\_ad\_id, media\_url, copy, copy\_length, image\_text, first\_seen, last\_seen, days\_running, duplicates, ad\_rank, reach\_delta, eu\_reach, win\_score, bucket | Stage 4 |
-| `ad_extractions` | ad\_id, avatar\_label, claim\_type, awareness, mechanism, proof\_types, objections\_handled, emotion, risk\_flags, embedding | Stage 4 |
+| `ads` | id, competitor\_id, trendtrack\_ad\_id, media\_url, copy, copy\_length, image\_text, first\_seen, last\_seen, days\_running, duplicates, ad\_rank, reach\_delta, eu\_reach, win\_score, bucket | Stage 3 |
+| `ad_extractions` | ad\_id, avatar\_label, claim\_type, awareness, mechanism, proof\_types, objections\_handled, emotion, risk\_flags, embedding | Stage 3 |
 | `avatars` | id, run\_id, parent\_id, name, description, demand\_share, supply\_share, win\_rate, review\_count, ad\_count, awareness, confidence | Two levels via parent\_id |
 | `avatar_members` | avatar\_id, item\_type (review, ad), item\_id, score | Links evidence to avatars |
-| `market_assessments` | run\_id, sophistication\_stage, awareness\_level, confidence, evidence (json) | Stage 2 |
+| `market_assessments` | run\_id, sophistication\_stage, awareness\_level, confidence, evidence (json) | Stage 4 |
 | `gaps` | id, run\_id, type, avatar\_id, demand\_share, supply\_share, evidence\_ids, confidence, blocked\_reason | Stage 6 |
 | `generated_ads` | id, run\_id, target (avatar or gap), primary\_text, headlines, hooks, image\_brief, risk\_level, compliance\_notes, status | Stage 7 |
 | `outcomes` | generated\_ad\_id, launched\_at, spend, cpa, roas, days\_running, is\_winner | Empty in MVP; filled once the ad account is connected |
@@ -465,9 +465,10 @@ Each phase starts only when the previous one passes its gate.
 - Models: the LLM for each task (high-volume extraction versus synthesis and copy) is set in the code's environment variables, so models can be swapped without code changes.
 - Brand constraints: pilot customers share permitted claims and brand voice before the first run; collected in onboarding.
 - Ad-account access: pilot customers grant read-only Meta ad-account access after the MVP, which starts the outcome loop (phase 2).
-- 2026-10-17, review volume: 500 reviews per product while testing (stage 3).
+- 2026-10-17, review volume: 500 reviews per product while testing (stage 2).
 - 2026-10-17, avatars: an agent reads, groups and keeps a memory of avatars and angles, updated as it reads; no embedding clusters (stage 5).
 - 2026-10-17, thresholds: ranking weights, review weights, ad buckets and gap thresholds are judged by an LLM for now, not fixed code.
 - 2026-10-17, product images: stored in Neon's object storage for now.
-- 2026-10-19, which ads stage 4 studies: as a growth marketer would, in rings. Competitors' own ads; ads for the same problem from any product (counted as supply for the avatars); ads for another problem aimed at the same buyer (kept as formats to borrow, not supply); anything else is dropped. *Changed the same day:* an agent (the scout) finds them, not code. It searches TrendTrack with tools, discovers brands as it goes, and keeps the ads worth studying in those rings; code only checks it kept ads it saw, within the budget and caps.
-- 2026-10-20, a fourth ring for stage 4: winning long-form statics from trending shops, in any market. Many fast-growing shops scale on long-form statics, and their structures (hook, story, proof, offer, funnel) can be applied to the client's store whatever the shops sell. The scout gets `find_trending_shops` (TrendTrack's trending feed, filtered to shops actively running Meta ads) and searches a promising shop's ads by domain. Kept as a playbook like same buyer, not counted as supply.
+- 2026-10-19, which ads stage 3 studies: as a growth marketer would, in rings. Competitors' own ads; ads for the same problem from any product (counted as supply for the avatars); ads for another problem aimed at the same buyer (kept as formats to borrow, not supply); anything else is dropped. *Changed the same day:* an agent (the scout) finds them, not code. It searches TrendTrack with tools, discovers brands as it goes, and keeps the ads worth studying in those rings; code only checks it kept ads it saw, within the budget and caps.
+- 2026-10-20, a fourth ring for stage 3: winning long-form statics from trending shops, in any market. Many fast-growing shops scale on long-form statics, and their structures (hook, story, proof, offer, funnel) can be applied to the client's store whatever the shops sell. The scout gets `find_trending_shops` (TrendTrack's trending feed, filtered to shops actively running Meta ads) and searches a promising shop's ads by domain. Kept as a playbook like same buyer, not counted as supply.
+- 2026-10-20, stage order: market awareness and sophistication moves from stage 2 to stage 4 and needs stages 1 to 3; reviews become stage 2 and competitor ads stage 3. Sophistication cannot be judged before competitor ads are read, nor awareness per avatar before avatars exist; the per-avatar part is done by stage 5's judge (`spec-stage4.md`).
