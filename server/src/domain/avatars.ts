@@ -73,6 +73,8 @@ export const AvatarVerdictsSchema = z.object({
       confidence: z.enum(AVATAR_CONFIDENCE).describe("How well the evidence supports this avatar: review count, sources, how consistent the reviews are."),
       standing: z.enum(AVATAR_STANDING).describe("emerging when the evidence is too thin to act on yet (the spec's guidance: about 30 reviews)."),
       best_competitor_angle: z.string().nullable().describe("The angle that works best among competitors' ads on this avatar, or null when none target it."),
+      skepticism: z.number().int().min(1).max(5).describe("How skeptical this avatar's buyers are: 1 beginner, 2 explorer, 3 researcher, 4 skeptic, 5 hopeless."),
+      skepticism_review_ids: z.array(z.string()).describe("One to three of this avatar's own reviews, by id, that show it."),
     }),
   ),
 });
@@ -94,7 +96,12 @@ export interface StoredAvatar {
   awareness: string | null;
   confidence: string | null;
   standing: string;
-  profile: Pick<AvatarProfile, "pains" | "desires" | "triggers" | "prior_solutions" | "objections" | "outcomes" | "angles"> & { best_competitor_angle: string | null };
+  profile: Pick<AvatarProfile, "pains" | "desires" | "triggers" | "prior_solutions" | "objections" | "outcomes" | "angles"> & {
+    best_competitor_angle: string | null;
+    skepticism: number | null;
+    skepticism_review_ids: string[];
+    awareness_by_channel: Partial<Record<"meta_ads" | "reviews", Partial<Record<string, number>>>>;
+  };
 }
 
 export interface AvatarQuote {

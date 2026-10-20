@@ -88,7 +88,7 @@ describe("stage 5", () => {
         .on("Product: ", [call("submit", { amazon_url: null, why: "store only" })])
         .on("The client's product:", [reader.respond, reader.respond])
         .on("ads to place:", [(messages) => call("submit", { place: [...text(messages.find((m) => m.role === "user")).matchAll(/<ad id="([0-9a-f]+)"/g)].map((m) => ({ ad_id: m[1], avatar: "ex_smokers" })) })])
-        .on("placed on them", [call("submit", { verdicts: ["ex_smokers", "doubters"].map((key) => ({ key, awareness: "problem_aware", confidence: "medium", standing: key === "ex_smokers" ? "avatar" : "emerging", best_competitor_angle: key === "ex_smokers" ? "Still coughing after you quit?" : null })) })])
+        .on("placed on them", [call("submit", { verdicts: ["ex_smokers", "doubters"].map((key) => ({ key, awareness: "problem_aware", confidence: "medium", standing: key === "ex_smokers" ? "avatar" : "emerging", best_competitor_angle: key === "ex_smokers" ? "Still coughing after you quit?" : null, skepticism: key === "ex_smokers" ? 3 : 5, skepticism_review_ids: [] })) })])
         .steps(400),
     );
     const sources = new Map<ReviewSourceName, ReviewSource>([["judgeme", new Reviews("judgeme", 90)]]);
@@ -116,6 +116,8 @@ describe("stage 5", () => {
     const byKey = Object.fromEntries(avatars.map((avatar) => [avatar.key, avatar]));
     expect(byKey.ex_smokers).toMatchObject({ review_count: 54, demand_share: 0.6, supply_share: 1, win_rate: 0.5, standing: "avatar", confidence: "medium" });
     expect(byKey.ex_smokers!.profile.best_competitor_angle).toBe("Still coughing after you quit?");
+    expect(byKey.ex_smokers!.profile).toMatchObject({ skepticism: 3, awareness_by_channel: { meta_ads: { problem_aware: 2 } } });
+    expect(byKey.doubters!.profile.skepticism).toBe(5);
     expect(byKey.doubters).toMatchObject({ review_count: 36, ad_count: 0, win_rate: null, standing: "emerging" });
     expect(quotes.filter((q) => q.avatar_id === byKey.doubters!.id).every((q) => q.rating <= 2)).toBe(true);
     const snapshots = await pg.db.all<{ batch: number }>("SELECT batch FROM avatar_memories WHERE run_id = ? ORDER BY batch", [runId]);

@@ -8,6 +8,7 @@ import type { Charge } from "./charges.js";
 import type { Competitor, CompetitorPick, CompetitorProfile, Relationship } from "./competitors.js";
 import type { Generation, LlmCall, LlmCallRecord, RunEvent } from "./logs.js";
 import type { BrandVisual, Product, ProductBrief } from "./products.js";
+import type { MarketAssessment } from "./market.js";
 import type { Run, RunSummary, RunUpdate } from "./runs.js";
 import type { StageStates } from "./stages.js";
 import type { CollectedReview, ReviewCoverage, ReviewTarget, StoredReview } from "./reviews.js";
@@ -118,6 +119,12 @@ export interface CallLog {
   list(runId: string): Promise<LlmCall[]>;
 }
 
+/** Stage 4's assessment of the market, one per run; a rerun replaces it. */
+export interface MarketStore {
+  save(accountId: string, assessment: MarketAssessment): Promise<void>;
+  get(runId: string): Promise<MarketAssessment | null>;
+}
+
 export interface ResearchStore {
   readonly accounts: AccountDirectory;
   readonly runs: RunStore;
@@ -126,6 +133,7 @@ export interface ResearchStore {
   readonly reviews: ReviewStore;
   readonly ads: AdStore;
   readonly avatars: AvatarStore;
+  readonly market: MarketStore;
   readonly visuals: BrandVisualCache;
   readonly signals: ShopSignalCache;
   readonly events: EventLog;

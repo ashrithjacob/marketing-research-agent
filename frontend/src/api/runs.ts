@@ -1,4 +1,5 @@
 import { request } from './client';
+import type { MarketAssessment } from './market-types';
 import type { AnalysisInput, AvatarQuote, CompetitorPick, Config, ReadAd, ReviewCoverage, Run, RunEvent, RunSummary, RunView, StoredAvatar, StoredReview } from './types';
 
 const base = '/api/research';
@@ -16,6 +17,7 @@ export const runs = {
   reviews: (id: string, competitor: string | null, limit = 20) =>
     request<{ coverage: ReviewCoverage[]; reviews: StoredReview[] }>(`${base}/runs/${id}/reviews?limit=${limit}${competitor ? `&competitor=${competitor}` : ''}`),
   ads: (id: string) => request<{ ads: ReadAd[] }>(`${base}/runs/${id}/ads`),
+  market: (id: string) => request<{ market: MarketAssessment | null }>(`${base}/runs/${id}/market`),
   avatars: (id: string) => request<{ avatars: StoredAvatar[]; quotes: AvatarQuote[] }>(`${base}/runs/${id}/avatars`),
   follow: (id: string, onEvent: (event: RunEvent) => void): (() => void) => {
     const source = new EventSource(`${base}/runs/${id}/events`, { withCredentials: true });

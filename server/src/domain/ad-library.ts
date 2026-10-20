@@ -16,6 +16,9 @@ export interface AdQuery {
   longForm?: { minCopyChars: number };
   /** At most one ad per advertiser page. TrendTrack's `maxAdsPerBrand` accepts only 1 (400 unsupported_filter otherwise, measured 2026-10-19), so a cap above one is kept by the caller, never asked of the library. */
   onePerBrand?: boolean;
+  /** Only ads first seen inside this window, ISO dates; with TrendTrack's `status: all` this reaches ads long stopped. */
+  createdAfter?: string;
+  createdBefore?: string;
 }
 
 /** One Meta ad as an ad library indexed it: who ran it, where it sends people, when it ran, what it says. */

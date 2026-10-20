@@ -41,6 +41,8 @@ export class TrendtrackAds implements AdLibrary {
       ...(query.longForm ? { mediaType: "image", minDescriptionLength: query.longForm.minCopyChars } : {}),
       ...(query.onePerBrand ? { maxAdsPerBrand: 1 } : {}),
       ...(query.page ? { page: query.page } : {}),
+      ...(query.createdAfter ? { createdAfter: query.createdAfter } : {}),
+      ...(query.createdBefore ? { createdBefore: query.createdBefore } : {}),
       limit: query.limit,
     };
     const response = await Http.withTimeout(

@@ -31,6 +31,8 @@ export interface Settings {
   trendtrackApiKey: string;
   trendtrackBaseUrl: string;
   trendtrackConcurrency: number;
+  apifyToken: string;
+  apifyWaitSeconds: number;
   webTimeoutSeconds: number;
   fetchCharLimit: number;
   prices: ServicePrices;
@@ -42,6 +44,8 @@ export interface Settings {
   adSearchesPerRun: number;
   adMinCopyChars: number;
   adsPerBrand: number;
+  marketHistorySearches: number;
+  marketPaidCalls: number;
 
   databaseUrl: string;
   databaseConnections: number;

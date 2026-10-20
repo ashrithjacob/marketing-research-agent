@@ -1,3 +1,4 @@
+import type { ActorLimits, ActorRun, ArchivedPage, ForumPost, ForumQuery, KeywordVolume, MarketplaceListing, SuggestionSource } from "./market-sources.js";
 import type { ShopPage, ShopQuery } from "./shop-finder.js";
 import type { ShopSignals, ShopTraction } from "./traction.js";
 import type { AdPage, AdQuery } from "./ad-library.js";
@@ -46,6 +47,34 @@ export interface ShopIntel {
 /** Finds shops on TrendTrack's trending feed by what they sell and how hard they advertise; every shop returned is billed. */
 export interface ShopFinder {
   find(query: ShopQuery, signal?: AbortSignal): Promise<ShopPage>;
+}
+
+/** What people type into a search box, as the box itself completes a seed; free. */
+export interface SearchSuggestions {
+  suggest(seed: string, source: SuggestionSource, country: string, signal?: AbortSignal): Promise<string[]>;
+}
+
+/** A page's history in the Wayback Machine: its snapshots, about one a month, and the text of one. */
+export interface PageArchive {
+  snapshots(url: string, signal?: AbortSignal): Promise<ArchivedPage[]>;
+  read(page: ArchivedPage, signal?: AbortSignal): Promise<string>;
+}
+
+/** Runs one Apify actor to the end within its limits and returns its dataset with what Apify charged. */
+export interface ActorRunner {
+  run(actor: string, input: Record<string, unknown>, limits: ActorLimits, signal?: AbortSignal): Promise<ActorRun>;
+}
+
+export interface KeywordVolumes {
+  volumes(keywords: readonly string[], country: string, signal?: AbortSignal): Promise<KeywordVolume[]>;
+}
+
+export interface MarketplaceSearch {
+  search(keywords: readonly string[], marketplace: string, perKeyword: number, signal?: AbortSignal): Promise<MarketplaceListing[]>;
+}
+
+export interface ForumSearch {
+  search(query: ForumQuery, signal?: AbortSignal): Promise<ForumPost[]>;
 }
 
 /** What OpenRouter billed for one generation, looked up by its response id. */

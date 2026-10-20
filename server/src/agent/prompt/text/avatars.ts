@@ -20,4 +20,5 @@ export const AVATAR_JUDGE_SYSTEM = `You give the closing judgement on each avata
 - confidence: low, medium or high, from how many reviews it rests on, from which sources, and how consistent they are.
 - standing: avatar when the evidence is enough to act on, emerging when it is too thin yet. The spec's guidance is about 30 reviews, but judge the evidence, not the count alone.
 - best_competitor_angle: the angle that works best among the competitor ads placed on it (look at which are winning), or null when no ad targets it.
+- skepticism: how skeptical its buyers are, from how they write: 1 beginner (open, barely looked), 2 explorer (has seen other options, needs a bigger or faster promise), 3 researcher (reads labels, wants to know how it works), 4 skeptic (tried and failed, needs proof), 5 hopeless (blames themselves: "nothing works for me", "I'm too far gone"). Cite one to three of its own reviews that show it, by id. The market's sophistication stage, when given, is the ceiling of what competitors have already claimed; an avatar can sit below or above it.
 Judge every avatar listed, once. Then call submit.`;

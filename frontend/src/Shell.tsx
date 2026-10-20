@@ -7,30 +7,32 @@ export default function Shell({ session, home, nav, error, onClearError, onSignO
   return (
     <div className="shell">
       <aside className="sidebar">
-        <Link to={paths.home()} className="sidebar-brand">
-          <span className="sidebar-logo">A</span>
-          Avatar Strategist
-        </Link>
-        <nav className="sidebar-nav">
-          <div className="sidebar-group">Overview</div>
-          <Link to={paths.home()} className={`sidebar-item ${home ? 'active' : ''}`}>
-            <span className="sidebar-icon">⌂</span>
-            <span className="sidebar-label">Analyses</span>
+        <div className="sidebar-inner">
+          <Link to={paths.home()} className="sidebar-brand">
+            <span className="sidebar-logo">A</span>
+            Avatar Strategist
           </Link>
-          {nav}
-        </nav>
-        {session.auth_required && (
-          <div className="sidebar-foot">
-            <span className="sidebar-avatar">{(session.user ?? '?').slice(0, 1).toUpperCase()}</span>
-            <span className="sidebar-who">
-              <strong>{session.user}</strong>
-              <span>{session.account}</span>
-            </span>
-            <button className="sidebar-signout" onClick={onSignOut}>
-              Sign out
-            </button>
-          </div>
-        )}
+          <nav className="sidebar-nav">
+            <div className="sidebar-group">Overview</div>
+            <Link to={paths.home()} className={`sidebar-item ${home ? 'active' : ''}`}>
+              <span className="sidebar-icon">⌂</span>
+              <span className="sidebar-label">Analyses</span>
+            </Link>
+            {nav}
+          </nav>
+          {session.auth_required && (
+            <div className="sidebar-foot">
+              <span className="sidebar-avatar">{(session.user ?? '?').slice(0, 1).toUpperCase()}</span>
+              <span className="sidebar-who">
+                <strong>{session.user}</strong>
+                <span>{session.account}</span>
+              </span>
+              <button className="sidebar-signout" onClick={onSignOut}>
+                Sign out
+              </button>
+            </div>
+          )}
+        </div>
       </aside>
       <main>
         {error && (

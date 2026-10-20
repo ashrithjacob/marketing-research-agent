@@ -142,6 +142,45 @@ classDiagram
     class LlmCall {
       <<interface>>
     }
+    class ArchivedPage {
+      <<interface>>
+    }
+    class KeywordVolume {
+      <<interface>>
+    }
+    class MarketplaceListing {
+      <<interface>>
+    }
+    class ForumPost {
+      <<interface>>
+    }
+    class ForumQuery {
+      <<interface>>
+    }
+    class ActorRun {
+      <<interface>>
+    }
+    class ActorLimits {
+      <<interface>>
+    }
+    class SourceMarkets {
+      keywordCountry()
+      amazonMarketplace()
+      amazonSuggest()
+      googleCountry()
+    }
+    class EvidenceItem {
+      <<interface>>
+    }
+    class ClaimCensus {
+      <<interface>>
+    }
+    class ChannelAwareness {
+      <<interface>>
+    }
+    class MarketAssessment {
+      <<interface>>
+    }
     class PageFetcher {
       <<interface>>
       scrape()
@@ -174,6 +213,31 @@ classDiagram
     class ShopFinder {
       <<interface>>
       find()
+    }
+    class SearchSuggestions {
+      <<interface>>
+      suggest()
+    }
+    class PageArchive {
+      <<interface>>
+      snapshots()
+      read()
+    }
+    class ActorRunner {
+      <<interface>>
+      run()
+    }
+    class KeywordVolumes {
+      <<interface>>
+      volumes()
+    }
+    class MarketplaceSearch {
+      <<interface>>
+      search()
+    }
+    class ForumSearch {
+      <<interface>>
+      search()
     }
     class GenerationSource {
       <<interface>>
@@ -333,6 +397,11 @@ classDiagram
       setGeneration()
       list()
     }
+    class MarketStore {
+      <<interface>>
+      save()
+      get()
+    }
     class ResearchStore {
       <<interface>>
       close()
@@ -390,6 +459,13 @@ classDiagram
     }
     class AvatarTally {
       records()
+      awareness()
+    }
+    class MarketTally {
+      assessment()
+      census()
+      metaAds()
+      channels()
     }
     class PriceCheck {
       problems()
@@ -397,6 +473,28 @@ classDiagram
     }
   }
   namespace adapters {
+    class ActorResult {
+      items()
+      number()
+    }
+    class ApifyAmazonSearch {
+      search()
+    }
+    class ApifyKeywordVolumes {
+      volumes()
+    }
+    class ApifyRedditSearch {
+      search()
+    }
+    class ApifyRun {
+      <<interface>>
+    }
+    class ApifyRunner {
+      run()
+    }
+    class MeteredActorRunner {
+      run()
+    }
     class CachedVisuals {
       find()
     }
@@ -567,6 +665,11 @@ classDiagram
       add()
       list()
     }
+    class MarketTable {
+      save()
+      get()
+      dominant()
+    }
     class Migrator {
       checksum()
       migrate()
@@ -670,6 +773,14 @@ classDiagram
     class TrendtrackShops {
       lookup()
       traction()
+    }
+    class WaybackArchive {
+      snapshots()
+      read()
+      text()
+    }
+    class WebSuggestions {
+      suggest()
     }
   }
   namespace agent {
@@ -842,6 +953,27 @@ classDiagram
     class ReviewOrder {
       batches()
     }
+    class MarketLog {
+      add()
+      item()
+      ofKind()
+      spend()
+      left()
+      calls()
+    }
+    class MarketReader {
+      read()
+      problems()
+    }
+    class MarketSources {
+      <<interface>>
+    }
+    class MarketLimits {
+      <<interface>>
+    }
+    class MarketStage {
+      run()
+    }
     class BrandVisualsCollector {
       collect()
     }
@@ -874,15 +1006,51 @@ classDiagram
       run()
       empty()
     }
+    class AdHistoryTool {
+      tool()
+      item()
+    }
     class AdSearchTool {
       tool()
     }
+    class AmazonSearchTool {
+      tool()
+    }
+    class FindReviewsTool {
+      tool()
+    }
+    class ListAdsTool {
+      tool()
+      row()
+    }
+    class PageHistoryTool {
+      tool()
+      host()
+    }
     class ReadAdTool {
+      tool()
+    }
+    class ReadLandingTool {
+      tool()
+    }
+    class ReadSnapshotTool {
+      tool()
+    }
+    class RedditTool {
       tool()
     }
     class SearchLongFormTool {
       tool()
       row()
+    }
+    class SuggestionsTool {
+      tool()
+    }
+    class ToolReply {
+      text()
+      external()
+      refused()
+      clip()
     }
     class AgentKit {
       <<interface>>
@@ -903,6 +1071,9 @@ classDiagram
       saw()
       unread()
       unknown()
+    }
+    class VolumeTool {
+      tool()
     }
     class WebFetchTool {
       tool()
@@ -965,6 +1136,12 @@ classDiagram
       verify()
     }
   }
+  ApifyAmazonSearch --> ActorRunner
+  ApifyKeywordVolumes --> ActorRunner
+  ApifyRedditSearch --> ActorRunner
+  ApifyRunner --> Settings
+  MeteredActorRunner --> ActorRunner
+  MeteredActorRunner --> ChargeMeter
   CachedVisuals --> BrandVisuals
   CachedVisuals --> BrandVisualCache
   Crawl4ai --> Settings
@@ -1004,6 +1181,7 @@ classDiagram
   ChargeTable --> SqlDatabase
   CompetitorTable --> SqlDatabase
   EventTable --> SqlDatabase
+  MarketTable --> SqlDatabase
   Migrator --> SqlDatabase
   Migrator --> Migration
   ProductTable --> SqlDatabase
@@ -1022,6 +1200,9 @@ classDiagram
   TrendtrackApi --> Settings
   TrendtrackShopFinder --> TrendtrackApi
   TrendtrackShops --> TrendtrackApi
+  WaybackArchive --> Settings
+  WaybackArchive --> PublicPage
+  WebSuggestions --> Settings
   AnalysisService --> ResearchStore
   AnalysisService --> RunLauncher
   AnalysisService --> LiveRuns
@@ -1057,6 +1238,9 @@ classDiagram
   CompetitorAdStage --> ShopFinder
   CompetitorAdStage --> ServicePrices
   CompetitorAdStage --> ScoutLimits
+  MarketStage --> MarketSources
+  MarketStage --> ServicePrices
+  MarketStage --> MarketLimits
   BrandVisualsCollector --> BrandVisuals
   ProductMarketStage --> BrandVisualsCollector
   ProductMarketStage --> ShopTractionCollector
@@ -1065,15 +1249,35 @@ classDiagram
   ReviewListings --> Storefront
   ReviewListings --> AmazonListingFinder
   ReviewStage --> ReviewListings
+  AdHistoryTool --> AdLibrary
+  AdHistoryTool --> MarketLog
   AdSearchTool --> AdLibrary
   AdSearchTool --> UrlLedger
+  AmazonSearchTool --> MarketplaceSearch
+  AmazonSearchTool --> MarketLog
+  FindReviewsTool --> StoredReview
+  FindReviewsTool --> MarketLog
+  ListAdsTool --> ReadAd
+  ListAdsTool --> MarketLog
+  PageHistoryTool --> PageArchive
+  PageHistoryTool --> MarketLog
   ReadAdTool --> ScoutLog
+  ReadLandingTool --> PageFetcher
+  ReadLandingTool --> MarketLog
+  ReadSnapshotTool --> PageArchive
+  ReadSnapshotTool --> MarketLog
+  RedditTool --> ForumSearch
+  RedditTool --> MarketLog
   SearchLongFormTool --> AdLibrary
   SearchLongFormTool --> ScoutLog
+  SuggestionsTool --> SearchSuggestions
+  SuggestionsTool --> MarketLog
   Toolbox --> ServiceClients
   Toolbox --> Settings
   TrendingShopsTool --> ShopFinder
   TrendingShopsTool --> ScoutLog
+  VolumeTool --> KeywordVolumes
+  VolumeTool --> MarketLog
   WebFetchTool --> PageFetcher
   WebFetchTool --> UrlLedger
   WebSearchTool --> WebSearch
@@ -1099,6 +1303,12 @@ classDiagram
 
 | Layer | Module | Classes |
 |---|---|---|
+| `adapters` | `adapters/apify/actor-result.ts` | ActorResult |
+| `adapters` | `adapters/apify/apify-amazon-search.ts` | ApifyAmazonSearch |
+| `adapters` | `adapters/apify/apify-keyword-volumes.ts` | ApifyKeywordVolumes |
+| `adapters` | `adapters/apify/apify-reddit-search.ts` | ApifyRedditSearch |
+| `adapters` | `adapters/apify/apify-runner.ts` | ApifyRun, ApifyRunner |
+| `adapters` | `adapters/apify/metered-actor-runner.ts` | MeteredActorRunner |
 | `adapters` | `adapters/cached-visuals.ts` | CachedVisuals |
 | `adapters` | `adapters/crawl4ai.ts` | Crawl4aiPayload, Crawl4ai |
 | `adapters` | `adapters/fallback-fetcher.ts` | FallbackPageFetcher |
@@ -1127,6 +1337,7 @@ classDiagram
 | `adapters` | `adapters/store/charge-table.ts` | ChargeTable |
 | `adapters` | `adapters/store/competitor-table.ts` | CompetitorTable |
 | `adapters` | `adapters/store/event-table.ts` | EventTable |
+| `adapters` | `adapters/store/market-table.ts` | MarketTable |
 | `adapters` | `adapters/store/migrator.ts` | Migrator |
 | `adapters` | `adapters/store/postgres-database.ts` | PostgresStatements, PostgresDatabase |
 | `adapters` | `adapters/store/postgres-dialect.ts` | PostgresDialect |
@@ -1143,6 +1354,8 @@ classDiagram
 | `adapters` | `adapters/trendtrack-api.ts` | TrendtrackApi |
 | `adapters` | `adapters/trendtrack-shop-finder.ts` | TrendtrackShopRow, TrendtrackShopFinder |
 | `adapters` | `adapters/trendtrack-shops.ts` | TrendtrackShop, TrendtrackShops |
+| `adapters` | `adapters/wayback-archive.ts` | WaybackArchive |
+| `adapters` | `adapters/web-suggestions.ts` | WebSuggestions |
 | `agent` | `agent/analysis-service.ts` | AnalysisService |
 | `agent` | `agent/kernel/agent-runner.ts` | AgentJob, AgentRunnerDeps, AgentRunner |
 | `agent` | `agent/kernel/billed-costs.ts` | BilledCosts |
@@ -1176,6 +1389,9 @@ classDiagram
 | `agent` | `agent/stages/avatars/avatar-stage.ts` | AvatarStage |
 | `agent` | `agent/stages/avatars/memory-view.ts` | MemoryView |
 | `agent` | `agent/stages/avatars/review-order.ts` | ReviewOrder |
+| `agent` | `agent/stages/market/market-log.ts` | MarketLog |
+| `agent` | `agent/stages/market/market-reader.ts` | MarketReader |
+| `agent` | `agent/stages/market/market-stage.ts` | MarketSources, MarketLimits, MarketStage |
 | `agent` | `agent/stages/product-market/brand-visuals-collector.ts` | BrandVisualsCollector |
 | `agent` | `agent/stages/product-market/competitor-profiler.ts` | CompetitorProfiler |
 | `agent` | `agent/stages/product-market/product-brief-agent.ts` | ProductBriefAgent |
@@ -1184,13 +1400,24 @@ classDiagram
 | `agent` | `agent/stages/reviews/amazon-listing-finder.ts` | AmazonListingFinder |
 | `agent` | `agent/stages/reviews/review-listings.ts` | TargetListings, ReviewListings |
 | `agent` | `agent/stages/reviews/review-stage.ts` | ReviewStage |
+| `agent` | `agent/tools/ad-history-tool.ts` | AdHistoryTool |
 | `agent` | `agent/tools/ad-search-tool.ts` | AdSearchTool |
+| `agent` | `agent/tools/amazon-search-tool.ts` | AmazonSearchTool |
+| `agent` | `agent/tools/find-reviews-tool.ts` | FindReviewsTool |
+| `agent` | `agent/tools/list-ads-tool.ts` | ListAdsTool |
+| `agent` | `agent/tools/page-history-tool.ts` | PageHistoryTool |
 | `agent` | `agent/tools/read-ad-tool.ts` | ReadAdTool |
+| `agent` | `agent/tools/read-landing-tool.ts` | ReadLandingTool |
+| `agent` | `agent/tools/read-snapshot-tool.ts` | ReadSnapshotTool |
+| `agent` | `agent/tools/reddit-tool.ts` | RedditTool |
 | `agent` | `agent/tools/search-long-form-tool.ts` | SearchLongFormTool |
+| `agent` | `agent/tools/suggestions-tool.ts` | SuggestionsTool |
+| `agent` | `agent/tools/tool-reply.ts` | ToolReply |
 | `agent` | `agent/tools/toolbox.ts` | AgentKit, Toolbox |
 | `agent` | `agent/tools/traced-tool.ts` | TracedTool |
 | `agent` | `agent/tools/trending-shops-tool.ts` | TrendingShopsTool |
 | `agent` | `agent/tools/url-ledger.ts` | UrlLedger |
+| `agent` | `agent/tools/volume-tool.ts` | VolumeTool |
 | `agent` | `agent/tools/web-fetch-tool.ts` | WebFetchTool |
 | `agent` | `agent/tools/web-search-tool.ts` | WebSearchTool |
 | `config` | `config/settings-shape.ts` | ServicePrices, Settings |
@@ -1204,7 +1431,9 @@ classDiagram
 | `domain` | `domain/competitors.ts` | Competitor, CompetitorRelationship |
 | `domain` | `domain/ids.ts` | Clock, Ids |
 | `domain` | `domain/logs.ts` | RunEvent, LlmCallRecord, Generation, LlmCall |
-| `domain` | `domain/ports.ts` | PageFetcher, WebSearch, AdLibrary, ReviewSource, Storefront, BrandVisuals, ShopIntel, ShopFinder, GenerationSource |
+| `domain` | `domain/market-sources.ts` | ArchivedPage, KeywordVolume, MarketplaceListing, ForumPost, ForumQuery, ActorRun, ActorLimits, SourceMarkets |
+| `domain` | `domain/market.ts` | EvidenceItem, ClaimCensus, ChannelAwareness, MarketAssessment |
+| `domain` | `domain/ports.ts` | PageFetcher, WebSearch, AdLibrary, ReviewSource, Storefront, BrandVisuals, ShopIntel, ShopFinder, SearchSuggestions, PageArchive, ActorRunner, KeywordVolumes, MarketplaceSearch, ForumSearch, GenerationSource |
 | `domain` | `domain/products.ts` | BrandVisual, Product |
 | `domain` | `domain/reviews.ts` | CollectedReview, ReviewTarget, StoredReview, ReviewCoverage, StorefrontFacts, Asins |
 | `domain` | `domain/runs.ts` | Run, RunUpdate, RunSummary |
@@ -1212,12 +1441,13 @@ classDiagram
 | `domain` | `domain/service-report.ts` | ServicePart, ServiceReport |
 | `domain` | `domain/shop-finder.ts` | ShopQuery, FoundShop, ShopPage |
 | `domain` | `domain/stages.ts` | StagePlan, StageState, Stages |
-| `domain` | `domain/store-ports.ts` | AccountDirectory, RunStore, ProductStore, CompetitorStore, ReviewStore, AvatarStore, AvatarRecord, AdStore, BrandVisualCache, ShopSignalCache, EventLog, ChargeLedger, CallLog, ResearchStore |
+| `domain` | `domain/store-ports.ts` | AccountDirectory, RunStore, ProductStore, CompetitorStore, ReviewStore, AvatarStore, AvatarRecord, AdStore, BrandVisualCache, ShopSignalCache, EventLog, ChargeLedger, CallLog, MarketStore, ResearchStore |
 | `domain` | `domain/traction.ts` | ShopSignals, ShopTraction, ShopHandles |
 | `domain` | `domain/web.ts` | SearchHit, SearchPage, SearchScope, FetchedPage, ServiceUnavailableError |
 | `extract` | `extract/avatar-memory-check.ts` | AvatarMemoryCheck |
 | `extract` | `extract/avatar-memory.ts` | AvatarMemoryBook |
 | `extract` | `extract/avatar-tally.ts` | AvatarTally |
+| `extract` | `extract/market-tally.ts` | MarketTally |
 | `extract` | `extract/price-check.ts` | PriceCheck |
 | `http` | `http/account-commands.ts` | AccountCommands |
 | `http` | `http/app.ts` | AppParts, App |

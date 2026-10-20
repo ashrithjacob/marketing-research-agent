@@ -4,6 +4,7 @@ import { runs, type Config } from '../api';
 import Activity from './Activity';
 import Ads from './Ads';
 import Avatars from './Avatars';
+import Market from './Market';
 import Competitors from './Competitors';
 import ConfirmPanel from './ConfirmPanel';
 import ProductBrief from './ProductBrief';
@@ -59,6 +60,7 @@ export default function RunPage({ runId, section, frame, onError }: { runId: str
       )}
       {section === 'reviews' && product && <Reviews runId={runId} product={product} competitors={competitors} coverage={coverage} onError={onError} />}
       {section === 'ads' && <Ads ads={ads} competitors={competitors} />}
+      {section === 'market' && product && <Market runId={runId} version={run.stage_status.sophistication?.status ?? ''} onError={onError} />}
       {section === 'avatars' && product && <Avatars runId={runId} version={run.stage_status.avatars?.status ?? ''} onError={onError} />}
       {section !== null && !product && <p className="panel dim">Nothing here yet: this stage runs once the product is confirmed.</p>}
     </div>

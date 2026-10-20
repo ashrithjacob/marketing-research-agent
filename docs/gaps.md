@@ -116,3 +116,16 @@ rewrite is in git history before `b6f45cc`.
     connected.
 15. **`check-conventions.mjs` hung once for over 100 s** on 2026-10-17 and was
     not reproduced; every later run took under 2 s.
+
+## Stage 4
+
+19. **Reviews are labelled by sample.** The market reader labels only the
+    reviews `find_reviews` showed it (at most 15 a search), so an avatar's
+    review-awareness counts cover a sample of its reviews, not all of them.
+20. **Amazon listings have titles, not bullet points**: the chosen actor
+    returns none.
+21. **Amazon search-box completions only for the US and the UK**, the two
+    hosts seen working. Search volume has no EU market.
+22. **Reddit is collected by scraper, not Reddit's API**, against Reddit's User
+    Agreement (effective July 1, 2026); the user accepted the risk on 2026-10-20.
+

@@ -62,6 +62,7 @@ services:
       - CRAWL4AI_API_KEY=${CRAWL4AI_API_KEY:-}
       - PARALLEL_API_KEY=${PARALLEL_API_KEY:-}
       - TRENDTRACK_API_KEY=${TRENDTRACK_API_KEY:-}
+      - APIFY_TOKEN=${APIFY_TOKEN:-}
 
 volumes:
   pg_data: {}

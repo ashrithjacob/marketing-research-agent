@@ -14,6 +14,7 @@ export * from "./stages/reviews/review-stage.js";
 export * from "./stages/reviews/review-listings.js";
 export * from "./stages/reviews/amazon-listing-finder.js";
 export * from "./stages/ads/competitor-ad-stage.js";
+export * from "./stages/market/market-stage.js";
 export * from "./stages/avatars/avatar-stage.js";
 export * from "./stages/product-market/brand-visuals-collector.js";
 export * from "./resolve/resolution-visuals.js";

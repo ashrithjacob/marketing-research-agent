@@ -8,6 +8,7 @@ import { CallTable } from "./call-table.js";
 import { ChargeTable } from "./charge-table.js";
 import { CompetitorTable } from "./competitor-table.js";
 import { EventTable } from "./event-table.js";
+import { MarketTable } from "./market-table.js";
 import { Migrator } from "./migrator.js";
 import { ProductTable } from "./product-table.js";
 import { ReviewTable } from "./review-table.js";
@@ -25,6 +26,7 @@ export class SqlResearchStore implements ResearchStore {
   readonly reviews: ReviewTable;
   readonly ads: AdTable;
   readonly avatars: AvatarTable;
+  readonly market: MarketTable;
   readonly visuals: VisualTable;
   readonly signals: SignalTable;
   readonly events: EventTable;
@@ -40,6 +42,7 @@ export class SqlResearchStore implements ResearchStore {
     this.reviews = new ReviewTable(db);
     this.ads = new AdTable(db);
     this.avatars = new AvatarTable(db);
+    this.market = new MarketTable(db);
     this.visuals = new VisualTable(db);
     this.signals = new SignalTable(db);
     this.events = new EventTable(db);

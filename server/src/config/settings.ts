@@ -88,6 +88,8 @@ export class Env {
       trendtrackApiKey: Env.text("TRENDTRACK_API_KEY", ""),
       trendtrackBaseUrl: Env.text("TRENDTRACK_BASE_URL", "https://api.trendtrack.io"),
       trendtrackConcurrency: Env.number("MRA_TRENDTRACK_CONCURRENCY", 2),
+      apifyToken: Env.text("APIFY_TOKEN", ""),
+      apifyWaitSeconds: Env.number("MRA_APIFY_WAIT_SECONDS", 600),
       webTimeoutSeconds: Env.number("MRA_WEB_TIMEOUT_SECONDS", 90),
       fetchCharLimit: Env.number("MRA_FETCH_CHAR_LIMIT", 25000),
       prices: {
@@ -105,6 +107,8 @@ export class Env {
       adSearchesPerRun: Env.number("MRA_AD_SEARCHES_PER_RUN", 20),
       adMinCopyChars: Env.number("MRA_AD_MIN_COPY_CHARS", 2000),
       adsPerBrand: Env.number("MRA_ADS_PER_BRAND", 15),
+      marketHistorySearches: Env.number("MRA_MARKET_HISTORY_SEARCHES", 8),
+      marketPaidCalls: Env.number("MRA_MARKET_PAID_CALLS", 2),
 
       databaseUrl: Env.required("DATABASE_URL"),
       databaseConnections: Env.number("MRA_DATABASE_CONNECTIONS", 5),

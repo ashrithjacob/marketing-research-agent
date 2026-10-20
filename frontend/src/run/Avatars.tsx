@@ -12,6 +12,19 @@ function List({ label, items }: { label: string; items: string[] }) {
   );
 }
 
+const SKEPTICISM: Record<number, string> = { 1: 'beginner', 2: 'explorer', 3: 'researcher', 4: 'skeptic', 5: 'hopeless' };
+
+function ChannelCounts({ counts }: { counts: StoredAvatar['profile']['awareness_by_channel'] | undefined }) {
+  const rows = Object.entries(counts ?? {}).filter(([, levels]) => levels && Object.keys(levels).length > 0);
+  if (rows.length === 0) return null;
+  return (
+    <div className="small">
+      <span className="dim">Awareness:</span>{' '}
+      {rows.map(([channel, levels]) => `${channel === 'meta_ads' ? 'its ads open' : 'its reviews'} ${Object.entries(levels ?? {}).map(([level, n]) => `${n} ${level.replace('_', ' ')}`).join(', ')}`).join(' · ')}
+    </div>
+  );
+}
+
 function AvatarCard({ avatar, children, quotes }: { avatar: StoredAvatar; children: StoredAvatar[]; quotes: AvatarQuote[] }) {
   const share = (v: number | null) => (v === null ? '—' : `${Math.round(v * 100)}%`);
   return (
@@ -33,6 +46,10 @@ function AvatarCard({ avatar, children, quotes }: { avatar: StoredAvatar; childr
       <List label="Objections" items={avatar.profile.objections} />
       <List label="Angles" items={avatar.profile.angles} />
       {avatar.profile.best_competitor_angle && <div className="small"><span className="dim">Competitors' best angle:</span> {avatar.profile.best_competitor_angle}</div>}
+      {avatar.profile.skepticism !== null && avatar.profile.skepticism !== undefined && (
+        <div className="small"><span className="dim">Skepticism:</span> {avatar.profile.skepticism} of 5, {SKEPTICISM[avatar.profile.skepticism]}</div>
+      )}
+      <ChannelCounts counts={avatar.profile.awareness_by_channel} />
       {quotes.length > 0 && (
         <ul className="quotes">
           {quotes.slice(0, 4).map((quote) => (

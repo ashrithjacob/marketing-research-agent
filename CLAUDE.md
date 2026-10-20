@@ -26,7 +26,7 @@ deploy steps are about **agentchat**, a different app. Use the ones below.
 - The north star every change answers to: `docs/goal.md`, narrowed on
   2026-10-16 to avatar research for long-form statics: `docs/spec.md`, the
   Avatar Strategist spec. Its seven stages are the code's seven stages
-  (`domain/stages.ts`); stages 1, 2, 3 and 5 are built. Every older spec, and the
+  (`domain/stages.ts`); stages 1 to 5 are built. Every older spec, and the
   code they described (operator, plans, tasks, ledger roles), was deleted on
   2026-10-17; git history before `b6f45cc` has them.
 
@@ -77,10 +77,9 @@ it does not mean your change is on it. Only `deploy/vps/deploy.sh` does that.
 
 **5. Never start a run that spends money without asking first.** Every run
 spends: OpenRouter per token, Parallel per search, Firecrawl per page,
-TrendTrack per ad result. Nothing in the code calls Apify since the 2026-10-17
-rewrite; when stage 2 brings review collection back, a run that pulls paid
-reviews is billed to the user per review, and must be asked about with its
-estimated cost. Faux-model tests (`tests/analysis.test.ts`) are how a change is
+TrendTrack per ad result, Apify per actor run (stage 4: search volume about
+$0.30, Amazon listings about $0.03, Reddit a few cents of platform time;
+billed to the user's card). Ask with the estimated cost. Faux-model tests (`tests/analysis.test.ts`) are how a change is
 seen working without spending. One run is enough to verify something; don't
 rerun to polish.
 

@@ -2,9 +2,9 @@ import type { Run, StageInfo } from '../api';
 import BrandMark from '../BrandMark';
 import { Link, paths } from '../route';
 
-export const STAGE_SECTIONS: Record<string, string> = { product_market: 'product', reviews: 'reviews', competitor_ads: 'ads', avatars: 'avatars' };
+export const STAGE_SECTIONS: Record<string, string> = { product_market: 'product', reviews: 'reviews', competitor_ads: 'ads', sophistication: 'market', avatars: 'avatars' };
 
-const SHORT_TITLES: Record<string, string> = { product_market: 'Product & market', reviews: 'Reviews', competitor_ads: 'Long-form ads', avatars: 'Avatars' };
+const SHORT_TITLES: Record<string, string> = { product_market: 'Product & market', reviews: 'Reviews', competitor_ads: 'Long-form ads', sophistication: 'Market awareness', avatars: 'Avatars' };
 
 export function sectionOf(stage: string): string {
   return STAGE_SECTIONS[stage] ?? stage;

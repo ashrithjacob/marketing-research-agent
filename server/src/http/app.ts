@@ -1,6 +1,6 @@
 import { Hono, type Context, type Next } from "hono";
 
-import { CachedVisuals, JudgemeReviews, OpenRouterPrices, PageVisuals, PublicPage, ServiceClients, ShopifyStorefront, WootReviews } from "../adapters/index.js";
+import { ApifyRunner, CachedVisuals, JudgemeReviews, OpenRouterPrices, PageVisuals, PublicPage, ServiceClients, ShopifyStorefront, WaybackArchive, WebSuggestions, WootReviews } from "../adapters/index.js";
 import {
   AmazonListingFinder,
   AnalysisService,
@@ -9,6 +9,7 @@ import {
   CompetitorAdStage,
   LiveRuns,
   LlmModels,
+  MarketStage,
   Pipeline,
   ProductMarketStage,
   ProductResolver,
@@ -90,6 +91,11 @@ export class App {
       new ProductMarketStage(new BrandVisualsCollector(visuals), new ShopTractionCollector(clients.shops, settings.prices)),
       new ReviewStage(new ReviewListings(new ShopifyStorefront(pages), new AmazonListingFinder()), sources, settings.reviewsPerProduct),
       new CompetitorAdStage(clients.ads, clients.shopFinder, settings.prices, limits),
+      new MarketStage(
+        { ads: clients.ads, pages: clients.pages, suggestions: new WebSuggestions(settings), archive: new WaybackArchive(settings, pages), actors: settings.apifyToken ? new ApifyRunner(settings) : null },
+        settings.prices,
+        { historySearches: settings.marketHistorySearches, paidCalls: settings.marketPaidCalls },
+      ),
       new AvatarStage(),
     ]);
   }

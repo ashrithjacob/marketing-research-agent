@@ -30,6 +30,7 @@ export class EvidenceRoutes {
       }),
     );
     api.get("/runs/:runId/ads", async (c) => this.withProduct(c, async () => c.json({ ads: await this.store.ads.list(c.req.param("runId") ?? "") })));
+    api.get("/runs/:runId/market", async (c) => this.withProduct(c, async () => c.json({ market: await this.store.market.get(c.req.param("runId") ?? "") })));
     api.get("/runs/:runId/avatars", async (c) =>
       this.withProduct(c, async () => {
         const runId = c.req.param("runId") ?? "";

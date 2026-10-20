@@ -223,6 +223,9 @@ export interface StoredAvatar {
     outcomes: string[];
     angles: string[];
     best_competitor_angle: string | null;
+    skepticism: number | null;
+    skepticism_review_ids: string[];
+    awareness_by_channel: Partial<Record<'meta_ads' | 'reviews', Partial<Record<string, number>>>>;
   };
 }
 

@@ -203,6 +203,64 @@ The code sweep before it (keywords from an agent, then fixed searches) was
 removed on 2026-10-19: on run `344caa7d` its one-word keywords pulled in dental
 and pet ads, and it paid for 540 rows to keep 150.
 
+## Stage 4: market awareness and sophistication
+
+`MarketStage` (`agent/stages/market/`) waits for stages 1, 2 and 3
+(`docs/spec-stage4.md`). One agent, `market_reader` (50 turns), answers two
+separate questions:
+
+- **Sophistication**: how far the market's claims have escalated, stage 1 to
+  5. It groups this run's ads into claims, and looks at a competitor's past
+  ads and its pages over time.
+- **Awareness**: how much a buyer already knows, per channel. It labels each
+  piece of buyer evidence: unaware, problem aware, solution aware, product
+  aware, most aware.
+
+Its tools, each logged in `MarketLog` under the id the agent cites:
+
+| Tool | Source | Cost | Limit |
+|---|---|---|---|
+| `list_ads` | this run's read ads | free | — |
+| `search_ad_history` | TrendTrack, a domain's ads, running and stopped, optional first-seen window | credits per ad | `MRA_MARKET_HISTORY_SEARCHES` (8) |
+| `page_history`, `read_snapshot` | Wayback Machine CDX index, then the raw snapshot reduced to text | free | 6, 12 |
+| `search_suggestions` | Google and Amazon search-box completions (Amazon: US and UK only) | free | 20 |
+| `search_volume` | Apify `memo23/keyword-metrics`, Google only | about $0.30 a call | `MRA_MARKET_PAID_CALLS` (2) |
+| `search_amazon` | Apify `apt_marble/amazon-search-results-scraper`, 30 a search | about $0.02 a call | 2 |
+| `search_reddit` | Apify `coding-doctor-omar/reddit-scraper-pro`, 25 posts, 15 comments each, 2 deep | platform time | 2 |
+| `find_reviews` | stored reviews containing a phrase | free | 20 |
+| `read_landing` | an ad's landing page, through the page reader | Firecrawl per page | 6 |
+
+The Apify tools exist only with `APIFY_TOKEN`. Every Apify run is charged as
+Apify billed it (`usageTotalUsd`, which includes per-result charges: a
+`junglee` run returning 1 review showed $0.005, the BRONZE price, so the
+STARTER plan pays BRONZE prices, measured 2026-10-20). A run still going
+after `MRA_APIFY_WAIT_SECONDS` (600) is aborted. An empty dataset is an error,
+never "no results".
+
+**Code checks** on the submission: every claim group cites only ads a tool
+showed; the stage rests on submitted claim groups; cited snapshots were read;
+labels go only on queries, listings, Reddit posts, reviews and landing pages,
+each once. Ads carry their own awareness from stage 3.
+
+**Code counts** everything (`MarketTally`):
+- **The claim census:** each claim's brands, earliest first seen, longest run,
+  and how many of its ads are still running.
+- **Awareness shares per channel:**
+  - Google searches weighted by monthly volume, when every query has one;
+  - Amazon listings weighted by number of ratings;
+  - competitor ad openings from stage 3's readings of supply ads.
+
+The result is one `market_assessments` row per run, served at
+`GET /runs/:id/market`.
+
+**Stage 5 reads it.**
+- The judge is told the market's stage.
+- It gives each avatar a skepticism stage (1 beginner to 5 hopeless), citing
+  that avatar's own reviews; code refuses another avatar's.
+- Code counts each avatar's awareness:
+  - from its ads' openings;
+  - from the stage 4 labels on its reviews.
+
 ## Stage 5: avatars
 
 `AvatarStage` (`agent/stages/avatars/`) needs stages 1, 2 and 3 (and 4 once it
