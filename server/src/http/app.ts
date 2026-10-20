@@ -89,7 +89,7 @@ export class App {
     return new Pipeline([
       new ProductMarketStage(new BrandVisualsCollector(visuals), new ShopTractionCollector(clients.shops, settings.prices)),
       new ReviewStage(new ReviewListings(new ShopifyStorefront(pages), new AmazonListingFinder()), sources, settings.reviewsPerProduct),
-      new CompetitorAdStage(clients.ads, settings.prices, limits),
+      new CompetitorAdStage(clients.ads, clients.shopFinder, settings.prices, limits),
       new AvatarStage(),
     ]);
   }

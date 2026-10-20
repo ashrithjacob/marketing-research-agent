@@ -148,10 +148,13 @@ work and keeps the books.
 
 1. **Scout** (`AdScout`, agent `ad_scout`, 40 turns), briefed as a growth
    marketer with the client's product, claims and confirmed competitors, and
-   the three rings to study (`prompt/text/ad-scout.ts`): direct competitors
+   the four rings to study (`prompt/text/ad-scout.ts`): direct competitors
    (same product), same problem (another product for the same buyer at the
-   same moment of pain) and same buyer (another problem, the same age, gender
-   and awareness: formats to borrow). Its tools:
+   same moment of pain), same buyer (another problem, the same age, gender
+   and awareness: formats to borrow) and trending shop (winning long-form
+   statics from a shop on TrendTrack's trending feed, any market: structures
+   to apply to the client's store). Only the first two count as supply in the
+   avatars (`AdRings.isSupply`). Its tools:
    - `search_ads` (`SearchLongFormTool`): TrendTrack `POST /v1/ads/query` for
      image ads with `MRA_AD_MIN_COPY_CHARS` (2000) characters of copy in the
      run's markets, by ad copy, brand or domain, sorted as it chooses (only
@@ -161,6 +164,13 @@ work and keeps the books.
      billed to the run; the scout has `MRA_AD_SEARCHES_PER_RUN` (20) searches,
      after which the tool refuses.
    - `read_ad` (`ReadAdTool`): the full copy of an ad it has seen; free.
+   - `find_trending_shops` (`TrendingShopsTool`): TrendTrack
+     `POST /v1/shops/query` with `displayInTrending`, the run's markets as
+     main market, at least `min_active_ads` (default 20) Meta ads in the last
+     7 days, optional product or site text, sorted by estimated sales, active
+     ads, traffic growth or visits, 1–10 shops. It returns shops, not ads; the
+     scout then searches a shop's long-form ads by domain. 4 credits per shop,
+     and each call spends one of the same 20 searches.
    It discovers brands as it goes and submits the ads worth studying, each
    with its ring and why, and the brands it found. Code refuses an ad no search
    returned, an ad kept twice, more than `MRA_ADS_PER_RUN` (150), or more than

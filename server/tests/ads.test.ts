@@ -1,4 +1,4 @@
-/** Stage 4: a scout agent studies the market's long-form ads with search_ads and read_ad, discovering brands as it goes, and keeps ads in a growth marketer's rings; code refuses an ad it never saw and holds the budget; each kept ad is then read. */
+/** Stage 4: a scout agent studies the market's long-form ads with search_ads, read_ad and find_trending_shops, discovering brands as it goes, and keeps ads in a growth marketer's rings; code refuses an ad it never saw and holds the budget; each kept ad is then read. */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import type { Message } from "@earendil-works/pi-ai";
@@ -7,7 +7,8 @@ import { ServiceClients } from "../src/adapters/index.js";
 import { CompetitorAdStage, Pipeline, ProductMarketStage } from "../src/agent/index.js";
 import { ScoutLog } from "../src/agent/stages/ads/scout-log.js";
 import { SearchLongFormTool } from "../src/agent/tools/search-long-form-tool.js";
-import type { AdHit, AdLibrary, AdPage, AdQuery, ReadAd } from "../src/domain/index.js";
+import { TrendingShopsTool } from "../src/agent/tools/trending-shops-tool.js";
+import type { AdHit, AdLibrary, AdPage, AdQuery, ReadAd, ShopFinder, ShopPage, ShopQuery } from "../src/domain/index.js";
 import { App } from "../src/http/index.js";
 
 import { Faux, FakeVisuals, FakeWeb, NoBilling, TestSettings } from "./fakes.js";
@@ -27,7 +28,9 @@ class FakeAds implements AdLibrary {
     const term = query.terms[0]!;
     const hits = term === "lungclear.com"
       ? [FakeAds.hit("lc1", "lungclear.com", 64), FakeAds.hit("lc2", "lungclear.com", 3)]
-      : Array.from({ length: Math.min(query.limit, 8) }, (_, i) => FakeAds.hit(`${term}-${i}`, `brand${i}.com`, 20 + i));
+      : term === "glowpatch.com"
+        ? [FakeAds.hit("gp1", "glowpatch.com", 90)]
+        : Array.from({ length: Math.min(query.limit, 8) }, (_, i) => FakeAds.hit(`${term}-${i}`, `brand${i}.com`, 20 + i));
     return { hits, total: hits.length, credits: hits.length };
   }
 
@@ -37,6 +40,19 @@ class FakeAds implements AdLibrary {
       countries: ["US"], body: LONG, ad_reach: 1000, page_reach_30d: null, page_live_ads: null, days_running: days, duplicates: 2, reach_delta_7d: 10, reach_delta_30d: 50,
       current_rank: 4, is_eu: false, media_url: `https://cdn.test/${id}.jpg`, thumbnail_url: null, age_min: 45, age_max: 65, gender: "all",
     };
+  }
+}
+
+class FakeShops implements ShopFinder {
+  readonly queries: ShopQuery[] = [];
+
+  async find(query: ShopQuery): Promise<ShopPage> {
+    this.queries.push(query);
+    const shops = [
+      { domain: "glowpatch.com", name: "GlowPatch", main_category: "Health & Beauty", monthly_visits: 412000, visits_growth_30d: 0.62, monthly_sales_usd: 318400, active_ads: 140, best_sellers: ["Sleep Patch", "Energy Patch"] },
+      { domain: "dressly.com", name: "Dressly", main_category: "Apparel", monthly_visits: null, visits_growth_30d: null, monthly_sales_usd: null, active_ads: 33, best_sellers: [] },
+    ].slice(0, query.limit);
+    return { shops, total: 1489, credits: 4 * shops.length };
   }
 }
 
@@ -67,6 +83,25 @@ describe("search_ads", () => {
   });
 });
 
+describe("find_trending_shops", () => {
+  it("lists trending shops in the run's markets, spends one search of the scout's budget, and refuses once it is spent", async () => {
+    const log = new ScoutLog(1);
+    const shops = new FakeShops();
+    const tool = new TrendingShopsTool(shops, ["US"], log).tool();
+    const refused = await tool.execute("x", { sort_by: "unitsSold" });
+    expect((refused.content[0] as { text: string }).text).toContain("sort_by unitsSold is not one this tool accepts");
+    const first = await tool.execute("1", { query: "supplements", sort_by: "estMonthlySales", limit: 2 });
+    const shown = (first.content[0] as { text: string }).text;
+    expect(shown).toContain("glowpatch.com (GlowPatch) | Health & Beauty | $318,400/mo sales | 412000 visits/mo, +62% in 30 days | 140 active ads\n   best sellers: Sleep Patch; Energy Patch");
+    expect(shown).toContain("dressly.com (Dressly) | Apparel | sales unknown | ? visits/mo | 33 active ads");
+    expect(shops.queries[0]).toEqual({ text: "supplements", searchIn: "product_text", countries: ["US"], sortBy: "estMonthlySales", minActiveAds: 20, limit: 2 });
+    expect(log.shopsSeen).toBe(2);
+    const second = await tool.execute("2", { sort_by: "activeAds" });
+    expect((second.content[0] as { text: string }).text).toContain("Your search budget (1) is spent");
+    expect(shops.queries).toHaveLength(1);
+  });
+});
+
 let pg: PostgresStores;
 
 beforeAll(async () => {
@@ -85,6 +120,7 @@ describe("stage 4", () => {
       { ad_id: "lc1", ring: "direct_competitor", why: "LungClear's own tincture, 64 days" },
       { ad_id: "mullein-0", ring: "same_problem", why: "lung tea for smokers, 45+" },
       { ad_id: "mullein-1", ring: "same_buyer", why: "joint pain advertorial for 50+, winning" },
+      { ad_id: "gp1", ring: "trending_shop", why: "sleep patch advertorial, 90 days, shop scaling on long-form" },
     ];
     const brands = [{ brand: "LungClear", domain: "lungclear.com", ring: "direct_competitor", why: "mullein tincture" }];
     const faux = new Faux();
@@ -98,6 +134,8 @@ describe("stage 4", () => {
           call("search_ads", { query: "lungclear.com", search_in: "domain", sort_by: "longestRunning", limit: 5 }),
           call("search_ads", { query: "mullein", search_in: "ad_copy", sort_by: "reachDelta7d", limit: 4 }),
           call("read_ad", { ad_id: "mullein-1" }),
+          call("find_trending_shops", { sort_by: "estMonthlySales", limit: 1 }),
+          call("search_ads", { query: "glowpatch.com", search_in: "domain", sort_by: "longestRunning", limit: 3 }),
           call("submit", { kept: [...keep, { ad_id: "ghost-9", ring: "same_problem", why: "x" }], brands }),
           (messages) => {
             refusal = JSON.stringify(messages.at(-1)?.content ?? "");
@@ -109,7 +147,8 @@ describe("stage 4", () => {
     );
     const web = new FakeWeb(PAGES, SEARCH_HITS);
     const limits = { searches: 20, maxAds: 150, maxAdsPerBrand: 15, minCopyChars: 2000 };
-    const pipeline = new Pipeline([new ProductMarketStage(), new CompetitorAdStage(ads, TestSettings.make().settings.prices, limits)]);
+    const shops = new FakeShops();
+    const pipeline = new Pipeline([new ProductMarketStage(), new CompetitorAdStage(ads, shops, TestSettings.make().settings.prices, limits)]);
     const { settings, traces } = TestSettings.make();
     const app = new App({ settings, traces, store: pg.store, services: new ServiceClients(web, web, ads), models: faux.models, generations: new NoBilling(), visuals: new FakeVisuals(), pipeline });
     const driver = new RunDriver(app);
@@ -119,15 +158,16 @@ describe("stage 4", () => {
     const done = await driver.confirmAndFinish(runId, { product_url: PRODUCT_URL, competitors: picks });
 
     expect(done.run.stage_status.competitor_ads).toMatchObject({ status: "completed", error: "" });
-    expect(done.run.stage_status.competitor_ads.summary).toBe("3 ads kept of 6 seen in 2 searches, from 1 brands; 1 direct competitor, 1 same problem, 1 same buyer; 3 read.");
+    expect(done.run.stage_status.competitor_ads.summary).toBe("4 ads kept of 7 seen in 4 searches (1 trending shops looked at), from 1 brands; 1 direct competitor, 1 same problem, 1 same buyer, 1 trending shop; 4 read.");
     expect(refusal).toContain("ad ghost-9 was not in any of your searches");
-    expect(ads.queries.map((q) => [q.terms[0], q.searchIn, q.sortBy, q.longForm?.minCopyChars])).toEqual([["lungclear.com", "domain", "longestRunning", 2000], ["mullein", "ad_copy", "reachDelta7d", 2000]]);
+    expect(ads.queries.map((q) => [q.terms[0], q.searchIn, q.sortBy, q.longForm?.minCopyChars])).toEqual([["lungclear.com", "domain", "longestRunning", 2000], ["mullein", "ad_copy", "reachDelta7d", 2000], ["glowpatch.com", "domain", "longestRunning", 2000]]);
+    expect(shops.queries.map((q) => [q.text, q.sortBy, q.countries])).toEqual([[null, "estMonthlySales", ["US"]]]);
     const { ads: stored } = await driver.json<{ ads: ReadAd[] }>(`/runs/${runId}/ads`);
     const lungclear = done.competitors.find((c) => c.brand === "LungClear")!.id;
-    expect(stored.map((ad) => [ad.trendtrack_ad_id, ad.ring]).sort()).toEqual([["lc1", "direct_competitor"], ["mullein-0", "same_problem"], ["mullein-1", "same_buyer"]]);
+    expect(stored.map((ad) => [ad.trendtrack_ad_id, ad.ring]).sort()).toEqual([["gp1", "trending_shop"], ["lc1", "direct_competitor"], ["mullein-0", "same_problem"], ["mullein-1", "same_buyer"]]);
     expect(stored.find((ad) => ad.trendtrack_ad_id === "lc1")).toMatchObject({ competitor_id: lungclear, bucket: "winning", ring_why: "LungClear's own tincture, 64 days" });
     expect(stored.every((ad) => ad.reading?.claim_type === "mechanism")).toBe(true);
     const { charges } = await driver.json<{ charges: { service: string; agent_id: string; units: number }[] }>(`/runs/${runId}/charges`);
-    expect(charges.filter((c) => c.service === "trendtrack").map((c) => [c.agent_id, c.units])).toEqual([["ad_scout", 2], ["ad_scout", 4]]);
+    expect(charges.filter((c) => c.service === "trendtrack").map((c) => [c.agent_id, c.units])).toEqual([["ad_scout", 2], ["ad_scout", 4], ["ad_scout", 4], ["ad_scout", 1]]);
   });
 });

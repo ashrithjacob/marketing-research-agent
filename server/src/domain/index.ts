@@ -13,6 +13,7 @@ export * from "./resolution.js";
 export * from "./reviews.js";
 export * from "./runs.js";
 export * from "./schemas.js";
+export * from "./shop-finder.js";
 export type * from "./service-report.js";
 export * from "./stages.js";
 export * from "./traction.js";

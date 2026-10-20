@@ -1,6 +1,6 @@
 import { Type } from "@earendil-works/pi-ai";
 
-import { AD_SORTS } from "../../domain/index.js";
+import { AD_SORTS, SHOP_SORTS } from "../../domain/index.js";
 
 export const searchParameters = Type.Object({
   query: Type.String({ description: "The search query." }),
@@ -28,4 +28,12 @@ export const searchLongFormParameters = Type.Object({
 
 export const readAdParameters = Type.Object({
   ad_id: Type.String({ description: "An ad id from a search_ads result." }),
+});
+
+export const trendingShopsParameters = Type.Object({
+  query: Type.Optional(Type.String({ description: "Optional: what the shops sell, such as supplements or joint pain. Leave it out to browse the whole trending feed." })),
+  search_in: Type.Optional(Type.Union([Type.Literal("product_text"), Type.Literal("site_text")], { description: "product_text matches the shop's product titles (default); site_text matches any text on its site." })),
+  sort_by: Type.String({ enum: [...SHOP_SORTS], description: "estMonthlySales finds the biggest sellers; activeAds the heaviest advertisers; growth30d the fastest-growing traffic, which also surfaces tiny shops with a spike." }),
+  min_active_ads: Type.Optional(Type.Number({ description: "Only shops running at least this many Meta ads over the last 7 days (default 20)." })),
+  limit: Type.Optional(Type.Number({ description: "How many shops to return, 1 to 10 (default 5). Every shop returned is billed." })),
 });

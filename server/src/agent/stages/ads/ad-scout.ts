@@ -1,12 +1,13 @@
-import { MeteredAdLibrary } from "../../../adapters/index.js";
+import { MeteredAdLibrary, MeteredShopFinder } from "../../../adapters/index.js";
 import type { ServicePrices } from "../../../config/index.js";
-import { Markets, ScoutReportSchema, type AdLibrary, type Competitor, type Product, type ScoutReport } from "../../../domain/index.js";
+import { Markets, ScoutReportSchema, type AdLibrary, type Competitor, type Product, type ScoutReport, type ShopFinder } from "../../../domain/index.js";
 import { Trace } from "../../../trace/index.js";
 import type { AgentResult } from "../../kernel/agent-runner.js";
 import type { RunContext } from "../../pipeline/run-context.js";
 import { AD_SCOUT_SYSTEM } from "../../prompt/text/ad-scout.js";
 import { ReadAdTool } from "../../tools/read-ad-tool.js";
 import { SearchLongFormTool } from "../../tools/search-long-form-tool.js";
+import { TrendingShopsTool } from "../../tools/trending-shops-tool.js";
 
 import { ScoutLog } from "./scout-log.js";
 
@@ -24,6 +25,7 @@ export class AdScout {
 
   constructor(
     private readonly ads: AdLibrary,
+    private readonly shops: ShopFinder | null,
     private readonly prices: ServicePrices,
     private readonly limits: ScoutLimits,
   ) {}
@@ -31,8 +33,13 @@ export class AdScout {
   async scout(context: RunContext, product: Product, competitors: readonly Competitor[]): Promise<{ result: AgentResult<ScoutReport>; log: ScoutLog }> {
     Trace.line(import.meta.url, "AdScout.scout", { competitors: competitors.length });
     const log = new ScoutLog(this.limits.searches);
-    const library = new MeteredAdLibrary(this.ads, this.prices, context.meter(AdScout.AGENT_ID));
-    const tools = [new SearchLongFormTool(library, Markets.countries(context.run.input.markets), this.limits.minCopyChars, log).tool(), new ReadAdTool(log).tool()];
+    const meter = context.meter(AdScout.AGENT_ID);
+    const countries = Markets.countries(context.run.input.markets);
+    const tools = [
+      new SearchLongFormTool(new MeteredAdLibrary(this.ads, this.prices, meter), countries, this.limits.minCopyChars, log).tool(),
+      new ReadAdTool(log).tool(),
+      ...(this.shops ? [new TrendingShopsTool(new MeteredShopFinder(this.shops, this.prices, meter), countries, log).tool()] : []),
+    ];
     const result = await context.agent({
       agentId: AdScout.AGENT_ID,
       system: AD_SCOUT_SYSTEM,

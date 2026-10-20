@@ -1,7 +1,7 @@
 /** Shop traction from TrendTrack, shaped as measured on 2026-10-19: a free lookup by exact domain before the user chooses, then each confirmed shop's sales and the product's best-seller rank, charged to the run. */
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
-import { ServiceClients, TrendtrackShops } from "../src/adapters/index.js";
+import { ServiceClients, TrendtrackApi, TrendtrackShopFinder, TrendtrackShops } from "../src/adapters/index.js";
 import { Pipeline, ProductMarketStage, ShopTractionCollector } from "../src/agent/index.js";
 import type { Competitor, Product, ShopIntel, ShopSignals, ShopTraction } from "../src/domain/index.js";
 import { App } from "../src/http/index.js";
@@ -17,12 +17,27 @@ const { settings } = TestSettings.make({ trendtrackApiKey: "tt-test", trendtrack
 
 afterEach(() => vi.unstubAllGlobals());
 
+describe("TrendTrack's trending shops", () => {
+  it("asks the trending feed for shops advertising in the run's markets, and reads each row's sales, traffic and best sellers", async () => {
+    const fetch = vi.fn(async (_url: string, _init: RequestInit) =>
+      json({ data: [{ domain: "us.ohpolly.com", name: "Oh Polly", catalog: { mainCategory: "Apparel", bestSellers: [{ title: "Mini Dress" }, {}] }, traffic: { monthlyVisits: 1259493, growth30d: 0.15 }, sales: { estMonthlySales: 755291 }, advertising: { activeAds: 2054 } }, { name: "no domain" }], pagination: { total: 1489 } }, 4),
+    );
+    vi.stubGlobal("fetch", fetch);
+    const page = await new TrendtrackShopFinder(new TrendtrackApi(settings)).find({ text: "lung", searchIn: "product_text", countries: ["US"], sortBy: "estMonthlySales", minActiveAds: 20, limit: 2 });
+    expect(fetch.mock.calls[0]![0]).toBe("https://trendtrack.test/v1/shops/query");
+    expect(JSON.parse(String(fetch.mock.calls[0]![1].body))).toEqual({ search: "lung", searchType: "productName", displayInTrending: true, mainMarketCountries: ["US"], sortBy: "estMonthlySales", order: "desc", adsTimePeriod: "last7d", minActiveAds: 20, limit: 2, offset: 0 });
+    expect(page).toEqual({ total: 1489, credits: 4, shops: [{ domain: "us.ohpolly.com", name: "Oh Polly", main_category: "Apparel", monthly_visits: 1259493, visits_growth_30d: 0.15, monthly_sales_usd: 755291, active_ads: 2054, best_sellers: ["Mini Dress"] }] });
+    await new TrendtrackShopFinder(new TrendtrackApi(settings)).find({ text: null, searchIn: "product_text", countries: ["US"], sortBy: "activeAds", minActiveAds: 20, limit: 1 });
+    expect(JSON.parse(String(fetch.mock.calls[1]![1].body))).not.toHaveProperty("search");
+  });
+});
+
 describe("TrendTrack shops", () => {
   it("finds a shop only by an exact domain match, and reads its signals", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => json({ data: [{ matchType: "exact", matchField: "domain", shop: { id: "s1" }, signals: { monthlyVisits: 118945, activeAds: 43 } }] })));
-    expect(await new TrendtrackShops(settings).lookup("trybetterbrand.com")).toEqual({ domain: "trybetterbrand.com", shop_id: "s1", monthly_visits: 118945, active_ads: 43 });
+    expect(await new TrendtrackShops(new TrendtrackApi(settings)).lookup("trybetterbrand.com")).toEqual({ domain: "trybetterbrand.com", shop_id: "s1", monthly_visits: 118945, active_ads: 43 });
     vi.stubGlobal("fetch", vi.fn(async () => json({ data: [{ matchType: "fuzzy", matchField: "name", shop: { id: "s2" } }] })));
-    expect(await new TrendtrackShops(settings).lookup("betterbrand")).toBeNull();
+    expect(await new TrendtrackShops(new TrendtrackApi(settings)).lookup("betterbrand")).toBeNull();
   });
 
   it("gives shop-wide sales and the product's best-seller rank, matching an encoded handle, and counts the credits each call reports", async () => {
@@ -32,7 +47,7 @@ describe("TrendTrack shops", () => {
         : json({ data: { catalog: { productsCount: 23 }, sales: { estMonthlySales: 52737, estMonthlySalesMin: 37819, estMonthlySalesMax: 67525, unitsSold: 1573 }, traffic: { monthlyVisits: 118945, growth30d: 0.64 }, advertising: { activeAds: 44 } } }, 4),
     );
     vi.stubGlobal("fetch", fetch);
-    const { traction, credits } = await new TrendtrackShops(settings).traction({ domain: "trybetterbrand.com", shop_id: "s1", monthly_visits: 1, active_ads: 1 }, "betterlungs®-mullein-chlorophyll");
+    const { traction, credits } = await new TrendtrackShops(new TrendtrackApi(settings)).traction({ domain: "trybetterbrand.com", shop_id: "s1", monthly_visits: 1, active_ads: 1 }, "betterlungs®-mullein-chlorophyll");
     expect(credits).toBe(8);
     expect(traction).toMatchObject({ monthly_sales_usd: 52737, monthly_sales_min_usd: 37819, units_sold: 1573, products_count: 23, product_rank: 1, ranked_within: 2, single_product: false, active_ads: 44 });
     expect(String(fetch.mock.calls[1]![0])).toContain("sortBy=popularity");
@@ -40,14 +55,14 @@ describe("TrendTrack shops", () => {
 
   it("says the rank is unknown, not low, when TrendTrack lists no best-sellers for a shop (Mullevia, 2026-10-19)", async () => {
     vi.stubGlobal("fetch", vi.fn(async (url: string) => (url.includes("/products?") ? json({ data: [], pagination: { total: 0 } }, 4) : json({ data: { catalog: { productsCount: 6 }, sales: { estMonthlySales: 48658 } } }, 4))));
-    const { traction } = await new TrendtrackShops(settings).traction({ domain: "mullevia.com", shop_id: "m", monthly_visits: 7629, active_ads: 0 }, "mullevia-mullein-drops");
+    const { traction } = await new TrendtrackShops(new TrendtrackApi(settings)).traction({ domain: "mullevia.com", shop_id: "m", monthly_visits: 7629, active_ads: 0 }, "mullevia-mullein-drops");
     expect(traction).toMatchObject({ products_count: 6, product_rank: null, ranked_within: 0 });
   });
 
   it("treats a one-product shop's sales as the product's, without paying for its product list", async () => {
     const fetch = vi.fn(async () => json({ data: { catalog: { productsCount: 1 }, sales: { estMonthlySales: 9000, unitsSold: 300 } } }, 4));
     vi.stubGlobal("fetch", fetch);
-    const { traction } = await new TrendtrackShops(settings).traction({ domain: "one.com", shop_id: "s9", monthly_visits: null, active_ads: null }, "drops");
+    const { traction } = await new TrendtrackShops(new TrendtrackApi(settings)).traction({ domain: "one.com", shop_id: "s9", monthly_visits: null, active_ads: null }, "drops");
     expect(traction).toMatchObject({ single_product: true, product_rank: 1, ranked_within: 1, monthly_sales_usd: 9000 });
     expect(fetch).toHaveBeenCalledTimes(1);
   });

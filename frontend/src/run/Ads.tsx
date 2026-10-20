@@ -7,6 +7,7 @@ const RINGS: { key: string; title: string; note: string; matches: (ad: ReadAd) =
   { key: 'direct_competitor', title: 'Direct competitors', note: 'the same product: what is already being said to your buyer', matches: (ad) => ad.competitor_id !== null || ad.ring === 'direct_competitor' },
   { key: 'same_problem', title: 'Same problem, other products', note: 'the same buyer at the same moment of pain; counted as supply in the avatars', matches: (ad) => ad.competitor_id === null && ad.ring === 'same_problem' },
   { key: 'same_buyer', title: 'Same buyer, other problems', note: 'hooks, story structures, proof and offers this buyer responds to; not counted as supply', matches: (ad) => ad.competitor_id === null && ad.ring === 'same_buyer' },
+  { key: 'trending_shop', title: 'Trending shops, any market', note: 'long-form statics scaling for shops that are trending now; structures to apply to your store, not counted as supply', matches: (ad) => ad.competitor_id === null && ad.ring === 'trending_shop' },
   { key: 'earlier', title: 'From an earlier search', note: 'kept before the scout placed ads in rings', matches: (ad) => ad.competitor_id === null && ad.ring === null },
 ];
 

@@ -1,4 +1,4 @@
-import type { AdLibrary, AdRing, Product, ReadAd, StageName, StoredAd } from "../../../domain/index.js";
+import type { AdLibrary, AdRing, Product, ReadAd, ShopFinder, StageName, StoredAd } from "../../../domain/index.js";
 import { CompetitorRelationship } from "../../../domain/index.js";
 import type { ServicePrices } from "../../../config/index.js";
 import { Trace } from "../../../trace/index.js";
@@ -15,6 +15,7 @@ export class CompetitorAdStage implements Stage {
 
   constructor(
     private readonly ads: AdLibrary | null,
+    private readonly shops: ShopFinder | null,
     private readonly prices: ServicePrices,
     private readonly limits: ScoutLimits,
     private readonly reader = new AdReader(),
@@ -27,7 +28,7 @@ export class CompetitorAdStage implements Stage {
     const { context } = input;
     const product = (await context.store.products.get(input.product.id))!;
     const competitors = (await context.store.competitors.list(product.id)).filter((c) => c.status === "confirmed");
-    const { result, log } = await new AdScout(this.ads, this.prices, this.limits).scout(context, product, competitors);
+    const { result, log } = await new AdScout(this.ads, this.shops, this.prices, this.limits).scout(context, product, competitors);
     if (result.status !== "completed") {
       const why = result.status === "invalid" ? result.problems.join("; ") : result.status === "failed" ? result.error : "stopped";
       return { status: result.status === "invalid" ? "invalid" : "failed", summary: `${log.searched} searches, ${log.returned} ads returned`, error: `scout: ${why}` };
@@ -39,7 +40,7 @@ export class CompetitorAdStage implements Stage {
     for (const ad of stored) await context.store.ads.saveRing(ad.id, ringOf.get(ad.trendtrack_ad_id)!.ring, ringOf.get(ad.trendtrack_ad_id)!.why);
     await context.emit("ads.brands", { brands: report.brands });
     const unread = await this.readAll(context, product, stored);
-    const summary = `${stored.length} ads kept of ${log.returned} seen in ${log.searched} searches, from ${report.brands.length} brands; ${CompetitorAdStage.rings(await context.store.ads.list(product.id))}; ${stored.length - unread} read.`;
+    const summary = `${stored.length} ads kept of ${log.returned} seen in ${log.searched} searches (${log.shopsSeen} trending shops looked at), from ${report.brands.length} brands; ${CompetitorAdStage.rings(await context.store.ads.list(product.id))}; ${stored.length - unread} read.`;
     if (stored.length > 0 && unread === stored.length) return { status: "invalid", summary, error: "no batch of ads could be read" };
     return { status: "completed", summary, error: "" };
   }
@@ -47,7 +48,7 @@ export class CompetitorAdStage implements Stage {
   static rings(ads: readonly ReadAd[]): string {
     Trace.line(import.meta.url, "CompetitorAdStage.rings", { ads: ads.length });
     const count = (ring: AdRing) => ads.filter((ad) => ad.ring === ring).length;
-    return `${count("direct_competitor")} direct competitor, ${count("same_problem")} same problem, ${count("same_buyer")} same buyer`;
+    return `${count("direct_competitor")} direct competitor, ${count("same_problem")} same problem, ${count("same_buyer")} same buyer, ${count("trending_shop")} trending shop`;
   }
 
   private async readAll(context: RunContext, product: Product, ads: readonly StoredAd[]): Promise<number> {

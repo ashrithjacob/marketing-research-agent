@@ -15,4 +15,6 @@ export * from "./reviews/woot-reviews.js";
 export * from "./public-page.js";
 export * from "./page-visuals.js";
 export * from "./cached-visuals.js";
+export * from "./trendtrack-api.js";
+export * from "./trendtrack-shop-finder.js";
 export * from "./trendtrack-shops.js";

@@ -11,6 +11,8 @@ Ours, not TrendTrack's. Each was seen on a real call; the docs in `trendtrack/ap
 - **`sortBy` on `POST /v1/ads/query` refuses `reachDelta30d` and `reachDelta1d`** (2026-10-19, with `mediaType: image`, `minDescriptionLength: 2000`): `400 unsupported_filter`, "not representable on ads-search". Accepted: `longestRunning`, `reachDelta7d`, `reach`, `mostDuplicates`, `rankDelta30d`, `newest`, each 2 credits for a one-row page. `AD_SORTS` lists only these. `longestRunning` also narrows the results (3,403 against 11,169 for "mullein").
 - **`GET /v1/shops/{id}` costs 4 credits**, not one per returned resource (2026-10-19, `X-Credits-Used: 4`). One page of `/v1/shops/{id}/products` also cost 4 for 5 rows.
 - **`GET /v1/lookup` is free** as documented: no `X-Credits-Used` header came back.
+- **`POST /v1/shops/query` costs 4 credits per shop returned** (2026-10-20, `X-Credits-Used: 4` for a one-row page, with and without a search text).
+- **`displayInTrending: true` barely narrows** (2026-10-20): with `mainMarketCountries: ["US"]` alone it matched 493,786 shops, and `sortBy: growth30d` put first a shop with 0 active ads and `growth30d: 11460` (a ratio, not a percent, off a tiny base). `productName: "lung"` matched 1,489 shops, the first a dress shop. `TrendingShopsTool` therefore also asks for active ads (default at least 20 over 7 days).
 - **A shop's best-seller list can be empty while `catalog.productsCount` is not** (Mullevia: 6 products, `total: 0`).
 
 <Callout title="Resource-based navigation">

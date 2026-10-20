@@ -1,3 +1,4 @@
+import type { ShopPage, ShopQuery } from "./shop-finder.js";
 import type { ShopSignals, ShopTraction } from "./traction.js";
 import type { AdPage, AdQuery } from "./ad-library.js";
 import type { Generation } from "./logs.js";
@@ -40,6 +41,11 @@ export interface BrandVisuals {
 export interface ShopIntel {
   lookup(domain: string, signal?: AbortSignal): Promise<ShopSignals | null>;
   traction(signals: ShopSignals, productHandle: string | null, signal?: AbortSignal): Promise<{ traction: ShopTraction; credits: number }>;
+}
+
+/** Finds shops on TrendTrack's trending feed by what they sell and how hard they advertise; every shop returned is billed. */
+export interface ShopFinder {
+  find(query: ShopQuery, signal?: AbortSignal): Promise<ShopPage>;
 }
 
 /** What OpenRouter billed for one generation, looked up by its response id. */

@@ -8,6 +8,9 @@ import type {
   PageFetcher,
   SearchPage,
   SearchScope,
+  ShopFinder,
+  ShopPage,
+  ShopQuery,
   ShopIntel,
   ShopSignals,
   ShopTraction,
@@ -86,5 +89,21 @@ export class MeteredShopIntel implements ShopIntel {
     const result = await this.inner.traction(signals, productHandle, signal);
     await this.meter.charge({ service: "trendtrack", item: "shop", units: result.credits, usd: result.credits * this.prices.trendtrackUsdPerCredit, basis: "credits" });
     return result;
+  }
+}
+
+/** A search of TrendTrack's trending shops, charged in the credits its header reports. */
+export class MeteredShopFinder implements ShopFinder {
+  constructor(
+    private readonly inner: ShopFinder,
+    private readonly prices: ServicePrices,
+    private readonly meter: ChargeMeter,
+  ) {}
+
+  async find(query: ShopQuery, signal?: AbortSignal): Promise<ShopPage> {
+    Trace.line(import.meta.url, "MeteredShopFinder.find", { text: query.text });
+    const page = await this.inner.find(query, signal);
+    await this.meter.charge({ service: "trendtrack", item: "shops", units: page.credits, usd: page.credits * this.prices.trendtrackUsdPerCredit, basis: "credits" });
+    return page;
   }
 }

@@ -7,8 +7,8 @@ export const AWARENESS_LEVELS = ["unaware", "problem_aware", "solution_aware", "
 export const AD_BUCKETS = ["winning", "testing", "dead"] as const;
 export type AdBucket = (typeof AD_BUCKETS)[number];
 
-/** The rings a growth marketer studies a market's long-form ads in: a direct competitor's ad (the same product); an ad for the same problem from another product (the same buyer at the same moment of pain); an ad for another problem aimed at the same buyer (a format to borrow). The first two are supply for the client's avatars; the third is a playbook. */
-export const AD_RINGS = ["direct_competitor", "same_problem", "same_buyer"] as const;
+/** The rings a growth marketer studies a market's long-form ads in: a direct competitor's ad (the same product); an ad for the same problem from another product (the same buyer at the same moment of pain); an ad for another problem aimed at the same buyer (a format to borrow); a winning ad from a trending shop that scales on long-form statics, in any market (a playbook to apply to the client's store). The first two are supply for the client's avatars; the last two are playbooks. */
+export const AD_RINGS = ["direct_competitor", "same_problem", "same_buyer", "trending_shop"] as const;
 export type AdRing = (typeof AD_RINGS)[number];
 
 /** What the scout hands back: the ads worth studying, each in its ring with why, and the brands it found on the way. Ads are named by the TrendTrack id its searches returned. */

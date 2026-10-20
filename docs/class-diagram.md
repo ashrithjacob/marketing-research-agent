@@ -171,6 +171,10 @@ classDiagram
       lookup()
       traction()
     }
+    class ShopFinder {
+      <<interface>>
+      find()
+    }
     class GenerationSource {
       <<interface>>
       generation()
@@ -216,6 +220,15 @@ classDiagram
       <<interface>>
     }
     class ServiceReport {
+      <<interface>>
+    }
+    class ShopQuery {
+      <<interface>>
+    }
+    class FoundShop {
+      <<interface>>
+    }
+    class ShopPage {
       <<interface>>
     }
     class StagePlan {
@@ -414,6 +427,9 @@ classDiagram
     class MeteredShopIntel {
       lookup()
       traction()
+    }
+    class MeteredShopFinder {
+      find()
     }
     class OpenRouterGeneration {
       parse()
@@ -634,6 +650,16 @@ classDiagram
     class TrendtrackAds {
       search()
     }
+    class TrendtrackApi {
+      get()
+      post()
+    }
+    class TrendtrackShopRow {
+      <<interface>>
+    }
+    class TrendtrackShopFinder {
+      find()
+    }
     class TrendtrackShop {
       <<interface>>
     }
@@ -787,6 +813,7 @@ classDiagram
     }
     class ScoutLog {
       record()
+      recordShops()
       ad()
     }
     class AdPlacer {
@@ -861,6 +888,10 @@ classDiagram
     }
     class TracedTool {
       wrap()
+    }
+    class TrendingShopsTool {
+      tool()
+      row()
     }
     class UrlLedger {
       read()
@@ -947,6 +978,9 @@ classDiagram
   MeteredShopIntel --> ShopIntel
   MeteredShopIntel --> ServicePrices
   MeteredShopIntel --> ChargeMeter
+  MeteredShopFinder --> ShopFinder
+  MeteredShopFinder --> ServicePrices
+  MeteredShopFinder --> ChargeMeter
   PageVisuals --> PublicPage
   ParallelApi --> Settings
   ParallelSearch --> ParallelApi
@@ -957,6 +991,7 @@ classDiagram
   ServiceClients --> WebSearch
   ServiceClients --> AdLibrary
   ServiceClients --> ShopIntel
+  ServiceClients --> ShopFinder
   ShopifyStorefront --> PublicPage
   AccountTable --> SqlDatabase
   AdTable --> SqlDatabase
@@ -980,7 +1015,9 @@ classDiagram
   ThrottledAdLibrary --> AdLibrary
   ThrottledAdLibrary --> ServiceQueue
   TrendtrackAds --> Settings
-  TrendtrackShops --> Settings
+  TrendtrackApi --> Settings
+  TrendtrackShopFinder --> TrendtrackApi
+  TrendtrackShops --> TrendtrackApi
   AnalysisService --> ResearchStore
   AnalysisService --> RunLauncher
   AnalysisService --> LiveRuns
@@ -1009,9 +1046,11 @@ classDiagram
   RunLauncher --> ResolutionVisuals
   RunLauncher --> ResolutionSignals
   AdScout --> AdLibrary
+  AdScout --> ShopFinder
   AdScout --> ServicePrices
   AdScout --> ScoutLimits
   CompetitorAdStage --> AdLibrary
+  CompetitorAdStage --> ShopFinder
   CompetitorAdStage --> ServicePrices
   CompetitorAdStage --> ScoutLimits
   BrandVisualsCollector --> BrandVisuals
@@ -1029,6 +1068,8 @@ classDiagram
   SearchLongFormTool --> ScoutLog
   Toolbox --> ServiceClients
   Toolbox --> Settings
+  TrendingShopsTool --> ShopFinder
+  TrendingShopsTool --> ScoutLog
   WebFetchTool --> PageFetcher
   WebFetchTool --> UrlLedger
   WebSearchTool --> WebSearch
@@ -1059,7 +1100,7 @@ classDiagram
 | `adapters` | `adapters/fallback-fetcher.ts` | FallbackPageFetcher |
 | `adapters` | `adapters/firecrawl.ts` | FirecrawlPayload, Firecrawl |
 | `adapters` | `adapters/http.ts` | Http |
-| `adapters` | `adapters/metered.ts` | MeteredWebSearch, MeteredPageFetcher, MeteredAdLibrary, MeteredShopIntel |
+| `adapters` | `adapters/metered.ts` | MeteredWebSearch, MeteredPageFetcher, MeteredAdLibrary, MeteredShopIntel, MeteredShopFinder |
 | `adapters` | `adapters/openrouter-generation.ts` | OpenRouterGeneration |
 | `adapters` | `adapters/openrouter-prices.ts` | OpenRouterPrices |
 | `adapters` | `adapters/page-visuals.ts` | PageVisuals |
@@ -1095,6 +1136,8 @@ classDiagram
 | `adapters` | `adapters/store/visual-table.ts` | VisualTable |
 | `adapters` | `adapters/throttled.ts` | ThrottledPageFetcher, ThrottledWebSearch, ThrottledAdLibrary |
 | `adapters` | `adapters/trendtrack-ads.ts` | TrendtrackAd, TrendtrackAds |
+| `adapters` | `adapters/trendtrack-api.ts` | TrendtrackApi |
+| `adapters` | `adapters/trendtrack-shop-finder.ts` | TrendtrackShopRow, TrendtrackShopFinder |
 | `adapters` | `adapters/trendtrack-shops.ts` | TrendtrackShop, TrendtrackShops |
 | `agent` | `agent/analysis-service.ts` | AnalysisService |
 | `agent` | `agent/kernel/agent-runner.ts` | AgentJob, AgentRunnerDeps, AgentRunner |
@@ -1142,6 +1185,7 @@ classDiagram
 | `agent` | `agent/tools/search-long-form-tool.ts` | SearchLongFormTool |
 | `agent` | `agent/tools/toolbox.ts` | AgentKit, Toolbox |
 | `agent` | `agent/tools/traced-tool.ts` | TracedTool |
+| `agent` | `agent/tools/trending-shops-tool.ts` | TrendingShopsTool |
 | `agent` | `agent/tools/url-ledger.ts` | UrlLedger |
 | `agent` | `agent/tools/web-fetch-tool.ts` | WebFetchTool |
 | `agent` | `agent/tools/web-search-tool.ts` | WebSearchTool |
@@ -1156,12 +1200,13 @@ classDiagram
 | `domain` | `domain/competitors.ts` | Competitor, CompetitorRelationship |
 | `domain` | `domain/ids.ts` | Clock, Ids |
 | `domain` | `domain/logs.ts` | RunEvent, LlmCallRecord, Generation, LlmCall |
-| `domain` | `domain/ports.ts` | PageFetcher, WebSearch, AdLibrary, ReviewSource, Storefront, BrandVisuals, ShopIntel, GenerationSource |
+| `domain` | `domain/ports.ts` | PageFetcher, WebSearch, AdLibrary, ReviewSource, Storefront, BrandVisuals, ShopIntel, ShopFinder, GenerationSource |
 | `domain` | `domain/products.ts` | BrandVisual, Product |
 | `domain` | `domain/reviews.ts` | CollectedReview, ReviewTarget, StoredReview, ReviewCoverage, StorefrontFacts, Asins |
 | `domain` | `domain/runs.ts` | Run, RunUpdate, RunSummary |
 | `domain` | `domain/schemas.ts` | Schemas |
 | `domain` | `domain/service-report.ts` | ServicePart, ServiceReport |
+| `domain` | `domain/shop-finder.ts` | ShopQuery, FoundShop, ShopPage |
 | `domain` | `domain/stages.ts` | StagePlan, StageState, Stages |
 | `domain` | `domain/store-ports.ts` | AccountDirectory, RunStore, ProductStore, CompetitorStore, ReviewStore, AvatarStore, AvatarRecord, AdStore, BrandVisualCache, ShopSignalCache, EventLog, ChargeLedger, CallLog, ResearchStore |
 | `domain` | `domain/traction.ts` | ShopSignals, ShopTraction, ShopHandles |
