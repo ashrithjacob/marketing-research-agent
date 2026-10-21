@@ -49,11 +49,16 @@ class Archive implements PageArchive {
 
 class Actors implements ActorRunner {
   readonly actors: string[] = [];
+  async billed(run: ActorRun): Promise<number | null> {
+    return run.id.startsWith("memo23") ? 0.3 : run.id.startsWith("apt_marble") ? 0.02 : 0.01;
+  }
+
   async run(actor: string, input: Record<string, unknown>, _limits: ActorLimits): Promise<ActorRun> {
     this.actors.push(actor);
-    if (actor.startsWith("memo23")) return { status: "SUCCEEDED", usd: 0.3, items: (input.keywords as string[]).map((keyword) => ({ keyword, google_search_volume: keyword.startsWith("why") ? 1000 : 9000 })) };
-    if (actor.startsWith("apt_marble")) return { status: "SUCCEEDED", usd: 0.02, items: [{ asin: "B1", title: "Mullein Drops Lung Detox", url: "https://amazon.com/dp/B1", keyword: "mullein drops", rating: 4.5, ratingsCount: 300, isSponsored: false, organicPosition: 1 }] };
-    return { status: "SUCCEEDED", usd: 0.01, items: [{ submissionId: "p1", submissionType: "post", submissionUrl: "https://reddit.com/p1", subreddit: "r/COPD", title: "Does mullein actually work?", bodyText: "Tried it for a month.", score: 12 }] };
+    const done = { id: actor, status: "SUCCEEDED", finished_at: null };
+    if (actor.startsWith("memo23")) return { ...done, items: (input.keywords as string[]).map((keyword) => ({ keyword, google_search_volume: keyword.startsWith("why") ? 1000 : 9000 })) };
+    if (actor.startsWith("apt_marble")) return { ...done, items: [{ asin: "B1", title: "Mullein Drops Lung Detox", url: "https://amazon.com/dp/B1", keyword: "mullein drops", rating: 4.5, ratingsCount: 300, isSponsored: false, organicPosition: 1 }] };
+    return { ...done, items: [{ submissionId: "p1", submissionType: "post", submissionUrl: "https://reddit.com/p1", subreddit: "r/COPD", title: "Does mullein actually work?", bodyText: "Tried it for a month.", score: 12 }] };
   }
 }
 

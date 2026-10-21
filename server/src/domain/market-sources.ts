@@ -46,16 +46,16 @@ export interface ForumPost {
 
 export interface ForumQuery {
   keywords: readonly string[];
-  subreddits: readonly string[];
   maxPosts: number;
   commentsPerPost: number;
 }
 
-/** What one Apify actor run returned and what Apify charged for it (platform usage and per-event charges together, measured 2026-10-20). */
+/** What one Apify actor run returned. Its charge is not here: Apify adds per-result charges some seconds after the run finishes (0 at 12 s, final at 16 s, measured 2026-10-21), so it is looked up afterwards. */
 export interface ActorRun {
+  id: string;
   status: string;
   items: Array<Record<string, unknown>>;
-  usd: number | null;
+  finished_at: string | null;
 }
 
 export interface ActorLimits {

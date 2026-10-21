@@ -1,6 +1,6 @@
 import { Hono, type Context, type Next } from "hono";
 
-import { ApifyRunner, CachedVisuals, JudgemeReviews, OpenRouterPrices, PageVisuals, PublicPage, ServiceClients, ShopifyStorefront, WaybackArchive, WebSuggestions, WootReviews } from "../adapters/index.js";
+import { ApifyApi, ApifyRunner, CachedVisuals, JudgemeReviews, OpenRouterPrices, PageVisuals, PublicPage, ServiceClients, ShopifyStorefront, WaybackArchive, WebSuggestions, WootReviews } from "../adapters/index.js";
 import {
   AmazonListingFinder,
   AnalysisService,
@@ -92,7 +92,7 @@ export class App {
       new ReviewStage(new ReviewListings(new ShopifyStorefront(pages), new AmazonListingFinder()), sources, settings.reviewsPerProduct),
       new CompetitorAdStage(clients.ads, clients.shopFinder, settings.prices, limits),
       new MarketStage(
-        { ads: clients.ads, pages: clients.pages, suggestions: new WebSuggestions(settings), archive: new WaybackArchive(settings, pages), actors: settings.apifyToken ? new ApifyRunner(settings) : null },
+        { ads: clients.ads, pages: clients.pages, suggestions: new WebSuggestions(settings), archive: new WaybackArchive(settings, pages), actors: settings.apifyToken ? new ApifyRunner(new ApifyApi(settings), settings) : null },
         settings.prices,
         { historySearches: settings.marketHistorySearches, paidCalls: settings.marketPaidCalls },
       ),

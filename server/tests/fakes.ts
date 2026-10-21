@@ -96,6 +96,7 @@ export class TestSettings {
       trendtrackConcurrency: 2,
       apifyToken: "",
       apifyWaitSeconds: 5,
+      apifySettleSeconds: 0,
       webTimeoutSeconds: 5,
       fetchCharLimit: 25000,
       prices: { parallelSearchUsd: 0.005, parallelExtractUsd: 0.001, trendtrackUsdPerCredit: 0.0089, crawl4aiUsdPerPage: 0, firecrawlUsdPerPage: 0.001 },

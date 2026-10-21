@@ -226,6 +226,7 @@ classDiagram
     class ActorRunner {
       <<interface>>
       run()
+      billed()
     }
     class KeywordVolumes {
       <<interface>>
@@ -473,6 +474,12 @@ classDiagram
     }
   }
   namespace adapters {
+    class InputSchema {
+      <<interface>>
+    }
+    class ActorInputCheck {
+      problems()
+    }
     class ActorResult {
       items()
       number()
@@ -480,10 +487,16 @@ classDiagram
     class ApifyAmazonSearch {
       search()
     }
+    class ApifyApi {
+      get()
+      post()
+      items()
+    }
     class ApifyKeywordVolumes {
       volumes()
     }
     class ApifyRedditSearch {
+      expression()
       search()
     }
     class ApifyRun {
@@ -491,9 +504,11 @@ classDiagram
     }
     class ApifyRunner {
       run()
+      billed()
     }
     class MeteredActorRunner {
       run()
+      billed()
     }
     class CachedVisuals {
       find()
@@ -1136,9 +1151,12 @@ classDiagram
       verify()
     }
   }
+  ActorInputCheck --> ApifyApi
   ApifyAmazonSearch --> ActorRunner
+  ApifyApi --> Settings
   ApifyKeywordVolumes --> ActorRunner
   ApifyRedditSearch --> ActorRunner
+  ApifyRunner --> ApifyApi
   ApifyRunner --> Settings
   MeteredActorRunner --> ActorRunner
   MeteredActorRunner --> ChargeMeter
@@ -1303,8 +1321,10 @@ classDiagram
 
 | Layer | Module | Classes |
 |---|---|---|
+| `adapters` | `adapters/apify/actor-input-check.ts` | InputSchema, ActorInputCheck |
 | `adapters` | `adapters/apify/actor-result.ts` | ActorResult |
 | `adapters` | `adapters/apify/apify-amazon-search.ts` | ApifyAmazonSearch |
+| `adapters` | `adapters/apify/apify-api.ts` | ApifyApi |
 | `adapters` | `adapters/apify/apify-keyword-volumes.ts` | ApifyKeywordVolumes |
 | `adapters` | `adapters/apify/apify-reddit-search.ts` | ApifyRedditSearch |
 | `adapters` | `adapters/apify/apify-runner.ts` | ApifyRun, ApifyRunner |

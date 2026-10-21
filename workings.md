@@ -230,12 +230,27 @@ Its tools, each logged in `MarketLog` under the id the agent cites:
 | `find_reviews` | stored reviews containing a phrase | free | 20 |
 | `read_landing` | an ad's landing page, through the page reader | Firecrawl per page | 6 |
 
-The Apify tools exist only with `APIFY_TOKEN`. Every Apify run is charged as
-Apify billed it (`usageTotalUsd`, which includes per-result charges: a
-`junglee` run returning 1 review showed $0.005, the BRONZE price, so the
-STARTER plan pays BRONZE prices, measured 2026-10-20). A run still going
-after `MRA_APIFY_WAIT_SECONDS` (600) is aborted. An empty dataset is an error,
-never "no results".
+The Apify tools exist only with `APIFY_TOKEN`. Before an actor runs, its
+input is checked against the actor's current input schema (a free read,
+cached per process); a field the actor no longer accepts stops the run with
+the field named. That happened on 2026-10-21: the Reddit actor replaced
+`keywordsIncluded` with `query`, ran its default search, returned nothing and
+was charged.
+
+Every Apify run is charged as Apify billed it (`usageTotalUsd`, which includes
+per-result charges; the STARTER plan pays BRONZE prices), read once the charge
+has settled:
+- **Why it waits:** Apify adds per-result charges after the run finishes.
+  Measured 2026-10-21: $0 at 12 s, final at 16 s.
+- **How the lookup works:** it waits `MRA_APIFY_SETTLE_SECONDS` (60) after
+  the run finished, then reads until two reads 15 s apart agree.
+- **Why the run waits for it:** the lookup is deferred through `BilledCosts`,
+  so the run waits for it before totalling its cost.
+- **What it fixed:** reading at finish recorded $0.0001 for a memo23 run Apify
+  billed $0.30.
+
+A run still going after `MRA_APIFY_WAIT_SECONDS` (600) is aborted. An empty
+dataset is an error, never "no results".
 
 **Code checks** on the submission: every claim group cites only ads a tool
 showed; the stage rests on submitted claim groups; cited snapshots were read;

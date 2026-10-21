@@ -1,7 +1,7 @@
 import type { GenerationSource, LlmCall, ResearchStore } from "../../domain/index.js";
 import { Trace } from "../../trace/index.js";
 
-/** Looks up what OpenRouter billed for each call; the lookup 404s for a few seconds after a turn, so each one is kept pending until the run ends and waits for it. */
+/** Looks up what each service billed once its bill exists: OpenRouter's lookup 404s for a few seconds after a turn, Apify adds its charges seconds after a run. Each lookup is kept pending until the run ends and waits for it. */
 export class BilledCosts {
   private readonly pending = new Set<Promise<void>>();
 
@@ -16,6 +16,14 @@ export class BilledCosts {
     const work = this.record(call).catch((error: unknown) => console.error(`run ${call.run_id}: billed cost lookup failed`, error));
     this.pending.add(work);
     void work.finally(() => this.pending.delete(work));
+  };
+
+  /** Keeps another service's billing lookup pending the same way. */
+  readonly defer = (work: Promise<void>): void => {
+    Trace.line(import.meta.url, "BilledCosts.defer", { pending: this.pending.size });
+    const tracked = work.catch((error: unknown) => console.error("billed cost lookup failed", error));
+    this.pending.add(tracked);
+    void tracked.finally(() => this.pending.delete(tracked));
   };
 
   async settled(): Promise<void> {

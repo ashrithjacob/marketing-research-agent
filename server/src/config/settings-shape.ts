@@ -33,6 +33,7 @@ export interface Settings {
   trendtrackConcurrency: number;
   apifyToken: string;
   apifyWaitSeconds: number;
+  apifySettleSeconds: number;
   webTimeoutSeconds: number;
   fetchCharLimit: number;
   prices: ServicePrices;

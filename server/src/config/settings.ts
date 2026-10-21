@@ -90,6 +90,7 @@ export class Env {
       trendtrackConcurrency: Env.number("MRA_TRENDTRACK_CONCURRENCY", 2),
       apifyToken: Env.text("APIFY_TOKEN", ""),
       apifyWaitSeconds: Env.number("MRA_APIFY_WAIT_SECONDS", 600),
+      apifySettleSeconds: Env.number("MRA_APIFY_SETTLE_SECONDS", 60),
       webTimeoutSeconds: Env.number("MRA_WEB_TIMEOUT_SECONDS", 90),
       fetchCharLimit: Env.number("MRA_FETCH_CHAR_LIMIT", 25000),
       prices: {

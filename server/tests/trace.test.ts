@@ -8,7 +8,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import ts from "typescript";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { App } from "../src/http/index.js";
 import { Trace, TraceFile, TraceFormat, WireTap, type TraceStep } from "../src/trace/index.js";
@@ -181,8 +181,15 @@ describe("the wire", () => {
 });
 
 describe("the download", () => {
+  let pg: PostgresStores;
+  beforeAll(async () => {
+    pg = await PostgresStores.start();
+  });
+  afterAll(async () => {
+    await pg.stop();
+  });
+
   it("serves a run's trace as an attachment, with the agent's own lines in it", async () => {
-    const pg = await PostgresStores.start();
     const faux = new Faux();
     faux.provider.setResponses(
       new ScriptedAgents()
@@ -208,7 +215,6 @@ describe("the download", () => {
     expect(text.split("\n")[0]).toContain(`run ${run.id} phase=resolve`);
     expect(text).toContain("[agent/resolve/product-resolver.ts] ProductResolver.resolve");
     expect(text.trim().split("\n").every((line) => /\[[\w./-]+\.ts\]/.test(line))).toBe(true);
-    await pg.stop();
   });
 });
 

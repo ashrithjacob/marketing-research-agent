@@ -60,9 +60,10 @@ export interface PageArchive {
   read(page: ArchivedPage, signal?: AbortSignal): Promise<string>;
 }
 
-/** Runs one Apify actor to the end within its limits and returns its dataset with what Apify charged. */
+/** Runs one Apify actor to the end within its limits and returns its dataset; what Apify charged for a run is read once the charge has settled. */
 export interface ActorRunner {
   run(actor: string, input: Record<string, unknown>, limits: ActorLimits, signal?: AbortSignal): Promise<ActorRun>;
+  billed(run: ActorRun): Promise<number | null>;
 }
 
 export interface KeywordVolumes {

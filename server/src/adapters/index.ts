@@ -15,6 +15,7 @@ export * from "./reviews/woot-reviews.js";
 export * from "./public-page.js";
 export * from "./page-visuals.js";
 export * from "./cached-visuals.js";
+export * from "./apify/apify-api.js";
 export * from "./apify/apify-runner.js";
 export * from "./apify/metered-actor-runner.js";
 export * from "./apify/apify-keyword-volumes.js";

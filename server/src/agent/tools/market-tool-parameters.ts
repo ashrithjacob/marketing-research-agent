@@ -32,8 +32,7 @@ export const amazonSearchParameters = Type.Object({
 });
 
 export const redditParameters = Type.Object({
-  keywords: Type.Array(Type.String(), { description: "1 to 3 keyword searches, e.g. 'mullein cough'." }),
-  subreddits: Type.Optional(Type.Array(Type.String(), { description: "Communities to read instead of searching all of Reddit, e.g. COPD, quittingsmoking." })),
+  keywords: Type.Array(Type.String(), { description: "1 to 3 keyword searches, e.g. 'mullein cough'; any of them may match." }),
 });
 
 export const findReviewsParameters = Type.Object({

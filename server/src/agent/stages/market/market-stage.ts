@@ -105,7 +105,7 @@ export class MarketStage implements Stage {
     ];
     if (sources.ads) tools.push(new AdHistoryTool(new MeteredAdLibrary(sources.ads, prices, meter), Markets.countries(context.run.input.markets), log).tool());
     if (sources.actors) {
-      const runner = new MeteredActorRunner(sources.actors, meter);
+      const runner = new MeteredActorRunner(sources.actors, meter, context.billing.defer);
       tools.push(
         new VolumeTool(new ApifyKeywordVolumes(runner), SourceMarkets.keywordCountry(market), log).tool(),
         new AmazonSearchTool(new ApifyAmazonSearch(runner), SourceMarkets.amazonMarketplace(market), log).tool(),

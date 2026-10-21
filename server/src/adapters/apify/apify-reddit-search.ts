@@ -3,7 +3,7 @@ import { Trace } from "../../trace/index.js";
 
 import { ActorResult } from "./actor-result.js";
 
-/** Reddit posts and their comments through `coding-doctor-omar/reddit-scraper-pro`, which has no fee: only Apify's platform time, so it is bounded by a timeout and memory, and its comment defaults (50,000 a post, 10 deep) are capped. Collects pages without Reddit's API; the user accepted that risk on 2026-10-20. */
+/** Reddit posts and their comments, site-wide by keyword, through `coding-doctor-omar/reddit-scraper-pro` (input as of build 0.0.48, 2026-10-21: one `query` expression). It has no fee, only Apify's platform time, so it is bounded by a timeout and memory, and its comment defaults (50,000 a post, 10 deep) are capped. Collects pages without Reddit's API; the user accepted that risk on 2026-10-20. */
 export class ApifyRedditSearch implements ForumSearch {
   static readonly ACTOR = "coding-doctor-omar/reddit-scraper-pro";
   static readonly LIMITS = { maxTotalChargeUsd: null, timeoutSeconds: 300, memoryMb: 1024 };
@@ -11,15 +11,18 @@ export class ApifyRedditSearch implements ForumSearch {
 
   constructor(private readonly runner: ActorRunner) {}
 
+  /** Each search in parentheses, joined by OR: the actor's advanced expression syntax. */
+  static expression(keywords: readonly string[]): string {
+    Trace.line(import.meta.url, "ApifyRedditSearch.expression", { keywords: keywords.length });
+    return keywords.map((keyword) => keyword.replace(/[()]/g, " ").trim()).filter((keyword) => keyword !== "").map((keyword) => (keywords.length > 1 ? `(${keyword})` : keyword)).join(" OR ");
+  }
+
   async search(query: ForumQuery, signal?: AbortSignal): Promise<ForumPost[]> {
-    Trace.line(import.meta.url, "ApifyRedditSearch.search", { keywords: query.keywords, subreddits: query.subreddits });
+    Trace.line(import.meta.url, "ApifyRedditSearch.search", { keywords: query.keywords });
     const input = {
-      scrapingMode: query.subreddits.length > 0 ? "standard" : "keywordSearch",
-      ...(query.subreddits.length > 0 ? { subredditUrls: query.subreddits.map((name) => `https://www.reddit.com/r/${name.replace(/^r\//, "")}/`) } : {}),
-      keywordsIncluded: [...query.keywords],
+      scrapingMode: "keywordSearch",
+      query: ApifyRedditSearch.expression(query.keywords),
       maxResults: query.maxPosts,
-      maxPostsPerCollection: query.maxPosts,
-      timeFrame: "all-time",
       sort: "default",
       includeComments: query.commentsPerPost > 0,
       maxCommentsDepth: ApifyRedditSearch.COMMENT_DEPTH,
