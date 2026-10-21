@@ -58,7 +58,7 @@ describe("products and competitors", () => {
   it("summarise each run with its product's and competitors' pictures and its evidence counts", async () => {
     const { store } = pg;
     const account = await store.accounts.addAccount("summary-client");
-    const input = { product_url: "https://s.example/p", product_name: null, markets: ["US" as const], known_competitors: [], brand_constraints: "", price_offer: "" };
+    const input = { product_url: "https://s.example/p", product_name: null, markets: ["US" as const] };
     const run = await store.runs.create({ accountId: account.id, input, model: "m", stages: Stages.initial([]) });
     const product = await store.products.upsert(account.id, "https://s.example/p", "Drops", "S");
     await store.products.saveVisual(product.id, { image_url: "https://s.example/p.jpg", logo_url: null });
@@ -79,7 +79,7 @@ describe("products and competitors", () => {
   it("list runs only for the account a scope admits", async () => {
     const { store } = pg;
     const other = await store.accounts.addAccount("other-client");
-    const input = { product_url: "https://x.example/p", product_name: null, markets: ["US" as const], known_competitors: [], brand_constraints: "", price_offer: "" };
+    const input = { product_url: "https://x.example/p", product_name: null, markets: ["US" as const] };
     const mine = await store.runs.create({ accountId: other.id, input, model: "m", stages: Stages.initial([]) });
     expect((await store.runs.list(Scope.of(other.id))).map((r) => r.id)).toEqual([mine.id]);
     expect((await store.runs.list(Scope.of(ADMIN_ACCOUNT))).map((r) => r.id)).not.toContain(mine.id);

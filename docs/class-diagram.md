@@ -329,6 +329,7 @@ classDiagram
       summaries()
       updateRun()
       unfinished()
+      delete()
     }
     class ProductStore {
       <<interface>>
@@ -341,6 +342,7 @@ classDiagram
     class CompetitorStore {
       <<interface>>
       confirm()
+      add()
       list()
       saveProfile()
       saveVisual()
@@ -370,6 +372,7 @@ classDiagram
       save()
       saveReading()
       saveRing()
+      link()
       list()
     }
     class BrandVisualCache {
@@ -467,6 +470,9 @@ classDiagram
       census()
       metaAds()
       channels()
+    }
+    class PackCheck {
+      problems()
     }
     class PriceCheck {
       problems()
@@ -652,6 +658,7 @@ classDiagram
       save()
       saveReading()
       saveRing()
+      link()
       list()
     }
     class AvatarTable {
@@ -671,6 +678,7 @@ classDiagram
     }
     class CompetitorTable {
       confirm()
+      add()
       list()
       saveProfile()
       saveVisual()
@@ -729,6 +737,7 @@ classDiagram
       create()
       get()
       list()
+      delete()
       summaries()
       updateRun()
       unfinished()
@@ -804,8 +813,17 @@ classDiagram
       confirm()
       rerun()
       stop()
+      delete()
       get()
       recover()
+    }
+    class CompetitorLauncher {
+      search()
+      add()
+    }
+    class CompetitorService {
+      search()
+      add()
     }
     class AgentJob {
       <<interface>>
@@ -871,6 +889,7 @@ classDiagram
       openrouter()
     }
     class Pipeline {
+      add()
       run()
     }
     class RunServices {
@@ -903,6 +922,14 @@ classDiagram
     class Stage {
       <<interface>>
       run()
+      add()
+    }
+    class CompetitorSearch {
+      search()
+    }
+    class CompetitorUrlCheck {
+      problems()
+      key()
     }
     class ProductResolver {
       resolve()
@@ -925,6 +952,7 @@ classDiagram
       chain()
       resolve()
       research()
+      crashed()
     }
     class AdReader {
       read()
@@ -939,6 +967,7 @@ classDiagram
     }
     class CompetitorAdStage {
       run()
+      add()
       rings()
     }
     class ScoutLog {
@@ -991,6 +1020,7 @@ classDiagram
     }
     class BrandVisualsCollector {
       collect()
+      collectCompetitors()
     }
     class CompetitorProfiler {
       profile()
@@ -1003,9 +1033,11 @@ classDiagram
     }
     class ProductMarketStage {
       run()
+      add()
     }
     class ShopTractionCollector {
       collect()
+      collectCompetitors()
     }
     class AmazonListingFinder {
       find()
@@ -1019,6 +1051,7 @@ classDiagram
     }
     class ReviewStage {
       run()
+      add()
       empty()
     }
     class AdHistoryTool {
@@ -1225,6 +1258,15 @@ classDiagram
   AnalysisService --> RunLauncher
   AnalysisService --> LiveRuns
   AnalysisService --> Pipeline
+  CompetitorLauncher --> RunServices
+  CompetitorLauncher --> LiveRuns
+  CompetitorLauncher --> RunLauncher
+  CompetitorLauncher --> Pipeline
+  CompetitorLauncher --> CompetitorSearch
+  CompetitorLauncher --> ResolutionVisuals
+  CompetitorLauncher --> ResolutionSignals
+  CompetitorService --> ResearchStore
+  CompetitorService --> CompetitorLauncher
   AgentRunner --> AgentRunnerDeps
   BilledCosts --> ResearchStore
   BilledCosts --> GenerationSource
@@ -1310,6 +1352,7 @@ classDiagram
   EvidenceRoutes --> AnalysisService
   RunRoutes --> ResearchStore
   RunRoutes --> AnalysisService
+  RunRoutes --> CompetitorService
   RunRoutes --> RunEvents
   RunRoutes --> TraceFile
   Sessions --> AccountDirectory
@@ -1377,6 +1420,8 @@ classDiagram
 | `adapters` | `adapters/wayback-archive.ts` | WaybackArchive |
 | `adapters` | `adapters/web-suggestions.ts` | WebSuggestions |
 | `agent` | `agent/analysis-service.ts` | AnalysisService |
+| `agent` | `agent/competitor-launcher.ts` | CompetitorLauncher |
+| `agent` | `agent/competitor-service.ts` | CompetitorService |
 | `agent` | `agent/kernel/agent-runner.ts` | AgentJob, AgentRunnerDeps, AgentRunner |
 | `agent` | `agent/kernel/billed-costs.ts` | BilledCosts |
 | `agent` | `agent/kernel/llm-call-log.ts` | CallSequence, LlmCallLog |
@@ -1394,6 +1439,8 @@ classDiagram
 | `agent` | `agent/pipeline/run-events.ts` | RunEvents |
 | `agent` | `agent/pipeline/stage-progress.ts` | StageProgress |
 | `agent` | `agent/pipeline/stage.ts` | StageInput, StageOutcome, Stage |
+| `agent` | `agent/resolve/competitor-search.ts` | CompetitorSearch |
+| `agent` | `agent/resolve/competitor-url-check.ts` | CompetitorUrlCheck |
 | `agent` | `agent/resolve/product-resolver.ts` | ProductResolver |
 | `agent` | `agent/resolve/resolution-signals.ts` | ResolutionSignals |
 | `agent` | `agent/resolve/resolution-visuals.ts` | ResolutionVisuals |
@@ -1468,6 +1515,7 @@ classDiagram
 | `extract` | `extract/avatar-memory.ts` | AvatarMemoryBook |
 | `extract` | `extract/avatar-tally.ts` | AvatarTally |
 | `extract` | `extract/market-tally.ts` | MarketTally |
+| `extract` | `extract/pack-check.ts` | PackCheck |
 | `extract` | `extract/price-check.ts` | PriceCheck |
 | `http` | `http/account-commands.ts` | AccountCommands |
 | `http` | `http/app.ts` | AppParts, App |

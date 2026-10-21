@@ -403,6 +403,15 @@ ALTER TABLE ads ADD CONSTRAINT ads_run_ad UNIQUE (run_id, trendtrack_ad_id);
 CREATE INDEX ads_run ON ads(run_id);
 `;
 
+const PRODUCT_LABEL_FACTS = `
+ALTER TABLE products
+    ADD COLUMN price_points       JSONB NOT NULL DEFAULT '[]',
+    ADD COLUMN subscription_terms JSONB,
+    ADD COLUMN pack               JSONB,
+    ADD COLUMN coa_url            TEXT,
+    ADD COLUMN miscellaneous      JSONB NOT NULL DEFAULT '[]';
+`;
+
 /** Applied in order, once each, recorded in schema_migrations. An applied migration is never edited: a change is a new entry at the end. */
 export const MIGRATIONS: readonly Migration[] = [
   { id: 1, name: "avatar_schema", sql: AVATAR_SCHEMA },
@@ -413,4 +422,5 @@ export const MIGRATIONS: readonly Migration[] = [
   { id: 6, name: "shop_traction", sql: SHOP_TRACTION },
   { id: 7, name: "ad_rings", sql: AD_RINGS },
   { id: 8, name: "ads_per_run", sql: ADS_PER_RUN },
+  { id: 9, name: "product_label_facts", sql: PRODUCT_LABEL_FACTS },
 ];

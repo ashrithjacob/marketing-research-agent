@@ -1,5 +1,5 @@
-import { ProductBriefSchema, type AnalysisInput, type Product, type ProductBrief } from "../../../domain/index.js";
-import { PriceCheck } from "../../../extract/index.js";
+import { ProductBriefSchema, type Product, type ProductBrief } from "../../../domain/index.js";
+import { PackCheck, PriceCheck } from "../../../extract/index.js";
 import { Trace } from "../../../trace/index.js";
 import type { AgentResult } from "../../kernel/agent-runner.js";
 import type { RunContext } from "../../pipeline/run-context.js";
@@ -17,7 +17,7 @@ export class ProductBriefAgent {
     return context.agent({
       agentId: ProductBriefAgent.AGENT_ID,
       system: PRODUCT_BRIEF_SYSTEM,
-      instructions: ProductBriefAgent.instructions(product, context.run.input),
+      instructions: ProductBriefAgent.instructions(product),
       tools,
       maxTurns: ProductBriefAgent.MAX_TURNS,
       submission: { schema: ProductBriefSchema, describe: "Hand back the product brief.", check: (brief) => ProductBriefAgent.problems(brief, urls) },
@@ -29,26 +29,26 @@ export class ProductBriefAgent {
     return [
       ...(brief.price ? [brief.price.source_url] : []),
       brief.offer.source_url,
+      ...brief.price_points.map((point) => point.source_url),
+      ...(brief.subscription_terms ? [brief.subscription_terms.source_url] : []),
+      ...(brief.pack ? [brief.pack.source_url] : []),
       ...brief.ingredients.map((ingredient) => ingredient.source_url),
       ...brief.claims_on_page.map((claim) => claim.source_url),
+      ...(brief.coa_url ? [brief.coa_url] : []),
+      ...brief.miscellaneous.map((fact) => fact.source_url),
     ];
   }
 
   static problems(brief: ProductBrief, urls: UrlLedger): string[] {
     Trace.line(import.meta.url, "ProductBriefAgent.problems");
     const unread = urls.unread(ProductBriefAgent.citedUrls(brief)).map((url) => `source_url ${url} was never read with web_fetch; read it or cite a page you did read`);
-    return [...unread, ...PriceCheck.problems(brief.price, (url) => urls.textOf(url), "price")];
+    const textOf = (url: string) => urls.textOf(url);
+    const points = brief.price_points.flatMap((point, i) => PriceCheck.problems(point, textOf, `price_points[${i}]`));
+    return [...unread, ...PriceCheck.problems(brief.price, textOf, "price"), ...points, ...PackCheck.problems(brief.pack, textOf)];
   }
 
-  private static instructions(product: Product, input: AnalysisInput): string {
+  private static instructions(product: Product): string {
     Trace.line(import.meta.url, "ProductBriefAgent.instructions");
-    return [
-      `Product page: ${product.url}`,
-      `Product as resolved: ${product.name}`,
-      input.price_offer ? `The user says about price and offer (check it against the page): ${input.price_offer}` : "",
-      input.brand_constraints ? `The brand's own notes on claims it can and cannot make: ${input.brand_constraints}` : "",
-    ]
-      .filter((line) => line !== "")
-      .join("\n");
+    return [`Product page: ${product.url}`, `Product as resolved: ${product.name}`].join("\n");
   }
 }

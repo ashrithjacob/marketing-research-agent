@@ -1,0 +1,5 @@
+- font and style of product brioef
+- more competitors looks ugly
+- Reviews can I get some profiling on reviewer
+- Long form adds see specs
+- market awareness too verbose on first page itself

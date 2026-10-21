@@ -46,6 +46,13 @@ export class CompetitorAdStage implements Stage {
     return { status: "completed", summary, error: "" };
   }
 
+  /** Ads this run already kept that land on an added competitor's site become that competitor's; no new search is made. */
+  async add(input: StageInput): Promise<string> {
+    Trace.line(import.meta.url, "CompetitorAdStage.add", { runId: input.context.run.id, competitors: input.competitors.length });
+    const linked = await input.context.store.ads.link(input.context.run.id, new Map(input.competitors.map((c) => [CompetitorRelationship.domainOf(c.url), c.id])));
+    return `${linked} ads already kept land on their sites`;
+  }
+
   static rings(ads: readonly ReadAd[]): string {
     Trace.line(import.meta.url, "CompetitorAdStage.rings", { ads: ads.length });
     const count = (ring: AdRing) => ads.filter((ad) => ad.ring === ring).length;

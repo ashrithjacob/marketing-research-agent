@@ -35,7 +35,7 @@ describe("accounts", () => {
     const clientA = await store.accounts.addAccount("client-a");
     const clientB = await store.accounts.addAccount("client-b");
     await store.accounts.addUser({ username: "alice", passwordHash: await Passwords.hash("alice-password"), accountId: clientA.id, isAdmin: false });
-    const input = { product_url: "https://x.example/p", product_name: null, markets: ["US" as const], known_competitors: [], brand_constraints: "", price_offer: "" };
+    const input = { product_url: "https://x.example/p", product_name: null, markets: ["US" as const] };
     const ofB = await store.runs.create({ accountId: clientB.id, input, model: "m", stages: Stages.initial([]) });
 
     expect((await get("/runs")).status).toBe(401);

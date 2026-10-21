@@ -120,6 +120,22 @@ describe("a run", () => {
     expect((await view(runId)).run.status).toBe("cancelled");
   });
 
+  it("is deleted with everything it wrote once it waits or has ended, and refused while it is working", async () => {
+    faux.provider.setResponses(new ScriptedAgents().on("Product url:", resolver).steps());
+    const runId = await start({ product_url: PRODUCT_URL });
+    await settle(runId, ["awaiting_confirmation"]);
+    expect((await pg.db.all("SELECT id FROM llm_calls WHERE run_id = ?", [runId])).length).toBeGreaterThan(0);
+    await pg.store.runs.updateRun(runId, { status: "running" });
+    const refused = await driver.delete(runId);
+    expect(refused.status).toBe(409);
+    expect(JSON.stringify(await refused.json())).toContain("stop it before deleting it");
+    await pg.store.runs.updateRun(runId, { status: "awaiting_confirmation" });
+    expect((await driver.delete(runId)).status).toBe(200);
+    expect((await api(`/runs/${runId}`)).status).toBe(404);
+    expect(await pg.db.all("SELECT id FROM run_events WHERE run_id = ?", [runId])).toEqual([]);
+    expect(await pg.db.all("SELECT id FROM llm_calls WHERE run_id = ?", [runId])).toEqual([]);
+  });
+
   it("refuses a url typed as a product name, and an input with neither", async () => {
     const asName = await api("/runs", { product_name: "https://mullevia.com/products/mullein-drops" });
     expect(asName.status).toBe(422);

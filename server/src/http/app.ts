@@ -4,6 +4,9 @@ import { ApifyApi, ApifyRunner, CachedVisuals, JudgemeReviews, OpenRouterPrices,
 import {
   AmazonListingFinder,
   AnalysisService,
+  CompetitorLauncher,
+  CompetitorSearch,
+  CompetitorService,
   AvatarStage,
   BrandVisualsCollector,
   CompetitorAdStage,
@@ -69,15 +72,18 @@ export class App {
       generations: parts.generations ?? this.prices,
       events,
     };
-    const launcher = new RunLauncher(services, settings, this.live, pipeline, new ProductResolver(), new ResolutionVisuals(visuals), new ResolutionSignals(clients.shops, store.signals));
+    const resolutionVisuals = new ResolutionVisuals(visuals);
+    const resolutionSignals = new ResolutionSignals(clients.shops, store.signals);
+    const launcher = new RunLauncher(services, settings, this.live, pipeline, new ProductResolver(), resolutionVisuals, resolutionSignals);
     this.analyses = new AnalysisService(store, launcher, this.live, pipeline, settings.model);
+    const competitors = new CompetitorService(store, new CompetitorLauncher(services, this.live, launcher, pipeline, new CompetitorSearch(), resolutionVisuals, resolutionSignals));
 
     const hono = new Hono<ApiEnv>();
     hono.use("*", (c, next) => this.request(c, next));
     new AuthGate(settings, store.accounts).register(hono);
     hono.get("/api/health", (c) => c.json({ status: "ok" }));
     hono.route("/api/research", new ConfigRoutes(settings.model, pipeline.built).router());
-    hono.route("/api/research", new RunRoutes(store, this.analyses, events, parts.traces).router());
+    hono.route("/api/research", new RunRoutes(store, this.analyses, competitors, events, parts.traces).router());
     hono.route("/api/research", new EvidenceRoutes(store, this.analyses).router());
     new Frontend(settings.staticDir).mount(hono);
     this.fetch = hono.fetch;

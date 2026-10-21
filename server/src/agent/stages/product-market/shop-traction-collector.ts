@@ -16,10 +16,24 @@ export class ShopTractionCollector {
     Trace.line(import.meta.url, "ShopTractionCollector.collect", { competitors: competitors.length });
     if (!this.shops) return 0;
     const shops = new MeteredShopIntel(this.shops, this.prices, context.meter("shop_traction"));
-    const jobs: Array<() => Promise<"found" | "none" | string>> = [
-      () => this.one(context, shops, product.url, (traction) => context.store.products.saveTraction(product.id, traction)),
-      ...competitors.map((c) => () => this.one(context, shops, c.url, (traction) => context.store.competitors.saveTraction(c.id, traction))),
-    ];
+    return this.gather(context, [() => this.one(context, shops, product.url, (traction) => context.store.products.saveTraction(product.id, traction)), ...this.jobs(context, shops, competitors)]);
+  }
+
+  async collectCompetitors(context: RunContext, competitors: readonly Competitor[]): Promise<number> {
+    Trace.line(import.meta.url, "ShopTractionCollector.collectCompetitors", { competitors: competitors.length });
+    if (!this.shops) return 0;
+    const shops = new MeteredShopIntel(this.shops, this.prices, context.meter("shop_traction"));
+    return this.gather(context, this.jobs(context, shops, competitors));
+  }
+
+  private jobs(context: RunContext, shops: ShopIntel, competitors: readonly Competitor[]): Array<() => Promise<"found" | "none" | string>> {
+    Trace.line(import.meta.url, "ShopTractionCollector.jobs", { competitors: competitors.length });
+    return competitors.map((c) => () => this.one(context, shops, c.url, (traction) => context.store.competitors.saveTraction(c.id, traction)));
+  }
+
+  private async gather(context: RunContext, jobs: Array<() => Promise<"found" | "none" | string>>): Promise<number> {
+    Trace.line(import.meta.url, "ShopTractionCollector.gather", { jobs: jobs.length });
+    const of = jobs.length;
     let found = 0;
     const failures: string[] = [];
     const worker = async (): Promise<void> => {
@@ -30,7 +44,7 @@ export class ShopTractionCollector {
       }
     };
     await Promise.all(Array.from({ length: Math.min(this.concurrency, jobs.length) }, worker));
-    await context.emit("traction.collected", { found, of: competitors.length + 1, failures });
+    await context.emit("traction.collected", { found, of, failures });
     return found;
   }
 

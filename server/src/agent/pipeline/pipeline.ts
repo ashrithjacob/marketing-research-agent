@@ -18,6 +18,13 @@ export class Pipeline {
     return [...this.stages.keys()];
   }
 
+  /** Each stage's share of the work for competitors added to a finished run, all at once; one line per stage that has any. */
+  async add(input: StageInput): Promise<string[]> {
+    Trace.line(import.meta.url, "Pipeline.add", { runId: input.context.run.id, competitors: input.competitors.length });
+    const lines = await Promise.all([...this.stages.values()].map(async (stage) => (stage.add ? `${stage.name}: ${await stage.add(input)}` : null)));
+    return lines.filter((line): line is string => line !== null);
+  }
+
   async run(input: StageInput, progress: StageProgress): Promise<void> {
     Trace.line(import.meta.url, "Pipeline.run", { runId: input.context.run.id });
     const finished = new Map<StageName, Promise<StageStatus>>();

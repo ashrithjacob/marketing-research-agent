@@ -38,6 +38,18 @@ export class ProductMarketStage implements Stage {
     return { status: "completed", summary: misses.length > 0 ? `${summary} Not profiled: ${misses.join("; ")}` : summary, error: "" };
   }
 
+  async add(input: StageInput): Promise<string> {
+    Trace.line(import.meta.url, "ProductMarketStage.add", { runId: input.context.run.id, competitors: input.competitors.length });
+    const product = (await input.context.store.products.get(input.product.id))!;
+    const [misses] = await Promise.all([
+      this.profileAll(input.context, product, input.competitors),
+      this.visuals?.collectCompetitors(input.context, input.competitors),
+      this.traction?.collectCompetitors(input.context, input.competitors),
+    ]);
+    const line = `profiled ${input.competitors.length - misses.length} of ${input.competitors.length}`;
+    return misses.length > 0 ? `${line}; not profiled: ${misses.join("; ")}` : line;
+  }
+
   private async profileAll(context: RunContext, product: Product, competitors: readonly Competitor[]): Promise<string[]> {
     Trace.line(import.meta.url, "ProductMarketStage.profileAll", { count: competitors.length });
     const misses: string[] = [];

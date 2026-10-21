@@ -36,6 +36,11 @@ export class RunTable implements RunStore {
     return rows.map((row) => RunTable.run(row)!);
   }
 
+  async delete(runId: string): Promise<void> {
+    Trace.line(import.meta.url, "RunTable.delete", { runId });
+    await this.db.run("DELETE FROM runs WHERE id = ?", [runId]);
+  }
+
   async summaries(scope: Scope, limit = 50): Promise<RunSummary[]> {
     Trace.line(import.meta.url, "RunTable.summaries", { accountId: scope.accountId, limit });
     const rows = await this.db.all(

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 
 import { runs, type AvatarQuote, type StoredAvatar } from '../api';
 import AvatarMap from './AvatarMap';
+import type { BarOf } from './StageBar';
 
 function List({ label, items }: { label: string; items: string[] }) {
   if (items.length === 0) return null;
@@ -28,7 +29,7 @@ function ChannelCounts({ counts }: { counts: StoredAvatar['profile']['awareness_
 function AvatarCard({ avatar, children, quotes }: { avatar: StoredAvatar; children: StoredAvatar[]; quotes: AvatarQuote[] }) {
   const share = (v: number | null) => (v === null ? '—' : `${Math.round(v * 100)}%`);
   return (
-    <li className={`avatar standing-${avatar.standing}`}>
+    <li id={`avatar-${avatar.id}`} className={`avatar standing-${avatar.standing}`}>
       <div className="competitor-head">
         <strong>{avatar.name}</strong>
         {avatar.standing === 'emerging' && <span className="badge">emerging</span>}
@@ -62,7 +63,7 @@ function AvatarCard({ avatar, children, quotes }: { avatar: StoredAvatar; childr
   );
 }
 
-export default function Avatars({ runId, version, onError }: { runId: string; version: string; onError: (message: string) => void }) {
+export default function Avatars({ runId, version, bar, onError }: { runId: string; version: string; bar: BarOf; onError: (message: string) => void }) {
   const [avatars, setAvatars] = useState<StoredAvatar[]>([]);
   const [quotes, setQuotes] = useState<AvatarQuote[]>([]);
 
@@ -74,17 +75,21 @@ export default function Avatars({ runId, version, onError }: { runId: string; ve
     }, (e: Error) => onError(e.message));
   }, [runId, version, onError]);
 
-  if (avatars.length === 0) return null;
+  if (avatars.length === 0) return bar([]);
   const tops = avatars.filter((a) => a.parent_id === null);
+  const share = (v: number | null) => (v === null ? '' : ` · ${Math.round(v * 100)}% of demand`);
   return (
-    <section className="panel">
-      <h2>Avatars</h2>
-      <AvatarMap avatars={avatars} />
-      <ul className="cards avatars">
-        {tops.map((avatar) => (
-          <AvatarCard key={avatar.id} avatar={avatar} children={avatars.filter((a) => a.parent_id === avatar.id)} quotes={quotes.filter((q) => q.avatar_id === avatar.id)} />
-        ))}
-      </ul>
-    </section>
+    <>
+      {bar(tops.map((avatar) => ({ label: avatar.name, value: `${avatar.review_count} reviews${share(avatar.demand_share)}`, target: `avatar-${avatar.id}` })))}
+      <section className="panel">
+        <h2>Avatars</h2>
+        <AvatarMap avatars={avatars} />
+        <ul className="cards avatars">
+          {tops.map((avatar) => (
+            <AvatarCard key={avatar.id} avatar={avatar} children={avatars.filter((a) => a.parent_id === avatar.id)} quotes={quotes.filter((q) => q.avatar_id === avatar.id)} />
+          ))}
+        </ul>
+      </section>
+    </>
   );
 }

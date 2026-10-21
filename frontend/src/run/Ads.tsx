@@ -1,5 +1,6 @@
 import type { Competitor, ReadAd } from '../api';
 import AdCard from './AdCard';
+import type { BarOf } from './StageBar';
 
 const BUCKET_ORDER: Record<string, number> = { winning: 0, testing: 1, dead: 2 };
 
@@ -15,32 +16,38 @@ function ordered(ads: ReadAd[]): ReadAd[] {
   return [...ads].sort((a, b) => (BUCKET_ORDER[a.bucket ?? ''] ?? 3) - (BUCKET_ORDER[b.bucket ?? ''] ?? 3) || (b.days_running ?? 0) - (a.days_running ?? 0));
 }
 
-export default function Ads({ ads, competitors }: { ads: ReadAd[]; competitors: Competitor[] }) {
-  if (ads.length === 0) return null;
+export default function Ads({ ads, competitors, bar }: { ads: ReadAd[]; competitors: Competitor[]; bar: BarOf }) {
+  if (ads.length === 0) return bar([]);
   const logo = (ad: ReadAd) => {
     const owner = competitors.find((c) => c.id === ad.competitor_id);
     return owner?.logo_url ?? owner?.image_url ?? null;
   };
+  const chips = RINGS.map((ring) => ({ ring, members: ads.filter(ring.matches) }))
+    .filter(({ members }) => members.length > 0)
+    .map(({ ring, members }) => ({ label: ring.title.toLowerCase(), value: `${members.length} · ${members.filter((ad) => ad.bucket === 'winning').length} winning`, target: `ring-${ring.key}` }));
   return (
-    <section className="panel">
-      <h2>Long-form statics in this market</h2>
-      <p className="dim small">Found and grouped by the scout agent as a growth marketer would study them; winning ads first in each group.</p>
-      {RINGS.map((ring) => {
-        const members = ordered(ads.filter(ring.matches));
-        if (members.length === 0) return null;
-        return (
-          <div key={ring.key} className="ring">
-            <h3>
-              {ring.title} <span className="dim small">({members.length}, {members.filter((ad) => ad.bucket === 'winning').length} winning) · {ring.note}</span>
-            </h3>
-            <ul className="cards ads">
-              {members.map((ad) => (
-                <AdCard key={ad.id} ad={ad} logo={logo(ad)} />
-              ))}
-            </ul>
-          </div>
-        );
-      })}
-    </section>
+    <>
+      {bar(chips)}
+      <section className="panel">
+        <h2>Long-form statics in this market</h2>
+        <p className="dim small">Found and grouped by the scout agent as a growth marketer would study them; winning ads first in each group.</p>
+        {RINGS.map((ring) => {
+          const members = ordered(ads.filter(ring.matches));
+          if (members.length === 0) return null;
+          return (
+            <div key={ring.key} id={`ring-${ring.key}`} className="ring">
+              <h3>
+                {ring.title} <span className="dim small">({members.length}, {members.filter((ad) => ad.bucket === 'winning').length} winning) · {ring.note}</span>
+              </h3>
+              <ul className="cards ads">
+                {members.map((ad) => (
+                  <AdCard key={ad.id} ad={ad} logo={logo(ad)} />
+                ))}
+              </ul>
+            </div>
+          );
+        })}
+      </section>
+    </>
   );
 }

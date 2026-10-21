@@ -32,8 +32,13 @@ export const BRIEF: ProductBrief = {
   key_active: "Mullein leaf extract",
   price: { amount: 32.95, currency: "USD", source_url: PRODUCT_URL },
   offer: { bundles: [], subscription: null, guarantee: null, source_url: PRODUCT_URL },
-  ingredients: [{ name: "Mullein leaf extract", dose: 1000, unit: "mg", source_url: PRODUCT_URL }],
+  price_points: [{ label: "1 bottle", amount: 32.95, currency: "USD", units: 1, subscription: false, source_url: PRODUCT_URL }],
+  subscription_terms: null,
+  pack: { net_contents: { amount: 60, unit: "mL" }, serving_size: null, servings_per_container: null, servings_per_day: null, directions_as_printed: null, source_url: PRODUCT_URL },
+  ingredients: [{ name: "Mullein leaf extract", dose: 1000, unit: "mg", form: "leaf extract", standardisation: null, in_proprietary_blend: false, source_url: PRODUCT_URL }],
   claims_on_page: [{ text: "Supports clear breathing.", source_url: PRODUCT_URL }],
+  coa_url: null,
+  miscellaneous: [],
 };
 
 export class Profiles {

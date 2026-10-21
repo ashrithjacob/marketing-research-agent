@@ -35,6 +35,7 @@ export interface RunStore {
   summaries(scope: Scope, limit?: number): Promise<RunSummary[]>;
   updateRun(runId: string, fields: RunUpdate): Promise<void>;
   unfinished(): Promise<Run[]>;
+  delete(runId: string): Promise<void>;
 }
 
 /** One row per product per account, refreshed in place by every run that researches it. */
@@ -48,6 +49,7 @@ export interface ProductStore {
 
 export interface CompetitorStore {
   confirm(product: Product, picks: readonly CompetitorPick[]): Promise<Competitor[]>;
+  add(product: Product, picks: readonly CompetitorPick[]): Promise<Competitor[]>;
   list(productId: string): Promise<Competitor[]>;
   saveProfile(competitorId: string, profile: CompetitorProfile, relationship: Relationship): Promise<void>;
   saveVisual(competitorId: string, visual: BrandVisual): Promise<void>;
@@ -86,6 +88,7 @@ export interface AdStore {
   save(accountId: string, runId: string, productId: string, hits: readonly AdHit[], competitorByDomain: ReadonlyMap<string, string>): Promise<StoredAd[]>;
   saveReading(adId: string, reading: AdReading): Promise<void>;
   saveRing(adId: string, ring: AdRing, why: string): Promise<void>;
+  link(runId: string, competitorByDomain: ReadonlyMap<string, string>): Promise<number>;
   list(runId: string): Promise<ReadAd[]>;
 }
 

@@ -22,16 +22,28 @@ export class CompetitorTable implements CompetitorStore {
     Trace.line(import.meta.url, "CompetitorTable.confirm", { productId: product.id, picks: picks.length });
     await this.db.transaction(async (tx) => {
       await tx.run("UPDATE competitors SET status = 'proposed', updated_at = now() WHERE product_id = ?", [product.id]);
-      for (const pick of picks) {
-        await tx.run(
-          "INSERT INTO competitors (id, account_id, product_id, status, brand, product_name, url, domain) VALUES (?,?,?,?,?,?,?,?)" +
-            " ON CONFLICT (product_id, url) DO UPDATE SET status = 'confirmed', brand = EXCLUDED.brand," +
-            " product_name = EXCLUDED.product_name, updated_at = now()",
-          [Ids.next(), product.account_id, product.id, "confirmed", pick.brand, pick.product_name, pick.url, CompetitorRelationship.domainOf(pick.url)],
-        );
-      }
+      await CompetitorTable.upsert(tx, product, picks);
     });
     return (await this.list(product.id)).filter((competitor) => competitor.status === "confirmed");
+  }
+
+  async add(product: Product, picks: readonly CompetitorPick[]): Promise<Competitor[]> {
+    Trace.line(import.meta.url, "CompetitorTable.add", { productId: product.id, picks: picks.length });
+    await this.db.transaction((tx) => CompetitorTable.upsert(tx, product, picks));
+    const urls = new Set(picks.map((pick) => pick.url));
+    return (await this.list(product.id)).filter((competitor) => competitor.status === "confirmed" && urls.has(competitor.url));
+  }
+
+  private static async upsert(tx: SqlDatabase, product: Product, picks: readonly CompetitorPick[]): Promise<void> {
+    Trace.line(import.meta.url, "CompetitorTable.upsert", { picks: picks.length });
+    for (const pick of picks) {
+      await tx.run(
+        "INSERT INTO competitors (id, account_id, product_id, status, brand, product_name, url, domain) VALUES (?,?,?,?,?,?,?,?)" +
+          " ON CONFLICT (product_id, url) DO UPDATE SET status = 'confirmed', brand = EXCLUDED.brand," +
+          " product_name = EXCLUDED.product_name, updated_at = now()",
+        [Ids.next(), product.account_id, product.id, "confirmed", pick.brand, pick.product_name, pick.url, CompetitorRelationship.domainOf(pick.url)],
+      );
+    }
   }
 
   async list(productId: string): Promise<Competitor[]> {

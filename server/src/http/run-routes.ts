@@ -1,19 +1,20 @@
 import { Hono, type Context } from "hono";
 
-import type { AnalysisService, RunEvents } from "../agent/index.js";
+import type { AnalysisService, CompetitorService, RunEvents } from "../agent/index.js";
 import { CompetitorRelationship, Scope, type ResearchStore, type Run } from "../domain/index.js";
 import { Trace, type TraceFile } from "../trace/index.js";
 
 import type { ApiEnv } from "./api-env.js";
 import { EventStream } from "./event-stream.js";
 
-/** Runs: start one, read it with its product and competitors, confirm what it resolved, stop it, follow its events, read what it spent and its trace. */
+/** Runs: start one, read it with its product and competitors, confirm what it resolved, add competitors once it has finished, stop it, delete it, follow its events, read what it spent and its trace. */
 export class RunRoutes {
   private readonly stream: EventStream;
 
   constructor(
     private readonly store: ResearchStore,
     private readonly analyses: AnalysisService,
+    private readonly competitors: CompetitorService,
     events: RunEvents,
     private readonly traces: TraceFile,
   ) {
@@ -42,10 +43,28 @@ export class RunRoutes {
         return "refused" in rerun ? c.json({ detail: rerun.refused }, 409) : c.json(await this.view(rerun));
       }),
     );
+    api.post("/runs/:runId/competitors/search", async (c) =>
+      this.withRun(c, async (run) => {
+        const searching = await this.competitors.search(run);
+        return "refused" in searching ? c.json({ detail: searching.refused }, 409) : c.json(await this.view(searching));
+      }),
+    );
+    api.post("/runs/:runId/competitors", async (c) =>
+      this.withRun(c, async (run) => {
+        const adding = await this.competitors.add(run, await c.req.json().catch(() => null));
+        return "refused" in adding ? c.json({ detail: adding.refused }, 409) : c.json(await this.view(adding));
+      }),
+    );
     api.post("/runs/:runId/stop", async (c) =>
       this.withRun(c, async (run) => {
         await this.analyses.stop(run);
         return c.json({ ok: true });
+      }),
+    );
+    api.delete("/runs/:runId", async (c) =>
+      this.withRun(c, async (run) => {
+        const refused = await this.analyses.delete(run);
+        return refused ? c.json({ detail: refused.refused }, 409) : c.json({ ok: true });
       }),
     );
     api.get("/runs/:runId/events", async (c) => this.withRun(c, async (run) => this.stream.open(c, run.id)));

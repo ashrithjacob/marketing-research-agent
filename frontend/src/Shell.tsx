@@ -16,7 +16,7 @@ export default function Shell({ session, home, nav, error, onClearError, onSignO
             <div className="sidebar-group">Overview</div>
             <Link to={paths.home()} className={`sidebar-item ${home ? 'active' : ''}`}>
               <span className="sidebar-icon">⌂</span>
-              <span className="sidebar-label">Analyses</span>
+              <span className="sidebar-label">Researched brands</span>
             </Link>
             {nav}
           </nav>

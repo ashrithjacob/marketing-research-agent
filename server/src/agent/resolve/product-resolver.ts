@@ -1,9 +1,11 @@
-import { Asins, ResolutionSchema, type AnalysisInput, type Resolution } from "../../domain/index.js";
+import { ResolutionSchema, type AnalysisInput, type Resolution } from "../../domain/index.js";
 import { Trace } from "../../trace/index.js";
 import type { AgentResult } from "../kernel/agent-runner.js";
 import type { RunContext } from "../pipeline/run-context.js";
 import { RESOLVER_SYSTEM } from "../prompt/text/resolver.js";
 import type { UrlLedger } from "../tools/url-ledger.js";
+
+import { CompetitorUrlCheck } from "./competitor-url-check.js";
 
 /** Turns what the user typed into a product page and a competitor list for them to confirm. */
 export class ProductResolver {
@@ -29,14 +31,8 @@ export class ProductResolver {
 
   static problems(resolution: Resolution, urls: UrlLedger): string[] {
     Trace.line(import.meta.url, "ProductResolver.problems");
-    const problems = urls.unread([resolution.product.url]).map((url) => `product.url ${url} was never read with web_fetch; read it first`);
-    const competitorUrls = resolution.competitors.map((competitor) => competitor.url);
-    for (const url of urls.unknown(competitorUrls)) problems.push(`competitor url ${url} did not appear in any search, ad or page you read; use a url you actually met`);
-    if (competitorUrls.includes(resolution.product.url)) problems.push("the product itself is listed as a competitor");
-    for (const url of competitorUrls) {
-      if (/(^|\.)amazon\.[a-z.]+$/.test(new URL(url).hostname) && !Asins.fromUrl(url)) problems.push(`competitor url ${url} is an Amazon page but not a product page; use the listing's /dp/ url`);
-    }
-    return problems;
+    const unread = urls.unread([resolution.product.url]).map((url) => `product.url ${url} was never read with web_fetch; read it first`);
+    return [...unread, ...CompetitorUrlCheck.problems(resolution.competitors.map((competitor) => competitor.url), urls, resolution.product.url)];
   }
 
   private static instructions(input: AnalysisInput): string {
@@ -44,10 +40,6 @@ export class ProductResolver {
     return [
       input.product_url ? `Product url: ${input.product_url}` : `Product name: ${input.product_name}`,
       `Markets: ${input.markets.join(", ")}`,
-      input.known_competitors.length > 0 ? `Competitors the user named, include each: ${input.known_competitors.join("; ")}` : "The user named no competitors.",
-      input.price_offer ? `What the user said about price and offer: ${input.price_offer}` : "",
-    ]
-      .filter((line) => line !== "")
-      .join("\n");
+    ].join("\n");
   }
 }

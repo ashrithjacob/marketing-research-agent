@@ -81,6 +81,14 @@ export class AnalysisService {
     this.live.stop(run.id);
   }
 
+  /** Deletes the run and everything it produced; refused while it is working, since a live run would keep writing to it. */
+  async delete(run: Run): Promise<Refused | null> {
+    Trace.line(import.meta.url, "AnalysisService.delete", { runId: run.id, status: run.status });
+    if (!FINAL_RUN_STATUSES.has(run.status) && run.status !== "awaiting_confirmation") return { refused: [`the run is ${run.status}; stop it before deleting it`] };
+    await this.store.runs.delete(run.id);
+    return null;
+  }
+
   async get(runId: string, scope: Scope): Promise<Run | null> {
     Trace.line(import.meta.url, "AnalysisService.get", { runId });
     const run = await this.store.runs.get(runId);

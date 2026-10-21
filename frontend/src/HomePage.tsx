@@ -2,16 +2,17 @@ import { useEffect, useState } from 'react';
 
 import { runs, type Config, type RunSummary } from './api';
 import BrandMark, { domainOf } from './BrandMark';
+import DeleteRun from './DeleteRun';
 import NewAnalysis from './NewAnalysis';
 import { Link, paths } from './route';
 import { Money, StatusBadge } from './run/badges';
 
-function RunRow({ run }: { run: RunSummary }) {
+function RunRow({ run, onDeleted, onError }: { run: RunSummary; onDeleted: () => void; onError: (message: string) => void }) {
   const name = run.product?.name ?? run.resolution?.product.name ?? run.input.product_name ?? run.input.product_url ?? '';
   const brand = run.product?.brand || run.resolution?.product.brand || '';
   const url = run.resolution?.product.url ?? run.input.product_url ?? '';
   return (
-    <li>
+    <li className="run-item">
       <Link to={paths.run(run.id)} className="run-row">
         <BrandMark name={brand || name} src={run.product?.image_url ?? null} size={56} shape="square" />
         <div className="run-row-title">
@@ -37,6 +38,7 @@ function RunRow({ run }: { run: RunSummary }) {
           <Money usd={run.cost_usd} />
         </div>
       </Link>
+      <DeleteRun runId={run.id} status={run.status} onDeleted={onDeleted} onError={onError} />
     </li>
   );
 }
@@ -59,13 +61,15 @@ export default function HomePage({ onError }: { onError: (message: string) => vo
       </section>
       <section className="panel flush">
         <div className="panel-head">
-          <h2>Analyses</h2>
+          <h2>Researched brands</h2>
           <span className="count-chip">{list?.length ?? 0}</span>
         </div>
         {list === null && <p className="dim pad">Loading…</p>}
         {list?.length === 0 && <p className="dim pad">None yet.</p>}
         <ul className="run-rows">
-          {list?.map((run) => <RunRow key={run.id} run={run} />)}
+          {list?.map((run) => (
+            <RunRow key={run.id} run={run} onError={onError} onDeleted={() => setList((now) => now?.filter((r) => r.id !== run.id) ?? null)} />
+          ))}
         </ul>
       </section>
     </div>

@@ -25,8 +25,8 @@ export class ProductTable implements ProductStore {
   async saveBrief(productId: string, brief: ProductBrief): Promise<Product> {
     Trace.line(import.meta.url, "ProductTable.saveBrief", { productId });
     await this.db.run(
-      "UPDATE products SET brand = ?, name = ?, category = ?, form_factor = ?, key_active = ?, price = ?, offer = ?," +
-        " ingredients = ?, claims_on_page = ?, updated_at = now() WHERE id = ?",
+      "UPDATE products SET brand = ?, name = ?, category = ?, form_factor = ?, key_active = ?, price = ?, offer = ?, price_points = ?," +
+        " subscription_terms = ?, pack = ?, ingredients = ?, claims_on_page = ?, coa_url = ?, miscellaneous = ?, updated_at = now() WHERE id = ?",
       [
         brief.brand,
         brief.name,
@@ -35,8 +35,13 @@ export class ProductTable implements ProductStore {
         brief.key_active,
         brief.price === null ? null : JSON.stringify(brief.price),
         JSON.stringify(brief.offer),
+        JSON.stringify(brief.price_points),
+        brief.subscription_terms === null ? null : JSON.stringify(brief.subscription_terms),
+        brief.pack === null ? null : JSON.stringify(brief.pack),
         JSON.stringify(brief.ingredients),
         JSON.stringify(brief.claims_on_page),
+        brief.coa_url,
+        JSON.stringify(brief.miscellaneous),
         productId,
       ],
     );

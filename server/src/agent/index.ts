@@ -1,4 +1,7 @@
 export * from "./analysis-service.js";
+export * from "./competitor-launcher.js";
+export * from "./competitor-service.js";
+export * from "./resolve/competitor-search.js";
 export * from "./live-runs.js";
 export * from "./run-launcher.js";
 export * from "./run-end.js";

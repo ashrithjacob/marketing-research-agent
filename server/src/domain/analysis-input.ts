@@ -6,7 +6,7 @@ export type Market = (typeof MARKETS)[number];
 
 const LOOKS_LIKE_URL = /^(https?:\/\/|www\.)|\.[a-z]{2,}\//i;
 
-/** What a user types to start an analysis: a product by url or by name, and optional context the agent would otherwise have to guess. */
+/** What a user types to start an analysis: a product by url or by name, and the markets to research it in. */
 export const AnalysisInputSchema = z
   .object({
     product_url: z.url().nullable().default(null),
@@ -18,9 +18,6 @@ export const AnalysisInputSchema = z
       .nullable()
       .default(null),
     markets: z.array(z.enum(MARKETS)).min(1).default(["US"]),
-    known_competitors: z.array(z.string().trim().min(2)).max(15).default([]),
-    brand_constraints: z.string().default(""),
-    price_offer: z.string().default(""),
   })
   .refine((input) => input.product_url !== null || input.product_name !== null, "give a product_url or a product_name");
 

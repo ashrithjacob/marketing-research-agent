@@ -57,15 +57,15 @@ The MVP is a single-run analysis for one product that ends in an avatar report a
 
 ## Inputs
 
-The user gives one required input and optional context; the agent resolves the rest.
+The user gives a product and its markets; the agent resolves the rest.
 
 | Field | Required | Example | Notes |
 | --- | --- | --- | --- |
 | Product URL **or** product name | Yes | brand.com/products/product-name, or "mullein lung drops" | A URL is scraped directly; a name triggers a search to resolve the product and candidate URLs, confirmed by the user |
 | Target markets | No (default: US first, then UK, CA, AU, NZ) | US (primary), UK, Canada, Australia, New Zealand | Drives review marketplaces, ad countries and compliance rules |
-| Known competitors | No | 3–10 brand names or URLs | Agent proposes more; user can accept or remove |
-| Brand constraints | Yes, collected in onboarding before the first run | Claims the brand can and cannot make, voice notes | Feeds generation and compliance |
-| Price and offer | No (scraped if URL given) | €32.95, 2+1 and 3+2 bundles, subscription | Used in economics and offer framing |
+| ~~Known competitors~~ | Removed 2026-10-21 | 3–10 brand names or URLs | Superseded: the user already accepts or removes the agent's competitors at the confirmation step, so typing them up front added nothing that step lacks |
+| ~~Brand constraints~~ | Removed 2026-10-21 | Claims the brand can and cannot make, voice notes | Superseded: only the stage 1 brief agent read it, as a prompt hint nothing checked; the generation and compliance stages it was meant to feed are not built. Bring it back with them |
+| ~~Price and offer~~ | Removed 2026-10-21 | €32.95, 2+1 and 3+2 bundles, subscription | Superseded: stage 1 reads the price from the product page and code checks it against that page (`PriceCheck`); a typed price was only an unchecked hint |
 
 **Confirmation step:** before spending on scraping, the agent shows the resolved product, proposed competitor list and estimated cost (review volume × source price), and the user approves.
 

@@ -54,7 +54,7 @@ export default function Competitors({ product, competitors, coverage, ads }: { p
   const reviewsOf = (id: string) => coverage.filter((row) => row.competitor_id === id).reduce((sum, row) => sum + Number(row.reviews), 0);
   const unprofiled = competitors.filter((c) => c.relationship === null);
   return (
-    <section className="panel flush">
+    <section id="competitors" className="panel flush">
       <div className="panel-head">
         <h2>Competitors</h2>
         <span className="dim small">Classified by code from each product page, against {product.key_active || 'the key active'} in {product.form_factor?.replace('_', ' ') ?? 'its form'}. Ordered by TrendTrack's estimated monthly sales; Amazon listings have none.</span>
@@ -77,7 +77,7 @@ export default function Competitors({ product, competitors, coverage, ads }: { p
       })}
       {unprofiled.length > 0 && (
         <>
-          <h3 className="pad">Not profiled yet</h3>
+          <h3 id="competitors-unprofiled" className="pad">Not profiled yet</h3>
           <ul className="competitor-rows">
             {unprofiled.map((c) => (
               <Row key={c.id} competitor={c} reviews={reviewsOf(c.id)} ads={ads.filter((ad) => ad.competitor_id === c.id)} />

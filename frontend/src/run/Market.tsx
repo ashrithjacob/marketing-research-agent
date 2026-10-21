@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 
 import { runs, type ChannelAwareness, type EvidenceItem, type MarketAssessment } from '../api';
+import type { BarOf } from './StageBar';
 
 const STAGES: Record<number, { name: string; note: string }> = {
   1: { name: 'Plain claim', note: 'few competitors, plain benefit claims' },
@@ -61,17 +62,23 @@ function Evidence({ item }: { item: EvidenceItem }) {
   );
 }
 
-export default function Market({ runId, version, onError }: { runId: string; version: string; onError: (message: string) => void }) {
+export default function Market({ runId, version, bar, onError }: { runId: string; version: string; bar: BarOf; onError: (message: string) => void }) {
   const [market, setMarket] = useState<MarketAssessment | null | undefined>(undefined);
   useEffect(() => {
     runs.market(runId).then((answer) => setMarket(answer.market), (e: Error) => onError(e.message));
   }, [runId, version, onError]);
-  if (market === undefined) return null;
-  if (market === null) return <p className="panel dim">Stage 4 has not read this market yet.</p>;
+  if (market === undefined) return bar([]);
+  if (market === null) return <>{bar([])}<p className="panel dim">Stage 4 has not read this market yet.</p></>;
   const stage = STAGES[market.sophistication_stage];
   return (
     <>
-      <section className="panel">
+      {bar([
+        { label: 'sophistication', value: `${market.sophistication_stage} · ${stage?.name ?? ''}`, target: 'market-sophistication' },
+        { label: 'claims tracked', value: market.claims.length, target: 'market-claims' },
+        { label: 'channels read for awareness', value: market.awareness.length, target: 'market-awareness' },
+        { label: 'evidence items', value: market.evidence.length, target: 'market-evidence' },
+      ])}
+      <section id="market-sophistication" className="panel">
         <h2>Market sophistication</h2>
         <div className="soph-scale">
           {[1, 2, 3, 4, 5].map((n) => (
@@ -84,7 +91,7 @@ export default function Market({ runId, version, onError }: { runId: string; ver
           <strong>Stage {market.sophistication_stage}: {stage?.name}</strong> <span className="badge faint">{market.confidence} confidence</span>
         </p>
         <p>{market.why}</p>
-        <table className="claims">
+        <table id="market-claims" className="claims">
           <thead>
             <tr><th>Claim</th><th>Type</th><th>Brands</th><th>Ads</th><th>First seen</th><th>Longest run</th><th>Running</th></tr>
           </thead>
@@ -97,7 +104,7 @@ export default function Market({ runId, version, onError }: { runId: string; ver
           </tbody>
         </table>
       </section>
-      <section className="panel">
+      <section id="market-awareness" className="panel">
         <h2>Awareness by channel</h2>
         <p className="dim small">How much a buyer already knows when they meet the market, channel by channel. Each bar is the share of that channel's evidence at each level.</p>
         <div className="levels-key small">
@@ -105,7 +112,7 @@ export default function Market({ runId, version, onError }: { runId: string; ver
         </div>
         {market.awareness.map((channel) => <ChannelBar key={channel.channel} channel={channel} />)}
       </section>
-      <section className="panel">
+      <section id="market-evidence" className="panel">
         <h2>Evidence</h2>
         <ul className="evidence">{market.evidence.map((item) => <Evidence key={item.id} item={item} />)}</ul>
       </section>

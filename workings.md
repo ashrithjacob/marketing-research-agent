@@ -15,8 +15,7 @@ resolving ──▶ awaiting_confirmation ──(user confirms)──▶ running
 
 1. **Start.** `POST /api/research/runs` with an `AnalysisInput`
    (`domain/analysis-input.ts`): `product_url` or `product_name`, `markets`
-   (default `["US"]`), and optional `known_competitors`, `brand_constraints`,
-   `price_offer`. zod refuses a url typed as a product name with a 422 before
+   (default `["US"]`). zod refuses a url typed as a product name with a 422 before
    anything is spent. The run row is created with every stage `pending` if it is
    built, `not_built` if not (`Stages.initial`).
 2. **Resolve.** `RunLauncher.resolve` runs one agent, `resolver`
@@ -72,6 +71,44 @@ adds only reviews it has not stored (they belong to the product); stage 3
 deletes its run's ads before the scout starts (`AdTable.clear`, ads belong to
 the run since migration 8); stage 5 replaces its run's avatars.
 
+## More competitors for a finished run
+
+The resolver proposes 5 to 15 competitors and the user confirms some; the rest
+stay only in `run.resolution`. A finished run can take more without its stages
+running again, from the "More competitors" panel on the Product & market page:
+
+- **Search** (`POST /runs/:id/competitors/search`, `CompetitorService.search`):
+  the `competitor_search` agent (`agent/resolve/competitor-search.ts`, 20 turns,
+  `web_search`, `web_fetch`, `ad_search`) is given every competitor url the run
+  already knows, confirmed or proposed, and submits up to 15 more.
+  `CompetitorUrlCheck` (shared with the resolver) refuses a url it never met,
+  the product itself, an Amazon page that is not a listing, and any url already
+  known. What it finds is appended to `run.resolution.competitors`, with
+  pictures and shop signals, and shows as tiles to pick.
+- **Add** (`POST /runs/:id/competitors` with `{competitors}`,
+  `CompetitorService.add`): refused for a competitor already researched. The
+  picks are confirmed (`CompetitorStore.add`, which, unlike `confirm`, demotes
+  nobody), then `Pipeline.add` runs each stage's `add`, for those competitors
+  only: stage 1 profiles and classifies them and collects their pictures and
+  TrendTrack traction, without redoing the brief; stage 2 collects their
+  reviews, not the client's again; stage 3 makes no new search and gives them
+  the ads this run already kept that land on their sites (`AdStore.link`).
+  Stages 4 and 5 are not run; the panel says to rerun them to include the new
+  competitors.
+
+Either way the run is `running` while the work goes on, the stage states are
+left as they were, and it ends through `RunEnd` with those states' verdict and
+a cost that now includes this work. A deploy or restart in the middle ends it
+`failed`, like any working run.
+
+Cost, measured from run `344caa7d`'s charges: the original resolver came to
+$0.032 (OpenRouter $0.004, Parallel $0.010, TrendTrack $0.018), so a search is
+shown as about $0.03. One added competitor came to about $0.09: profiling about
+$0.003 (four profiles, $0.0085 of tokens and one $0.005 search), its Amazon
+listing finder about $0.02 ($0.12 over six), and its TrendTrack shop record
+$0.064 ($0.32 over five). Review collection itself recorded no charge.
+Firecrawl page reads are not priced in either figure.
+
 ## How an agent ends
 
 Every agent is driven by `AgentRunner` (`agent/kernel/agent-runner.ts`) and
@@ -97,9 +134,16 @@ problem numbered; after 3 refusals the agent is stopped (`SubmitTool`).
 
 1. **Product brief**, agent `product_brief`, 25 turns, `web_search` and
    `web_fetch`. Submits a `ProductBrief`: brand, name, category, `form_factor`
-   (a closed list), `key_active`, price, offer, ingredients with doses, claims
-   word for word. Every `source_url` must be a page that agent read; code
-   refuses any other.
+   (a closed list), `key_active`, price, offer, every price point (label,
+   containers, subscription or not), subscription terms, the pack (net
+   contents, serving size, servings per container and per day, directions),
+   ingredients with dose, form, standardisation and whether they sit in a
+   proprietary blend, claims word for word, the certificate-of-analysis url, and
+   `miscellaneous` (labelled facts no other field holds). Every `source_url`
+   must be a page that agent read; code refuses any other. Code also refuses a
+   price point not shown on its page (`PriceCheck`), a servings count not on
+   the pack's page, and a pack whose net contents ÷ serving size is more than
+   10% off its servings count, when the two units match (`PackCheck`).
 2. **Competitor profiles**, one agent per confirmed competitor
    (`competitor:<domain>`), 15 turns each, four at a time. Each submits a
    `CompetitorProfile`: platform, form factor, `has_key_active`, how the page

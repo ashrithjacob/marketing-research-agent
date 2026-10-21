@@ -1,19 +1,20 @@
 import { useEffect, useState, type ReactNode } from 'react';
 
-import { runs, type Config } from '../api';
+import { competitors as competitorWork, runs, type Config } from '../api';
 import Activity from './Activity';
 import Ads from './Ads';
 import Avatars from './Avatars';
 import Market from './Market';
 import Competitors from './Competitors';
 import ConfirmPanel from './ConfirmPanel';
+import MoreCompetitors from './MoreCompetitors';
 import ProductBrief from './ProductBrief';
 import RerunPrompt from './RerunPrompt';
 import Reviews from './Reviews';
 import RunHeader from './RunHeader';
 import RunNav, { sectionOf } from './RunNav';
 import StagesPanel from './StagesPanel';
-import StageTracker from './StageTracker';
+import StageBar, { type Chip } from './StageBar';
 import { useEvidence } from './use-evidence';
 import { useRun } from './use-run';
 
@@ -36,6 +37,20 @@ export default function RunPage({ runId, section, frame, onError }: { runId: str
   const reviewCount = coverage.reduce((sum, row) => sum + Number(row.reviews), 0);
   const counts = { product_market: competitors.length, reviews: reviewCount, competitor_ads: ads.length, avatars: null };
   const stage = config.stages.find((info) => section !== null && sectionOf(info.name) === section);
+  const bar = (chips: Chip[]) => (stage ? <StageBar stage={stage} state={run.stage_status[stage.name]} chips={chips} /> : null);
+  const unprofiled = competitors.filter((c) => c.relationship === null).length;
+  const waiting = competitorWork.candidates(view).length;
+  const productChips: Chip[] = product
+    ? [
+        { label: 'ingredients', value: product.ingredients.length, target: 'brief-ingredients' },
+        ...(product.price_points.length > 0 ? [{ label: 'prices', value: product.price_points.length, target: 'brief-prices' }] : []),
+        { label: 'claims on the page', value: product.claims_on_page.length, target: 'brief-claims' },
+        ...(product.miscellaneous.length > 0 ? [{ label: 'also on the page', value: product.miscellaneous.length, target: 'brief-other' }] : []),
+        { label: 'competitors profiled', value: `${competitors.length - unprofiled} of ${competitors.length}`, target: 'competitors' },
+        ...(unprofiled > 0 ? [{ label: 'not profiled', value: unprofiled, target: 'competitors-unprofiled', tone: 'warn' as const }] : []),
+        ...(waiting > 0 ? [{ label: 'proposed, not researched', value: waiting, target: 'more-competitors', tone: 'warn' as const }] : []),
+      ]
+    : [];
   const nav = <RunNav run={run} title={title} brand={brand} image={product?.image_url ?? picture?.image_url ?? null} stages={config.stages} section={section} counts={counts} />;
 
   const body = (
@@ -48,21 +63,27 @@ export default function RunPage({ runId, section, frame, onError }: { runId: str
           {run.status === 'resolving' && <p className="panel dim">Finding the product page and proposing competitors…</p>}
           {run.status === 'awaiting_confirmation' && run.resolution && <ConfirmPanel runId={runId} resolution={run.resolution} visuals={view.visuals} signals={view.signals} onDone={reload} onError={onError} />}
           <StagesPanel run={run} stages={config.stages} onDone={reload} onError={onError} />
-          <Activity events={events} />
+          <Activity run={run} events={events} stages={config.stages} />
         </>
       )}
-      {stage && <StageTracker stages={[stage]} states={run.stage_status} />}
       {section === 'product' && product && (
         <>
+          {bar(productChips)}
           <ProductBrief product={product} />
           <Competitors product={product} competitors={competitors} coverage={coverage} ads={ads} />
+          <MoreCompetitors view={view} events={events} onDone={reload} onError={onError} />
         </>
       )}
-      {section === 'reviews' && product && <Reviews runId={runId} product={product} competitors={competitors} coverage={coverage} onError={onError} />}
-      {section === 'ads' && <Ads ads={ads} competitors={competitors} />}
-      {section === 'market' && product && <Market runId={runId} version={run.stage_status.sophistication?.status ?? ''} onError={onError} />}
-      {section === 'avatars' && product && <Avatars runId={runId} version={run.stage_status.avatars?.status ?? ''} onError={onError} />}
-      {section !== null && !product && <p className="panel dim">Nothing here yet: this stage runs once the product is confirmed.</p>}
+      {section === 'reviews' && product && <Reviews runId={runId} product={product} competitors={competitors} coverage={coverage} bar={bar} onError={onError} />}
+      {section === 'ads' && <Ads ads={ads} competitors={competitors} bar={bar} />}
+      {section === 'market' && product && <Market runId={runId} version={run.stage_status.sophistication?.status ?? ''} bar={bar} onError={onError} />}
+      {section === 'avatars' && product && <Avatars runId={runId} version={run.stage_status.avatars?.status ?? ''} bar={bar} onError={onError} />}
+      {section !== null && !product && (
+        <>
+          {bar([])}
+          <p className="panel dim">Nothing here yet: this stage runs once the product is confirmed.</p>
+        </>
+      )}
     </div>
   );
   return frame(nav, body);

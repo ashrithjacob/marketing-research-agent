@@ -11,16 +11,28 @@ export class BrandVisualsCollector {
 
   async collect(context: RunContext, product: Product, competitors: readonly Competitor[]): Promise<number> {
     Trace.line(import.meta.url, "BrandVisualsCollector.collect", { competitors: competitors.length });
-    const jobs: Array<() => Promise<boolean>> = [
-      () => this.one(context, product.url, (visual) => context.store.products.saveVisual(product.id, visual)),
-      ...competitors.map((competitor) => () => this.one(context, competitor.url, (visual) => context.store.competitors.saveVisual(competitor.id, visual))),
-    ];
+    return this.gather(context, [() => this.one(context, product.url, (visual) => context.store.products.saveVisual(product.id, visual)), ...this.jobs(context, competitors)]);
+  }
+
+  async collectCompetitors(context: RunContext, competitors: readonly Competitor[]): Promise<number> {
+    Trace.line(import.meta.url, "BrandVisualsCollector.collectCompetitors", { competitors: competitors.length });
+    return this.gather(context, this.jobs(context, competitors));
+  }
+
+  private jobs(context: RunContext, competitors: readonly Competitor[]): Array<() => Promise<boolean>> {
+    Trace.line(import.meta.url, "BrandVisualsCollector.jobs", { competitors: competitors.length });
+    return competitors.map((competitor) => () => this.one(context, competitor.url, (visual) => context.store.competitors.saveVisual(competitor.id, visual)));
+  }
+
+  private async gather(context: RunContext, jobs: Array<() => Promise<boolean>>): Promise<number> {
+    Trace.line(import.meta.url, "BrandVisualsCollector.gather", { jobs: jobs.length });
+    const of = jobs.length;
     let found = 0;
     const worker = async (): Promise<void> => {
       for (let job = jobs.shift(); job && !context.signal.aborted; job = jobs.shift()) if (await job()) found += 1;
     };
     await Promise.all(Array.from({ length: Math.min(this.concurrency, jobs.length) }, worker));
-    await context.emit("visuals.collected", { found, of: competitors.length + 1 });
+    await context.emit("visuals.collected", { found, of });
     return found;
   }
 

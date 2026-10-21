@@ -1,34 +1,75 @@
-import type { RunEvent } from '../api';
+import { useEffect, useState } from 'react';
 
-function describe(event: RunEvent): string | null {
-  const p = event.payload;
-  if (event.kind === 'tool.called') {
-    const args = p.args as Record<string, unknown>;
-    const what = args.url ?? args.query ?? '';
-    return `${p.agent_id}: ${p.tool} ${String(what)}`;
-  }
-  if (event.kind === 'agent.started') return `${p.agent_id} started`;
-  if (event.kind === 'agent.ended') return `${p.agent_id} ${p.status}${p.error ? `: ${p.error}` : ''}`;
-  if (event.kind === 'agent.resumed') return `resumed after: ${p.error}`;
-  if (event.kind === 'stage.changed') return `stage ${p.stage}: ${p.status}`;
-  if (event.kind === 'reviews.collected') return `reviews: ${p.target}, ${p.collected} collected, ${p.saved} new`;
-  if (event.kind === 'avatars.memory') return `avatars after batch ${p.batch}: ${(p.avatars as { key: string; reviews: number }[]).map((a) => `${a.key} ${a.reviews}`).join(', ')}`;
-  if (event.kind === 'traction.collected') return `shop traction: ${p.found} of ${p.of}${(p.failures as string[] | undefined)?.length ? `, failed: ${(p.failures as string[]).join('; ')}` : ''}`;
-  if (event.kind === 'run.resolved') return `resolved, ${p.competitors} competitors proposed`;
-  if (event.kind === 'run.ended') return `run ${p.status}`;
-  return null;
+import type { Run, RunEvent, StageInfo } from '../api';
+import { story } from './activity-story';
+
+const WORKING = new Set(['resolving', 'running', 'stopping']);
+
+function ago(at: string, now: number): string {
+  const seconds = Math.max(0, Math.round((now - new Date(at).getTime()) / 1000));
+  if (seconds < 60) return `${seconds}s ago`;
+  if (seconds < 3600) return `${Math.round(seconds / 60)} min ago`;
+  return `${Math.round(seconds / 3600)} h ago`;
 }
 
-export default function Activity({ events }: { events: RunEvent[] }) {
-  const lines = events.map((event) => ({ id: event.id, at: event.created_at, text: describe(event) })).filter((line) => line.text !== null);
+function useNow(live: boolean): number {
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    if (!live) return;
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, [live]);
+  return now;
+}
+
+function Pulse({ run, stages, lastAt, now }: { run: Run; stages: StageInfo[]; lastAt: string | null; now: number }) {
+  if (WORKING.has(run.status)) {
+    const current = stages.filter((stage) => run.stage_status[stage.name]?.status === 'running').map((stage) => stage.title);
+    const doing = run.status === 'resolving' ? 'Finding your product and its competitors' : run.status === 'stopping' ? 'Stopping' : current.length > 0 ? `Working on ${current.join(' and ')}` : 'Working';
+    return (
+      <div className="pulse live">
+        <span className="pulse-dot" />
+        <strong>Live</strong>
+        <span>{doing}</span>
+        {lastAt && <span className="pulse-ago">last update {ago(lastAt, now)}</span>}
+      </div>
+    );
+  }
+  if (run.status === 'awaiting_confirmation') {
+    return (
+      <div className="pulse waiting">
+        <span className="pulse-dot" />
+        <strong>Waiting for you</strong>
+        <span>Confirm the product and competitors to start the research</span>
+      </div>
+    );
+  }
+  return (
+    <div className="pulse idle">
+      <span className="pulse-dot" />
+      <strong>{run.status === 'completed' ? 'Finished' : 'Not running'}</strong>
+      {run.ended_at && <span className="pulse-ago">{new Date(run.ended_at).toLocaleString()}</span>}
+    </div>
+  );
+}
+
+export default function Activity({ run, events, stages }: { run: Run; events: RunEvent[]; stages: StageInfo[] }) {
+  const now = useNow(WORKING.has(run.status));
+  const titles = Object.fromEntries(stages.map((stage) => [stage.name, stage.title]));
+  const lines = story(events, titles);
   if (lines.length === 0) return null;
   return (
     <section className="panel activity">
-      <h2>Live activity</h2>
+      <div className="activity-head">
+        <h2>Live activity</h2>
+        <Pulse run={run} stages={stages} lastAt={lines[lines.length - 1].at} now={now} />
+      </div>
       <ol>
-        {lines.slice(-30).reverse().map((line) => (
-          <li key={line.id}>
-            <span className="dim small">{new Date(line.at).toLocaleTimeString()}</span> {line.text}
+        {lines.slice(-60).reverse().map((line) => (
+          <li key={line.id} className={`tone-${line.tone}`}>
+            <time>{new Date(line.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</time>
+            <span className="tone-mark" />
+            <span className="activity-text">{line.text}</span>
           </li>
         ))}
       </ol>

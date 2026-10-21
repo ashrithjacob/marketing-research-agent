@@ -8,9 +8,6 @@ const LOOKS_LIKE_URL = /^(https?:\/\/|www\.)|\.[a-z]{2,}\//i;
 export default function NewAnalysis({ markets, onError }: { markets: string[]; onError: (message: string) => void }) {
   const [product, setProduct] = useState('');
   const [chosen, setChosen] = useState<string[]>(['US']);
-  const [competitors, setCompetitors] = useState('');
-  const [constraints, setConstraints] = useState('');
-  const [offer, setOffer] = useState('');
   const [busy, setBusy] = useState(false);
 
   const toggle = (market: string) => setChosen((now) => (now.includes(market) ? now.filter((m) => m !== market) : [...now, market]));
@@ -25,9 +22,6 @@ export default function NewAnalysis({ markets, onError }: { markets: string[]; o
         product_url: asUrl ? (typed.startsWith('http') ? typed : `https://${typed}`) : null,
         product_name: asUrl ? null : typed,
         markets: chosen,
-        known_competitors: competitors.split(/\n|,/).map((c) => c.trim()).filter(Boolean),
-        brand_constraints: constraints,
-        price_offer: offer,
       });
       navigate(paths.run(run.id));
     } catch (e) {
@@ -52,21 +46,6 @@ export default function NewAnalysis({ markets, onError }: { markets: string[]; o
           </label>
         ))}
       </fieldset>
-      <details>
-        <summary>Optional context</summary>
-        <label>
-          Known competitors, one per line
-          <textarea rows={3} value={competitors} onChange={(e) => setCompetitors(e.target.value)} />
-        </label>
-        <label>
-          Claims the brand can and cannot make, voice notes
-          <textarea rows={3} value={constraints} onChange={(e) => setConstraints(e.target.value)} />
-        </label>
-        <label>
-          Price and offer
-          <input value={offer} onChange={(e) => setOffer(e.target.value)} placeholder="€32.95, 2+1 and 3+2 bundles, subscription" />
-        </label>
-      </details>
       <button className="primary" type="submit" disabled={busy || chosen.length === 0 || product.trim().length < 2}>
         {busy ? 'Starting…' : 'Find the product'}
       </button>

@@ -18,20 +18,34 @@ export class ReviewStage implements Stage {
 
   async run(input: StageInput): Promise<StageOutcome> {
     Trace.line(import.meta.url, "ReviewStage.run", { runId: input.context.run.id, competitors: input.competitors.length });
-    const targets = [{ target: ReviewStage.client(input), brand: input.product.brand || input.product.name }, ...input.competitors.map((c) => ({ target: ReviewStage.competitor(input, c), brand: c.brand }))];
+    const { total, summary } = await this.collectAll(input.context, [{ target: ReviewStage.client(input), brand: input.product.brand || input.product.name }, ...this.competitorTargets(input)]);
+    return total > 0 ? { status: "completed", summary, error: "" } : { status: "invalid", summary, error: "no reviews could be collected for any product" };
+  }
+
+  async add(input: StageInput): Promise<string> {
+    Trace.line(import.meta.url, "ReviewStage.add", { runId: input.context.run.id, competitors: input.competitors.length });
+    return (await this.collectAll(input.context, this.competitorTargets(input))).summary;
+  }
+
+  private competitorTargets(input: StageInput): Array<{ target: ReviewTarget; brand: string }> {
+    Trace.line(import.meta.url, "ReviewStage.competitorTargets", { competitors: input.competitors.length });
+    return input.competitors.map((c) => ({ target: ReviewStage.competitor(input, c), brand: c.brand }));
+  }
+
+  private async collectAll(context: RunContext, targets: Array<{ target: ReviewTarget; brand: string }>): Promise<{ total: number; summary: string }> {
+    Trace.line(import.meta.url, "ReviewStage.collectAll", { targets: targets.length });
     const lines: string[] = [];
     let total = 0;
     const queue = [...targets];
     const worker = async (): Promise<void> => {
-      for (let next = queue.shift(); next && !input.context.signal.aborted; next = queue.shift()) {
-        const { saved, line } = await this.collect(input.context, next.target, next.brand);
+      for (let next = queue.shift(); next && !context.signal.aborted; next = queue.shift()) {
+        const { saved, line } = await this.collect(context, next.target, next.brand);
         total += saved;
         lines.push(line);
       }
     };
     await Promise.all(Array.from({ length: Math.min(this.concurrency, targets.length) }, worker));
-    const summary = `${total} reviews stored. ${lines.join("; ")}.`;
-    return total > 0 ? { status: "completed", summary, error: "" } : { status: "invalid", summary, error: "no reviews could be collected for any product" };
+    return { total, summary: `${total} reviews stored. ${lines.join("; ")}.` };
   }
 
   private async collect(context: RunContext, target: ReviewTarget, brand: string): Promise<{ saved: number; line: string }> {

@@ -129,3 +129,11 @@ rewrite is in git history before `b6f45cc`.
 22. **Reddit is collected by scraper, not Reddit's API**, against Reddit's User
     Agreement (effective July 1, 2026); the user accepted the risk on 2026-10-20.
 
+## More competitors
+
+23. **An added competitor gets no ad search of its own.** Stage 3's `add` only
+    links ads the run already kept that land on its site; finding its ads means
+    rerunning stage 3, which searches the whole market again.
+24. **Adding competitors leaves stages 4 and 5 as they were.** Market awareness
+    and the avatars are built from every competitor's ads and reviews, so they
+    are out of date until rerun; the panel says so, nothing marks them stale.

@@ -54,6 +54,15 @@ export class AdTable implements AdStore {
     await this.db.run("INSERT INTO ad_extractions (ad_id, relation, relation_why) VALUES (?,?,?) ON CONFLICT (ad_id) DO UPDATE SET relation = EXCLUDED.relation, relation_why = EXCLUDED.relation_why", [adId, ring, why]);
   }
 
+  async link(runId: string, competitorByDomain: ReadonlyMap<string, string>): Promise<number> {
+    Trace.line(import.meta.url, "AdTable.link", { runId, competitors: competitorByDomain.size });
+    let linked = 0;
+    for (const [domain, competitorId] of competitorByDomain) {
+      linked += await this.db.run("UPDATE ads SET competitor_id = ? WHERE run_id = ? AND competitor_id IS NULL AND regexp_replace(landing_domain, '^www\\.', '') = ?", [competitorId, runId, domain]);
+    }
+    return linked;
+  }
+
   async list(runId: string): Promise<ReadAd[]> {
     Trace.line(import.meta.url, "AdTable.list", { runId });
     const rows = await this.db.all(

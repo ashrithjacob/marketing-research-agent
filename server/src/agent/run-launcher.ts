@@ -75,7 +75,7 @@ export class RunLauncher {
     });
   }
 
-  private async crashed(runId: string, context: RunContext, error: unknown): Promise<void> {
+  async crashed(runId: string, context: RunContext, error: unknown): Promise<void> {
     Trace.line(import.meta.url, "RunLauncher.crashed", { runId });
     console.error(`run ${runId} crashed`, error);
     await context.settled().catch(() => undefined);

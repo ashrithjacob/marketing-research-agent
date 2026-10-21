@@ -12,6 +12,10 @@ export class RunDriver {
     return this.app.fetch(new Request(`http://test/api/research${path}`, init));
   }
 
+  async delete(runId: string): Promise<Response> {
+    return this.app.fetch(new Request(`http://test/api/research/runs/${runId}`, { method: "DELETE" }));
+  }
+
   async json<T>(path: string): Promise<T> {
     return (await (await this.api(path)).json()) as T;
   }
