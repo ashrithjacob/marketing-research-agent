@@ -7,6 +7,12 @@ export const AWARENESS_LEVELS = ["unaware", "problem_aware", "solution_aware", "
 export const AD_BUCKETS = ["winning", "testing", "dead"] as const;
 export type AdBucket = (typeof AD_BUCKETS)[number];
 
+export const PROOF_KINDS = ["clinical_study", "expert", "testimonial", "before_after", "results_timeline", "ingredient_science", "statistics", "social_numbers", "comparison", "third_party_testing", "traditional_use", "media_mention", "guarantee", "none"] as const;
+export const OFFER_KINDS = ["discount", "bundle", "subscription", "free_gift", "free_shipping", "guarantee", "price_only", "none"] as const;
+export const EMOTION_KINDS = ["fear", "hope", "relief", "shame", "guilt", "anger", "frustration", "grief", "curiosity", "vindication", "belonging", "pride"] as const;
+export const LANDING_KINDS = ["advertorial", "listicle", "product_page", "unknown"] as const;
+export const COPY_STRUCTURES = ["personal_story", "expert_letter", "listicle", "testimonial_stack", "problem_solution", "comparison"] as const;
+
 /** The rings a growth marketer studies a market's long-form ads in: a direct competitor's ad (the same product); an ad for the same problem from another product (the same buyer at the same moment of pain); an ad for another problem aimed at the same buyer (a format to borrow); a winning ad from a trending shop that scales on long-form statics, in any market (a playbook to apply to the client's store). The first two are supply for the client's avatars; the last two are playbooks. */
 export const AD_RINGS = ["direct_competitor", "same_problem", "same_buyer", "trending_shop"] as const;
 export type AdRing = (typeof AD_RINGS)[number];
@@ -46,6 +52,11 @@ export const AdReadingSchema = z.object({
   offer: z.string().nullable(),
   objections_handled: z.array(z.string()),
   emotion: z.string().min(1),
+  proof_kinds: z.array(z.enum(PROOF_KINDS)).min(1).describe("Every kind of proof the ad uses; none when it uses none."),
+  offer_kinds: z.array(z.enum(OFFER_KINDS)).min(1).describe("Every part of the offer: guarantee for a money-back promise, price_only when a price is stated with nothing else, none when the ad only links."),
+  emotion_kind: z.enum(EMOTION_KINDS).describe("The emotion the opening leads with."),
+  landing_kind: z.enum(LANDING_KINDS).describe("Where the click lands, read from the landing url: advertorial for an article or story page, listicle for a numbered reasons page, product_page for a store product page, unknown when the url does not say."),
+  copy_structure: z.enum(COPY_STRUCTURES).describe("How the long copy is built."),
   risk_flags: z.array(z.string()).describe("Claims that look risky under FTC or Meta health rules, quoted short."),
   bucket: z.enum(AD_BUCKETS).describe("winning: has run long or been duplicated, so it is likely profitable; testing: too new to tell; dead: stopped early."),
   bucket_why: z.string().min(1).describe("One line naming the signals that decided the bucket."),
@@ -82,10 +93,17 @@ export interface StoredAd {
   audience: { age_min: number | null; age_max: number | null; gender: string | null } | null;
 }
 
+/** A reading as stored. Ads read before the closed lists existed have no kinds: empty lists and nulls. */
+export type StoredReading = Omit<AdReading, "ad_id" | "bucket" | "bucket_why" | "emotion_kind" | "landing_kind" | "copy_structure"> & {
+  emotion_kind: AdReading["emotion_kind"] | null;
+  landing_kind: AdReading["landing_kind"] | null;
+  copy_structure: AdReading["copy_structure"] | null;
+};
+
 export interface ReadAd extends StoredAd {
   ring: AdRing | null;
   ring_why: string | null;
-  reading: Omit<AdReading, "ad_id" | "bucket" | "bucket_why"> | null;
+  reading: StoredReading | null;
 }
 
 /** The ads that measure supply for the client's buyers: a confirmed competitor's own, or one the scout put in the direct-competitor or same-problem ring. Same-buyer ads are a playbook, not supply. */

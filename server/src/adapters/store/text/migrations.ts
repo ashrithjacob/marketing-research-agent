@@ -412,6 +412,35 @@ ALTER TABLE products
     ADD COLUMN miscellaneous      JSONB NOT NULL DEFAULT '[]';
 `;
 
+const AD_ANALYSIS = `
+ALTER TABLE ad_extractions
+    ADD COLUMN proof_kinds    JSONB NOT NULL DEFAULT '[]',
+    ADD COLUMN offer_kinds    JSONB NOT NULL DEFAULT '[]',
+    ADD COLUMN emotion_kind   TEXT,
+    ADD COLUMN landing_kind   TEXT,
+    ADD COLUMN copy_structure TEXT;
+CREATE TABLE ad_angles (
+    run_id            TEXT NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
+    key               TEXT NOT NULL,
+    position          INTEGER NOT NULL,
+    name              TEXT NOT NULL,
+    description       TEXT NOT NULL,
+    ad_ids            JSONB NOT NULL,
+    fit               TEXT,
+    fit_claim_indexes JSONB NOT NULL DEFAULT '[]',
+    fit_why           TEXT,
+    PRIMARY KEY (run_id, key)
+);
+CREATE TABLE ad_findings (
+    run_id   TEXT NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
+    step     INTEGER NOT NULL,
+    subjects JSONB NOT NULL,
+    headline TEXT NOT NULL,
+    ad_ids   JSONB NOT NULL,
+    PRIMARY KEY (run_id, step)
+);
+`;
+
 /** Applied in order, once each, recorded in schema_migrations. An applied migration is never edited: a change is a new entry at the end. */
 export const MIGRATIONS: readonly Migration[] = [
   { id: 1, name: "avatar_schema", sql: AVATAR_SCHEMA },
@@ -423,4 +452,5 @@ export const MIGRATIONS: readonly Migration[] = [
   { id: 7, name: "ad_rings", sql: AD_RINGS },
   { id: 8, name: "ads_per_run", sql: ADS_PER_RUN },
   { id: 9, name: "product_label_facts", sql: PRODUCT_LABEL_FACTS },
+  { id: 10, name: "ad_analysis", sql: AD_ANALYSIS },
 ];

@@ -237,8 +237,34 @@ work and keeps the books.
 3. **Read**: agents (`ad_reader:<n>`, no tools), told the client's product,
    take 8 kept ads at a time and record avatar, claim type, awareness,
    mechanism, proof, offer, objections, emotion, risk flags and a bucket
-   (winning, testing, dead) with the signals that decided it. Code refuses a
-   batch that skips, invents or repeats an ad id.
+   (winning, testing, dead) with the signals that decided it, plus five closed
+   lists so ads can be counted together: proof kinds, offer kinds, the emotion
+   the opening leads with, where the click lands (read from the landing url;
+   `unknown` when it does not say) and how the copy is built. Code refuses a
+   batch that skips, invents or repeats an ad id, and any value outside a list.
+4. **Group into angles** (`AngleGrouper`, agent `angle_grouper`, no tools):
+   one call sees every read ad as one line (id, advertiser, claim type,
+   mechanism, who it speaks to, its hook) and puts each in exactly one of up
+   to 20 angles. Code refuses an ad left out, placed twice or invented, and a
+   key used twice. Stored in `ad_angles`.
+5. **Check fit** (`AngleFitter`, agent `angle_fitter`): one call judges each
+   angle against the client's own claims (`claims_on_page`, numbered):
+   `supported` (citing the claims), `needs_new_claim` or `does_not_apply`.
+   Code refuses a missing verdict, an unknown claim number, and `supported`
+   with no claim cited.
+6. **Write findings** (`FindingsWriter`, agent `ads_findings`): one call is
+   given the tables code counted (`AdsAnalyzer`), not the ads, and writes one
+   finding per step 2 to 5 of the page: what it is about, a one-sentence
+   headline and up to six ads. Code refuses a headline with a digit in it, so
+   every number on the page is one code counted, and any subject or ad that
+   does not exist. Stored in `ad_findings`.
+
+If any of 4 to 6 ends `invalid` or `failed`, stage 3 ends that way, with its
+ads kept and read. The page's counts (`GET /runs/:id/ads/analysis`) are
+computed on every load from the ads, angles and findings: **proven** is
+still active, 30+ days running and 2+ duplicates (`ProvenRule`); launches are
+counted from first-seen dates against the run's date (`Momentum`). The spec is
+`docs/spec-ads-analysis.md`.
 
 Stage 5 counts as supply only confirmed competitors' ads and ads the scout put
 in `direct_competitor` or `same_problem` (`AdRings.isSupply`).

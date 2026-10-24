@@ -8,7 +8,7 @@ import { CompetitorAdStage, Pipeline, ProductMarketStage } from "../src/agent/in
 import { ScoutLog } from "../src/agent/stages/ads/scout-log.js";
 import { SearchLongFormTool } from "../src/agent/tools/search-long-form-tool.js";
 import { TrendingShopsTool } from "../src/agent/tools/trending-shops-tool.js";
-import type { AdHit, AdLibrary, AdPage, AdQuery, ReadAd, ShopFinder, ShopPage, ShopQuery } from "../src/domain/index.js";
+import type { AdHit, AdLibrary, AdPage, AdQuery, AdsAnalysis, ReadAd, ShopFinder, ShopPage, ShopQuery } from "../src/domain/index.js";
 import { App } from "../src/http/index.js";
 
 import { Faux, FakeVisuals, FakeWeb, NoBilling, TestSettings } from "./fakes.js";
@@ -63,10 +63,15 @@ const text = (message: Message | undefined): string => {
 
 const reading = (adId: string) => ({
   ad_id: adId, avatar: "Ex-smokers who still wake up coughing", claim_type: "mechanism", awareness: "problem_aware", mechanism: "clears trapped mucus", proof_types: ["testimonial"],
-  offer: null, objections_handled: [], emotion: "relief", risk_flags: [], bucket: "winning", bucket_why: "64 days running, duplicated",
+  offer: null, objections_handled: [], emotion: "relief", risk_flags: [], proof_kinds: ["testimonial"], offer_kinds: ["guarantee"], emotion_kind: "relief", landing_kind: "advertorial", copy_structure: "personal_story", bucket: "winning", bucket_why: "64 days running, duplicated",
 });
 
 const readAll = (messages: Message[]) => call("submit", { ads: [...text(messages.find((m) => m.role === "user")).matchAll(/<ad id="([0-9a-f]+)">/g)].map((m) => reading(m[1]!)) });
+
+const groupAll = (messages: Message[]) =>
+  call("submit", { angles: [{ key: "morning_cough", name: "Morning cough", description: "Ex-smokers who wake up coughing", ad_ids: [...text(messages.find((m) => m.role === "user")).matchAll(/^\[([0-9a-f]+)\]/gm)].map((m) => m[1]!) }] });
+
+const findings = (headline: string) => call("submit", { findings: [2, 3, 4, 5].map((step) => ({ step, subjects: ["morning_cough"], headline, ad_ids: [] })) });
 
 describe("search_ads", () => {
   it("logs every ad it shows and refuses to search once the budget is spent", async () => {
@@ -116,6 +121,7 @@ describe("stage 3", () => {
   it("lets the scout search, read and keep ads in rings, refuses an ad it never saw, then reads every kept ad", async () => {
     const ads = new FakeAds();
     let refusal = "";
+    let findingsRefusal = "";
     let scouts = 0;
     const keep = [
       { ad_id: "lc1", ring: "direct_competitor", why: "LungClear's own tincture, 64 days" },
@@ -145,6 +151,15 @@ describe("stage 3", () => {
           },
         ])
         .on("<ad id=", [readAll])
+        .on("Ads to group into angles:", [groupAll])
+        .on("Angles to check against the client's claims.", [call("submit", { fits: [{ angle_key: "morning_cough", verdict: "supported", claim_indexes: [0], why: "it already claims clear breathing" }] })])
+        .on("Counted tables for steps", [
+          findings("3 brands run it."),
+          (messages) => {
+            findingsRefusal = JSON.stringify(messages.at(-1)?.content ?? "");
+            return findings("The morning cough angle is proven and the client can already claim it.");
+          },
+        ])
         .steps(),
     );
     const web = new FakeWeb(PAGES, SEARCH_HITS);
@@ -160,7 +175,13 @@ describe("stage 3", () => {
     const done = await driver.confirmAndFinish(runId, { product_url: PRODUCT_URL, competitors: picks });
 
     expect(done.run.stage_status.competitor_ads).toMatchObject({ status: "completed", error: "" });
-    expect(done.run.stage_status.competitor_ads.summary).toBe("4 ads kept of 7 seen in 4 searches (1 trending shops looked at), from 1 brands; 1 direct competitor, 1 same problem, 1 same buyer, 1 trending shop; 4 read.");
+    expect(done.run.stage_status.competitor_ads.summary).toBe("4 ads kept of 7 seen in 4 searches (1 trending shops looked at), from 1 brands; 1 direct competitor, 1 same problem, 1 same buyer, 1 trending shop; 4 read; 1 angles, 2 proven ads, 4 findings.");
+    expect(findingsRefusal).toContain("headline has a digit");
+    const { analysis } = await driver.json<{ analysis: AdsAnalysis }>(`/runs/${runId}/ads/analysis`);
+    expect(analysis.angles.map((a) => [a.key, a.ads, a.proven, a.fit, a.fit_claims])).toEqual([["morning_cough", 4, 2, "supported", ["Supports clear breathing."]]]);
+    expect(analysis.angles[0]!.hooks[0]!.hook).toBe("I could not stop coughing every morning.");
+    expect(analysis.findings.map((f) => f.step)).toEqual([2, 3, 4, 5]);
+    expect(analysis.labels.find((l) => l.label === "proof" && l.value === "testimonial")).toMatchObject({ proven: 2, rest: 2, ranked: false });
     expect(refusal).toContain("ad ghost-9 was not in any of your searches");
     expect(ads.queries.map((q) => [q.terms[0], q.searchIn, q.sortBy, q.longForm?.minCopyChars])).toEqual([["lungclear.com", "domain", "longestRunning", 2000], ["mullein", "ad_copy", "reachDelta7d", 2000], ["glowpatch.com", "domain", "longestRunning", 2000]]);
     expect(shops.queries.map((q) => [q.text, q.sortBy, q.countries])).toEqual([[null, "estMonthlySales", ["US"]]]);

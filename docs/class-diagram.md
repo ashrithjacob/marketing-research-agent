@@ -71,6 +71,24 @@ classDiagram
       forViewer()
       admits()
     }
+    class AdAngle {
+      <<interface>>
+    }
+    class AngleHook {
+      <<interface>>
+    }
+    class AngleRow {
+      <<interface>>
+    }
+    class LabelRow {
+      <<interface>>
+    }
+    class BrandRow {
+      <<interface>>
+    }
+    class AdsAnalysis {
+      <<interface>>
+    }
     class AdQuery {
       <<interface>>
     }
@@ -102,6 +120,9 @@ classDiagram
       <<interface>>
     }
     class AvatarQuote {
+      <<interface>>
+    }
+    class AvatarRecord {
       <<interface>>
     }
     class ChargeDraft {
@@ -363,9 +384,6 @@ classDiagram
       list()
       quotes()
     }
-    class AvatarRecord {
-      <<interface>>
-    }
     class AdStore {
       <<interface>>
       clear()
@@ -374,6 +392,14 @@ classDiagram
       saveRing()
       link()
       list()
+    }
+    class AdAnalysisStore {
+      <<interface>>
+      saveAngles()
+      saveFits()
+      saveFindings()
+      angles()
+      findings()
     }
     class BrandVisualCache {
       <<interface>>
@@ -453,6 +479,13 @@ classDiagram
     }
   }
   namespace extract {
+    class AdsAnalyzer {
+      analyze()
+    }
+    class AngleTally {
+      rows()
+      brand()
+    }
     class AvatarMemoryCheck {
       problems()
     }
@@ -465,11 +498,23 @@ classDiagram
       records()
       awareness()
     }
+    class BrandGrid {
+      rows()
+    }
+    class HookCutter {
+      cut()
+    }
+    class LabelDiff {
+      rows()
+    }
     class MarketTally {
       assessment()
       census()
       metaAds()
       channels()
+    }
+    class Momentum {
+      of()
     }
     class PackCheck {
       problems()
@@ -477,6 +522,9 @@ classDiagram
     class PriceCheck {
       problems()
       shown()
+    }
+    class ProvenRule {
+      isProven()
     }
   }
   namespace adapters {
@@ -652,6 +700,13 @@ classDiagram
       byUsername()
       users()
       setPassword()
+    }
+    class AdAnalysisTable {
+      saveAngles()
+      saveFits()
+      saveFindings()
+      angles()
+      findings()
     }
     class AdTable {
       clear()
@@ -954,6 +1009,9 @@ classDiagram
       research()
       crashed()
     }
+    class AdAnalysisStep {
+      analyze()
+    }
     class AdReader {
       read()
       problems()
@@ -965,10 +1023,23 @@ classDiagram
       scout()
       problems()
     }
+    class AngleFitter {
+      fit()
+      problems()
+    }
+    class AngleGrouper {
+      group()
+      problems()
+    }
     class CompetitorAdStage {
       run()
       add()
       rings()
+    }
+    class FindingsWriter {
+      write()
+      problems()
+      subjects()
     }
     class ScoutLog {
       record()
@@ -1226,6 +1297,7 @@ classDiagram
   ServiceClients --> ShopFinder
   ShopifyStorefront --> PublicPage
   AccountTable --> SqlDatabase
+  AdAnalysisTable --> SqlDatabase
   AdTable --> SqlDatabase
   AvatarTable --> SqlDatabase
   CallTable --> SqlDatabase
@@ -1394,6 +1466,7 @@ classDiagram
 | `adapters` | `adapters/service-queue.ts` | Waiter, ServiceQueue |
 | `adapters` | `adapters/shopify-storefront.ts` | ShopifyStorefront |
 | `adapters` | `adapters/store/account-table.ts` | AccountTable |
+| `adapters` | `adapters/store/ad-analysis-table.ts` | AdAnalysisTable |
 | `adapters` | `adapters/store/ad-table.ts` | AdTable |
 | `adapters` | `adapters/store/avatar-table.ts` | AvatarTable |
 | `adapters` | `adapters/store/call-table.ts` | CallTable |
@@ -1446,9 +1519,13 @@ classDiagram
 | `agent` | `agent/resolve/resolution-visuals.ts` | ResolutionVisuals |
 | `agent` | `agent/run-end.ts` | RunVerdict, RunEnd |
 | `agent` | `agent/run-launcher.ts` | RunLauncher |
+| `agent` | `agent/stages/ads/ad-analysis-step.ts` | AdAnalysisStep |
 | `agent` | `agent/stages/ads/ad-reader.ts` | AdReader |
 | `agent` | `agent/stages/ads/ad-scout.ts` | ScoutLimits, AdScout |
+| `agent` | `agent/stages/ads/angle-fitter.ts` | AngleFitter |
+| `agent` | `agent/stages/ads/angle-grouper.ts` | AngleGrouper |
 | `agent` | `agent/stages/ads/competitor-ad-stage.ts` | CompetitorAdStage |
+| `agent` | `agent/stages/ads/findings-writer.ts` | FindingsWriter |
 | `agent` | `agent/stages/ads/scout-log.ts` | ScoutLog |
 | `agent` | `agent/stages/avatars/ad-placer.ts` | AdPlacer |
 | `agent` | `agent/stages/avatars/avatar-judge.ts` | AvatarJudge |
@@ -1490,10 +1567,11 @@ classDiagram
 | `config` | `config/settings-shape.ts` | ServicePrices, Settings |
 | `config` | `config/settings.ts` | Env |
 | `domain` | `domain/accounts.ts` | Account, User, UserListing, Principal, Scope |
+| `domain` | `domain/ad-analysis.ts` | AdAngle, AngleHook, AngleRow, LabelRow, BrandRow, AdsAnalysis |
 | `domain` | `domain/ad-library.ts` | AdQuery, AdHit, AdPage |
 | `domain` | `domain/ads.ts` | StoredAd, ReadAd, AdRings |
 | `domain` | `domain/analysis-input.ts` | Markets |
-| `domain` | `domain/avatars.ts` | AvatarProfile, AvatarMemory, StoredAvatar, AvatarQuote |
+| `domain` | `domain/avatars.ts` | AvatarProfile, AvatarMemory, StoredAvatar, AvatarQuote, AvatarRecord |
 | `domain` | `domain/charges.ts` | ChargeDraft, Charge, ChargeMeter, ServiceUse |
 | `domain` | `domain/competitors.ts` | Competitor, CompetitorRelationship |
 | `domain` | `domain/ids.ts` | Clock, Ids |
@@ -1508,15 +1586,22 @@ classDiagram
 | `domain` | `domain/service-report.ts` | ServicePart, ServiceReport |
 | `domain` | `domain/shop-finder.ts` | ShopQuery, FoundShop, ShopPage |
 | `domain` | `domain/stages.ts` | StagePlan, StageState, Stages |
-| `domain` | `domain/store-ports.ts` | AccountDirectory, RunStore, ProductStore, CompetitorStore, ReviewStore, AvatarStore, AvatarRecord, AdStore, BrandVisualCache, ShopSignalCache, EventLog, ChargeLedger, CallLog, MarketStore, ResearchStore |
+| `domain` | `domain/store-ports.ts` | AccountDirectory, RunStore, ProductStore, CompetitorStore, ReviewStore, AvatarStore, AdStore, AdAnalysisStore, BrandVisualCache, ShopSignalCache, EventLog, ChargeLedger, CallLog, MarketStore, ResearchStore |
 | `domain` | `domain/traction.ts` | ShopSignals, ShopTraction, ShopHandles |
 | `domain` | `domain/web.ts` | SearchHit, SearchPage, SearchScope, FetchedPage, ServiceUnavailableError |
+| `extract` | `extract/ads-analyzer.ts` | AdsAnalyzer |
+| `extract` | `extract/angle-tally.ts` | AngleTally |
 | `extract` | `extract/avatar-memory-check.ts` | AvatarMemoryCheck |
 | `extract` | `extract/avatar-memory.ts` | AvatarMemoryBook |
 | `extract` | `extract/avatar-tally.ts` | AvatarTally |
+| `extract` | `extract/brand-grid.ts` | BrandGrid |
+| `extract` | `extract/hook-cutter.ts` | HookCutter |
+| `extract` | `extract/label-diff.ts` | LabelDiff |
 | `extract` | `extract/market-tally.ts` | MarketTally |
+| `extract` | `extract/momentum.ts` | Momentum |
 | `extract` | `extract/pack-check.ts` | PackCheck |
 | `extract` | `extract/price-check.ts` | PriceCheck |
+| `extract` | `extract/proven-rule.ts` | ProvenRule |
 | `http` | `http/account-commands.ts` | AccountCommands |
 | `http` | `http/app.ts` | AppParts, App |
 | `http` | `http/auth-gate.ts` | AuthGate |

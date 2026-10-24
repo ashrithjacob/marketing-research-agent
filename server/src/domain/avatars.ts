@@ -111,3 +111,12 @@ export interface AvatarQuote {
   body: string;
   source: string;
 }
+
+/** One avatar to store, with the evidence ids it rests on; parents are named by key. */
+export interface AvatarRecord {
+  avatar: Omit<StoredAvatar, "id" | "run_id" | "parent_id">;
+  parent_key: string | null;
+  review_ids: readonly string[];
+  quote_ids: readonly string[];
+  ad_ids: readonly string[];
+}

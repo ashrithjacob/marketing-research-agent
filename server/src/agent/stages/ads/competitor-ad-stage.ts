@@ -5,10 +5,11 @@ import { Trace } from "../../../trace/index.js";
 import type { RunContext } from "../../pipeline/run-context.js";
 import type { Stage, StageInput, StageOutcome } from "../../pipeline/stage.js";
 
+import { AdAnalysisStep } from "./ad-analysis-step.js";
 import { AdReader } from "./ad-reader.js";
 import { AdScout, type ScoutLimits } from "./ad-scout.js";
 
-/** Stage 3: a scout agent studies the market's long-form ads in a growth marketer's rings and keeps the ones worth studying; each kept ad is then read for its avatar, claim, awareness and bucket. */
+/** Stage 3: a scout agent studies the market's long-form ads in a growth marketer's rings and keeps the ones worth studying; each kept ad is then read for its avatar, claim, awareness and bucket, and the read ads are grouped into angles and analysed. */
 export class CompetitorAdStage implements Stage {
   readonly name: StageName = "competitor_ads";
   static readonly BATCH = 8;
@@ -19,6 +20,7 @@ export class CompetitorAdStage implements Stage {
     private readonly prices: ServicePrices,
     private readonly limits: ScoutLimits,
     private readonly reader = new AdReader(),
+    private readonly analysis = new AdAnalysisStep(),
     private readonly concurrency = 3,
   ) {}
 
@@ -41,12 +43,14 @@ export class CompetitorAdStage implements Stage {
     for (const ad of stored) await context.store.ads.saveRing(ad.id, ringOf.get(ad.trendtrack_ad_id)!.ring, ringOf.get(ad.trendtrack_ad_id)!.why);
     await context.emit("ads.brands", { brands: report.brands });
     const unread = await this.readAll(context, product, stored);
-    const summary = `${stored.length} ads kept of ${log.returned} seen in ${log.searched} searches (${log.shopsSeen} trending shops looked at), from ${report.brands.length} brands; ${CompetitorAdStage.rings(await context.store.ads.list(context.run.id))}; ${stored.length - unread} read.`;
-    if (stored.length > 0 && unread === stored.length) return { status: "invalid", summary, error: "no batch of ads could be read" };
-    return { status: "completed", summary, error: "" };
+    const all = await context.store.ads.list(context.run.id);
+    const kept = `${stored.length} ads kept of ${log.returned} seen in ${log.searched} searches (${log.shopsSeen} trending shops looked at), from ${report.brands.length} brands; ${CompetitorAdStage.rings(all)}; ${stored.length - unread} read`;
+    if (stored.length > 0 && unread === stored.length) return { status: "invalid", summary: `${kept}.`, error: "no batch of ads could be read" };
+    const analysed = await this.analysis.analyze(context, product, all);
+    return { status: analysed.status, summary: `${kept}; ${analysed.note}.`, error: analysed.error };
   }
 
-  /** Ads this run already kept that land on an added competitor's site become that competitor's; no new search is made. */
+  /** Ads this run already kept that land on an added competitor's site become that competitor's; no new search is made. The page counts competitors when it loads, so the analysis needs no rerun. */
   async add(input: StageInput): Promise<string> {
     Trace.line(import.meta.url, "CompetitorAdStage.add", { runId: input.context.run.id, competitors: input.competitors.length });
     const linked = await input.context.store.ads.link(input.context.run.id, new Map(input.competitors.map((c) => [CompetitorRelationship.domainOf(c.url), c.id])));

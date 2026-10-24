@@ -2,7 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 
 import { competitors as competitorWork, runs, type Config } from '../api';
 import Activity from './Activity';
-import Ads from './Ads';
+import Ads from './ads/Ads';
 import Avatars from './Avatars';
 import Market from './Market';
 import Competitors from './Competitors';
@@ -75,7 +75,7 @@ export default function RunPage({ runId, section, frame, onError }: { runId: str
         </>
       )}
       {section === 'reviews' && product && <Reviews runId={runId} product={product} competitors={competitors} coverage={coverage} bar={bar} onError={onError} />}
-      {section === 'ads' && <Ads ads={ads} competitors={competitors} bar={bar} />}
+      {section === 'ads' && <Ads runId={runId} version={version} ads={ads} competitors={competitors} bar={bar} onError={onError} />}
       {section === 'market' && product && <Market runId={runId} version={run.stage_status.sophistication?.status ?? ''} bar={bar} onError={onError} />}
       {section === 'avatars' && product && <Avatars runId={runId} version={run.stage_status.avatars?.status ?? ''} bar={bar} onError={onError} />}
       {section !== null && !product && (

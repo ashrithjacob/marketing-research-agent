@@ -2,6 +2,7 @@ import type { ResearchStore } from "../../domain/index.js";
 import { Trace } from "../../trace/index.js";
 
 import { AccountTable } from "./account-table.js";
+import { AdAnalysisTable } from "./ad-analysis-table.js";
 import { AdTable } from "./ad-table.js";
 import { AvatarTable } from "./avatar-table.js";
 import { CallTable } from "./call-table.js";
@@ -25,6 +26,7 @@ export class SqlResearchStore implements ResearchStore {
   readonly competitors: CompetitorTable;
   readonly reviews: ReviewTable;
   readonly ads: AdTable;
+  readonly adAnalysis: AdAnalysisTable;
   readonly avatars: AvatarTable;
   readonly market: MarketTable;
   readonly visuals: VisualTable;
@@ -41,6 +43,7 @@ export class SqlResearchStore implements ResearchStore {
     this.competitors = new CompetitorTable(db);
     this.reviews = new ReviewTable(db);
     this.ads = new AdTable(db);
+    this.adAnalysis = new AdAnalysisTable(db);
     this.avatars = new AvatarTable(db);
     this.market = new MarketTable(db);
     this.visuals = new VisualTable(db);

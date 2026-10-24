@@ -137,6 +137,11 @@ export interface AdReading {
   objections_handled: string[];
   emotion: string;
   risk_flags: string[];
+  proof_kinds: string[];
+  offer_kinds: string[];
+  emotion_kind: string | null;
+  landing_kind: string | null;
+  copy_structure: string | null;
 }
 
 export interface ReadAd {

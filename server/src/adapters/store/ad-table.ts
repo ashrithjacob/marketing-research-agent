@@ -39,12 +39,15 @@ export class AdTable implements AdStore {
     await this.db.transaction(async (tx) => {
       await tx.run("UPDATE ads SET bucket = ?, bucket_why = ? WHERE id = ?", [reading.bucket, reading.bucket_why, adId]);
       await tx.run(
-        "INSERT INTO ad_extractions (ad_id, avatar_label, claim_type, awareness, mechanism, proof_types, offer, objections_handled, emotion, risk_flags)" +
-          " VALUES (?,?,?,?,?,?,?,?,?,?) ON CONFLICT (ad_id) DO UPDATE SET avatar_label = EXCLUDED.avatar_label, claim_type = EXCLUDED.claim_type," +
+        "INSERT INTO ad_extractions (ad_id, avatar_label, claim_type, awareness, mechanism, proof_types, offer, objections_handled, emotion, risk_flags," +
+          " proof_kinds, offer_kinds, emotion_kind, landing_kind, copy_structure)" +
+          " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT (ad_id) DO UPDATE SET avatar_label = EXCLUDED.avatar_label, claim_type = EXCLUDED.claim_type," +
           " awareness = EXCLUDED.awareness, mechanism = EXCLUDED.mechanism, proof_types = EXCLUDED.proof_types, offer = EXCLUDED.offer," +
-          " objections_handled = EXCLUDED.objections_handled, emotion = EXCLUDED.emotion, risk_flags = EXCLUDED.risk_flags",
+          " objections_handled = EXCLUDED.objections_handled, emotion = EXCLUDED.emotion, risk_flags = EXCLUDED.risk_flags, proof_kinds = EXCLUDED.proof_kinds," +
+          " offer_kinds = EXCLUDED.offer_kinds, emotion_kind = EXCLUDED.emotion_kind, landing_kind = EXCLUDED.landing_kind, copy_structure = EXCLUDED.copy_structure",
         [adId, reading.avatar, reading.claim_type, reading.awareness, reading.mechanism, JSON.stringify(reading.proof_types), reading.offer,
-          JSON.stringify(reading.objections_handled), reading.emotion, JSON.stringify(reading.risk_flags)],
+          JSON.stringify(reading.objections_handled), reading.emotion, JSON.stringify(reading.risk_flags), JSON.stringify(reading.proof_kinds),
+          JSON.stringify(reading.offer_kinds), reading.emotion_kind, reading.landing_kind, reading.copy_structure],
       );
     });
   }
@@ -67,7 +70,8 @@ export class AdTable implements AdStore {
     Trace.line(import.meta.url, "AdTable.list", { runId });
     const rows = await this.db.all(
       "SELECT a.*, to_char(a.first_seen, 'YYYY-MM-DD') AS first_seen, to_char(a.last_seen, 'YYYY-MM-DD') AS last_seen, e.claim_type IS NOT NULL AS read, e.avatar_label," +
-        " e.claim_type, e.awareness, e.mechanism, e.proof_types, e.offer, e.objections_handled, e.emotion, e.risk_flags, e.relation, e.relation_why" +
+        " e.claim_type, e.awareness, e.mechanism, e.proof_types, e.offer, e.objections_handled, e.emotion, e.risk_flags, e.relation, e.relation_why," +
+        " e.proof_kinds, e.offer_kinds, e.emotion_kind, e.landing_kind, e.copy_structure" +
         " FROM ads a LEFT JOIN ad_extractions e ON e.ad_id = a.id WHERE a.run_id = ? ORDER BY a.days_running DESC NULLS LAST, a.id",
       [runId],
     );
@@ -76,8 +80,11 @@ export class AdTable implements AdStore {
 
   private static ad(row: Record<string, any>): ReadAd {
     Trace.tick(import.meta.url, "AdTable.ad");
-    const { read, avatar_label, claim_type, awareness, mechanism, proof_types, offer, objections_handled, emotion, risk_flags, relation, relation_why, account_id: _account, image_text: _text, win_score: _score, ...ad } = row;
-    const reading = read ? { avatar: avatar_label, claim_type, awareness, mechanism, proof_types, offer, objections_handled, emotion, risk_flags } : null;
+    const { read, avatar_label, claim_type, awareness, mechanism, proof_types, offer, objections_handled, emotion, risk_flags, relation, relation_why, account_id: _account, image_text: _text, win_score: _score,
+      proof_kinds, offer_kinds, emotion_kind, landing_kind, copy_structure, ...ad } = row;
+    const reading = read
+      ? { avatar: avatar_label, claim_type, awareness, mechanism, proof_types, offer, objections_handled, emotion, risk_flags, proof_kinds, offer_kinds, emotion_kind, landing_kind, copy_structure }
+      : null;
     return { ...(ad as StoredAd), ring: relation ?? null, ring_why: relation_why ?? null, reading };
   }
 }

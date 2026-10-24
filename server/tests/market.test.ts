@@ -128,7 +128,7 @@ describe("stage 4", () => {
     const runId = await driver.start({ product_url: PRODUCT_URL });
     const [ad] = await pg.store.ads.save("admin", runId, product.id, [History.hit("s1", "2025-04-01", 90, "active")], new Map());
     await pg.store.ads.saveRing(ad!.id, "direct_competitor", "same tincture");
-    await pg.store.ads.saveReading(ad!.id, { ad_id: ad!.id, avatar: "ex-smokers", claim_type: "mechanism", awareness: "problem_aware", mechanism: "dissolves mucus", proof_types: [], offer: null, objections_handled: [], emotion: "relief", risk_flags: [], bucket: "winning", bucket_why: "90 days" });
+    await pg.store.ads.saveReading(ad!.id, { ad_id: ad!.id, avatar: "ex-smokers", claim_type: "mechanism", awareness: "problem_aware", mechanism: "dissolves mucus", proof_types: [], offer: null, objections_handled: [], emotion: "relief", risk_flags: [], proof_kinds: ["testimonial"], offer_kinds: ["guarantee"], emotion_kind: "relief", landing_kind: "advertorial", copy_structure: "personal_story", bucket: "winning", bucket_why: "90 days" });
     const done = await driver.confirmAndFinish(runId, { product_url: PRODUCT_URL, competitors: RESOLUTION.competitors.slice(0, 1).map(({ why: _why, ...pick }) => pick) });
 
     expect(done.run.stage_status.sophistication).toMatchObject({ status: "completed", error: "" });

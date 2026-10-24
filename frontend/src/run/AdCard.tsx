@@ -9,7 +9,7 @@ function audienceOf(ad: ReadAd): string | null {
   return `${who.gender && who.gender !== 'all' ? `${who.gender}, ` : ''}${who.age_min ?? '?'}–${who.age_max ?? '?'}`;
 }
 
-export default function AdCard({ ad, logo }: { ad: ReadAd; logo: string | null }) {
+export default function AdCard({ ad, logo, proven = false, angle = null }: { ad: ReadAd; logo: string | null; proven?: boolean; angle?: string | null }) {
   const [open, setOpen] = useState(false);
   const audience = audienceOf(ad);
   return (
@@ -19,7 +19,9 @@ export default function AdCard({ ad, logo }: { ad: ReadAd; logo: string | null }
         <BrandMark name={ad.advertiser} src={logo} size={22} />
         <strong>{ad.advertiser}</strong>
         {ad.bucket && <span className={`badge bucket-${ad.bucket}`}>{ad.bucket}</span>}
+        {proven && <span className="badge bucket-winning">proven</span>}
       </div>
+      {angle && <div className="small">angle: <strong>{angle}</strong></div>}
       <div className="dim small">
         {ad.landing_domain} · {ad.days_running ?? '?'} days · {ad.duplicates ?? '?'} duplicates · {ad.status}
         {audience && ` · ${audience}`}

@@ -26,22 +26,18 @@ services:
     networks: [default, edge]
     volumes:
       - mra_data:/data
-      - corpus:/corpus
     environment:
       - MRA_APP_USER=${MRA_APP_USER:-ash}
       # `:?` is the guard: compose refuses to start this stack at all with an
       # empty hash, so an unauthenticated agent with paid API keys cannot end
       # up on a public hostname by accident. Set it once with `npm run hashpw`;
-      # after the first boot logins live in research.db (mra-users.sh).
+      # the first boot seeds this admin into the `users` table.
       - "MRA_APP_PASSWORD_HASH=${MRA_APP_PASSWORD_HASH:?must be set: it turns login on and seeds the first admin (setup.md 5a)}"
       - MRA_JWT_SECRET=${MRA_JWT_SECRET:?MRA_JWT_SECRET is not set}
       - MRA_COOKIE_SECURE=true
-      - MRA_DATABASE_PATH=/data/research.db
-      # The store. Set, it lives in Postgres on Neon (Frankfurt, project
-      # silent-band-48662060); blank, in the SQLite file above, as before
-      # 2026-10-03. setup.md 5a has the cutover and the way back.
-      - DATABASE_URL=${DATABASE_URL:-}
-      - MRA_CORPUS_PATH=/corpus
+      # The store: Postgres on Neon (Frankfurt, project silent-band-48662060).
+      # Required since the avatar rewrite; the server refuses to start without it.
+      - DATABASE_URL=${DATABASE_URL:?DATABASE_URL is not set}
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:?OPENROUTER_API_KEY is not set}
       - MRA_MODEL=${MRA_MODEL:?MRA_MODEL must be set in .env - the model id lives only there}
       - MRA_BACKUP_MODELS=${MRA_BACKUP_MODELS:-}
@@ -49,31 +45,16 @@ services:
       # Fallback page reader, used only when Firecrawl can fetch nothing at all
       # (out of credits, key refused, or no key). Optional: blank disables it.
       - CRAWL4AI_API_KEY=${CRAWL4AI_API_KEY:-}
-      # Every web_search, stage 1 and product truth, goes to Parallel, and
-      # product truth reads pages through it too. Required: without it no
-      # agent can search at all.
+      # Every web_search goes to Parallel. Required: without it no agent can
+      # search at all.
       - PARALLEL_API_KEY=${PARALLEL_API_KEY:?PARALLEL_API_KEY is not set}
-      # Meta ad search for the product, competitors and category agents
-      # (ad_library_search). Optional: blank and the tool is not offered.
+      # Meta ads (stage 3), shop traction (stage 1), ad history (stage 4).
+      # Optional: blank and stage 3 fails with a reason, the rest still run.
       - TRENDTRACK_API_KEY=${TRENDTRACK_API_KEY:-}
-      # Cheap pre-read gate over every fetch; empty disables. Fails open.
-      - MRA_GATE_MODEL=${MRA_GATE_MODEL:-}
-      - MRA_JUDGE_MODEL=${MRA_JUDGE_MODEL:-}
-      - MRA_GATE_CHAR_LIMIT=${MRA_GATE_CHAR_LIMIT:-4000}
-      - MRA_GATE_TIMEOUT_SECONDS=${MRA_GATE_TIMEOUT_SECONDS:-12}
-      # Review mining only, and deliberately NOT `:?` like the two above. This
-      # key spends against a card with no allowance rather than per-token
-      # inference, so an absent one withholds the three review tools from the
-      # agent and leaves the rest of the cockpit working — better than refusing
-      # to boot. See setup.md §5b.
+      # Stage 4's search volume, Amazon listings and Reddit. Deliberately not
+      # `:?`: it spends against a card, so an absent one leaves stage 4 running
+      # without those three rather than refusing to boot.
       - APIFY_TOKEN=${APIFY_TOKEN:-}
-      # Reviews requested per product per star band; the FREE plan's actor caps
-      # it at 10 per run anyway. Passed through explicitly — an .env line for a
-      # variable the compose file does not forward is silently ignored, and the
-      # code default would look like it had been honoured.
-      - MRA_APIFY_MAX_REVIEWS=${MRA_APIFY_MAX_REVIEWS:-50}
-      # Apify actor runs mine_reviews keeps in flight at once.
-      - MRA_APIFY_CONCURRENCY=${MRA_APIFY_CONCURRENCY:-16}
 
 networks:
   # Shared with Caddy and nothing else. Not `pa-compose_default`: that is the
@@ -85,7 +66,6 @@ networks:
     name: edge
 
 volumes:
-  # Runs, events and packets. Captured nightly by owui-snapshot.sh.
+  # Traces (the store is on Neon). Captured nightly by owui-snapshot.sh.
+  # The old `mra_corpus` volume is left on the VPS, no longer mounted.
   mra_data: {}
-  # Raw fetched bodies, content-addressed. Captured nightly too.
-  corpus: {}

@@ -41,7 +41,7 @@ export class AdReader {
     const delta = ad.reach_delta ? `reach growth ${ad.reach_delta.d7 ?? "?"} in 7 days, ${ad.reach_delta.d30 ?? "?"} in 30 days` : "reach growth unknown";
     return [
       `<ad id="${ad.id}">`,
-      `advertiser: ${ad.advertiser}; lands on ${ad.landing_domain}; status ${ad.status}; audience ${AdReader.audience(ad)}`,
+      `advertiser: ${ad.advertiser}; lands on ${ad.landing_url || ad.landing_domain}; status ${ad.status}; audience ${AdReader.audience(ad)}`,
       `first seen ${ad.first_seen ?? "?"}, last seen ${ad.last_seen ?? "still running"}, ${ad.days_running ?? "?"} days running, ${ad.duplicates ?? "?"} duplicates, reach ${ad.reach ?? "?"}, ${delta}, rank ${ad.ad_rank ?? "?"}`,
       ad.copy,
       "</ad>",

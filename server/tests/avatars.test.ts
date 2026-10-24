@@ -99,7 +99,7 @@ describe("stage 5", () => {
 
     const runId = await driver.start({ product_url: PRODUCT_URL });
     const [winning, dead, sameBuyer] = await pg.store.ads.save("admin", runId, product.id, [ad("w1"), ad("d1"), ad("b1")], new Map());
-    const reading = { avatar: "ex-smokers", claim_type: "identity" as const, awareness: "problem_aware" as const, mechanism: null, proof_types: [], offer: null, objections_handled: [], emotion: "relief", risk_flags: [] };
+    const reading = { avatar: "ex-smokers", claim_type: "identity" as const, awareness: "problem_aware" as const, mechanism: null, proof_types: [], offer: null, objections_handled: [], emotion: "relief", risk_flags: [], proof_kinds: ["testimonial" as const], offer_kinds: ["guarantee" as const], emotion_kind: "relief" as const, landing_kind: "advertorial" as const, copy_structure: "personal_story" as const };
     await pg.store.ads.saveRing(winning!.id, "same_problem", "lungs");
     await pg.store.ads.saveRing(dead!.id, "direct_competitor", "same tincture");
     await pg.store.ads.saveRing(sameBuyer!.id, "same_buyer", "joint pain, 50+");

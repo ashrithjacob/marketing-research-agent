@@ -21,15 +21,15 @@ echo "==> tests"
 echo "==> build"
 docker build -t mra:latest .
 
-# Preflight the image, not just the code. Both mount points must be writable
-# by the runtime user on a *fresh* volume — the corpus once shipped root-owned,
-# which fails silently: runs still complete, with every source unarchived.
-echo "==> preflight: fresh volumes are writable by the runtime user"
+# Preflight the image, not just the code. /data must be writable by the
+# runtime user on a *fresh* volume: a mount once shipped root-owned, which
+# fails silently. Traces are written there.
+echo "==> preflight: a fresh volume is writable by the runtime user"
 PROBE="mra_preflight_$$"
-trap 'docker volume rm -f "${PROBE}_corpus" "${PROBE}_data" >/dev/null 2>&1 || true' EXIT
-docker run --rm -v "${PROBE}_corpus:/corpus" -v "${PROBE}_data:/data" --entrypoint sh mra:latest \
-  -c 'touch /corpus/.w && touch /data/.w' \
-  || { echo "!! /corpus or /data is not writable by the image's user — refusing to deploy" >&2; exit 1; }
+trap 'docker volume rm -f "${PROBE}_data" >/dev/null 2>&1 || true' EXIT
+docker run --rm -v "${PROBE}_data:/data" --entrypoint sh mra:latest \
+  -c 'touch /data/.w' \
+  || { echo "!! /data is not writable by the image's user — refusing to deploy" >&2; exit 1; }
 
 echo "==> ship image (docker save | ssh docker load)"
 docker save mra:latest | gzip -1 | ssh "$REMOTE" 'gunzip | docker load'

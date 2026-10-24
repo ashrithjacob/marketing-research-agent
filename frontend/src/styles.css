@@ -382,3 +382,37 @@ button.link { background: none; border: 0; padding: 0 0 0 4px; color: var(--acce
 .facts.wide { grid-template-columns: 160px 1fr; }
 .facts .contents { display: contents; }
 .review-list-head { scroll-margin-top: 16px; margin-top: 14px; }
+.ads-step h2 { display: flex; align-items: center; gap: 10px; }
+.step-n { display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 8px; background: var(--accent); color: #fff; font-size: 14px; font-weight: 600; flex: none; }
+.finding { background: var(--accent-soft); border-left: 3px solid var(--accent); border-radius: 8px; padding: 10px 14px; margin: 10px 0 14px; }
+.finding-headline { font-size: 16px; font-weight: 600; margin: 0 0 6px; }
+.finding-facts { margin: 0 0 8px; padding-left: 18px; color: var(--dim); }
+.claims .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.claims tr.clickable { cursor: pointer; }
+.claims tr.clickable:hover td { background: var(--accent-soft); }
+.link-button { background: none; border: 0; padding: 0; color: var(--accent); cursor: pointer; font: inherit; }
+.link-button.on { font-weight: 700; text-decoration: underline; }
+.angle-detail { padding: 6px 0; }
+.hooks { padding-left: 18px; margin: 4px 0 8px; }
+.hooks li { margin-bottom: 4px; }
+.brand-grid { margin-top: 10px; }
+.claims.grid { display: block; overflow-x: auto; }
+.cell-hot { background: #d1fae5; }
+.cell-warm { background: #ecfdf5; }
+.cell-cold { background: var(--panel-2); }
+.launch-bar { display: flex; height: 10px; border-radius: 4px; overflow: hidden; min-width: 8px; }
+.launch-30 { background: var(--accent); }
+.launch-60 { background: var(--accent-2); opacity: 0.6; }
+.launch-old { background: var(--line); }
+.trend-rising { color: var(--ok); font-weight: 600; }
+.trend-fading { color: var(--faint); }
+.claims td.up { color: var(--ok); }
+.claims td.down { color: var(--bad); }
+.fits { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; }
+.fit { display: flex; gap: 10px; align-items: flex-start; }
+.fit-mark { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 6px; flex: none; font-weight: 700; background: var(--panel-2); }
+.fit-supported .fit-mark { background: #ecfdf5; color: var(--ok); }
+.fit-needs_new_claim .fit-mark { background: #fffbeb; color: var(--warn); }
+.fit-does_not_apply .fit-mark { color: var(--faint); }
+.filters select { border: 0; background: transparent; font: inherit; color: var(--accent); }
+.ads-step, #ads-all { scroll-margin-top: 16px; }
