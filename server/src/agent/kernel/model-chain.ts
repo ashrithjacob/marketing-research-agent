@@ -27,6 +27,13 @@ export class ModelChain {
     return this.models[this.position]!;
   }
 
+  /** The model after `model` in the chain, for one agent to move to on its own; null at the end. */
+  after(model: Model<Api>): Model<Api> | null {
+    Trace.line(import.meta.url, "ModelChain.after", { model: model.id });
+    const index = this.models.findIndex((m) => m.id === model.id);
+    return index < 0 ? null : (this.models[index + 1] ?? null);
+  }
+
   failover(agent: Agent): { from: string; to: string } | null {
     Trace.line(import.meta.url, "ModelChain.failover", { position: this.position });
     if (this.position >= this.models.length - 1) return null;

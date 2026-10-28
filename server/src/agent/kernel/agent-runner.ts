@@ -1,4 +1,4 @@
-import { Agent, type AgentEvent, type AgentTool } from "@earendil-works/pi-agent-core";
+import { Agent, type AgentEvent, type AgentTool, type ThinkingLevel } from "@earendil-works/pi-agent-core";
 import type { Models } from "@earendil-works/pi-ai";
 
 import type { CallLog, LlmCall } from "../../domain/index.js";
@@ -7,6 +7,7 @@ import { TracedTool } from "../tools/traced-tool.js";
 
 import { CallSequence, LlmCallLog } from "./llm-call-log.js";
 import type { ModelChain } from "./model-chain.js";
+import { RepeatedTurns } from "./repeated-turns.js";
 import { DEFAULT_RETRY, Retries, type RetryPolicy } from "./retry.js";
 import { SubmitTool, type Submission } from "./submit-tool.js";
 import { ToolSteps } from "./tool-steps.js";
@@ -19,6 +20,7 @@ export interface AgentJob<T> {
   tools: readonly AgentTool<any>[];
   submission: Submission<T>;
   maxTurns: number;
+  reasoning?: ThinkingLevel;
 }
 
 export type AgentResult<T> =
@@ -39,8 +41,10 @@ export interface AgentRunnerDeps {
   retry?: RetryPolicy;
 }
 
-/** Drives one agent until submit accepts its answer, it runs out of turns or refusals, the run is stopped, or the model cannot be reached; a dropped stream is resumed on the next model in the chain. */
+/** Drives one agent until submit accepts its answer, it runs out of turns or refusals, the run is stopped, or the model cannot be reached; a dropped stream is resumed on the next model in the chain, and an agent repeating its last turn's tool calls is moved to it. Every reply is capped at MAX_OUTPUT_TOKENS, reasoning included. */
 export class AgentRunner {
+  static readonly MAX_OUTPUT_TOKENS = 40_000;
+
   constructor(private readonly deps: AgentRunnerDeps) {}
 
   async run<T>(job: AgentJob<T>): Promise<AgentResult<T>> {
@@ -74,15 +78,18 @@ export class AgentRunner {
     const { deps } = this;
     const steps = new ToolSteps();
     const log = new LlmCallLog({ runId: deps.runId, agentId: job.agentId, sequence: deps.sequence, calls: deps.calls, onCall: deps.onCall });
+    const repeats = new RepeatedTurns(deps.chain, (from, to) => deps.emit("agent.model_switched", { agent_id: job.agentId, from, to, why: "repeated tool calls" }));
     return new Agent({
-      streamFn: log.wrap((model, context, options) => deps.models.streamSimple(model, context, { ...options, onPayload: deps.chain.withFallbacks(options?.onPayload) })),
+      streamFn: log.wrap((model, context, options) => deps.models.streamSimple(model, context, { ...options, maxTokens: AgentRunner.MAX_OUTPUT_TOKENS, onPayload: deps.chain.withFallbacks(options?.onPayload) })),
       sessionId: `${deps.runId}-${job.agentId}`,
       initialState: {
         systemPrompt: job.system,
         model: deps.chain.current,
+        ...(job.reasoning ? { thinkingLevel: job.reasoning } : {}),
         tools: [...job.tools, submit.tool()].map((tool) => TracedTool.wrap(tool, steps)),
       },
       finishTurn: policy.finishTurn,
+      prepareNextTurnWithContext: repeats.prepareNextTurn,
     });
   }
 

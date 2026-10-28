@@ -29,7 +29,7 @@ export class ServiceClients {
     return new ServiceClients(
       ServiceClients.pageChain(settings),
       new ThrottledWebSearch(new ParallelSearch(new ParallelApi(settings)), new ServiceQueue("parallel", settings.parallelConcurrency)),
-      settings.trendtrackApiKey ? new ThrottledAdLibrary(new TrendtrackAds(settings), new ServiceQueue("trendtrack", settings.trendtrackConcurrency)) : null,
+      settings.trendtrackApiKey ? new ThrottledAdLibrary(new TrendtrackAds(new TrendtrackApi(settings)), new ServiceQueue("trendtrack", settings.trendtrackConcurrency)) : null,
       settings.trendtrackApiKey ? new TrendtrackShops(new TrendtrackApi(settings)) : null,
       settings.trendtrackApiKey ? new TrendtrackShopFinder(new TrendtrackApi(settings)) : null,
     );

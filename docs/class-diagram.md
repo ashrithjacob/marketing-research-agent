@@ -71,25 +71,16 @@ classDiagram
       forViewer()
       admits()
     }
-    class AdAngle {
-      <<interface>>
-    }
-    class AngleHook {
-      <<interface>>
-    }
-    class AngleRow {
-      <<interface>>
-    }
-    class LabelRow {
-      <<interface>>
-    }
-    class BrandRow {
-      <<interface>>
-    }
-    class AdsAnalysis {
-      <<interface>>
-    }
     class AdQuery {
+      <<interface>>
+    }
+    class AdAudienceFilter {
+      <<interface>>
+    }
+    class AdCategory {
+      <<interface>>
+    }
+    class AdCategoryPage {
       <<interface>>
     }
     class AdHit {
@@ -98,13 +89,20 @@ classDiagram
     class AdPage {
       <<interface>>
     }
+    class PulledAd {
+      <<interface>>
+    }
     class StoredAd {
       <<interface>>
     }
     class ReadAd {
       <<interface>>
     }
+    class AdBuckets {
+      of()
+    }
     class AdRings {
+      quotas()
       isSupply()
     }
     class Markets {
@@ -213,6 +211,7 @@ classDiagram
     class AdLibrary {
       <<interface>>
       search()
+      categories()
     }
     class ReviewSource {
       <<interface>>
@@ -389,17 +388,10 @@ classDiagram
       clear()
       save()
       saveReading()
-      saveRing()
+      setPageKinds()
+      setSegments()
       link()
       list()
-    }
-    class AdAnalysisStore {
-      <<interface>>
-      saveAngles()
-      saveFits()
-      saveFindings()
-      angles()
-      findings()
     }
     class BrandVisualCache {
       <<interface>>
@@ -479,12 +471,18 @@ classDiagram
     }
   }
   namespace extract {
-    class AdsAnalyzer {
-      analyze()
+    class AdSegment {
+      <<interface>>
     }
-    class AngleTally {
-      rows()
-      brand()
+    class AdAvatarTally {
+      records()
+    }
+    class AdScripts {
+      group()
+    }
+    class AvatarFloor {
+      fold()
+      emerging()
     }
     class AvatarMemoryCheck {
       problems()
@@ -492,20 +490,12 @@ classDiagram
     class AvatarMemoryBook {
       empty()
       apply()
+      graft()
       placeAds()
     }
     class AvatarTally {
       records()
       awareness()
-    }
-    class BrandGrid {
-      rows()
-    }
-    class HookCutter {
-      cut()
-    }
-    class LabelDiff {
-      rows()
     }
     class MarketTally {
       assessment()
@@ -513,18 +503,12 @@ classDiagram
       metaAds()
       channels()
     }
-    class Momentum {
-      of()
-    }
     class PackCheck {
       problems()
     }
     class PriceCheck {
       problems()
       shown()
-    }
-    class ProvenRule {
-      isProven()
     }
   }
   namespace adapters {
@@ -593,6 +577,7 @@ classDiagram
     }
     class MeteredAdLibrary {
       search()
+      categories()
     }
     class MeteredShopIntel {
       lookup()
@@ -701,18 +686,12 @@ classDiagram
       users()
       setPassword()
     }
-    class AdAnalysisTable {
-      saveAngles()
-      saveFits()
-      saveFindings()
-      angles()
-      findings()
-    }
     class AdTable {
       clear()
       save()
       saveReading()
-      saveRing()
+      setPageKinds()
+      setSegments()
       link()
       list()
     }
@@ -829,12 +808,15 @@ classDiagram
     }
     class ThrottledAdLibrary {
       search()
+      categories()
     }
     class TrendtrackAd {
       <<interface>>
     }
     class TrendtrackAds {
       search()
+      categories()
+      body()
     }
     class TrendtrackApi {
       get()
@@ -902,8 +884,11 @@ classDiagram
     }
     class ModelChain {
       resolve()
+      after()
       failover()
       withFallbacks()
+    }
+    class RepeatedTurns {
     }
     class RetryPolicy {
       <<interface>>
@@ -921,6 +906,7 @@ classDiagram
     }
     class SubmitTool {
       tool()
+      unpacked()
     }
     class ToolSteps {
       start()
@@ -1009,42 +995,61 @@ classDiagram
       research()
       crashed()
     }
-    class AdAnalysisStep {
-      analyze()
+    class RingOutcome {
+      <<interface>>
+    }
+    class AdPull {
+      withRules()
+      pull()
+      merge()
     }
     class AdReader {
       read()
       problems()
     }
-    class ScoutLimits {
+    class Segmented {
       <<interface>>
     }
-    class AdScout {
-      scout()
-      problems()
+    class AudienceSegmenter {
+      segment()
+      nameProblems()
+      pickProblems()
     }
-    class AngleFitter {
-      fit()
-      problems()
-    }
-    class AngleGrouper {
-      group()
-      problems()
+    class AdPoolLimits {
+      <<interface>>
     }
     class CompetitorAdStage {
       run()
       add()
       rings()
+      pageKinds()
     }
-    class FindingsWriter {
-      write()
+    class PageSorter {
+      sort()
       problems()
-      subjects()
     }
-    class ScoutLog {
+    class RingSearch {
+      <<interface>>
+    }
+    class RingLog {
+      claim()
+      unclaim()
+      idOf()
+      reserve()
+      release()
       record()
-      recordShops()
-      ad()
+      hit()
+      found()
+    }
+    class RingScout {
+      pull()
+      problems()
+    }
+    class AdAvatarProfiler {
+      profile()
+    }
+    class AdAvatars {
+      build()
     }
     class AdPlacer {
       place()
@@ -1060,6 +1065,10 @@ classDiagram
     class AvatarStage {
       run()
     }
+    class GapFinder {
+      find()
+      sample()
+    }
     class MemoryView {
       memory()
       reviews()
@@ -1067,6 +1076,9 @@ classDiagram
     }
     class ReviewOrder {
       batches()
+    }
+    class SubAvatarSplitter {
+      split()
     }
     class MarketLog {
       add()
@@ -1125,6 +1137,9 @@ classDiagram
       add()
       empty()
     }
+    class AdCategoriesTool {
+      tool()
+    }
     class AdHistoryTool {
       tool()
       item()
@@ -1146,10 +1161,20 @@ classDiagram
       tool()
       host()
     }
-    class ReadAdTool {
+    class AdPullRules {
+      <<interface>>
+    }
+    class PullAdsTool {
       tool()
+      repeated()
+      signature()
+      label()
+      row()
     }
     class ReadLandingTool {
+      tool()
+    }
+    class ReadPulledAdTool {
       tool()
     }
     class ReadSnapshotTool {
@@ -1157,10 +1182,6 @@ classDiagram
     }
     class RedditTool {
       tool()
-    }
-    class SearchLongFormTool {
-      tool()
-      row()
     }
     class SuggestionsTool {
       tool()
@@ -1179,10 +1200,6 @@ classDiagram
     }
     class TracedTool {
       wrap()
-    }
-    class TrendingShopsTool {
-      tool()
-      row()
     }
     class UrlLedger {
       read()
@@ -1297,7 +1314,6 @@ classDiagram
   ServiceClients --> ShopFinder
   ShopifyStorefront --> PublicPage
   AccountTable --> SqlDatabase
-  AdAnalysisTable --> SqlDatabase
   AdTable --> SqlDatabase
   AvatarTable --> SqlDatabase
   CallTable --> SqlDatabase
@@ -1319,7 +1335,7 @@ classDiagram
   ThrottledWebSearch --> ServiceQueue
   ThrottledAdLibrary --> AdLibrary
   ThrottledAdLibrary --> ServiceQueue
-  TrendtrackAds --> Settings
+  TrendtrackAds --> TrendtrackApi
   TrendtrackApi --> Settings
   TrendtrackShopFinder --> TrendtrackApi
   TrendtrackShops --> TrendtrackApi
@@ -1342,6 +1358,7 @@ classDiagram
   AgentRunner --> AgentRunnerDeps
   BilledCosts --> ResearchStore
   BilledCosts --> GenerationSource
+  RepeatedTurns --> ModelChain
   RunMeter --> ChargeLedger
   Pipeline --> Stage
   RunContext --> Run
@@ -1362,14 +1379,13 @@ classDiagram
   RunLauncher --> ProductResolver
   RunLauncher --> ResolutionVisuals
   RunLauncher --> ResolutionSignals
-  AdScout --> AdLibrary
-  AdScout --> ShopFinder
-  AdScout --> ServicePrices
-  AdScout --> ScoutLimits
+  AdPull --> RingScout
   CompetitorAdStage --> AdLibrary
-  CompetitorAdStage --> ShopFinder
   CompetitorAdStage --> ServicePrices
-  CompetitorAdStage --> ScoutLimits
+  CompetitorAdStage --> AdPoolLimits
+  RingScout --> AdLibrary
+  RingScout --> ServicePrices
+  RingScout --> AdPullRules
   MarketStage --> MarketSources
   MarketStage --> ServicePrices
   MarketStage --> MarketLimits
@@ -1381,6 +1397,7 @@ classDiagram
   ReviewListings --> Storefront
   ReviewListings --> AmazonListingFinder
   ReviewStage --> ReviewListings
+  AdCategoriesTool --> AdLibrary
   AdHistoryTool --> AdLibrary
   AdHistoryTool --> MarketLog
   AdSearchTool --> AdLibrary
@@ -1393,21 +1410,20 @@ classDiagram
   ListAdsTool --> MarketLog
   PageHistoryTool --> PageArchive
   PageHistoryTool --> MarketLog
-  ReadAdTool --> ScoutLog
+  PullAdsTool --> AdLibrary
+  PullAdsTool --> AdPullRules
+  PullAdsTool --> RingLog
   ReadLandingTool --> PageFetcher
   ReadLandingTool --> MarketLog
+  ReadPulledAdTool --> RingLog
   ReadSnapshotTool --> PageArchive
   ReadSnapshotTool --> MarketLog
   RedditTool --> ForumSearch
   RedditTool --> MarketLog
-  SearchLongFormTool --> AdLibrary
-  SearchLongFormTool --> ScoutLog
   SuggestionsTool --> SearchSuggestions
   SuggestionsTool --> MarketLog
   Toolbox --> ServiceClients
   Toolbox --> Settings
-  TrendingShopsTool --> ShopFinder
-  TrendingShopsTool --> ScoutLog
   VolumeTool --> KeywordVolumes
   VolumeTool --> MarketLog
   WebFetchTool --> PageFetcher
@@ -1466,7 +1482,6 @@ classDiagram
 | `adapters` | `adapters/service-queue.ts` | Waiter, ServiceQueue |
 | `adapters` | `adapters/shopify-storefront.ts` | ShopifyStorefront |
 | `adapters` | `adapters/store/account-table.ts` | AccountTable |
-| `adapters` | `adapters/store/ad-analysis-table.ts` | AdAnalysisTable |
 | `adapters` | `adapters/store/ad-table.ts` | AdTable |
 | `adapters` | `adapters/store/avatar-table.ts` | AvatarTable |
 | `adapters` | `adapters/store/call-table.ts` | CallTable |
@@ -1499,6 +1514,7 @@ classDiagram
 | `agent` | `agent/kernel/billed-costs.ts` | BilledCosts |
 | `agent` | `agent/kernel/llm-call-log.ts` | CallSequence, LlmCallLog |
 | `agent` | `agent/kernel/model-chain.ts` | ModelChain |
+| `agent` | `agent/kernel/repeated-turns.ts` | RepeatedTurns |
 | `agent` | `agent/kernel/retry.ts` | RetryPolicy, Retries |
 | `agent` | `agent/kernel/run-meter.ts` | RunMeter |
 | `agent` | `agent/kernel/submit-tool.ts` | Submission, SubmitTool |
@@ -1519,20 +1535,23 @@ classDiagram
 | `agent` | `agent/resolve/resolution-visuals.ts` | ResolutionVisuals |
 | `agent` | `agent/run-end.ts` | RunVerdict, RunEnd |
 | `agent` | `agent/run-launcher.ts` | RunLauncher |
-| `agent` | `agent/stages/ads/ad-analysis-step.ts` | AdAnalysisStep |
+| `agent` | `agent/stages/ads/ad-pull.ts` | RingOutcome, AdPull |
 | `agent` | `agent/stages/ads/ad-reader.ts` | AdReader |
-| `agent` | `agent/stages/ads/ad-scout.ts` | ScoutLimits, AdScout |
-| `agent` | `agent/stages/ads/angle-fitter.ts` | AngleFitter |
-| `agent` | `agent/stages/ads/angle-grouper.ts` | AngleGrouper |
-| `agent` | `agent/stages/ads/competitor-ad-stage.ts` | CompetitorAdStage |
-| `agent` | `agent/stages/ads/findings-writer.ts` | FindingsWriter |
-| `agent` | `agent/stages/ads/scout-log.ts` | ScoutLog |
+| `agent` | `agent/stages/ads/audience-segmenter.ts` | Segmented, AudienceSegmenter |
+| `agent` | `agent/stages/ads/competitor-ad-stage.ts` | AdPoolLimits, CompetitorAdStage |
+| `agent` | `agent/stages/ads/page-sorter.ts` | PageSorter |
+| `agent` | `agent/stages/ads/ring-log.ts` | RingSearch, RingLog |
+| `agent` | `agent/stages/ads/ring-scout.ts` | RingScout |
+| `agent` | `agent/stages/avatars/ad-avatar-profiler.ts` | AdAvatarProfiler |
+| `agent` | `agent/stages/avatars/ad-avatars.ts` | AdAvatars |
 | `agent` | `agent/stages/avatars/ad-placer.ts` | AdPlacer |
 | `agent` | `agent/stages/avatars/avatar-judge.ts` | AvatarJudge |
 | `agent` | `agent/stages/avatars/avatar-reader.ts` | AvatarReader |
 | `agent` | `agent/stages/avatars/avatar-stage.ts` | AvatarStage |
+| `agent` | `agent/stages/avatars/gap-finder.ts` | GapFinder |
 | `agent` | `agent/stages/avatars/memory-view.ts` | MemoryView |
 | `agent` | `agent/stages/avatars/review-order.ts` | ReviewOrder |
+| `agent` | `agent/stages/avatars/sub-avatar-splitter.ts` | SubAvatarSplitter |
 | `agent` | `agent/stages/market/market-log.ts` | MarketLog |
 | `agent` | `agent/stages/market/market-reader.ts` | MarketReader |
 | `agent` | `agent/stages/market/market-stage.ts` | MarketSources, MarketLimits, MarketStage |
@@ -1544,22 +1563,22 @@ classDiagram
 | `agent` | `agent/stages/reviews/amazon-listing-finder.ts` | AmazonListingFinder |
 | `agent` | `agent/stages/reviews/review-listings.ts` | TargetListings, ReviewListings |
 | `agent` | `agent/stages/reviews/review-stage.ts` | ReviewStage |
+| `agent` | `agent/tools/ad-categories-tool.ts` | AdCategoriesTool |
 | `agent` | `agent/tools/ad-history-tool.ts` | AdHistoryTool |
 | `agent` | `agent/tools/ad-search-tool.ts` | AdSearchTool |
 | `agent` | `agent/tools/amazon-search-tool.ts` | AmazonSearchTool |
 | `agent` | `agent/tools/find-reviews-tool.ts` | FindReviewsTool |
 | `agent` | `agent/tools/list-ads-tool.ts` | ListAdsTool |
 | `agent` | `agent/tools/page-history-tool.ts` | PageHistoryTool |
-| `agent` | `agent/tools/read-ad-tool.ts` | ReadAdTool |
+| `agent` | `agent/tools/pull-ads-tool.ts` | AdPullRules, PullAdsTool |
 | `agent` | `agent/tools/read-landing-tool.ts` | ReadLandingTool |
+| `agent` | `agent/tools/read-pulled-ad-tool.ts` | ReadPulledAdTool |
 | `agent` | `agent/tools/read-snapshot-tool.ts` | ReadSnapshotTool |
 | `agent` | `agent/tools/reddit-tool.ts` | RedditTool |
-| `agent` | `agent/tools/search-long-form-tool.ts` | SearchLongFormTool |
 | `agent` | `agent/tools/suggestions-tool.ts` | SuggestionsTool |
 | `agent` | `agent/tools/tool-reply.ts` | ToolReply |
 | `agent` | `agent/tools/toolbox.ts` | AgentKit, Toolbox |
 | `agent` | `agent/tools/traced-tool.ts` | TracedTool |
-| `agent` | `agent/tools/trending-shops-tool.ts` | TrendingShopsTool |
 | `agent` | `agent/tools/url-ledger.ts` | UrlLedger |
 | `agent` | `agent/tools/volume-tool.ts` | VolumeTool |
 | `agent` | `agent/tools/web-fetch-tool.ts` | WebFetchTool |
@@ -1567,9 +1586,9 @@ classDiagram
 | `config` | `config/settings-shape.ts` | ServicePrices, Settings |
 | `config` | `config/settings.ts` | Env |
 | `domain` | `domain/accounts.ts` | Account, User, UserListing, Principal, Scope |
-| `domain` | `domain/ad-analysis.ts` | AdAngle, AngleHook, AngleRow, LabelRow, BrandRow, AdsAnalysis |
-| `domain` | `domain/ad-library.ts` | AdQuery, AdHit, AdPage |
-| `domain` | `domain/ads.ts` | StoredAd, ReadAd, AdRings |
+| `domain` | `domain/ad-library.ts` | AdQuery, AdAudienceFilter, AdCategory, AdCategoryPage, AdHit, AdPage |
+| `domain` | `domain/ad-pull.ts` | PulledAd |
+| `domain` | `domain/ads.ts` | StoredAd, ReadAd, AdBuckets, AdRings |
 | `domain` | `domain/analysis-input.ts` | Markets |
 | `domain` | `domain/avatars.ts` | AvatarProfile, AvatarMemory, StoredAvatar, AvatarQuote, AvatarRecord |
 | `domain` | `domain/charges.ts` | ChargeDraft, Charge, ChargeMeter, ServiceUse |
@@ -1586,22 +1605,18 @@ classDiagram
 | `domain` | `domain/service-report.ts` | ServicePart, ServiceReport |
 | `domain` | `domain/shop-finder.ts` | ShopQuery, FoundShop, ShopPage |
 | `domain` | `domain/stages.ts` | StagePlan, StageState, Stages |
-| `domain` | `domain/store-ports.ts` | AccountDirectory, RunStore, ProductStore, CompetitorStore, ReviewStore, AvatarStore, AdStore, AdAnalysisStore, BrandVisualCache, ShopSignalCache, EventLog, ChargeLedger, CallLog, MarketStore, ResearchStore |
+| `domain` | `domain/store-ports.ts` | AccountDirectory, RunStore, ProductStore, CompetitorStore, ReviewStore, AvatarStore, AdStore, BrandVisualCache, ShopSignalCache, EventLog, ChargeLedger, CallLog, MarketStore, ResearchStore |
 | `domain` | `domain/traction.ts` | ShopSignals, ShopTraction, ShopHandles |
 | `domain` | `domain/web.ts` | SearchHit, SearchPage, SearchScope, FetchedPage, ServiceUnavailableError |
-| `extract` | `extract/ads-analyzer.ts` | AdsAnalyzer |
-| `extract` | `extract/angle-tally.ts` | AngleTally |
+| `extract` | `extract/ad-avatar-tally.ts` | AdSegment, AdAvatarTally |
+| `extract` | `extract/ad-scripts.ts` | AdScripts |
+| `extract` | `extract/avatar-floor.ts` | AvatarFloor |
 | `extract` | `extract/avatar-memory-check.ts` | AvatarMemoryCheck |
 | `extract` | `extract/avatar-memory.ts` | AvatarMemoryBook |
 | `extract` | `extract/avatar-tally.ts` | AvatarTally |
-| `extract` | `extract/brand-grid.ts` | BrandGrid |
-| `extract` | `extract/hook-cutter.ts` | HookCutter |
-| `extract` | `extract/label-diff.ts` | LabelDiff |
 | `extract` | `extract/market-tally.ts` | MarketTally |
-| `extract` | `extract/momentum.ts` | Momentum |
 | `extract` | `extract/pack-check.ts` | PackCheck |
 | `extract` | `extract/price-check.ts` | PriceCheck |
-| `extract` | `extract/proven-rule.ts` | ProvenRule |
 | `http` | `http/account-commands.ts` | AccountCommands |
 | `http` | `http/app.ts` | AppParts, App |
 | `http` | `http/auth-gate.ts` | AuthGate |

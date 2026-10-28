@@ -5,4 +5,4 @@ export * from './ads';
 export type * from './types';
 export type * from './product-types';
 export type * from './market-types';
-export type * from './ads-types';
+export * from './market-shape';

@@ -75,9 +75,9 @@ export default function RunPage({ runId, section, frame, onError }: { runId: str
         </>
       )}
       {section === 'reviews' && product && <Reviews runId={runId} product={product} competitors={competitors} coverage={coverage} bar={bar} onError={onError} />}
-      {section === 'ads' && <Ads runId={runId} version={version} ads={ads} competitors={competitors} bar={bar} onError={onError} />}
+      {section === 'ads' && <Ads ads={ads} competitors={competitors} bar={bar} />}
       {section === 'market' && product && <Market runId={runId} version={run.stage_status.sophistication?.status ?? ''} bar={bar} onError={onError} />}
-      {section === 'avatars' && product && <Avatars runId={runId} version={run.stage_status.avatars?.status ?? ''} bar={bar} onError={onError} />}
+      {section === 'avatars' && product && <Avatars runId={runId} version={run.stage_status.avatars?.status ?? ''} ads={ads} bar={bar} onError={onError} />}
       {section !== null && !product && (
         <>
           {bar([])}

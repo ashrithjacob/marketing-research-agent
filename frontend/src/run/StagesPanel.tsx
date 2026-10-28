@@ -7,6 +7,7 @@ const PAID_SERVICES: Record<string, string> = { product_market: 'web search and 
 
 export default function StagesPanel({ run, stages, onDone, onError }: { run: Run; stages: StageInfo[]; onDone: () => void; onError: (message: string) => void }) {
   const [chosen, setChosen] = useState<string[] | null>(null);
+  const [single, setSingle] = useState<StageInfo | null>(null);
   const [busy, setBusy] = useState(false);
   const canRerun = FINAL_STATUSES.has(run.status) && Boolean(run.product_id);
   const built = stages.filter((stage) => stage.built);
@@ -14,12 +15,17 @@ export default function StagesPanel({ run, stages, onDone, onError }: { run: Run
   const running = chosen ? built.filter((stage) => chosen.includes(stage.name) || unfinished.includes(stage.name)) : [];
   const services = running.map((stage) => PAID_SERVICES[stage.name]).filter(Boolean);
 
-  async function rerun() {
+  function close() {
+    setChosen(null);
+    setSingle(null);
+  }
+
+  async function rerun(alone: boolean) {
     if (!chosen) return;
     setBusy(true);
     try {
-      await runs.rerun(run.id, chosen);
-      setChosen(null);
+      await (alone && single ? runs.rerun(run.id, [single.name], true) : runs.rerun(run.id, chosen));
+      close();
       onDone();
     } catch (e) {
       onError((e as Error).message);
@@ -32,7 +38,7 @@ export default function StagesPanel({ run, stages, onDone, onError }: { run: Run
     <>
       {canRerun && (
         <div className="stages-bar">
-          <button className="link" onClick={() => setChosen(built.map((stage) => stage.name))}>
+          <button className="link" onClick={() => { setSingle(null); setChosen(built.map((stage) => stage.name)); }}>
             Rerun all stages
           </button>
         </div>
@@ -43,19 +49,24 @@ export default function StagesPanel({ run, stages, onDone, onError }: { run: Run
             <strong>Rerun {running.length === 1 ? 'stage' : 'stages'} {running.map((stage) => stage.number).join(', ')}:</strong> {running.map((stage) => stage.title).join(' · ')}.
           </p>
           <p className="small dim">
-            A stage that uses another's results reruns with it, and what these stages found before is replaced. Other stages are kept. This spends model tokens{services.length > 0 ? `, ${services.join(', ')}` : ''}.
+            A stage that uses another's results reruns with it, and what these stages found before is replaced. Other stages are kept.{single && running.length > 1 ? ` "Only" reruns stage ${single.number} and leaves the stages after it as they are.` : ''} This spends model tokens{services.length > 0 ? `, ${services.join(', ')}` : ''}.
           </p>
           <div className="row">
-            <button className="primary" disabled={busy} onClick={rerun}>
+            <button className="primary" disabled={busy} onClick={() => rerun(false)}>
               {busy ? 'Starting…' : 'Rerun'}
             </button>
-            <button className="ghost" disabled={busy} onClick={() => setChosen(null)}>
+            {single && running.length > 1 && (
+              <button className="ghost" disabled={busy} onClick={() => rerun(true)}>
+                Rerun stage {single.number} only
+              </button>
+            )}
+            <button className="ghost" disabled={busy} onClick={close}>
               Cancel
             </button>
           </div>
         </section>
       )}
-      <StageTracker stages={stages} states={run.stage_status} onRerun={canRerun ? (stage) => setChosen(stage.reruns) : undefined} />
+      <StageTracker stages={stages} states={run.stage_status} onRerun={canRerun ? (stage) => { setSingle(stage); setChosen(stage.reruns); } : undefined} />
     </>
   );
 }

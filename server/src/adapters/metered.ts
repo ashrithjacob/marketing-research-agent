@@ -1,5 +1,6 @@
 import type { ServicePrices } from "../config/index.js";
 import type {
+  AdCategoryPage,
   AdLibrary,
   AdPage,
   AdQuery,
@@ -67,6 +68,13 @@ export class MeteredAdLibrary implements AdLibrary {
     const page = await this.inner.search(query, signal);
     const credits = page.credits ?? page.hits.length;
     await this.meter.charge({ service: "trendtrack", item: "ads", units: credits, usd: credits * this.prices.trendtrackUsdPerCredit, basis: "credits" });
+    return page;
+  }
+
+  async categories(search: string, signal?: AbortSignal): Promise<AdCategoryPage> {
+    Trace.line(import.meta.url, "MeteredAdLibrary.categories", { search });
+    const page = await this.inner.categories(search, signal);
+    if (page.credits > 0) await this.meter.charge({ service: "trendtrack", item: "categories", units: page.credits, usd: page.credits * this.prices.trendtrackUsdPerCredit, basis: "credits" });
     return page;
   }
 }

@@ -68,7 +68,7 @@ every attempt.
 
 What a rerun replaces: stage 1 overwrites the brief and the profiles; stage 2
 adds only reviews it has not stored (they belong to the product); stage 3
-deletes its run's ads before the scout starts (`AdTable.clear`, ads belong to
+deletes its run's ads before the pool is pulled (`AdTable.clear`, ads belong to
 the run since migration 8); stage 5 replaces its run's avatars.
 
 ## More competitors for a finished run
@@ -116,13 +116,33 @@ ends in exactly one way: a `submit` tool whose parameters are the domain zod
 schema turned into JSON Schema (`Schemas.json`). pi-ai validates the arguments
 against that schema before the tool runs; the tool then parses them with zod
 and runs the job's own code checks. A refusal goes back to the model with each
-problem numbered; after 3 refusals the agent is stopped (`SubmitTool`).
+problem numbered; after 3 refusals the agent is stopped (`SubmitTool`). A top-level array or object
+the model sends as JSON text is parsed back before validation
+(`SubmitTool.unpacked`, pi-agent-core's `prepareArguments`): on 2026-10-26 a
+GLM ad reader sent its readings as one string three times and lost the batch.
 
-- A turn that ends in text alone, without a submit, gets a reminder, at most
-  twice (`TurnPolicy`). The turn ceiling is per job.
+- A turn that ends in text alone, or is cut off at the output cap, without a
+  submit, gets a reminder, at most twice (`TurnPolicy`). The turn ceiling is
+  per job.
+- Every reply is capped at 40,000 output tokens, reasoning included
+  (`AgentRunner.MAX_OUTPUT_TOKENS`). The largest reply that ended normally in
+  the call log was 33,822 tokens (an `ad_reader` turn, about 88% reasoning).
+  Without a cap, a GLM-5.3-flash reader turn on 2026-10-21 streamed for 67
+  minutes until a restart ended it.
+- A job may set its reasoning level (`AgentJob.reasoning`, pi-ai's
+  `thinkingLevel`); left unset, the model's default applies. GLM-5.3-flash
+  cannot turn reasoning off, and at its default spent about 25,000 output
+  tokens and 2 to 9 minutes on each 40-review avatar batch (run `344caa7d`,
+  2026-10-19), where DeepSeek v4.1 flash took 6 to 50 seconds. The three
+  avatar agents ask for `low`.
 - A dropped stream is resumed, up to 3 times with backoff, on the next model in
   `MRA_MODEL` + `MRA_BACKUP_MODELS` (`ModelChain`, `Retries`). Terminal errors
   (quota, auth, context length) are not retried.
+- An agent whose turn sends exactly the tool calls (names and arguments) its
+  previous turn sent is moved, alone, to the next model in that chain for
+  its next turn, with a message saying why (`RepeatedTurns`, through
+  pi-agent-core's `prepareNextTurn`); the run gets an `agent.model_switched`
+  event. The run's other agents keep their model.
 - The result is `completed` (accepted), `invalid` (it ended without an accepted
   submit: refused out, turn limit, or never submitted), `failed` (the model
   could not be reached) or `cancelled` (the run was stopped). `invalid` is not
@@ -199,75 +219,98 @@ reviews of one ASIN in 12 s.
 ## Stage 3: the market's long-form statics
 
 `CompetitorAdStage` (`agent/stages/ads/`) waits for stage 1. Since
-2026-10-19 an agent decides which brands and ads matter; code only checks its
-work and keeps the books.
+2026-10-26 four agents pull the ads, one per ring; before that code pulled
+the top ads for one term under four sorts (`AdPool`), and before that one
+agent (the scout) chose its own searches and kept 5 ads of a market of 3,637
+(see `docs/spec.md`, decisions).
 
-1. **Scout** (`AdScout`, agent `ad_scout`, 40 turns), briefed as a growth
-   marketer with the client's product, claims and confirmed competitors, and
-   the four rings to study (`prompt/text/ad-scout.ts`): direct competitors
-   (same product), same problem (another product for the same buyer at the
-   same moment of pain), same buyer (another problem, the same age, gender
-   and awareness: formats to borrow) and trending shop (winning long-form
-   statics from a shop on TrendTrack's trending feed, any market: structures
-   to apply to the client's store). Only the first two count as supply in the
-   avatars (`AdRings.isSupply`). Its tools:
-   - `search_ads` (`SearchLongFormTool`): TrendTrack `POST /v1/ads/query` for
-     image ads with `MRA_AD_MIN_COPY_CHARS` (2000) characters of copy in the
-     run's markets, by ad copy, brand or domain, sorted as it chooses (only
-     sorts the API accepts: `AD_SORTS`), 1–20 ads. Each result shows id,
-     advertiser, landing domain, days running, duplicates, reach and 7-day
-     growth, audience age and gender, opening lines. Every returned row is
-     billed to the run; the scout has `MRA_AD_SEARCHES_PER_RUN` (20) searches,
-     after which the tool refuses.
-   - `read_ad` (`ReadAdTool`): the full copy of an ad it has seen; free.
-   - `find_trending_shops` (`TrendingShopsTool`): TrendTrack
-     `POST /v1/shops/query` with `displayInTrending`, the run's markets as
-     main market, at least `min_active_ads` (default 20) Meta ads in the last
-     7 days, optional product or site text, sorted by estimated sales, active
-     ads, traffic growth or visits, 1–10 shops. It returns shops, not ads; the
-     scout then searches a shop's long-form ads by domain. 4 credits per shop,
-     and each call spends one of the same 20 searches.
-   It discovers brands as it goes and submits the ads worth studying, each
-   with its ring and why, and the brands it found. Code refuses an ad no search
-   returned, an ad kept twice, more than `MRA_ADS_PER_RUN` (150), or more than
-   `MRA_ADS_PER_BRAND` (15) from one landing domain.
-2. **Store** (`AdTable`): the kept ads, linked to a confirmed competitor by
-   landing domain, each with the scout's ring and why (`ad_extractions.relation`).
-   The brands go in the `ads.brands` event.
-3. **Read**: agents (`ad_reader:<n>`, no tools), told the client's product,
-   take 8 kept ads at a time and record avatar, claim type, awareness,
-   mechanism, proof, offer, objections, emotion, risk flags and a bucket
-   (winning, testing, dead) with the signals that decided it, plus five closed
-   lists so ads can be counted together: proof kinds, offer kinds, the emotion
-   the opening leads with, where the click lands (read from the landing url;
-   `unknown` when it does not say) and how the copy is built. Code refuses a
-   batch that skips, invents or repeats an ad id, and any value outside a list.
-4. **Group into angles** (`AngleGrouper`, agent `angle_grouper`, no tools):
-   one call sees every read ad as one line (id, advertiser, claim type,
-   mechanism, who it speaks to, its hook) and puts each in exactly one of up
-   to 20 angles. Code refuses an ad left out, placed twice or invented, and a
-   key used twice. Stored in `ad_angles`.
-5. **Check fit** (`AngleFitter`, agent `angle_fitter`): one call judges each
-   angle against the client's own claims (`claims_on_page`, numbered):
-   `supported` (citing the claims), `needs_new_claim` or `does_not_apply`.
-   Code refuses a missing verdict, an unknown claim number, and `supported`
-   with no claim cited.
-6. **Write findings** (`FindingsWriter`, agent `ads_findings`): one call is
-   given the tables code counted (`AdsAnalyzer`), not the ads, and writes one
-   finding per step 2 to 5 of the page: what it is about, a one-sentence
-   headline and up to six ads. Code refuses a headline with a digit in it, so
-   every number on the page is one code counted, and any subject or ad that
-   does not exist. Stored in `ad_findings`.
+1. **Pull** (`AdPull`, `RingScout`, agents `ring_scout:<ring>`, all four at
+   once): the pool is `MRA_AD_POOL_SIZE` (400) ads, shared 40% direct
+   competitor, 25% same problem, 25% same buyer, 10% general (`AdRings.quotas`;
+   the rounding goes to direct competitor). Each scout has `pull_ads`,
+   `read_ad` (an ad's whole copy, free) and `find_ad_categories` (TrendTrack's
+   `GET /v1/facets/categories`). Code holds every `pull_ads` to TrendTrack
+   `POST /v1/ads/query` with `status: active`, `mediaType: image`,
+   `minDescriptionLength` `MRA_AD_MIN_COPY_CHARS` (3000), `minDaysRunning` at
+   least `MRA_AD_MIN_DAYS_RUNNING` (10) and the run's markets in
+   `adCountries`; the agent picks the terms and where they are looked for
+   (ad copy, brand, landing domain), any/all, the sort (longest running, most
+   duplicated, reach, 7-day reach growth), a higher days floor, a duplicates
+   floor, category ids, audience age and sex, the page and up to 50 per page.
+   Each ad shown gets a short ref (a1, a2, …); each scout may be shown at most
+   2.5 times its quota, and the page size shrinks to what is left. The scout
+   submits the refs it keeps. Code refuses a ref it was never shown, one kept
+   twice, more than the quota, and fewer than the quota without a stated
+   shortfall; a shortfall is taken only once every search it ran is paged to
+   the end, its budget is spent, or it has made 8 searches. An ad two scouts
+   kept stays in the ring listed first (direct competitor, same problem, same
+   buyer, general). The search that first found an ad is stored as its
+   `ring_why`.
+   A page of a search already sent (same settings, same page) is refused
+   without being fetched or billed, and the refusal echoes the settings as
+   received. On run `344caa7d` (2026-10-26) the same-problem scout's calls
+   all arrived as `{"category_ids": [178], "keyword_mode": "any"}` whatever
+   it wrote, so it re-bought the same pages and spent its budget on them.
+2. **Store** (`AdTable`): every kept ad with its ring, linked to a confirmed
+   competitor by landing domain, and bucketed by code from its signals
+   (`AdBuckets`): winning once it has run 10 days, or sooner while still
+   running with 400+ reach in 7 days or 5+ duplicates; testing while running
+   without either; dead when it stopped before 10 days. With the pull's
+   10-day floor every ad is winning.
+3. **Read**: the same copy often runs many times from several pages (one
+   Mullevia script ran as 77 ads), so code groups ads whose copy matches once
+   case, spacing and punctuation are set aside (`AdScripts`) and only the
+   first ad of each script is read. Agents (`ad_reader:<n>`, no tools,
+   reasoning low), told the client's product, take 8 scripts at a time and
+   record the avatar, the leading promise (`value_prop`, one of eight: the
+   real cause the treatment cannot reach, "managed" numbers hiding damage, a
+   better form after a cheap one failed, a ritual to replace, a suppressed or
+   forgotten remedy, a way off drugs or surgery, a brand notice, a plain
+   introduction), claim type, awareness, mechanism, proof, offer, objections, emotion, risk
+   flags, and five closed lists so ads can be counted together: proof kinds,
+   offer kinds, the emotion the opening leads with, where the click lands
+   (read from the landing url; `unknown` when it does not say) and how the
+   copy is built. Code refuses a batch that skips, invents or repeats an ad
+   id, and any value outside a list; it then copies each reading to every ad
+   of the script.
+4. **Sort pages** (`PageSorter`, agents `page_sorter:<n>`, no tools,
+   reasoning low), at the same time as the reading: each distinct advertiser
+   page once, under a short handle (p1, p2, …: page name, landing domain, ads
+   kept, one ad's opening), 60 pages a call, tagged with who the ads speak
+   as: `brand` (the brand's own page, bottom of the funnel), `community` (a
+   made-up community, publication or outlet, upper funnel), `persona` (a
+   private person's name, top of the funnel) or `authority` (an expert's
+   name with a credential, top of the funnel). Code refuses a page left
+   out, invented or sorted twice, then gives every ad its page's kind
+   (`ads.page_kind`, migration 13). A batch that cannot be sorted leaves its
+   ads untagged and ends the stage `invalid`, ads kept.
 
-If any of 4 to 6 ends `invalid` or `failed`, stage 3 ends that way, with its
-ads kept and read. The page's counts (`GET /runs/:id/ads/analysis`) are
-computed on every load from the ads, angles and findings: **proven** is
-still active, 30+ days running and 2+ duplicates (`ProvenRule`); launches are
-counted from first-seen dates against the run's date (`Momentum`). The spec is
-`docs/spec-ads-analysis.md`.
+5. **Segment audiences** (`AudienceSegmenter`), after reading, per market:
+   the client's market (direct competitor and same problem) and same buyer;
+   general ads are not segmented. One agent (`segment_namer:<market>`) sees
+   every distinct copy of the market once (handle, who it speaks to, its
+   opening) and names 3 to 10 segments; then agents
+   (`segment_sorter:<market>:<n>`) sort the copies into those segments, 25 a
+   call. Code refuses a copy left out, invented, sorted twice, or put in a
+   segment that was not named, and gives every ad of a copy its segment's name
+   (`ads.segment`, migration 14). Ads that cannot be sorted end the stage
+   `invalid`, ads kept. Segments are named per run, from the ads, because a
+   fixed list would fit one product only.
 
-Stage 5 counts as supply only confirmed competitors' ads and ads the scout put
-in `direct_competitor` or `same_problem` (`AdRings.isSupply`).
+The long-form ads page opens on an Analysis tab, counted in the browser from
+the run's ads (`run/ads/ad-digest.ts`): segments per market, promises per
+category, median days running and duplicates per promise, segment × promise,
+page kinds and opening awareness per category. All ads is the second tab.
+
+That is the whole stage. Grouping into angles, checking each angle's fit
+and writing findings (`AngleGrouper`, `AngleFitter`, `FindingsWriter`, the
+counted page at `GET /runs/:id/ads/analysis`) were removed on 2026-10-26
+(migration 12 drops `ad_angles` and `ad_findings`); `docs/spec.md`,
+decisions, says why.
+
+Stages 4 and 5 use only read ads, and count as supply only confirmed
+competitors' ads and ads kept in `direct_competitor` or `same_problem`
+(`AdRings.isSupply`).
 
 The code sweep before it (keywords from an agent, then fixed searches) was
 removed on 2026-10-19: on run `344caa7d` its one-word keywords pulled in dental
@@ -360,22 +403,60 @@ exists). An agent builds the avatars by reading, not by clustering (spec,
    text), and submits a `MemoryUpdate`: create, revise (replace fields, which is
    how lists get condensed), merge, assign every review to an avatar or none,
    and quote reviews by id. `AvatarMemoryCheck` (`extract/`) refuses an unknown
-   key, a third level, a review left out, invented or assigned twice, or a quote
+   key, a review left out, invented or assigned twice, or a quote
    from a review assigned elsewhere; `AvatarMemoryBook` applies the rest, merges
    last so everything moves with them. The memory is stored after every batch
    (`avatar_memories`). A batch refused three times is left out and counted in
    the summary.
-2. **Place the ads.** Stage 3's supply ads only (a competitor's own, or
-   `same_problem`; `AdRings.isSupply`), 15 at a time (`ad_placer:<n>`), each on
-   an avatar or none. Same-buyer and unrelated ads never count as supply.
-3. **Judge.** One agent (`avatar_judge`) gives every avatar its awareness level,
-   confidence, standing (avatar or emerging) and the competitors' best angle on
-   it, with every count in front of it.
-4. **Count** (`AvatarTally`, code, no thresholds): a top-level avatar counts its
-   sub-avatars' reviews and ads too; demand share is its reviews over all
-   reviews assigned to any avatar; supply share is its ads over all placed ads;
-   win rate is its ads judged winning over its ads. Stored in `avatars`, with
-   reviews, quotes and ads in `avatar_members`.
+   The reader builds broad avatars only, a user group or demography: its
+   `create` has no `parent`.
+2. **Split each avatar into sub-avatars.** For every avatar with at least 10
+   reviews, one after another, an agent (`sub_avatar_splitter:<key>:<n>`, no
+   tools) reads that avatar's own reviews, 100 a batch, into a memory of its
+   sub-avatars: the same `MemoryUpdate`, `AvatarMemoryCheck` and
+   `AvatarMemoryBook.apply` as step 1, on a memory that holds only this
+   avatar's sub-avatars. A review assigned to none, or in a refused batch,
+   stays with the avatar. The check also refuses a key another avatar already
+   holds. `AvatarMemoryBook.graft` then hangs the sub-avatars under the avatar,
+   moving their reviews and quotes from it. How many there are, none included,
+   is the agent's call.
+3. **Hold the floor** (`AvatarFloor`, code): a sub-avatar with fewer than 5
+   reviews is folded into its parent, reviews, quotes and ads with it; an
+   avatar with fewer than 15 is kept but reported `emerging` whatever its
+   verdict. The reader and splitter are told their numbers. It is a clustering
+   that must not overfit: no sub-avatar off one review.
+4. **Place the ads.** Every read lung-market and same-buyer ad from stage 3
+   (general ads left out), 15 at a time (`ad_placer:<n>`), each on an avatar or
+   none.
+5. **Judge** (`avatar_judge`), **find gaps** and **write ad avatars**, at once:
+   - the judge gives every avatar its awareness level, confidence, standing
+     and the best angle among the ads placed on it;
+   - per top-level review avatar, `gap_finder:<key>` sees the avatar, up to 30
+     of its reviews (its quotes first, then spread across star ratings,
+     `GapFinder.sample`) and the ads placed on it, and lists up to 8 themes its
+     reviews raise that none of those ads say (pain, desire, trigger,
+     objection, outcome, tried before), each citing one to four of the given
+     reviews; code refuses a review it was not given;
+   - per stage 3 audience segment, `ad_avatar:<n>` writes the avatar those ads
+     are aimed at from each distinct copy's reading, naming one to three of the
+     segment's ads; code refuses an ad outside the segment. For a same-buyer
+     segment it is also given the client's top-level review avatars and says
+     why the segment is the client's buyer (`same_buyer`): which of those
+     avatars its readers are, by key (code refuses a key not listed; null when
+     none), what they share in one sentence, and what of its ads carries over
+     (angles, hooks, story structures, proof formats, offers).
+6. **Count** (`AvatarTally` for review avatars, `AdAvatarTally` for ad
+   avatars): a top-level avatar counts its sub-avatars' reviews and ads too;
+   demand share is its reviews over all reviews assigned to any avatar; supply
+   share is its ads over all placed ads (for an ad avatar, over all segmented
+   ads); win rate is its ads judged winning over its ads. An ad avatar under 5
+   ads is emerging. Stored in `avatars` with `source` reviews or ads (migration
+   15), the gap themes in the avatar's profile, and reviews, quotes, ads and the
+   reviews a gap cites (`gap`) in `avatar_members`.
+
+The avatars page has three tabs: from reviews, from ads, and gaps (the
+demand-versus-supply map, then each review avatar most under-served first,
+with its themes and the reviews behind them).
 
 ## The first real run, 2026-10-19
 

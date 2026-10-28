@@ -41,10 +41,9 @@ export interface Settings {
   reviewsPerProduct: number;
   reviewsPerBand: number;
   wootDelayMs: number;
-  adsPerRun: number;
-  adSearchesPerRun: number;
+  adPoolSize: number;
   adMinCopyChars: number;
-  adsPerBrand: number;
+  adMinDaysRunning: number;
   marketHistorySearches: number;
   marketPaidCalls: number;
 

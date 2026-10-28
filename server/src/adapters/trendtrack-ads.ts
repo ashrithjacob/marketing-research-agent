@@ -1,8 +1,7 @@
-import type { Settings } from "../config/index.js";
-import { ServiceUnavailableError, type AdHit, type AdLibrary, type AdPage, type AdQuery, type AdSearchField } from "../domain/index.js";
+import type { AdCategoryPage, AdHit, AdLibrary, AdPage, AdQuery, AdSearchField } from "../domain/index.js";
 import { Trace } from "../trace/index.js";
 
-import { Http } from "./http.js";
+import type { TrendtrackApi } from "./trendtrack-api.js";
 
 interface TrendtrackAd {
   id?: string;
@@ -22,42 +21,48 @@ interface TrendtrackAd {
 /** Trendtrack's index of Meta ads, `POST /v1/ads/query`; one credit per ad returned. No key, a refused key or no credit means it can answer nothing. */
 export class TrendtrackAds implements AdLibrary {
   private static readonly SEARCH_TYPE: Readonly<Record<AdSearchField, string>> = { ad_copy: "adCopy", brand: "brand", domain: "domain" };
+  static readonly CATEGORY_LIMIT = 15;
 
-  constructor(private readonly settings: Settings) {}
+  constructor(private readonly api: TrendtrackApi) {}
 
   async search(query: AdQuery, signal?: AbortSignal): Promise<AdPage> {
     Trace.line(import.meta.url, "TrendtrackAds.search", { terms: query.terms, searchIn: query.searchIn, countries: query.countries });
-    const { trendtrackApiKey, trendtrackBaseUrl, webTimeoutSeconds } = this.settings;
-    if (!trendtrackApiKey) throw new ServiceUnavailableError("trendtrack", "TRENDTRACK_API_KEY is not set");
-    const body = {
-      search: [...query.terms],
-      searchType: TrendtrackAds.SEARCH_TYPE[query.searchIn],
-      keywordMode: "any",
+    const { body, credits } = await this.api.post("/v1/ads/query", TrendtrackAds.body(query), signal);
+    const payload = body as { data?: TrendtrackAd[]; pagination?: { total?: number } };
+    const hits = (payload.data ?? []).map(TrendtrackAds.hit);
+    return { hits, total: Number(payload.pagination?.total ?? payload.data?.length ?? 0), credits: credits > 0 ? credits : hits.length };
+  }
+
+  async categories(search: string, signal?: AbortSignal): Promise<AdCategoryPage> {
+    Trace.line(import.meta.url, "TrendtrackAds.categories", { search });
+    const { body, credits } = await this.api.get(`/v1/facets/categories?${new URLSearchParams({ search, limit: String(TrendtrackAds.CATEGORY_LIMIT) })}`, signal);
+    const rows = ((body as { data?: { id?: number; name?: string; path?: string; usageCount?: number }[] }).data ?? []).filter((row) => typeof row.id === "number");
+    return { categories: rows.map((row) => ({ id: row.id!, name: String(row.name ?? ""), path: String(row.path ?? row.name ?? ""), ads: row.usageCount ?? null })), credits };
+  }
+
+  static body(query: AdQuery): Record<string, unknown> {
+    Trace.line(import.meta.url, "TrendtrackAds.body", { terms: query.terms.length });
+    const audience = query.audience ?? {};
+    return {
+      ...(query.terms.length > 0 ? { search: [...query.terms], searchType: TrendtrackAds.SEARCH_TYPE[query.searchIn], keywordMode: query.keywordMode ?? "any" } : {}),
       sortBy: query.sortBy ?? "reach",
       order: "desc",
-      status: "all",
+      status: query.activeOnly ? "active" : "all",
       platforms: ["facebook"],
       ...(query.countries.length > 0 ? { adCountries: { include: [...query.countries] } } : {}),
       ...(query.longForm ? { mediaType: "image", minDescriptionLength: query.longForm.minCopyChars } : {}),
+      ...(query.minDaysRunning !== undefined ? { minDaysRunning: query.minDaysRunning } : {}),
+      ...(query.minDuplicates !== undefined ? { minDuplicates: query.minDuplicates } : {}),
+      ...(query.categoryIds && query.categoryIds.length > 0 ? { categoryIds: [...query.categoryIds] } : {}),
+      ...(audience.minAge !== undefined ? { minAge: audience.minAge } : {}),
+      ...(audience.maxAge !== undefined ? { maxAge: audience.maxAge } : {}),
+      ...(audience.sex ? { sex: audience.sex } : {}),
       ...(query.onePerBrand ? { maxAdsPerBrand: 1 } : {}),
       ...(query.page ? { page: query.page } : {}),
       ...(query.createdAfter ? { createdAfter: query.createdAfter } : {}),
       ...(query.createdBefore ? { createdBefore: query.createdBefore } : {}),
       limit: query.limit,
     };
-    const response = await Http.withTimeout(
-      `${trendtrackBaseUrl.replace(/\/$/, "")}/v1/ads/query`,
-      { method: "POST", headers: { Authorization: `Bearer ${trendtrackApiKey}`, "Content-Type": "application/json" }, body: JSON.stringify(body) },
-      webTimeoutSeconds,
-      signal,
-    );
-    const payload = (await response.json().catch(() => ({}))) as { data?: TrendtrackAd[]; pagination?: { total?: number }; message?: string; error?: unknown };
-    const error = `Trendtrack returned ${response.status}: ${String(payload.message ?? JSON.stringify(payload.error ?? "no body"))}`.slice(0, 300);
-    if (response.status === 401 || response.status === 402 || response.status === 403) throw new ServiceUnavailableError("trendtrack", error);
-    if (!response.ok) throw new Error(error);
-    const hits = (payload.data ?? []).map(TrendtrackAds.hit);
-    const credits = Number(response.headers.get("x-credits-used") ?? hits.length);
-    return { hits, total: Number(payload.pagination?.total ?? payload.data?.length ?? 0), credits: Number.isFinite(credits) ? credits : hits.length };
   }
 
   private static hit(ad: TrendtrackAd): AdHit {

@@ -1,7 +1,7 @@
 import type { AvatarMemory, AvatarProfile, MemoryUpdate } from "../domain/index.js";
 import { Trace } from "../trace/index.js";
 
-/** Applies a checked update to the avatar memory: creations, revisions, assignments and quotes first, merges last, so everything assigned to a merged avatar moves with it. */
+/** Applies a checked update to the avatar memory: creations, revisions, assignments and quotes first, merges last, so everything assigned to a merged avatar moves with it; and hangs an avatar's sub-avatars under it. */
 export class AvatarMemoryBook {
   static empty(): AvatarMemory {
     Trace.line(import.meta.url, "AvatarMemoryBook.empty");
@@ -11,7 +11,7 @@ export class AvatarMemoryBook {
   static apply(memory: AvatarMemory, update: MemoryUpdate): AvatarMemory {
     Trace.line(import.meta.url, "AvatarMemoryBook.apply", { create: update.create.length, merge: update.merge.length, assign: update.assign.length });
     const avatars = new Map<string, AvatarProfile>(memory.avatars.map((avatar) => [avatar.key, structuredClone(avatar)]));
-    for (const created of update.create) avatars.set(created.key, { ...created, review_ids: [], quote_ids: [], ad_ids: [] });
+    for (const created of update.create) avatars.set(created.key, { ...created, parent: null, review_ids: [], quote_ids: [], ad_ids: [] });
     for (const { key, ...fields } of update.revise) Object.assign(avatars.get(key)!, Object.fromEntries(Object.entries(fields).filter(([, value]) => value !== undefined)));
     const unassigned = [...memory.unassigned_review_ids];
     for (const assignment of update.assign) {
@@ -24,6 +24,22 @@ export class AvatarMemoryBook {
     }
     for (const merge of update.merge) AvatarMemoryBook.merge(avatars, merge.from, merge.into);
     return { avatars: [...avatars.values()], unassigned_review_ids: unassigned, batches_read: memory.batches_read + 1 };
+  }
+
+  /** The sub-avatars take the parent's reviews they were assigned, and its quotes from those reviews; the rest stay with the parent. */
+  static graft(memory: AvatarMemory, parentKey: string, subs: AvatarMemory): AvatarMemory {
+    Trace.line(import.meta.url, "AvatarMemoryBook.graft", { parent: parentKey, subs: subs.avatars.length });
+    const owner = new Map(subs.avatars.flatMap((sub) => sub.review_ids.map((id) => [id, sub.key] as const)));
+    const children = subs.avatars.map((sub) => ({ ...sub, parent: parentKey, quote_ids: [...sub.quote_ids] }));
+    const avatars = memory.avatars.map((avatar) => {
+      if (avatar.key !== parentKey) return avatar;
+      for (const id of avatar.quote_ids) {
+        const child = children.find((sub) => sub.key === owner.get(id));
+        if (child && !child.quote_ids.includes(id)) child.quote_ids.push(id);
+      }
+      return { ...avatar, review_ids: avatar.review_ids.filter((id) => !owner.has(id)), quote_ids: avatar.quote_ids.filter((id) => !owner.has(id)) };
+    });
+    return { ...memory, avatars: [...avatars, ...children] };
   }
 
   static placeAds(memory: AvatarMemory, placements: readonly { ad_id: string; avatar: string | null }[]): AvatarMemory {
@@ -41,7 +57,6 @@ export class AvatarMemoryBook {
     target.review_ids = [...new Set([...target.review_ids, ...source.review_ids])];
     target.quote_ids = [...new Set([...target.quote_ids, ...source.quote_ids])];
     target.ad_ids = [...new Set([...target.ad_ids, ...source.ad_ids])];
-    for (const avatar of avatars.values()) if (avatar.parent === from) avatar.parent = into;
     avatars.delete(from);
   }
 }

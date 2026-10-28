@@ -1,7 +1,7 @@
 import type { AssistantMessage, Message, TranscriptContext } from "@earendil-works/pi-ai";
 import { fauxAssistantMessage, fauxToolCall, type FauxResponseFactory } from "@earendil-works/pi-ai/providers/faux";
 
-type Turn = AssistantMessage | ((messages: Message[]) => AssistantMessage);
+type Turn = AssistantMessage | ((messages: Message[]) => AssistantMessage | Promise<AssistantMessage>);
 
 /** Replies to each agent by what its first instruction says and how many turns it has had, so agents running at once each get their own script. */
 export class ScriptedAgents {

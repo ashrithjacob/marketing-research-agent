@@ -1,5 +1,5 @@
 import type { Settings } from "../config/index.js";
-import type { Competitor, Product, Run } from "../domain/index.js";
+import type { Competitor, Product, Run, StageName } from "../domain/index.js";
 import { Trace } from "../trace/index.js";
 
 import { ModelChain } from "./kernel/model-chain.js";
@@ -59,14 +59,15 @@ export class RunLauncher {
     });
   }
 
-  research(run: Run, product: Product, competitors: readonly Competitor[]): void {
-    Trace.line(import.meta.url, "RunLauncher.research", { runId: run.id });
+  /** Runs the pipeline for a confirmed run; only the stages in `scope` may run, every built stage when none is given. */
+  research(run: Run, product: Product, competitors: readonly Competitor[], scope: readonly StageName[] = this.pipeline.built): void {
+    Trace.line(import.meta.url, "RunLauncher.research", { runId: run.id, scope });
     const chain = this.chain();
     this.live.start(run.id, { phase: "research", product: product.url }, async (signal) => {
       const context = new RunContext(run, signal, this.services, chain);
       try {
         const progress = new StageProgress(structuredClone(run.stage_status), this.services.store.runs, context);
-        await this.pipeline.run({ context, product, competitors }, progress);
+        await this.pipeline.run({ context, product, competitors }, progress, new Set(scope));
         await context.settled();
         await this.runEnd.end(run.id, RunEnd.verdict(progress.snapshot(), signal.aborted));
       } catch (error) {

@@ -16,7 +16,7 @@ export class MarketTally {
   static assessment(runId: string, read: MarketRead, items: ReadonlyMap<string, EvidenceItem>, stageAds: readonly ReadAd[]): MarketAssessment {
     Trace.line(import.meta.url, "MarketTally.assessment", { runId, groups: read.claim_groups.length, labels: read.labels.length });
     const labelled = new Map(read.labels.map((label) => [label.id, label.awareness]));
-    const cited = new Set([...read.claim_groups.flatMap((group) => group.ad_ids), ...read.sophistication.snapshot_ids, ...labelled.keys()]);
+    const cited = new Set([...read.claim_groups.flatMap((group) => group.ad_ids), ...read.sophistication.snapshot_ids, ...labelled.keys(), ...MarketTally.citedIn(read.sophistication.why, items)]);
     return {
       run_id: runId,
       sophistication_stage: read.sophistication.stage,
@@ -27,6 +27,12 @@ export class MarketTally {
       evidence: [...cited].map((id) => items.get(id)).filter((item): item is EvidenceItem => item !== undefined).map((item) => ({ ...item, text: item.text.slice(0, MarketTally.EVIDENCE_CHARS), awareness: labelled.get(item.id) ?? null })),
       snapshot_ids: read.sophistication.snapshot_ids,
     };
+  }
+
+  /** The ids of logged evidence the reasoning names in its prose, so every citation it makes can be shown. */
+  static citedIn(text: string, items: ReadonlyMap<string, EvidenceItem>): string[] {
+    Trace.line(import.meta.url, "MarketTally.citedIn", { chars: text.length });
+    return [...new Set(text.match(/[A-Za-z0-9_-]+/g) ?? [])].filter((token) => items.has(token));
   }
 
   static census(read: MarketRead, items: ReadonlyMap<string, EvidenceItem>): ClaimCensus[] {

@@ -4,6 +4,7 @@ import {
   ConfirmationSchema,
   RerunRequestSchema,
   Schemas,
+  STAGE_NAMES,
   Stages,
   type Confirmation,
   type ResearchStore,
@@ -62,14 +63,14 @@ export class AnalysisService {
     const built = this.pipeline.built;
     const unbuilt = parsed.value.stages.filter((name) => !built.includes(name));
     if (unbuilt.length > 0) return { refused: [`${unbuilt.join(", ")} is not built yet, so it cannot run`] };
-    const stages = Stages.toRerun(run.stage_status, built, parsed.value.stages);
+    const stages = parsed.value.alone ? STAGE_NAMES.filter((name) => parsed.value.stages.includes(name)) : Stages.toRerun(run.stage_status, built, parsed.value.stages);
     if (stages.length === 0) return { refused: ["every stage of this run completed; choose the stages to rerun"] };
     const product = (await this.store.products.get(run.product_id))!;
     const competitors = (await this.store.competitors.list(product.id)).filter((competitor) => competitor.status === "confirmed");
     await this.store.runs.updateRun(run.id, { status: "running", error: "", ended_at: null, stage_status: Stages.rerun(run.stage_status, built, stages) });
     const restarted = (await this.store.runs.get(run.id))!;
     await this.store.events.add(run.id, "run.rerun", { stages });
-    this.launcher.research(restarted, product, competitors);
+    this.launcher.research(restarted, product, competitors, stages);
     return restarted;
   }
 

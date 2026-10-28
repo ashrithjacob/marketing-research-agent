@@ -7,7 +7,7 @@ import { fauxProvider } from "@earendil-works/pi-ai/providers/faux";
 
 import { ServiceClients } from "../src/adapters/index.js";
 import type { Settings } from "../src/config/index.js";
-import type { AdLibrary, AdPage, BrandVisual, BrandVisuals, FetchedPage, GenerationSource, PageFetcher, SearchPage, WebSearch } from "../src/domain/index.js";
+import type { AdCategoryPage, AdLibrary, AdPage, BrandVisual, BrandVisuals, FetchedPage, GenerationSource, PageFetcher, SearchPage, WebSearch } from "../src/domain/index.js";
 import { TraceFile } from "../src/trace/index.js";
 
 export const FAUX_MODEL = "faux-model";
@@ -34,6 +34,10 @@ export class FakeWeb implements PageFetcher, WebSearch, AdLibrary {
 
   async search(): Promise<AdPage> {
     return { hits: [], total: 0, credits: 0 };
+  }
+
+  async categories(): Promise<AdCategoryPage> {
+    return { categories: [], credits: 0 };
   }
 
   services(): ServiceClients {
@@ -103,10 +107,9 @@ export class TestSettings {
       reviewsPerProduct: 500,
       reviewsPerBand: 100,
       wootDelayMs: 0,
-      adsPerRun: 150,
-      adSearchesPerRun: 20,
-      adMinCopyChars: 2000,
-      adsPerBrand: 15,
+      adPoolSize: 400,
+      adMinCopyChars: 3000,
+      adMinDaysRunning: 10,
       marketHistorySearches: 8,
       marketPaidCalls: 2,
       databaseUrl: "postgres://unused",

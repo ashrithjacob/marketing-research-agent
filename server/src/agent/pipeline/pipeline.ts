@@ -4,7 +4,7 @@ import { Trace } from "../../trace/index.js";
 import type { Stage, StageInput } from "./stage.js";
 import type { StageProgress } from "./stage-progress.js";
 
-/** Runs the built stages, each as soon as every stage it needs has completed; a stage already completed (a rerun keeps it) counts as done without running, and a stage whose input did not complete is skipped and says which. */
+/** Runs the built stages in scope, each as soon as every stage it needs has completed; a stage already completed (a rerun keeps it) counts as done without running, a stage out of scope keeps its state untouched, and a stage whose input did not complete is skipped and says which. */
 export class Pipeline {
   private readonly stages: ReadonlyMap<StageName, Stage>;
 
@@ -25,13 +25,13 @@ export class Pipeline {
     return lines.filter((line): line is string => line !== null);
   }
 
-  async run(input: StageInput, progress: StageProgress): Promise<void> {
-    Trace.line(import.meta.url, "Pipeline.run", { runId: input.context.run.id });
+  async run(input: StageInput, progress: StageProgress, scope: ReadonlySet<StageName> = new Set(this.built)): Promise<void> {
+    Trace.line(import.meta.url, "Pipeline.run", { runId: input.context.run.id, scope: [...scope] });
     const finished = new Map<StageName, Promise<StageStatus>>();
     const finish = (name: StageName): Promise<StageStatus> => {
       const known = finished.get(name);
       if (known) return known;
-      const started = this.runStage(name, input, progress, finish);
+      const started = scope.has(name) ? this.runStage(name, input, progress, finish) : Promise.resolve(progress.state(name).status);
       finished.set(name, started);
       return started;
     };

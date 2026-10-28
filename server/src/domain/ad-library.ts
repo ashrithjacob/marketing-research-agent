@@ -19,6 +19,41 @@ export interface AdQuery {
   /** Only ads first seen inside this window, ISO dates; with TrendTrack's `status: all` this reaches ads long stopped. */
   createdAfter?: string;
   createdBefore?: string;
+  /** Only ads still running; otherwise running and stopped alike. */
+  activeOnly?: boolean;
+  minDaysRunning?: number;
+  minDuplicates?: number;
+  /** TrendTrack category ids (Google's product taxonomy), matched against the advertiser's shop. */
+  categoryIds?: readonly number[];
+  /** The ad's targeted audience, as Meta reports it. */
+  audience?: AdAudienceFilter;
+  /** How several terms combine: any one of them, or all of them. */
+  keywordMode?: AdKeywordMode;
+}
+
+export const AD_KEYWORD_MODES = ["any", "all"] as const;
+export type AdKeywordMode = (typeof AD_KEYWORD_MODES)[number];
+
+export const AD_SEXES = ["men", "women"] as const;
+export type AdSex = (typeof AD_SEXES)[number];
+
+export interface AdAudienceFilter {
+  minAge?: number;
+  maxAge?: number;
+  sex?: AdSex;
+}
+
+/** One category an ad search can be narrowed to, and how many of the library's ads carry it. */
+export interface AdCategory {
+  id: number;
+  name: string;
+  path: string;
+  ads: number | null;
+}
+
+export interface AdCategoryPage {
+  categories: AdCategory[];
+  credits: number;
 }
 
 /** One Meta ad as an ad library indexed it: who ran it, where it sends people, when it ran, what it says. */

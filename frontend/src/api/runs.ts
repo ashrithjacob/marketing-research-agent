@@ -1,5 +1,4 @@
 import { request } from './client';
-import type { AdsAnalysis } from './ads-types';
 import type { MarketAssessment } from './market-types';
 import type { AnalysisInput, AvatarQuote, CompetitorPick, Config, ReadAd, ReviewCoverage, Run, RunEvent, RunSummary, RunView, StoredAvatar, StoredReview } from './types';
 
@@ -12,14 +11,13 @@ export const runs = {
   get: (id: string) => request<RunView>(`${base}/runs/${id}`),
   confirm: (id: string, product_url: string, competitors: CompetitorPick[]) =>
     request<RunView>(`${base}/runs/${id}/confirm`, { method: 'POST', body: JSON.stringify({ product_url, competitors }) }),
-  rerun: (id: string, stages: string[] = []) => request<RunView>(`${base}/runs/${id}/rerun`, { method: 'POST', body: JSON.stringify({ stages }) }),
+  rerun: (id: string, stages: string[] = [], alone = false) => request<RunView>(`${base}/runs/${id}/rerun`, { method: 'POST', body: JSON.stringify({ stages, alone }) }),
   stop: (id: string) => request<{ ok: boolean }>(`${base}/runs/${id}/stop`, { method: 'POST' }),
   delete: (id: string) => request<{ ok: boolean }>(`${base}/runs/${id}`, { method: 'DELETE' }),
   traceUrl: (id: string) => `${base}/runs/${id}/trace`,
   reviews: (id: string, competitor: string | null, limit = 20) =>
     request<{ coverage: ReviewCoverage[]; reviews: StoredReview[] }>(`${base}/runs/${id}/reviews?limit=${limit}${competitor ? `&competitor=${competitor}` : ''}`),
   ads: (id: string) => request<{ ads: ReadAd[] }>(`${base}/runs/${id}/ads`),
-  adAnalysis: (id: string) => request<{ analysis: AdsAnalysis }>(`${base}/runs/${id}/ads/analysis`),
   market: (id: string) => request<{ market: MarketAssessment | null }>(`${base}/runs/${id}/market`),
   avatars: (id: string) => request<{ avatars: StoredAvatar[]; quotes: AvatarQuote[] }>(`${base}/runs/${id}/avatars`),
   follow: (id: string, onEvent: (event: RunEvent) => void): (() => void) => {

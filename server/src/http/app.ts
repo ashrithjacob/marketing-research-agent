@@ -92,11 +92,10 @@ export class App {
   static pipeline(settings: Settings, clients: ServiceClients, pages: PublicPage, visuals: BrandVisuals): Pipeline {
     Trace.line(import.meta.url, "App.pipeline");
     const sources = new Map([new JudgemeReviews(settings), new WootReviews(settings)].map((source) => [source.name, source] as const));
-    const limits = { searches: settings.adSearchesPerRun, maxAds: settings.adsPerRun, minCopyChars: settings.adMinCopyChars, maxAdsPerBrand: settings.adsPerBrand };
     return new Pipeline([
       new ProductMarketStage(new BrandVisualsCollector(visuals), new ShopTractionCollector(clients.shops, settings.prices)),
       new ReviewStage(new ReviewListings(new ShopifyStorefront(pages), new AmazonListingFinder()), sources, settings.reviewsPerProduct),
-      new CompetitorAdStage(clients.ads, clients.shopFinder, settings.prices, limits),
+      new CompetitorAdStage(clients.ads, settings.prices, { total: settings.adPoolSize, minCopyChars: settings.adMinCopyChars, minDaysRunning: settings.adMinDaysRunning }),
       new MarketStage(
         { ads: clients.ads, pages: clients.pages, suggestions: new WebSuggestions(settings), archive: new WaybackArchive(settings, pages), actors: settings.apifyToken ? new ApifyRunner(new ApifyApi(settings), settings) : null },
         settings.prices,

@@ -1,9 +1,6 @@
-import type { AdsAnalysis } from './ads-types';
 import type { ReadAd } from './types';
 
 export type AdFilter = Record<string, string>;
-
-const pct = (share: number) => `${Math.round(share * 100)}%`;
 
 const LABEL_OF: Record<string, (ad: ReadAd) => string[]> = {
   awareness: (ad) => (ad.reading ? [ad.reading.awareness] : []),
@@ -18,41 +15,32 @@ const LABEL_OF: Record<string, (ad: ReadAd) => string[]> = {
 const brandOf = (ad: ReadAd) => (ad.landing_domain || ad.advertiser).replace(/^www\./, '').toLowerCase();
 
 export const adsShape = {
-  pct,
   words: (value: string) => value.replace(/_/g, ' '),
   brandOf,
   labels: Object.keys(LABEL_OF),
 
-  matches(ad: ReadAd, filter: AdFilter, analysis: AdsAnalysis | null): boolean {
+  rings: ['direct_competitor', 'same_problem', 'same_buyer', 'general'],
+
+  pages: { brand: 'brand page · bottom of funnel', community: 'community page · upper funnel', persona: 'persona page · top of funnel', authority: 'authority page · top of funnel' } as Record<string, string>,
+
+  ringOf: (ad: ReadAd) => ad.ring ?? (ad.competitor_id !== null ? 'direct_competitor' : null),
+
+  matches(ad: ReadAd, filter: AdFilter): boolean {
     return Object.entries(filter).every(([key, value]) => {
-      if (key === 'proven') return (analysis?.proven_ids.includes(ad.id) ?? false) === (value === 'yes');
-      if (key === 'angle') return analysis?.angle_of[ad.id] === value;
       if (key === 'brand') return brandOf(ad) === value;
       if (key === 'bucket') return ad.bucket === value;
-      if (key === 'ring') return (ad.competitor_id !== null ? 'direct_competitor' : ad.ring) === value;
-      if (key === 'ids') return value.split(',').includes(ad.id);
+      if (key === 'ring') return adsShape.ringOf(ad) === value;
+      if (key === 'page') return ad.page_kind === value;
       return LABEL_OF[key]?.(ad).includes(value) ?? true;
     });
   },
 
-  values(ads: ReadAd[], key: string, analysis: AdsAnalysis | null): string[] {
-    if (key === 'angle') return analysis?.angles.map((angle) => angle.key) ?? [];
-    if (key === 'proven') return ['yes', 'no'];
+  values(ads: ReadAd[], key: string): string[] {
     if (key === 'brand') return [...new Set(ads.map(brandOf))].sort();
     if (key === 'bucket') return ['winning', 'testing', 'dead'];
-    if (key === 'ring') return ['direct_competitor', 'same_problem', 'same_buyer', 'trending_shop'];
+    if (key === 'ring') return adsShape.rings;
+    if (key === 'page') return Object.keys(adsShape.pages);
     return [...new Set(ads.flatMap((ad) => LABEL_OF[key]?.(ad) ?? []))].sort();
-  },
-
-  facts(subject: string, analysis: AdsAnalysis): string | null {
-    const angle = analysis.angles.find((a) => a.key === subject);
-    if (angle) return `${angle.name}: ${angle.ads} ads, ${angle.proven} proven, ${angle.brands.length} brands, ${angle.launched_60d} launched in 60 days`;
-    const brand = analysis.brands.find((b) => b.domain === subject);
-    if (brand) return `${brand.domain}: ${brand.ads} kept ads, ${brand.proven} proven, ${brand.launched_60d} launched in 60 days`;
-    const [label, value] = subject.split(':');
-    const row = analysis.labels.find((l) => l.label === label && l.value === value);
-    if (row) return `${label} ${adsShape.words(value ?? '')}: ${pct(row.proven_share)} of proven ads, ${pct(row.rest_share)} of the rest`;
-    return null;
   },
 
   readFilter(): AdFilter {

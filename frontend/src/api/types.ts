@@ -142,10 +142,12 @@ export interface AdReading {
   emotion_kind: string | null;
   landing_kind: string | null;
   copy_structure: string | null;
+  value_prop: string | null;
 }
 
 export interface ReadAd {
   id: string;
+  trendtrack_ad_id: string;
   competitor_id: string | null;
   advertiser: string;
   landing_url: string;
@@ -159,8 +161,10 @@ export interface ReadAd {
   bucket: 'winning' | 'testing' | 'dead' | null;
   bucket_why: string | null;
   audience: { age_min: number | null; age_max: number | null; gender: string | null } | null;
-  ring: 'direct_competitor' | 'same_problem' | 'same_buyer' | 'trending_shop' | null;
+  ring: 'direct_competitor' | 'same_problem' | 'same_buyer' | 'general' | null;
   ring_why: string | null;
+  page_kind: 'brand' | 'community' | 'persona' | 'authority' | null;
+  segment: string | null;
   reading: AdReading | null;
 }
 
@@ -168,6 +172,7 @@ export interface StoredAvatar {
   id: string;
   parent_id: string | null;
   key: string;
+  source: 'reviews' | 'ads';
   name: string;
   description: string;
   demand_share: number;
@@ -190,11 +195,16 @@ export interface StoredAvatar {
     skepticism: number | null;
     skepticism_review_ids: string[];
     awareness_by_channel: Partial<Record<'meta_ads' | 'reviews', Partial<Record<string, number>>>>;
+    gaps?: { kind: string; theme: string; review_ids: string[] }[];
+    quote_ad_ids?: string[];
+    market?: 'client_market' | 'same_buyer';
+    same_buyer?: { review_avatar: string | null; shared: string; borrow: string[] };
   };
 }
 
 export interface AvatarQuote {
   avatar_id: string;
+  kind: 'quote' | 'gap';
   review_id: string;
   rating: number;
   body: string;

@@ -86,6 +86,12 @@ rewrite is in git history before `b6f45cc`.
     sorts and across terms, short copy and brands at their cap. Each search's
     returned and kept counts are now recorded (`ads.searched` events, the stage
     summary), so the next run shows which searches to cut.
+    *2026-10-26:* the scout is gone too. The pool (`AdPool`) asks for a fixed
+    400 rows (four sorts × 100); on Mullevia they held 351 distinct ads, so
+    about one row in eight is billed twice. TrendTrack bills 1.5 credits a row.
+    *Later 2026-10-26:* agents pull again, one per ring, each shown at most
+    2.5 × its quota in ads (`RingScout`), so the rows thrown away are bounded
+    per ring: at most 1,000 ads for a 400-ad pool, 1,500 credits.
 
 ## Stage 5
 

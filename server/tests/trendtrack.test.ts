@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ServiceClients } from "../src/adapters/index.js";
 import { TrendtrackAds } from "../src/adapters/trendtrack-ads.js";
+import { TrendtrackApi } from "../src/adapters/trendtrack-api.js";
 import { Toolbox } from "../src/agent/index.js";
 import { AdSearchTool } from "../src/agent/tools/ad-search-tool.js";
 import { UrlLedger } from "../src/agent/tools/url-ledger.js";
@@ -39,7 +40,7 @@ describe("TrendtrackAds", () => {
   it("asks for Meta ads by reach in the markets given, and keeps the landing domain that names a persona page's brand", async () => {
     const fetch = vi.fn(async () => json(200, { data: [persona], pagination: { total: 4244 } }));
     vi.stubGlobal("fetch", fetch);
-    const page = await new TrendtrackAds(settings()).search({ terms: ["skin fold rash"], searchIn: "ad_copy", countries: ["US", "GB"], limit: 5 });
+    const page = await new TrendtrackAds(new TrendtrackApi(settings())).search({ terms: ["skin fold rash"], searchIn: "ad_copy", countries: ["US", "GB"], limit: 5 });
     const [url, init] = fetch.mock.calls[0] as unknown as [string, RequestInit];
     expect(url).toBe("https://trendtrack.test/v1/ads/query");
     expect((init.headers as Record<string, string>).Authorization).toBe("Bearer tt-test");
@@ -55,23 +56,44 @@ describe("TrendtrackAds", () => {
     const scaled = { ...persona, daysRunning: 64, media: { type: "image", mediaUrl: "https://cdn.test/ad.jpg", thumbnailUrl: "https://cdn.test/t.jpg" }, metrics: { reach: 120000, duplicates: 7, reachDelta7d: 900, reachDelta30d: 5200 }, rank: { currentRank: 3 }, flags: { isEuAd: true } };
     const fetch = vi.fn(async () => json(200, { data: [scaled], pagination: { total: 1 } }));
     vi.stubGlobal("fetch", fetch);
-    const page = await new TrendtrackAds(settings()).search({
+    const page = await new TrendtrackAds(new TrendtrackApi(settings())).search({
       terms: ["mullein.com"], searchIn: "domain", countries: ["US"], limit: 20, page: 2, sortBy: "longestRunning", longForm: { minCopyChars: 2000 },
     });
     const body = JSON.parse(String((fetch.mock.calls[0] as unknown as [string, RequestInit])[1].body));
     expect(body).toMatchObject({ searchType: "domain", sortBy: "longestRunning", mediaType: "image", minDescriptionLength: 2000, page: 2, limit: 20 });
     expect(body).not.toHaveProperty("maxAdsPerBrand");
-    await new TrendtrackAds(settings()).search({ terms: ["x"], searchIn: "ad_copy", countries: [], limit: 5, onePerBrand: true });
+    await new TrendtrackAds(new TrendtrackApi(settings())).search({ terms: ["x"], searchIn: "ad_copy", countries: [], limit: 5, onePerBrand: true });
     expect(JSON.parse(String((fetch.mock.calls[1] as unknown as [string, RequestInit])[1].body)).maxAdsPerBrand).toBe(1);
     expect(page.hits[0]).toMatchObject({ days_running: 64, duplicates: 7, reach_delta_30d: 5200, current_rank: 3, is_eu: true, media_url: "https://cdn.test/ad.jpg" });
   });
 
+  it("sends a scout's filters: running only, a days and duplicates floor, categories and audience; no search terms means none are sent", async () => {
+    const fetch = vi.fn(async () => json(200, { data: [], pagination: { total: 0 } }));
+    vi.stubGlobal("fetch", fetch);
+    await new TrendtrackAds(new TrendtrackApi(settings())).search({
+      terms: [], searchIn: "ad_copy", countries: ["US"], limit: 10, sortBy: "mostDuplicates", activeOnly: true, longForm: { minCopyChars: 3000 },
+      minDaysRunning: 10, minDuplicates: 3, categoryIds: [491], audience: { minAge: 45, sex: "women" },
+    });
+    expect(JSON.parse(String((fetch.mock.calls[0] as unknown as [string, RequestInit])[1].body))).toEqual({
+      sortBy: "mostDuplicates", order: "desc", status: "active", platforms: ["facebook"], adCountries: { include: ["US"] }, mediaType: "image", minDescriptionLength: 3000,
+      minDaysRunning: 10, minDuplicates: 3, categoryIds: [491], minAge: 45, sex: "women", limit: 10,
+    });
+  });
+
+  it("looks categories up by a word, with the ids a search narrows by", async () => {
+    const fetch = vi.fn(async () => json(200, { data: [{ id: 491, name: "Vitamins & Supplements", path: "Health & Beauty > Health Care > Vitamins & Supplements", usageCount: 1842 }] }));
+    vi.stubGlobal("fetch", fetch);
+    const page = await new TrendtrackAds(new TrendtrackApi(settings())).categories("supplements");
+    expect((fetch.mock.calls[0] as unknown as [string])[0]).toBe("https://trendtrack.test/v1/facets/categories?search=supplements&limit=15");
+    expect(page.categories).toEqual([{ id: 491, name: "Vitamins & Supplements", path: "Health & Beauty > Health Care > Vitamins & Supplements", ads: 1842 }]);
+  });
+
   it("can answer nothing without a key or credit, and fails only the request otherwise", async () => {
-    await expect(new TrendtrackAds(settings({ trendtrackApiKey: "" })).search({ terms: ["x"], searchIn: "brand", countries: [], limit: 1 })).rejects.toBeInstanceOf(ServiceUnavailableError);
+    await expect(new TrendtrackAds(new TrendtrackApi(settings({ trendtrackApiKey: "" }))).search({ terms: ["x"], searchIn: "brand", countries: [], limit: 1 })).rejects.toBeInstanceOf(ServiceUnavailableError);
     vi.stubGlobal("fetch", vi.fn(async () => json(402, { message: "No credits" })));
-    await expect(new TrendtrackAds(settings()).search({ terms: ["x"], searchIn: "brand", countries: [], limit: 1 })).rejects.toBeInstanceOf(ServiceUnavailableError);
+    await expect(new TrendtrackAds(new TrendtrackApi(settings())).search({ terms: ["x"], searchIn: "brand", countries: [], limit: 1 })).rejects.toBeInstanceOf(ServiceUnavailableError);
     vi.stubGlobal("fetch", vi.fn(async () => json(422, { message: "bad body" })));
-    await expect(new TrendtrackAds(settings()).search({ terms: ["x"], searchIn: "brand", countries: [], limit: 1 })).rejects.toThrow(/422: bad body/);
+    await expect(new TrendtrackAds(new TrendtrackApi(settings())).search({ terms: ["x"], searchIn: "brand", countries: [], limit: 1 })).rejects.toThrow(/422: bad body/);
   });
 });
 
@@ -80,7 +102,7 @@ describe("ad_search", () => {
   const meter: ChargeMeter = { charge: async () => undefined };
 
   it("searches in the run's countries, caps the count at 20, and lets the agent cite each ad's landing page", async () => {
-    const ads = { search: vi.fn(async (): Promise<AdPage> => ({ hits: [hit], total: 4244 })) };
+    const ads = { search: vi.fn(async (): Promise<AdPage> => ({ hits: [hit], total: 4244 })), categories: vi.fn() };
     const urls = new UrlLedger();
     const result = await new AdSearchTool(ads, ["US", "GB"], urls).tool().execute("1", { query: "skin fold rash", max_results: 99 });
     expect(ads.search).toHaveBeenCalledWith({ terms: ["skin fold rash"], searchIn: "ad_copy", countries: ["US", "GB"], limit: 20 }, undefined);

@@ -441,6 +441,30 @@ CREATE TABLE ad_findings (
 );
 `;
 
+const RING_AT_PULL = `
+ALTER TABLE ads ADD COLUMN ring TEXT, ADD COLUMN ring_why TEXT;
+UPDATE ads SET ring = e.relation, ring_why = e.relation_why FROM ad_extractions e WHERE e.ad_id = ads.id;
+ALTER TABLE ad_extractions DROP COLUMN relation, DROP COLUMN relation_why;
+`;
+
+const NO_AD_ANALYSIS = `
+DROP TABLE ad_angles;
+DROP TABLE ad_findings;
+`;
+
+const AD_PAGE_KIND = `
+ALTER TABLE ads ADD COLUMN page_kind TEXT;
+`;
+
+const AD_AUDIENCE_AND_PROMISE = `
+ALTER TABLE ad_extractions ADD COLUMN value_prop TEXT;
+ALTER TABLE ads ADD COLUMN segment TEXT;
+`;
+
+const AVATAR_SOURCE = `
+ALTER TABLE avatars ADD COLUMN source TEXT NOT NULL DEFAULT 'reviews';
+`;
+
 /** Applied in order, once each, recorded in schema_migrations. An applied migration is never edited: a change is a new entry at the end. */
 export const MIGRATIONS: readonly Migration[] = [
   { id: 1, name: "avatar_schema", sql: AVATAR_SCHEMA },
@@ -453,4 +477,9 @@ export const MIGRATIONS: readonly Migration[] = [
   { id: 8, name: "ads_per_run", sql: ADS_PER_RUN },
   { id: 9, name: "product_label_facts", sql: PRODUCT_LABEL_FACTS },
   { id: 10, name: "ad_analysis", sql: AD_ANALYSIS },
+  { id: 11, name: "ring_at_pull", sql: RING_AT_PULL },
+  { id: 12, name: "no_ad_analysis", sql: NO_AD_ANALYSIS },
+  { id: 13, name: "ad_page_kind", sql: AD_PAGE_KIND },
+  { id: 14, name: "ad_audience_and_promise", sql: AD_AUDIENCE_AND_PROMISE },
+  { id: 15, name: "avatar_source", sql: AVATAR_SOURCE },
 ];

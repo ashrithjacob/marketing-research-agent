@@ -102,7 +102,7 @@ describe("more competitors for a finished run", () => {
       ad_reach: 10, page_reach_30d: null, page_live_ads: null, days_running: 40, duplicates: 1, reach_delta_7d: null, reach_delta_30d: null, current_rank: null, is_eu: false,
       media_url: null, thumbnail_url: null, age_min: null, age_max: null, gender: null,
     });
-    await pg.store.ads.save("admin", run.id, product.id, [hit("h1", "www.herbeya.com"), hit("o1", "other.com")], new Map());
+    await pg.store.ads.save("admin", run.id, product.id, [hit("h1", "www.herbeya.com"), hit("o1", "other.com")].map((one) => ({ hit: one, ring: "direct_competitor" as const, found_by: "x" })), new Map());
     const [herbeya] = await pg.store.competitors.add(product, [{ brand: "Herbeya", product_name: "Drops", url: HERBEYA_URL }]);
 
     expect(await pg.store.ads.link(run.id, new Map([["herbeya.com", herbeya!.id]]))).toBe(1);

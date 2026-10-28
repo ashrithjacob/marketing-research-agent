@@ -92,6 +92,6 @@ export class Stages {
   }
 }
 
-/** A rerun request: the stages to run again; none means every stage that did not complete. */
-export const RerunRequestSchema = z.object({ stages: z.array(z.enum(STAGE_NAMES)).default([]) });
+/** A rerun request: the stages to run again; none means every stage that did not complete. With `alone`, only the named stages run, and the stages that use them keep what they have. */
+export const RerunRequestSchema = z.object({ stages: z.array(z.enum(STAGE_NAMES)).default([]), alone: z.boolean().default(false) });
 export type RerunRequest = z.infer<typeof RerunRequestSchema>;

@@ -1,985 +1,592 @@
-<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<style>body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
-<title>How Stage 3 Reads Ads</title>
+<title>Stage 3 Ad Pool</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <style>
-/* Layout: one reading column; diagrams break wider; every section opens in plain words and deepens on click. */
+/* Layout: one reading column; figures break a little wider; a sticky step player in the middle of the page. */
 :root{
-  --bg:#eef1f4; --panel:#ffffff; --ink:#18222f; --muted:#5a6878; --line:#c9d1da;
-  --accent:#0f6e74; --accent-soft:#d6ecec; --money:#a8620a; --money-soft:#f6e8d2;
-  --bad:#a63a3a; --bad-soft:#f5dede; --good:#2f7a3d; --code-bg:#f5f7f9;
-  --f-display:"Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
-  --f-body:"IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
-  --f-mono:"IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+  --bg:#eef1f4; --panel:#ffffff; --ink:#18222f; --muted:#566475; --line:#c9d1da;
+  --accent:#0f6e74; --accent-soft:#d6ecec; --money:#9a5a08; --money-soft:#f6e8d2;
+  --bad:#a63a3a; --bad-soft:#f5dede; --good:#2f7a3d; --good-soft:#dcefdf; --code-bg:#f5f7f9;
+  --f-display:"Bricolage Grotesque","Segoe UI",system-ui,sans-serif;
+  --f-body:"IBM Plex Sans","Segoe UI",system-ui,sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
 }
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
-  --bg:#111820; --panel:#18222d; --ink:#e3e9ef; --muted:#97a5b4; --line:#2e3c4a;
+  --bg:#111820; --panel:#18222d; --ink:#e3e9ef; --muted:#9aa8b6; --line:#2e3c4a;
   --accent:#5cc2c4; --accent-soft:#163a3c; --money:#e5a54a; --money-soft:#3a2c17;
-  --bad:#e38787; --bad-soft:#3d2222; --good:#7fca8b; --code-bg:#121b24; color-scheme:dark}}
+  --bad:#e38787; --bad-soft:#3d2222; --good:#7fca8b; --good-soft:#1d3322; --code-bg:#121b24; color-scheme:dark}}
 :root[data-theme="dark"]{
-  --bg:#111820; --panel:#18222d; --ink:#e3e9ef; --muted:#97a5b4; --line:#2e3c4a;
+  --bg:#111820; --panel:#18222d; --ink:#e3e9ef; --muted:#9aa8b6; --line:#2e3c4a;
   --accent:#5cc2c4; --accent-soft:#163a3c; --money:#e5a54a; --money-soft:#3a2c17;
-  --bad:#e38787; --bad-soft:#3d2222; --good:#7fca8b; --code-bg:#121b24; color-scheme:dark}
+  --bad:#e38787; --bad-soft:#3d2222; --good:#7fca8b; --good-soft:#1d3322; --code-bg:#121b24; color-scheme:dark}
 *{box-sizing:border-box}
-body{background:var(--bg);color:var(--ink);font:16px/1.6 var(--f-body);
-  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0 64px}
-main{max-width:860px;margin:0 auto}
+body{background:var(--bg);color:var(--ink);font:16px/1.6 var(--f-body);margin:0;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0 72px}
+main{max-width:880px;margin:0 auto}
 .col{max-width:68ch}
 h1,h2,h3{font-family:var(--f-display);text-wrap:balance;line-height:1.15;margin:0}
-h1{font-size:clamp(30px,5vw,46px);font-weight:700;letter-spacing:-.01em}
-h2{font-size:clamp(22px,3.2vw,28px);font-weight:700;margin-bottom:10px}
-h3{font-size:18px;font-weight:600}
-p{margin:0 0 12px}
-section{padding-top:44px;display:grid;gap:14px}
+h1{font-size:clamp(30px,5vw,44px);font-weight:700}
+h2{font-size:clamp(22px,3.2vw,28px);font-weight:700}
+h3{font-size:17px;font-weight:600}
+p{margin:0}
+section{padding-top:48px;display:grid;gap:14px}
 .eyebrow{font:500 12px/1 var(--f-mono);letter-spacing:.12em;text-transform:uppercase;color:var(--accent)}
 .muted{color:var(--muted)}
 code,.mono{font-family:var(--f-mono);font-size:.88em}
-code{background:var(--code-bg);border:1px solid var(--line);border-radius:4px;padding:0 4px}
+code{background:var(--code-bg);border:1px solid var(--line);border-radius:4px;padding:0 4px;overflow-wrap:anywhere}
 a{color:var(--accent)}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-
-/* header + depth control */
-header{padding-top:40px;display:grid;gap:16px}
+header{padding-top:40px;display:grid;gap:14px}
 .lede{font-size:19px;max-width:62ch}
-.depth{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);padding:10px 0;border-bottom:1px solid var(--line);display:flex;flex-wrap:wrap;gap:8px;align-items:center}
-body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--bg)}
-.depth span{font:500 12px var(--f-mono);color:var(--muted);letter-spacing:.06em;text-transform:uppercase;margin-right:4px}
-.depth button{font:500 14px var(--f-body);border:1px solid var(--line);background:var(--panel);color:var(--ink);padding:6px 12px;border-radius:999px;cursor:pointer}
-.depth button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--bg)}
 .note{border-left:3px solid var(--money);background:var(--money-soft);padding:10px 14px;border-radius:0 6px 6px 0}
-
-/* disclosure */
-details{border:1px solid var(--line);border-radius:8px;background:var(--panel)}
-details>summary{cursor:pointer;list-style:none;padding:10px 14px;font-weight:500;display:flex;gap:10px;align-items:center}
-details>summary::-webkit-details-marker{display:none}
-details>summary::before{content:"+";font:600 15px var(--f-mono);color:var(--accent);width:14px}
-details[open]>summary::before{content:"−"}
-details>.body{padding:0 14px 12px 38px;display:grid;gap:10px}
-details.d3{background:var(--code-bg);border-style:dashed}
-details.d3>summary{font-size:14px;color:var(--muted)}
-.lvl{font:500 11px var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-left:auto;white-space:nowrap}
-
-/* steps */
-.steps{display:grid;gap:12px;counter-reset:s}
-.step{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px;display:grid;gap:10px}
-.step header{padding:0;display:flex;gap:12px;align-items:baseline}
-.step .n{font:700 22px var(--f-display);color:var(--accent);min-width:28px}
-.step p.plain{font-size:17px;margin:0}
-
-/* figures */
-figure{margin:0;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px;display:grid;gap:8px}
-figcaption{font-size:14px;color:var(--muted)}
-.svgwrap{overflow-x:auto}
-svg.dia{display:block;width:100%;min-width:640px;height:auto;color:var(--ink);font-family:var(--f-body)}
-svg .box rect{fill:var(--panel);stroke:var(--line);stroke-width:1.5}
-svg .box text.t{font:600 13px var(--f-body);fill:var(--ink)}
-svg .box text.s{font:400 11px var(--f-body);fill:var(--muted)}
-svg .box.ext rect{stroke-dasharray:5 4}
-svg .edge path{fill:none;stroke:var(--muted);stroke-width:1.4}
-svg .edge text{font:400 11px var(--f-body);fill:var(--muted)}
-svg .on rect{stroke:var(--accent);stroke-width:2.5;fill:var(--accent-soft)}
-svg .edge.on path{stroke:var(--accent);stroke-width:2.4}
-svg .edge.on text{fill:var(--accent);font-weight:600}
-svg .money rect{stroke:var(--money)}
-svg .dim{opacity:.28}
-svg .box{cursor:pointer}
-.boxinfo{min-height:72px;border-top:1px solid var(--line);padding-top:10px}
-
-/* player */
-.player{display:grid;gap:10px}
-.ctrl{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
-.ctrl button{font:500 14px var(--f-body);border:1px solid var(--line);background:var(--panel);color:var(--ink);padding:7px 14px;border-radius:6px;cursor:pointer}
-.ctrl button.primary{background:var(--accent);color:var(--bg);border-color:var(--accent)}
-.ctrl .count{font:500 13px var(--f-mono);color:var(--muted);margin-left:auto}
+.warn{border-left:3px solid var(--bad);background:var(--bad-soft);padding:10px 14px;border-radius:0 6px 6px 0}
+figure{margin:0;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px;overflow-x:auto}
+figure svg{display:block;width:100%;height:auto;min-width:620px;color:var(--ink)}
+figcaption{font-size:14px;color:var(--muted);margin-top:8px;max-width:72ch}
+.svg-box{fill:var(--panel);stroke:var(--line);stroke-width:1.2}
+.svg-hot{fill:var(--accent-soft);stroke:var(--accent);stroke-width:1.6}
+.svg-out{fill:var(--money-soft);stroke:var(--money);stroke-width:1.2}
+.svg-gone{fill:var(--bad-soft);stroke:var(--bad);stroke-width:1.2;stroke-dasharray:4 3}
+.t{font:500 12.5px var(--f-mono);fill:currentColor}
+.t2{font:400 11.5px var(--f-body);fill:var(--muted)}
+.tl{font:500 11px var(--f-body);fill:var(--muted)}
+.ln{stroke:currentColor;stroke-width:1.2;fill:none}
+.toggle,.player .ctl{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+button{font:500 14px var(--f-body);border:1px solid var(--line);background:var(--panel);color:var(--ink);padding:6px 14px;border-radius:999px;cursor:pointer}
+button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--bg)}
+button:disabled{opacity:.45;cursor:default}
+.player{display:grid;gap:12px}
 .scene{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 16px;display:grid;gap:8px;min-height:150px}
-.scene h3{color:var(--accent)}
-.scene pre{margin:0}
-.dots{display:flex;gap:4px;flex-wrap:wrap}
-.dots button{width:22px;height:6px;border-radius:3px;border:0;background:var(--line);cursor:pointer;padding:0}
-.dots button[aria-current="true"]{background:var(--accent)}
-
-/* toggle */
-.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
-.seg button{font:500 14px var(--f-body);border:0;background:var(--panel);color:var(--ink);padding:8px 14px;cursor:pointer}
-.seg button[aria-pressed="true"]{background:var(--accent);color:var(--bg)}
-
-/* code */
-pre{background:var(--code-bg);border:1px solid var(--line);border-radius:8px;padding:12px;overflow-x:auto;font:13px/1.55 var(--f-mono);margin:0}
-.codegrid{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:14px}
-@media (max-width:720px){.codegrid{grid-template-columns:minmax(0,1fr)}}
-.mk{display:inline-block;min-width:18px;text-align:center;background:var(--accent);color:var(--bg);border-radius:9px;font:600 11px/18px var(--f-mono);margin-right:4px}
-ol.notes{margin:0;padding-left:0;list-style:none;display:grid;gap:8px}
-ol.notes li{display:flex;gap:8px}
-.ref{font:12px var(--f-mono);color:var(--muted)}
-
-/* tables */
-.tw{overflow-x:auto}
-table{border-collapse:collapse;width:100%;font-size:14px;font-variant-numeric:tabular-nums}
-th,td{text-align:left;padding:7px 10px;border-bottom:1px solid var(--line);vertical-align:top}
-th{font:500 12px var(--f-mono);letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
-td.num{text-align:right;white-space:nowrap}
-
-/* ad row */
-.adrow{background:var(--code-bg);border:1px solid var(--line);border-radius:8px;padding:12px;font:13px/1.6 var(--f-mono);overflow-x:auto}
-.adrow button.f{font:inherit;background:var(--accent-soft);color:var(--ink);border:0;border-bottom:1.5px dotted var(--accent);padding:0 2px;cursor:pointer;border-radius:2px}
-.adrow button.f[aria-pressed="true"]{background:var(--accent);color:var(--bg)}
-.fieldinfo{min-height:64px}
-
-/* quiz */
-.q{display:grid;gap:8px}
-
-/* terms */
-.t{border-bottom:1.5px dotted var(--accent);cursor:help}
-#tip{position:fixed;z-index:20;max-width:300px;background:var(--ink);color:var(--bg);font-size:13px;line-height:1.45;padding:8px 10px;border-radius:6px;pointer-events:none}
-dl.gloss{display:grid;grid-template-columns:minmax(120px,max-content) minmax(0,1fr);gap:8px 18px;margin:0}
-dl.gloss dt{font-weight:600}
-dl.gloss dd{margin:0;color:var(--ink)}
-@media (max-width:520px){dl.gloss{grid-template-columns:minmax(0,1fr)} dl.gloss dd{margin-bottom:8px}}
-@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+.scene h3 span{font:500 12px var(--f-mono);color:var(--accent);margin-right:8px}
+.node rect{fill:var(--panel);stroke:var(--line);stroke-width:1.2;transition:fill .2s,stroke .2s}
+.node.on rect{fill:var(--accent-soft);stroke:var(--accent);stroke-width:2}
+.node.done rect{fill:var(--good-soft);stroke:var(--good)}
+.node.agent rect{stroke-dasharray:5 3}
+@media (prefers-reduced-motion: reduce){.node rect{transition:none}}
+.code{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:14px;align-items:start}
+@media (max-width:760px){.code{grid-template-columns:minmax(0,1fr)}}
+pre{margin:0;background:var(--code-bg);border:1px solid var(--line);border-radius:8px;padding:12px;overflow-x:auto;font:12.5px/1.55 var(--f-mono)}
+pre .m{background:var(--accent-soft);border-radius:3px;padding:0 2px}
+pre .n{color:var(--accent);font-weight:600}
+.src{font:500 12px var(--f-mono);color:var(--muted)}
+ol.notes{margin:0;padding-left:22px;display:grid;gap:8px;font-size:15px}
+table{border-collapse:collapse;width:100%;font-size:15px}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-weight:600}
+td.num{font-variant-numeric:tabular-nums;white-space:nowrap}
+.tablewrap{overflow-x:auto;background:var(--panel);border:1px solid var(--line);border-radius:10px}
+.step{display:grid;gap:12px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px}
+.step h3 .stepno{display:inline-block;font:500 12px var(--f-mono);color:var(--bg);background:var(--accent);border-radius:999px;padding:2px 10px;margin-right:10px;vertical-align:2px}
+.step ul{margin:0;padding-left:20px;display:grid;gap:6px}
+.step pre{white-space:pre-wrap;overflow-wrap:anywhere}
+table.small{font-size:13.5px}
+.pill{display:inline-block;font:500 12px var(--f-mono);border-radius:999px;padding:1px 8px;margin-right:6px}
+.pill.win{background:var(--good-soft);color:var(--good)}
+.pill.dead{background:var(--bad-soft);color:var(--bad)}
+details{border:1px solid var(--line);border-radius:8px;background:var(--panel)}
+details>summary{cursor:pointer;padding:10px 14px;font-weight:500}
+details>div{padding:0 14px 12px}
+.term{text-decoration:underline dotted var(--accent);text-underline-offset:3px;cursor:help;position:relative}
+.term:hover::after,.term:focus::after{content:attr(data-def);position:absolute;left:0;top:1.6em;z-index:4;width:min(320px,80vw);background:var(--ink);color:var(--bg);font:400 13px/1.45 var(--f-body);padding:8px 10px;border-radius:6px}
+dl{margin:0;display:grid;grid-template-columns:minmax(0,12em) minmax(0,1fr);gap:6px 16px}
+dt{font-weight:600}dd{margin:0}
+@media (max-width:560px){dl{grid-template-columns:minmax(0,1fr)}dd{margin-bottom:8px}}
 </style>
-</head>
-<body>
+
 <main>
 <header>
-  <div class="eyebrow">Stage 3 · Long-form ads</div>
-  <h1>How stage 3 finds, reads and analyses ads</h1>
-  <p class="lede">An AI agent searches a library of Facebook and Instagram ads and keeps the ads that it thinks are worth studying. Then other AI agents read each kept ad and label it. Three more AI calls group the ads into angles, check each angle against your own claims, and write one finding per step of the page. Code counts everything you see on the page.</p>
-  <p class="note col"><strong>Read this first.</strong> The scout agent on this page has not run yet. No call from it exists in either database. The three analysis agents (added 2026-10-22) have not run on real data either: they are proven by tests with scripted answers. The ads in the app now came from an older method (see "Before and after"). This page explains what the code does. The ad in the examples is real: it is stored from run <code>344caa7d</code> (Mullevia mullein drops, US).</p>
+  <div class="eyebrow">Stage 3 · Competitor long-form static ads · as built 26 Oct 2026</div>
+  <h1>How stage 3 finds and reads the market's ads</h1>
+  <p class="lede">Stage 3 now takes the market's top long-form ads for the product's ingredient, about 350 for mullein, and reads each different ad text once. Before, an agent chose its own searches and kept 5 ads.</p>
+  <p class="warn col"><strong>Status.</strong> The pool and the reading ran for real on the Mullevia run on 26 Oct. The run then stopped at the angle grouper. That step is now rebuilt and passes its tests, but it has not run on real ads yet.</p>
 </header>
 
-<div class="depth" role="group" aria-label="How much detail to show">
-  <span>Detail</span>
-  <button type="button" id="d1" data-d="1" aria-pressed="true">1 · What happens</button>
-  <button type="button" id="d2" data-d="2" aria-pressed="false">2 · How it works</button>
-  <button type="button" id="d3" data-d="3" aria-pressed="false">3 · Code words</button>
-</div>
-
-<!-- ============ 1. AGENT ============ -->
-<section id="agent">
-  <div class="eyebrow">Start here</div>
-  <h2>What an "agent" is</h2>
-  <div class="col">
-    <p>An agent is an AI model that works in a loop. It can ask for a tool, read the answer, and then decide what to do next. The app gives it the tools and runs them. The model itself only writes text.</p>
-    <p>The agent stops in one way only: it hands in its answer through a special tool called <span class="t" data-def="The one tool that ends an agent. Its input is the agent's final answer, in a fixed shape. Code checks the answer before it accepts it.">submit</span>. Code then checks the answer. If the answer breaks a rule, code sends the problems back, and the agent tries again.</p>
-  </div>
+<section>
+  <div class="eyebrow">1 · Where this lives</div>
+  <h2>The parts stage 3 uses</h2>
+  <p class="col">Stage 3 is one class, <code>CompetitorAdStage</code>. It calls one outside service for ads (TrendTrack), one for the <span class="term" tabindex="0" data-def="LLM = large language model. Here: the model on OpenRouter that reads each ad and writes judgements.">LLM</span> agents (OpenRouter), and the database. The cockpit page only reads what stage 3 stored.</p>
   <figure>
-    <div class="svgwrap">
-    <svg class="dia" viewBox="0 0 760 230" role="img" aria-label="The agent loop: the model asks for a tool, the app runs it and returns the result, until the model calls submit and code accepts or refuses the answer.">
-      <defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="currentColor"/></marker></defs>
-      <g class="box"><rect x="20" y="85" width="140" height="60" rx="8"/><text class="t" x="90" y="111" text-anchor="middle">The app</text><text class="s" x="90" y="128" text-anchor="middle">writes the task</text></g>
-      <g class="box"><rect x="240" y="85" width="150" height="60" rx="8"/><text class="t" x="315" y="111" text-anchor="middle">AI model</text><text class="s" x="315" y="128" text-anchor="middle">decides the next move</text></g>
-      <g class="box"><rect x="480" y="20" width="150" height="56" rx="8"/><text class="t" x="555" y="44" text-anchor="middle">A tool</text><text class="s" x="555" y="61" text-anchor="middle">the app runs it</text></g>
-      <g class="box"><rect x="480" y="150" width="150" height="56" rx="8"/><text class="t" x="555" y="174" text-anchor="middle">submit + check</text><text class="s" x="555" y="191" text-anchor="middle">code tests the answer</text></g>
-      <g class="box"><rect x="670" y="150" width="76" height="56" rx="8"/><text class="t" x="708" y="182" text-anchor="middle">Done</text></g>
-      <g class="edge" color="var(--muted)"><path d="M160,115 H238" marker-end="url(#ah)"/><text x="199" y="106" text-anchor="middle">task</text></g>
-      <g class="edge" color="var(--muted)"><path d="M390,100 C430,70 440,50 478,48" marker-end="url(#ah)"/><text x="420" y="58" text-anchor="middle">"call search"</text></g>
-      <g class="edge" color="var(--muted)"><path d="M480,66 C450,90 430,105 392,112" marker-end="url(#ah)"/><text x="452" y="104" text-anchor="middle">result</text></g>
-      <g class="edge" color="var(--muted)"><path d="M390,130 C430,160 440,178 478,178" marker-end="url(#ah)"/><text x="418" y="176" text-anchor="middle">answer</text></g>
-      <g class="edge" color="var(--muted)"><path d="M500,206 C440,226 360,200 330,147" marker-end="url(#ah)"/><text x="400" y="222" text-anchor="middle">refused: list of problems</text></g>
-      <g class="edge" color="var(--muted)"><path d="M630,178 H668" marker-end="url(#ah)"/><text x="649" y="170" text-anchor="middle">ok</text></g>
+    <svg viewBox="0 0 860 330" role="img" aria-label="Stage 3 calls TrendTrack through AdPool, OpenRouter through four agents, and stores ads in Postgres; the cockpit reads them back.">
+      <defs><marker id="a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="currentColor"/></marker></defs>
+      <rect class="svg-box" x="20" y="20" width="170" height="54" rx="8"/><text class="t" x="105" y="44" text-anchor="middle">Cockpit page</text><text class="t2" x="105" y="62" text-anchor="middle">Long-form ads tab</text>
+      <rect class="svg-box" x="20" y="130" width="170" height="54" rx="8"/><text class="t" x="105" y="154" text-anchor="middle">EvidenceRoutes</text><text class="t2" x="105" y="172" text-anchor="middle">GET /runs/:id/ads</text>
+      <rect class="svg-box" x="20" y="240" width="170" height="54" rx="8"/><text class="t" x="105" y="264" text-anchor="middle">Pipeline</text><text class="t2" x="105" y="282" text-anchor="middle">starts stage 3 after 1</text>
+      <line class="ln" x1="105" y1="130" x2="105" y2="78" marker-end="url(#a1)"/><text class="tl" x="112" y="108">sends JSON</text>
+      <rect class="svg-hot" x="250" y="220" width="200" height="94" rx="8"/><text class="t" x="350" y="244" text-anchor="middle">CompetitorAdStage</text><text class="t2" x="350" y="262" text-anchor="middle">pool → store → scripts →</text><text class="t2" x="350" y="278" text-anchor="middle">read → drop → analyse</text>
+      <line class="ln" x1="190" y1="267" x2="246" y2="267" marker-end="url(#a1)"/><text class="tl" x="196" y="258">run()</text>
+      <rect class="svg-hot" x="510" y="20" width="150" height="54" rx="8"/><text class="t" x="585" y="44" text-anchor="middle">AdPool</text><text class="t2" x="585" y="62" text-anchor="middle">8 searches by code</text>
+      <rect class="svg-out" x="700" y="20" width="140" height="54" rx="8"/><text class="t" x="770" y="44" text-anchor="middle">TrendTrack</text><text class="t2" x="770" y="62" text-anchor="middle">POST /v1/ads/query</text>
+      <line class="ln" x1="660" y1="47" x2="696" y2="47" marker-end="url(#a1)"/>
+      <rect class="svg-hot" x="510" y="110" width="150" height="80" rx="8"/><text class="t" x="585" y="132" text-anchor="middle">4 agents</text><text class="t2" x="585" y="150" text-anchor="middle">AdReader, AngleGrouper,</text><text class="t2" x="585" y="166" text-anchor="middle">AngleFitter, FindingsWriter</text>
+      <rect class="svg-out" x="700" y="123" width="140" height="54" rx="8"/><text class="t" x="770" y="147" text-anchor="middle">OpenRouter</text><text class="t2" x="770" y="165" text-anchor="middle">GLM, then backups</text>
+      <line class="ln" x1="660" y1="150" x2="696" y2="150" marker-end="url(#a1)"/>
+      <rect class="svg-hot" x="510" y="240" width="150" height="54" rx="8"/><text class="t" x="585" y="264" text-anchor="middle">AdTable</text><text class="t2" x="585" y="282" text-anchor="middle">ads, ad_extractions</text>
+      <rect class="svg-out" x="700" y="240" width="140" height="54" rx="8"/><text class="t" x="770" y="264" text-anchor="middle">Postgres</text><text class="t2" x="770" y="282" text-anchor="middle">local mra-db</text>
+      <line class="ln" x1="660" y1="267" x2="696" y2="267" marker-end="url(#a1)"/>
+      <path class="ln" d="M450,240 L480,240 L480,47 L506,47" marker-end="url(#a1)"/><text class="tl" x="456" y="120" transform="rotate(-90 470 120)">pull</text>
+      <path class="ln" d="M450,255 L490,255 L490,150 L506,150" marker-end="url(#a1)"/>
+      <line class="ln" x1="450" y1="280" x2="506" y2="280" marker-end="url(#a1)"/><text class="tl" x="458" y="300">save</text>
+      <path class="ln" d="M770,294 L770,318 L105,318 L105,186" marker-end="url(#a1)"/><text class="tl" x="380" y="313">the page reads what stage 3 stored</text>
     </svg>
-    </div>
-    <figcaption>The loop. Each pass through the AI model is one "turn". The loop ends when code accepts the answer, or when a limit stops it.</figcaption>
-  </figure>
-  <details class="d2"><summary>What limits stop an agent? <span class="lvl">How it works</span></summary><div class="body">
-    <ul>
-      <li><strong>Turns.</strong> Each agent has a maximum number of turns. The scout has 40. A reader has 4. At the limit, the agent stops.</li>
-      <li><strong>Refusals.</strong> Code refuses an answer at most 3 times. After the third refusal, the agent stops.</li>
-      <li><strong>Reminders.</strong> If the model writes text but calls no tool, the app reminds it to submit. It does this at most 2 times.</li>
-      <li><strong>Network.</strong> If the connection to the model drops, the app continues on a backup model, up to 3 times.</li>
-    </ul>
-    <p>An agent ends with one of four results: <strong>completed</strong> (answer accepted), <strong>invalid</strong> (no accepted answer, for example at the turn limit), <strong>failed</strong> (the model could not be reached) or <strong>cancelled</strong> (you stopped the run). "Invalid" is not "failed": the agent worked, but its answer broke a rule.</p>
-    <details class="d3"><summary>Code words <span class="lvl">Code</span></summary><div class="body">
-      <p><code>AgentRunner</code> drives the loop on top of the library <span class="t" data-def="An open-source library that runs the model-tool loop: it sends the conversation to the model, runs the tools the model asks for, and adds their results to the conversation.">pi-agent-core</span>. <code>TurnPolicy</code> counts turns and sends the reminders. <code>SubmitTool</code> runs the checks and counts refusals.</p>
-      <p class="ref">agent/kernel/agent-runner.ts:46 · turn-policy.ts:7 (REMINDERS = 2) · submit-tool.ts:16 (REFUSAL_LIMIT = 3)</p>
-    </div></details>
-  </div></details>
-</section>
-
-<!-- ============ 2. MAP ============ -->
-<section id="map">
-  <div class="eyebrow">The parts</div>
-  <h2>Who talks to whom</h2>
-  <p class="col">Click a box to see what it does. Dashed boxes are outside services that the app pays for.</p>
-  <figure>
-    <div class="svgwrap">
-    <svg class="dia" id="flow" viewBox="0 0 820 430" role="img" aria-label="Stage 3 flow: the stage code briefs the scout model; the model calls tools; the search tool queries TrendTrack and remembers each ad in the scout log; the model submits; the check compares the answer with the scout log; accepted ads go to the database; reader agents label them; analyst agents group them into angles, check fit and write findings; code counts the ads, angles and findings each time the page loads; the page shows them.">
-      <defs><marker id="ah2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="currentColor"/></marker></defs>
-      <g class="edge" id="e-brief" color="var(--muted)"><path d="M160,170 C190,170 200,68 228,68" marker-end="url(#ah2)"/><text x="176" y="112">brief</text></g>
-      <g class="edge" id="e-ask" color="var(--muted)"><path d="M290,96 V148" marker-end="url(#ah2)"/><text x="232" y="128">asks for</text></g>
-      <g class="edge" id="e-res" color="var(--muted)"><path d="M340,148 V98" marker-end="url(#ah2)"/><text x="346" y="128">result</text></g>
-      <g class="edge" id="e-q" color="var(--muted)"><path d="M390,165 H448" marker-end="url(#ah2)"/><text x="394" y="158">query (paid)</text></g>
-      <g class="edge" id="e-ads" color="var(--muted)"><path d="M448,190 H392" marker-end="url(#ah2)"/><text x="402" y="204">ads</text></g>
-      <g class="edge" id="e-rem" color="var(--muted)"><path d="M315,208 V258" marker-end="url(#ah2)"/><text x="322" y="238">remembers each ad</text></g>
-      <g class="edge" id="e-sub" color="var(--muted)"><path d="M390,60 H448" marker-end="url(#ah2)"/><text x="398" y="52">submit</text></g>
-      <g class="edge" id="e-ref" color="var(--muted)"><path d="M448,84 C420,96 410,96 392,84" marker-end="url(#ah2)"/><text x="398" y="110">refused</text></g>
-      <g class="edge" id="e-chk" color="var(--muted)"><path d="M390,285 C430,285 470,200 515,98" marker-end="url(#ah2)"/><text x="440" y="262">checked against</text></g>
-      <g class="edge" id="e-save" color="var(--muted)"><path d="M590,72 C640,72 640,150 640,256" marker-end="url(#ah2)"/><text x="648" y="120">accepted: save</text></g>
-      <g class="edge" id="e-batch" color="var(--muted)"><path d="M690,256 V196" marker-end="url(#ah2)"/><text x="696" y="232">8 ads</text></g>
-      <g class="edge" id="e-lab" color="var(--muted)"><path d="M740,196 V256" marker-end="url(#ah2)"/><text x="746" y="232">labels</text></g>
-      <g class="edge" id="e-ana" color="var(--muted)"><path d="M770,314 V354" marker-end="url(#ah2)"/><text x="776" y="338">read ads</text></g>
-      <g class="edge" id="e-ana2" color="var(--muted)"><path d="M670,354 V316" marker-end="url(#ah2)"/><text x="664" y="340" text-anchor="end">angles, findings</text></g>
-      <g class="edge" id="e-cnt" color="var(--muted)"><path d="M600,300 C580,300 576,330 576,354" marker-end="url(#ah2)"/></g>
-      <g class="edge" id="e-show" color="var(--muted)"><path d="M494,356 V326" marker-end="url(#ah2)"/><text x="500" y="344">numbers</text></g>
-
-      <g class="box" id="b-stage" data-k="stage"><rect x="20" y="140" width="140" height="60" rx="8"/><text class="t" x="90" y="166" text-anchor="middle">Stage 3 code</text><text class="s" x="90" y="183" text-anchor="middle">runs the steps</text></g>
-      <g class="box ext money" id="b-model" data-k="model"><rect x="230" y="40" width="160" height="56" rx="8"/><text class="t" x="310" y="64" text-anchor="middle">Scout (AI model)</text><text class="s" x="310" y="81" text-anchor="middle">chooses searches and ads</text></g>
-      <g class="box" id="b-tools" data-k="tools"><rect x="230" y="150" width="160" height="58" rx="8"/><text class="t" x="310" y="174" text-anchor="middle">Tools</text><text class="s" x="310" y="191" text-anchor="middle">search · read · shops</text></g>
-      <g class="box ext money" id="b-tt" data-k="tt"><rect x="450" y="148" width="140" height="58" rx="8"/><text class="t" x="520" y="172" text-anchor="middle">TrendTrack</text><text class="s" x="520" y="189" text-anchor="middle">ad library, per ad</text></g>
-      <g class="box" id="b-log" data-k="log"><rect x="230" y="260" width="160" height="50" rx="8"/><text class="t" x="310" y="282" text-anchor="middle">Scout log</text><text class="s" x="310" y="298" text-anchor="middle">every ad it has seen</text></g>
-      <g class="box" id="b-check" data-k="check"><rect x="450" y="40" width="140" height="56" rx="8"/><text class="t" x="520" y="64" text-anchor="middle">Submit check</text><text class="s" x="520" y="81" text-anchor="middle">code tests the answer</text></g>
-      <g class="box" id="b-db" data-k="db"><rect x="600" y="258" width="200" height="56" rx="8"/><text class="t" x="700" y="282" text-anchor="middle">Database</text><text class="s" x="700" y="299" text-anchor="middle">ads, labels, angles</text></g>
-      <g class="box ext money" id="b-read" data-k="read"><rect x="640" y="140" width="160" height="56" rx="8"/><text class="t" x="720" y="164" text-anchor="middle">Readers (AI model)</text><text class="s" x="720" y="181" text-anchor="middle">3 at a time</text></g>
-      <g class="box" id="b-page" data-k="page"><rect x="430" y="276" width="128" height="48" rx="8"/><text class="t" x="494" y="298" text-anchor="middle">Ads page</text><text class="s" x="494" y="314" text-anchor="middle">six steps + all ads</text></g>
-      <g class="box ext money" id="b-ana" data-k="ana"><rect x="640" y="356" width="160" height="56" rx="8"/><text class="t" x="720" y="380" text-anchor="middle">Analysts (AI model)</text><text class="s" x="720" y="397" text-anchor="middle">group · fit · findings</text></g>
-      <g class="box" id="b-count" data-k="count"><rect x="430" y="356" width="160" height="56" rx="8"/><text class="t" x="510" y="380" text-anchor="middle">Counts (code)</text><text class="s" x="510" y="397" text-anchor="middle">on every page load</text></g>
-    </svg>
-    </div>
-    <div class="boxinfo" id="boxinfo" aria-live="polite"><p class="muted">Click a box.</p></div>
-    <figcaption>The scout agent (top middle) never touches TrendTrack or the database itself. It asks for tools, and code does the work.</figcaption>
+    <figcaption>Teal boxes are stage 3's own code. Amber boxes are outside the app. Every arrow is a real call in the code.</figcaption>
   </figure>
 </section>
 
-<!-- ============ 3. WALKTHROUGH ============ -->
-<section id="walk">
-  <div class="eyebrow">One example, step by step</div>
-  <h2>Follow one run through stage 3</h2>
-  <p class="col">The product is Mullevia mullein drops, sold in the US. Press Play to step through on its own, or use Next. The diagram above highlights the parts that act in each step.</p>
+<section>
+  <div class="eyebrow">2 · The flow at a glance</div>
+  <h2>Nine steps, Mullevia Mullein Drops, US market</h2>
+  <p class="col">A short tour first. Press Play to hear each step, or use Back and Next. The section after it follows one ad through the same steps with the real data. The numbers come from run <code>344caa7d</code> on 26 Oct 2026, unless a step says otherwise.</p>
   <div class="player">
-    <div class="ctrl">
-      <button type="button" id="prev">Back</button>
-      <button type="button" id="play" class="primary">Play</button>
-      <button type="button" id="next">Next</button>
-      <span class="count" id="count">1 / 14</span>
+    <figure>
+      <svg viewBox="0 0 860 170" role="img" aria-label="The nine steps of stage 3 in order; the current step is highlighted.">
+        <defs><marker id="a3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="currentColor"/></marker></defs>
+        <g id="nodes"></g>
+      </svg>
+      <figcaption>Solid boxes are code. Dashed boxes are LLM agents. Green means done, teal means now.</figcaption>
+    </figure>
+    <div class="scene" aria-live="polite"><h3 id="sc-title"></h3><p id="sc-body" class="col"></p><p id="sc-src" class="src"></p></div>
+    <div class="ctl">
+      <button type="button" id="p-back">Back</button>
+      <button type="button" id="p-play" aria-pressed="false">Play</button>
+      <button type="button" id="p-next">Next</button>
+      <button type="button" id="p-mute" aria-pressed="false">Sound on</button>
+      <span class="muted mono" id="p-count"></span>
     </div>
-    <div class="dots" id="dots" role="tablist" aria-label="Steps"></div>
-    <div class="scene" id="scene" aria-live="polite"></div>
   </div>
 </section>
 
-<!-- ============ 4. STEPS ============ -->
-<section id="steps">
-  <div class="eyebrow">Flow of control</div>
-  <h2>The same steps, with the detail</h2>
-  <p class="col">Each step opens in plain words. Open "How it works" for the mechanism, then "Code words" for the names in the code and the file and line.</p>
-  <div class="steps">
+<section id="deep">
+  <div class="eyebrow">3 · Follow one ad through stage 3</div>
+  <h2>The real data at every step</h2>
+  <p class="col">This section follows one real ad from the Mullevia run, step by step. It shows what goes into each step and what comes out, as the app stores it. Long texts are cut with "…". All values come from run <code>344caa7d</code> on 26 Oct 2026, unless a step says otherwise.</p>
+  <p class="col">The ad: TrendTrack id <code>facebook_1042909135255527</code>. It sends people to a mullein inhaler called Balanlogy. It is one of 75 ads with the same text.</p>
 
-    <article class="step"><header><span class="n">0</span><h3>Stage 3 waits for stage 1</h3></header>
-      <p class="plain">Stage 3 starts when the product research (stage 1) is done. It does not wait for the reviews (stage 2).</p>
-      <details class="d2"><summary>How it works <span class="lvl">How it works</span></summary><div class="body">
-        <p>Each stage lists the stages it needs. Stage 3 needs only stage 1, because it needs the product and the confirmed competitors. So stage 2 and stage 3 can run at the same time. Stages 4 and 5 need stage 3.</p>
-        <details class="d3"><summary>Code words <span class="lvl">Code</span></summary><div class="body">
-          <p>The stage is <code>competitor_ads</code> in <code>STAGE_PLANS</code>, with <code>needs: ["product_market"]</code>. The class is <code>CompetitorAdStage</code>, built in <code>http/app.ts</code> with its limits from settings.</p>
-          <p class="ref">domain/stages.ts:21 · http/app.ts:95–99</p>
-        </div></details>
-      </div></details>
-    </article>
-
-    <article class="step"><header><span class="n">1</span><h3>Code clears the old ads</h3></header>
-      <p class="plain">Code deletes the ads that this run kept before. A second try of stage 3 starts from nothing.</p>
-      <details class="d2"><summary>How it works <span class="lvl">How it works</span></summary><div class="body">
-        <p>First, code checks that a TrendTrack key exists. Without a key, the stage ends "failed" and spends nothing. Then code loads the product and the competitors that you confirmed. Then it deletes this run's ads. Their labels go with them.</p>
-        <details class="d3"><summary>Code words <span class="lvl">Code</span></summary><div class="body">
-          <p><code>AdTable.clear(runId)</code> deletes the <code>ads</code> rows of this run. The <code>ad_extractions</code> rows (the labels) delete with them, because of a database rule called a cascade.</p>
-          <p class="ref">agent/stages/ads/competitor-ad-stage.ts:27–31</p>
-        </div></details>
-      </div></details>
-    </article>
-
-    <article class="step"><header><span class="n">2</span><h3>The scout gets its task</h3></header>
-      <p class="plain">Code gives the scout two texts: a fixed job description, and four lines about this product.</p>
-      <details class="d2"><summary>How it works <span class="lvl">How it works</span></summary><div class="body">
-        <p>The <strong>job description</strong> tells the model to act as a growth marketer. It must study four groups of ads, called <span class="t" data-def="One of four groups the scout puts each kept ad in: direct competitor, same problem, same buyer, trending shop.">rings</span>:</p>
-        <table><thead><tr><th>Ring</th><th>Which ads</th><th>Used for</th></tr></thead><tbody>
-          <tr><td>Direct competitor</td><td>The same product</td><td>What your buyer already hears</td></tr>
-          <tr><td>Same problem</td><td>Another product for the same pain</td><td>Angles that transfer</td></tr>
-          <tr><td>Same buyer</td><td>Another problem, same age and gender</td><td>Formats to copy</td></tr>
-          <tr><td>Trending shop</td><td>Winning ads from fast-growing shops, any market</td><td>Structures to copy</td></tr>
-        </tbody></table>
-        <p>It also says what "doing well" looks like: running 30 days or more, many copies, reach that still grows. It warns that every search costs money.</p>
-        <p>The <strong>four lines</strong> are the product and its key ingredient, the first five claims from its page, the confirmed competitors, and the budget: 20 searches, at most 150 ads, at most 15 from one brand.</p>
-        <details class="d3"><summary>Code words <span class="lvl">Code</span></summary><div class="body">
-          <p>The job description is the <span class="t" data-def="The fixed instructions an AI model gets before the task. They set its role and its rules.">system prompt</span> <code>AD_SCOUT_SYSTEM</code>. The four lines come from <code>AdScout.brief()</code>. The limits come from settings: <code>MRA_AD_SEARCHES_PER_RUN</code> (20), <code>MRA_ADS_PER_RUN</code> (150), <code>MRA_ADS_PER_BRAND</code> (15).</p>
-          <p class="ref">agent/prompt/text/ad-scout.ts:1 · agent/stages/ads/ad-scout.ts:68–79</p>
-        </div></details>
-      </div></details>
-    </article>
-
-    <article class="step"><header><span class="n">3</span><h3>The scout searches</h3></header>
-      <p class="plain">The scout asks for a search. Code runs it on TrendTrack, pays for each ad that comes back, and shows the scout a short line for each ad.</p>
-      <details class="d2"><summary>How it works <span class="lvl">How it works</span></summary><div class="body">
-        <p>The scout chooses four things: the words, where to look (ad text, brand name or website), the order (for example "longest running") and how many ads (1 to 20).</p>
-        <p>Code adds fixed filters. It asks only for image ads with at least 2,000 characters of text, in the run's countries, active or stopped.</p>
-        <p>Before the call, code refuses an order that TrendTrack does not accept, and refuses a search after the 20th. A refusal costs nothing.</p>
-        <p>After the call, code writes the cost to the run, then saves every ad that came back in the <strong>scout log</strong>. This log is how code can later prove that the scout really saw an ad.</p>
-        <details class="d3"><summary>Code words <span class="lvl">Code</span></summary><div class="body">
-          <p>The tool is <code>search_ads</code> (<code>SearchLongFormTool</code>). It calls <code>TrendtrackAds.search</code>, which sends <code>POST /v1/ads/query</code> with <code>mediaType: "image"</code> and <code>minDescriptionLength: 2000</code>. <code>MeteredAdLibrary</code> writes one <code>charges</code> row. <code>ScoutLog.record</code> saves the ads by TrendTrack id and counts the search.</p>
-          <p class="ref">agent/tools/search-long-form-tool.ts:30–43 · adapters/trendtrack-ads.ts:31–60 · adapters/metered.ts (MeteredAdLibrary)</p>
-        </div></details>
-      </div></details>
-    </article>
-
-    <article class="step"><header><span class="n">4</span><h3>The scout reads, and looks at trending shops</h3></header>
-      <p class="plain">The scout can read the full text of any ad it has seen, for free. It can also ask for a list of fast-growing shops, then search their ads.</p>
-      <details class="d2"><summary>How it works <span class="lvl">How it works</span></summary><div class="body">
-        <p>A search shows only the first 220 characters of each ad. To read the rest, the scout calls "read ad". Code takes the text from the scout log. Nothing is fetched, so it is free.</p>
-        <p>"Find trending shops" asks TrendTrack for shops on its trending list, in the run's countries, with at least 20 ads in the last 7 days. It returns shops, not ads. The scout then searches each shop's ads by its website. Each shop costs 4 credits, and each call uses one of the 20 searches.</p>
-        <p>The scout repeats steps 3 and 4 as it chooses, inside its 40 turns and 20 searches.</p>
-        <details class="d3"><summary>Code words <span class="lvl">Code</span></summary><div class="body">
-          <p><code>read_ad</code> is <code>ReadAdTool</code>; it reads <code>ScoutLog.ad(id)</code>. <code>find_trending_shops</code> is <code>TrendingShopsTool</code>, which sends <code>POST /v1/shops/query</code> with <code>displayInTrending: true</code> and <code>adsTimePeriod: "last7d"</code>. The shops are not stored.</p>
-          <p class="ref">agent/tools/read-ad-tool.ts · agent/tools/trending-shops-tool.ts · adapters/trendtrack-shop-finder.ts</p>
-        </div></details>
-      </div></details>
-    </article>
-
-    <article class="step"><header><span class="n">5</span><h3>The scout hands in its list, and code checks it</h3></header>
-      <p class="plain">The scout submits the ads it wants to keep, each with a ring and a reason, and the brands it found. Code checks the list against four rules.</p>
-      <details class="d2"><summary>How it works <span class="lvl">How it works</span></summary><div class="body">
-        <p>Code refuses the list if:</p>
-        <ol>
-          <li>an ad is not in the scout log (the scout never saw it, or copied its id wrong);</li>
-          <li>an ad is in the list two times;</li>
-          <li>the list has more than 150 ads;</li>
-          <li>more than 15 ads go to the same website.</li>
-        </ol>
-        <p>Code does <strong>not</strong> check whether an ad is good, or whether its ring is correct. That judgement belongs to the model.</p>
-        <p>If the scout ends without an accepted list, the stage ends there. The searches are still paid for.</p>
-        <details class="d3"><summary>Code words <span class="lvl">Code</span></summary><div class="body">
-          <p>The answer's shape is the <span class="t" data-def="A precise description of the shape an answer must have: which fields, which types, which values are allowed. Code rejects anything that does not fit.">schema</span> <code>ScoutReportSchema</code>: <code>kept[]</code> of <code>{ad_id, ring, why}</code> and <code>brands[]</code> of <code>{brand, domain, ring, why}</code>. The four rules are <code>AdScout.problems</code>. A scout result of <code>invalid</code> makes the stage <code>invalid</code>; anything else not completed makes it <code>failed</code>.</p>
-          <p class="ref">domain/ads.ts (ScoutReportSchema) · agent/stages/ads/ad-scout.ts:54–66 · competitor-ad-stage.ts:33–36</p>
-        </div></details>
-      </div></details>
-    </article>
-
-    <article class="step"><header><span class="n">6</span><h3>Code saves the kept ads</h3></header>
-      <p class="plain">Code saves each kept ad to the database, and marks it as a competitor's ad if it goes to that competitor's website.</p>
-      <details class="d2"><summary>How it works <span class="lvl">How it works</span></summary><div class="body">
-        <p>Code takes each ad's data from the scout log, not from the scout's answer. So the model cannot change an ad's numbers or text.</p>
-        <p>An ad is a competitor's when its website matches a confirmed competitor's website exactly ("www." removed). So <code>nz.lignosus.com</code> does not match <code>lignosus.com</code>.</p>
-        <p>Code saves the ring and the reason next to each ad. The brand list goes out as a run event; no table holds it.</p>
-        <details class="d3"><summary>Code words <span class="lvl">Code</span></summary><div class="body">
-          <p><code>AdTable.save</code> inserts one <code>ads</code> row per ad with a new internal id. <code>competitor_id</code> is set from the domain map. <code>AdTable.saveRing</code> writes <code>relation</code> and <code>relation_why</code> to <code>ad_extractions</code>. The brands go in the <code>ads.brands</code> event.</p>
-          <p class="ref">competitor-ad-stage.ts:37–42 · adapters/store/ad-table.ts:15–34</p>
-        </div></details>
-      </div></details>
-    </article>
-
-    <article class="step"><header><span class="n">7</span><h3>Reader agents label every ad</h3></header>
-      <p class="plain">Code splits the kept ads into groups of 8. A reader agent reads each group and labels each ad: who it speaks to, what it claims, and whether it is winning.</p>
-      <details class="d2"><summary>How it works <span class="lvl">How it works</span></summary><div class="body">
-        <p>Three readers work at the same time. Each one takes the next group until no groups are left. A reader has no tools and 4 turns. It gets the product, then each ad's numbers and full text.</p>
-        <p>For each ad it gives: the person the ad speaks to, the claim type, the awareness level, the mechanism, the proof, the offer, the objections, the emotion, risky health claims, and a <span class="t" data-def="The reader's judgement of how an ad is doing: winning, testing (too new to tell) or dead (stopped early). The model decides it from the ad's numbers.">bucket</span>: winning, testing or dead, with the reason.</p>
-        <p>Code checks only that each ad in the group has one label, and that no id is new. If a group fails, its 8 ads stay without labels. Nothing tries that group again.</p>
-        <details class="d3"><summary>Code words <span class="lvl">Code</span></summary><div class="body">
-          <p><code>CompetitorAdStage.readAll</code> makes batches of <code>BATCH = 8</code> and runs <code>concurrency = 3</code> workers. Each batch is one <code>AdReader.read</code> (agent <code>ad_reader:&lt;n&gt;</code>, <code>MAX_TURNS = 4</code>, schema <code>AdReadingsSchema</code>). The check is <code>AdReader.problems</code>. <code>AdTable.saveReading</code> writes the bucket to <code>ads</code> and the rest to <code>ad_extractions</code>.</p>
-          <p class="ref">competitor-ad-stage.ts:62–79 · agent/stages/ads/ad-reader.ts · prompt/text/ad-reader.ts</p>
-        </div></details>
-      </div></details>
-    </article>
-
-    <article class="step"><header><span class="n">8</span><h3>One call groups the ads into angles</h3></header>
-      <p class="plain">One AI call sees every read ad and puts each one in exactly one <span class="t" data-def="The core argument an ad makes to its buyer: the promise, the reason to believe it, and who it is for. Two ads with different words but the same argument share an angle.">angle</span>. Code checks that no ad is left out, placed twice or made up.</p>
-      <details class="d2"><summary>How it works <span class="lvl">How it works</span></summary><div class="body">
-        <p>The call gets one line per read ad: its id, advertiser, claim type, mechanism, who it speaks to, and its <span class="t" data-def="The opening of an ad: its first sentence or its first line, whichever is shorter, at most 200 characters. Code cuts it from the ad's text; no model writes it.">hook</span>. It hands back 5 to 20 angles. Each angle has a short key, a name, one line on what it claims, and the ids of its ads.</p>
-        <p>Why one call and not a label from each reader: the readers see 8 ads at a time. Names invented in separate groups would not match. One call that sees every ad keeps the names consistent.</p>
-        <p>Size, estimated: 190 ads at about 200 characters each is about 10,000 input tokens, about one cent at list price. Not measured: no live run has made this call.</p>
-        <details class="d3"><summary>Code words <span class="lvl">Code</span></summary><div class="body">
-          <p><code>AngleGrouper.group</code> runs agent <code>angle_grouper</code> (4 turns, no tools) with schema <code>AdAnglesSchema</code>. <code>AngleGrouper.problems</code> is the check. <code>AdAnalysisTable.saveAngles</code> writes table <code>ad_angles</code>. The hook comes from <code>HookCutter.cut</code>.</p>
-          <p class="ref">agent/stages/ads/angle-grouper.ts:13–35 · extract/hook-cutter.ts · adapters/store/ad-analysis-table.ts</p>
-        </div></details>
-      </div></details>
-    </article>
-
-    <article class="step"><header><span class="n">9</span><h3>One call checks each angle against your claims</h3></header>
-      <p class="plain">A second call reads the claims on your product page and gives each angle one of three answers: you already claim this, you need a new claim, or it does not apply.</p>
-      <details class="d2"><summary>How it works <span class="lvl">How it works</span></summary><div class="body">
-        <p>The call gets your product, your claims numbered from 0, and each angle with the hooks of its strongest ads. A "supported" answer must name the claims that back it, by number. Code refuses a number that does not exist, and a "supported" answer that names none.</p>
-        <p>Code, not the model, then adds the <strong>risk share</strong>: the part of an angle's proven ads that make a claim the reader flagged as risky under FTC (US Federal Trade Commission) or Meta health rules.</p>
-        <p>What this does not say: whether you are <em>allowed</em> to make a claim. Stage 1 stores the claims you already make, not a list of permitted ones.</p>
-        <details class="d3"><summary>Code words <span class="lvl">Code</span></summary><div class="body">
-          <p><code>AngleFitter.fit</code> runs agent <code>angle_fitter</code> with schema <code>AngleFitsSchema</code>; verdicts <code>supported</code>, <code>needs_new_claim</code>, <code>does_not_apply</code>. The claims are <code>product.claims_on_page</code>. <code>AdAnalysisTable.saveFits</code> writes <code>fit</code>, <code>fit_claim_indexes</code> and <code>fit_why</code> on each angle.</p>
-          <p class="ref">agent/stages/ads/angle-fitter.ts:12–37 · extract/angle-tally.ts (risk_share)</p>
-        </div></details>
-      </div></details>
-    </article>
-
-    <article class="step"><header><span class="n">10</span><h3>One call writes a finding for each step</h3></header>
-      <p class="plain">Code counts the tables. A third call reads only the tables, not the ads, and writes one sentence for each of steps 2 to 5 of the page. The sentence may not contain a digit.</p>
-      <details class="d2"><summary>How it works <span class="lvl">How it works</span></summary><div class="body">
-        <p>Each <span class="t" data-def="One sentence the findings writer gives for one step of the page, naming what it is about and up to six ads. Code checks every name and id, and refuses any digit.">finding</span> names what it is about (an angle, a label value or a brand), gives one sentence, and names up to six ads. Code checks that every name and every ad id exists.</p>
-        <p>The no-digit rule is the point. A model that writes "five brands" can be wrong, and code cannot check a number inside a sentence. So the sentence carries the meaning, and the page shows the numbers next to it, counted by code.</p>
-        <p>If any of the three calls ends without an accepted answer, stage 3 ends the same way ("invalid" or "failed"). The ads and their labels stay saved.</p>
-        <details class="d3"><summary>Code words <span class="lvl">Code</span></summary><div class="body">
-          <p><code>FindingsWriter.write</code> runs agent <code>ads_findings</code> with schema <code>AdFindingsSchema</code>, for <code>STAGE3_STEPS</code> = 2, 3, 4, 5. <code>AdAnalysisStep.analyze</code> runs the three calls in order and stops at the first that fails.</p>
-          <p class="ref">agent/stages/ads/findings-writer.ts:23–49 · agent/stages/ads/ad-analysis-step.ts:20–38 · competitor-ad-stage.ts:49–50</p>
-        </div></details>
-      </div></details>
-    </article>
-
-    <article class="step"><header><span class="n">11</span><h3>The stage gives its result</h3></header>
-      <p class="plain">The stage writes a one-line summary and ends "completed". It ends "invalid" if no group of ads could be read, or if one of the three analysis calls had its answer refused.</p>
-      <details class="d2"><summary>How it works <span class="lvl">How it works</span></summary><div class="body">
-        <p>The summary counts the ads kept, the ads seen, the searches, the trending shops, the brands, the ads in each ring, the ads read, and then the angles, the proven ads and the findings.</p>
-        <p>Later, if you add competitors to a finished run, stage 3 does not search again and does not call the analysts again. It only marks the ads it already has that go to the new competitors' websites. The page counts competitors when it loads, so its tables update. The findings are not rewritten.</p>
-        <details class="d3"><summary>Code words <span class="lvl">Code</span></summary><div class="body">
-          <p class="ref">competitor-ad-stage.ts:45–50 (summary and verdict) · competitor-ad-stage.ts:54–58 (<code>add</code>, which calls <code>AdTable.link</code>)</p>
-        </div></details>
-      </div></details>
-    </article>
-
-    <article class="step"><header><span class="n">12</span><h3>Code counts the page, every time it loads</h3></header>
-      <p class="plain">When you open the page, code counts every number on it from the stored ads, angles and findings. Stage 4 and stage 5 also use the ads.</p>
-      <details class="d2"><summary>How it works <span class="lvl">How it works</span></summary><div class="body">
-        <ul>
-          <li><strong>Proven</strong>: an ad that is still active, has run 30 days or more, and has 2 or more duplicates. A brand keeps paying for that only while the ad makes money. Code decides it from TrendTrack's numbers. The section "What the page counts" below shows it on real data.</li>
-          <li><strong>Launches</strong>: ads first seen in the last 30 and 60 days, against the run's date. An angle is "rising" when most of its dated ads are recent, "fading" when none are.</li>
-          <li><strong>Labels</strong>: for each value of each fixed list, its share among proven ads beside its share among the rest. A value on fewer than 5 ads is shown but not ranked.</li>
-          <li><strong>Stage 4</strong> uses the awareness labels. <strong>Stage 5</strong> uses only "supply" ads: a competitor's ad, or an ad in the direct-competitor or same-problem ring.</li>
-        </ul>
-        <details class="d3"><summary>Code words <span class="lvl">Code</span></summary><div class="body">
-          <p><code>GET /runs/:id/ads/analysis</code> calls <code>AdsAnalyzer.analyze</code>, which uses <code>ProvenRule</code>, <code>AngleTally</code>, <code>Momentum</code>, <code>LabelDiff</code> and <code>BrandGrid</code>. All are in <code>extract/</code>: plain code, no input or output, tested in <code>tests/ad-analysis.test.ts</code>.</p>
-          <p class="ref">http/evidence-routes.ts · extract/ads-analyzer.ts · extract/proven-rule.ts:9–12 · domain/ads.ts (<code>AdRings.isSupply</code>)</p>
-        </div></details>
-      </div></details>
-    </article>
-  </div>
-</section>
-
-<!-- ============ 4b. PAGE ============ -->
-<section id="page">
-  <div class="eyebrow">What the page counts</div>
-  <h2>From a pile of cards to six steps</h2>
-  <p class="col">The page used to list every kept ad as a card. Now it answers a brand owner's question first: what should my next test budget go on? The cards are still there, at the bottom, under filters.</p>
-  <div><div class="seg" role="group" aria-label="Choose page version"><button type="button" id="pb" aria-pressed="false">Before: cards in rings</button><button type="button" id="pa" aria-pressed="true">Now: six steps</button></div></div>
-  <figure>
-    <div class="svgwrap">
-    <svg class="dia" viewBox="0 0 760 300" role="img" aria-label="Before: the page showed four ring headings, each with a grid of ad cards. Now: six numbered steps, each a finding over a table, then all ads under a filter bar.">
-      <g id="pb-g" hidden>
-        <g class="box"><rect x="20" y="20" width="720" height="40" rx="8"/><text class="t" x="40" y="45">Direct competitors (8, 0 winning)</text></g>
-        <g class="box"><rect x="20" y="68" width="170" height="60" rx="6"/><text class="s" x="105" y="102" text-anchor="middle">ad card</text></g>
-        <g class="box"><rect x="200" y="68" width="170" height="60" rx="6"/><text class="s" x="285" y="102" text-anchor="middle">ad card</text></g>
-        <g class="box"><rect x="380" y="68" width="170" height="60" rx="6"/><text class="s" x="465" y="102" text-anchor="middle">ad card</text></g>
-        <g class="box"><rect x="560" y="68" width="180" height="60" rx="6"/><text class="s" x="650" y="102" text-anchor="middle">ad card</text></g>
-        <g class="box"><rect x="20" y="140" width="720" height="40" rx="8"/><text class="t" x="40" y="165">From an earlier search (199 ads)</text></g>
-        <g class="box"><rect x="20" y="188" width="170" height="60" rx="6"/><text class="s" x="105" y="222" text-anchor="middle">ad card</text></g>
-        <g class="box"><rect x="200" y="188" width="170" height="60" rx="6"/><text class="s" x="285" y="222" text-anchor="middle">ad card</text></g>
-        <g class="box"><rect x="380" y="188" width="170" height="60" rx="6"/><text class="s" x="465" y="222" text-anchor="middle">ad card</text></g>
-        <g class="box"><rect x="560" y="188" width="180" height="60" rx="6"/><text class="s" x="650" y="222" text-anchor="middle">… 199 more</text></g>
-        <text x="380" y="282" text-anchor="middle" font-size="12" fill="currentColor">Nothing is counted. You read every card yourself.</text>
-      </g>
-      <g id="pa-g">
-        <g class="box"><rect x="20" y="14" width="720" height="30" rx="6"/><text class="t" x="36" y="34">1 · Who this market pays to reach</text><text class="s" x="724" y="34" text-anchor="end">waits for stage 6</text></g>
-        <g class="box on"><rect x="20" y="50" width="720" height="30" rx="6"/><text class="t" x="36" y="70">2 · Proven, not just popular</text><text class="s" x="724" y="70" text-anchor="end">finding · angle scoreboard · brand × angle grid · hooks</text></g>
-        <g class="box on"><rect x="20" y="86" width="720" height="30" rx="6"/><text class="t" x="36" y="106">3 · What competitors are doubling down on</text><text class="s" x="724" y="106" text-anchor="end">finding · launches in 30 and 60 days</text></g>
-        <g class="box on"><rect x="20" y="122" width="720" height="30" rx="6"/><text class="t" x="36" y="142">4 · What proven ads do that the rest don't</text><text class="s" x="724" y="142" text-anchor="end">finding · label shares</text></g>
-        <g class="box on"><rect x="20" y="158" width="720" height="30" rx="6"/><text class="t" x="36" y="178">5 · Can you run it</text><text class="s" x="724" y="178" text-anchor="end">finding · fit with your claims · risk</text></g>
-        <g class="box"><rect x="20" y="194" width="720" height="30" rx="6"/><text class="t" x="36" y="214">6 · What to test next</text><text class="s" x="724" y="214" text-anchor="end">waits for stage 6</text></g>
-        <g class="box"><rect x="20" y="230" width="720" height="34" rx="6"/><text class="t" x="36" y="252">All ads</text><text class="s" x="724" y="252" text-anchor="end">filters: proven · angle · brand · proof · offer · landing … · kept in the address</text></g>
-        <text x="380" y="288" text-anchor="middle" font-size="12" fill="currentColor">Highlighted: written by stage 3 now. Steps 1 and 6 need the avatars, so stage 6 will write them.</text>
-      </g>
-    </svg>
-    </div>
-    <figcaption id="pcap">Now: six steps, each a finding over the table that proves it. Click any "see the ads" to open the grid already filtered.</figcaption>
-  </figure>
-
-  <h3>The proven rule, on real data</h3>
-  <p class="col">An ad is <span class="t" data-def="An ad that is still active, has run 30 days or more, and has 2 or more duplicates. Code decides it from TrendTrack's numbers. It means scaled and kept running, not known to be profitable.">proven</span> when it is still active, has run 30 days or more, and has 2 or more duplicates. Measured on run <code>344caa7d</code>:</p>
-  <div class="tw"><table>
-    <thead><tr><th>Ads in the run</th><th class="num">Count</th></tr></thead>
-    <tbody>
-      <tr><td>Kept</td><td class="num">207</td></tr>
-      <tr><td>Still active</td><td class="num">90</td></tr>
-      <tr><td>Active and running 30 days or more</td><td class="num">40</td></tr>
-      <tr><td><strong>Proven</strong> (also duplicated at least twice)</td><td class="num"><strong>30</strong> (14%)</td></tr>
-      <tr><td>No duplicate count from TrendTrack (can never be proven)</td><td class="num">68</td></tr>
-      <tr><td>Labelled "winning" by the readers, for comparison</td><td class="num">135</td></tr>
-    </tbody>
-  </table></div>
-  <p class="col">"Winning" covers 71% of the read ads, so it hardly separates good ads from bad. "Proven" covers 14%. The spec asked for a share between 10% and 40%, so the thresholds stayed.</p>
-  <p class="ref">One SQL query over the ads table, run 344caa7d, 2026-10-22 · the page shows the same 30 (GET /runs/:id/ads/analysis on the local copy)</p>
-
-  <details class="d2"><summary>What step 4 shows for this run today <span class="lvl">How it works</span></summary><div class="body">
-    <p>This run's ads were read before the new fixed lists existed. So step 4 can compare only the claim type and the awareness level. Real rows from the page:</p>
-    <div class="tw"><table>
-      <thead><tr><th>Label</th><th class="num">In proven (30)</th><th class="num">In the rest (160)</th><th class="num">Difference</th></tr></thead>
+  <article class="step">
+    <h3><span class="stepno">Step 1</span>Find the search word</h3>
+    <p class="col">Stage 1 has already stored the client's product. Stage 3 reads two of its fields.</p>
+    <div class="tablewrap"><table>
+      <thead><tr><th>Field</th><th>Value</th><th>Words code takes from it</th></tr></thead>
       <tbody>
-        <tr><td>claim: plain</td><td class="num">13% (4)</td><td class="num">2% (3)</td><td class="num">+11 pts</td></tr>
-        <tr><td>opening assumes: problem aware</td><td class="num">33% (10)</td><td class="num">25% (40)</td><td class="num">+8 pts</td></tr>
-        <tr><td>claim: mechanism</td><td class="num">83% (25)</td><td class="num">94% (151)</td><td class="num">−11 pts</td></tr>
+        <tr><td><code>name</code></td><td>Mullevia Mullein Drops</td><td>mullevia, mullein, drops</td></tr>
+        <tr><td><code>key_active</code></td><td>Mullein Leaf</td><td>mullein, leaf</td></tr>
+        <tr><td colspan="2"><strong>Shared word</strong></td><td><strong>mullein</strong></td></tr>
       </tbody>
     </table></div>
-    <p>Read a difference as a lead, not a law. The scout keeps ads worth studying, which favours long runners. So "the rest" is not a fair sample of ads that failed.</p>
-  </div></details>
+    <p class="col">Code keeps only the words the two fields share, so the search word is <code>mullein</code>. If they share no word, code searches the whole ingredient name. That matters: TrendTrack matches a phrase as a whole. On 26 Oct "Mullein Leaf" matched 411 US long-form ads, and "mullein" matched 3,464.</p>
+  </article>
 
-  <details class="d2"><summary>Two limits found while building it <span class="lvl">How it works</span></summary><div class="body">
-    <ol>
-      <li><strong>The risk share does not separate angles yet.</strong> 189 of the 190 read ads carry at least one risk flag. So every angle shows a risk share near 100%. The cause is how much the reader flags, not the count.</li>
-      <li><strong>Brand counts stop at 15.</strong> The scout keeps at most 15 ads per brand. A brand that runs 200 ads counts as 15 in the brand grid and in "launching now". The planned fix is a paid count per competitor (the "brand census"). It is not built: it first needs one paid test of what TrendTrack's total counts.</li>
-    </ol>
-    <p class="ref">docs/spec-ads-analysis.md D5, D6, D7</p>
-  </div></details>
+  <article class="step">
+    <h3><span class="stepno">Step 2</span>Ask TrendTrack for ads</h3>
+    <p class="col">TrendTrack is a paid service that records ads running on Facebook and Instagram. The app sends it a question as JSON (a text format of names and values) and gets JSON back. This is the first of the 8 questions, as the app builds it (<code>adapters/trendtrack-ads.ts:32-47</code>):</p>
+    <div class="code">
+<pre><span class="src">POST https://api.trendtrack.io/v1/ads/query</span>
+{
+  "search": ["mullein"],              <span class="n">①</span>
+  "searchType": "adCopy",             <span class="n">②</span>
+  "keywordMode": "any",
+  "sortBy": "longestRunning",         <span class="n">③</span>
+  "order": "desc",
+  "status": "all",                    <span class="n">④</span>
+  "platforms": ["facebook"],
+  "adCountries": { "include": ["US"] },  <span class="n">⑤</span>
+  "mediaType": "image",               <span class="n">⑥</span>
+  "minDescriptionLength": 2000,       <span class="n">⑦</span>
+  "page": 1,
+  "limit": 50                         <span class="n">⑧</span>
+}</pre>
+      <ol class="notes">
+        <li>The word to look for.</li>
+        <li>Look for it in the ad's text, not in the brand name or the web address.</li>
+        <li>The order of the answer. Stage 3 asks four times, with four orders (table below).</li>
+        <li>Include ads that stopped running, not only live ones.</li>
+        <li>Only ads shown in the run's markets. Here, the US.</li>
+        <li>Only image ads, no videos.</li>
+        <li>Only ads with 2,000 or more characters of text. This is what "long-form" means here.</li>
+        <li>50 ads per page. Code asks for page 1 and then page 2.</li>
+      </ol>
+    </div>
+    <p class="col">TrendTrack answers with a list called <code>data</code> (the ads) and a block called <code>pagination</code>. It also sends a header, <code>x-credits-used: 75</code>, which says what the page cost: 1.5 credits per ad. The app stores that as one charge: 75 credits, $0.67.</p>
+<pre>{ "data": [ <span class="muted">…50 ads, one shown in step 3…</span> ],
+  "pagination": { "page": 1, "limit": 50, "total": 11889, "totalPages": 238 } }</pre>
+    <p class="col"><code>total</code> is how many ads match in all. Stage 3 takes only the top 100 under each order:</p>
+    <div class="tablewrap"><table>
+      <thead><tr><th>Order (<code>sortBy</code>)</th><th>What comes first</th><th class="num">Ads that match</th><th class="num">Ads taken</th><th class="num">New ads</th></tr></thead>
+      <tbody>
+        <tr><td><code>longestRunning</code></td><td>ads that ran the most days</td><td class="num">3,464</td><td class="num">100</td><td class="num">100</td></tr>
+        <tr><td><code>mostDuplicates</code></td><td>ads with the most copies</td><td class="num">11,889</td><td class="num">100</td><td class="num">87</td></tr>
+        <tr><td><code>reach</code></td><td>ads seen by the most people</td><td class="num">11,889</td><td class="num">100</td><td class="num">86</td></tr>
+        <tr><td><code>reachDelta7d</code></td><td>ads whose reach grew most in 7 days</td><td class="num">11,889</td><td class="num">100</td><td class="num">78</td></tr>
+        <tr><td colspan="3"><strong>Total</strong></td><td class="num"><strong>400</strong></td><td class="num"><strong>351</strong></td></tr>
+      </tbody>
+    </table></div>
+    <p class="col muted">"New ads" counts ads not already found under an order above it. Measured from the same query on 26 Oct, in my own pull before the run. The run also kept 351. Why the first order matches fewer ads (3,464) than the others is not measured.</p>
+    <p class="col">8 questions, 600 credits, $5.34, 11 seconds (<code>charges</code> table, agent <code>ad_pool</code>).</p>
+  </article>
+
+  <article class="step">
+    <h3><span class="stepno">Step 3</span>One ad, as TrendTrack sends it</h3>
+    <p class="col">This is our ad, as it came back under the order <code>mostDuplicates</code>. Long values are cut.</p>
+    <div class="code">
+<pre>{
+  "id": "facebook_1042909135255527",
+  "status": "inactive",
+  "firstSeenAt": "2026-08-31T07:00:00.000Z",
+  "lastSeenAt": "2026-10-15T17:10:15.946Z",
+  "daysRunning": 45,
+  "media": { "type": "image", "mediaUrl": "https://medias.trendtrack.io/…jpg" },
+  "advertiser": { "name": "SoyJackツ", "facebookPageId": "274220533012505",
+                  "liveAdsCount": 143, "reach30d": 42966, "totalReach": 194247 },
+  "content": {
+    "title": null,
+    "body": "I'm pissed nobody told me about this sooner.\n\nBecause I almost …",
+    "callToAction": "LEARN MORE",
+    "landingPageUrl": "https://www.revibezen.us/products/lungcleansingpen18_en/up",
+    "landingPageDomain": "revibezen.us",
+    "ctaLinkDescription": "Balanlogy – 15,000+ reviews. 50% off today. …"
+  },
+  "metrics": { "reach": 115, "estimatedSpend": 1, "duplicates": 14,
+               "reachDelta7d": 0, "reachDelta30d": 47 },
+  "audience": { "targetedCountries": ["AT", "AU", …, "US"], "gender": "all",
+                "ageMin": 18, "ageMax": 65 },
+  "flags": { "isEuAd": true, "isLowReach": true },
+  "collationId": "853222661209101"
+}</pre>
+      <div class="tablewrap"><table class="small">
+        <thead><tr><th>TrendTrack field</th><th>Meaning</th><th>App keeps it as</th></tr></thead>
+        <tbody>
+          <tr><td><code>id</code></td><td>TrendTrack's id for the ad</td><td><code>trendtrack_ad_id</code></td></tr>
+          <tr><td><code>status</code></td><td><code>active</code> = still running</td><td><code>status</code></td></tr>
+          <tr><td><code>firstSeenAt</code>, <code>lastSeenAt</code></td><td>first and last day seen</td><td><code>first_seen</code>, <code>last_seen</code> (date only)</td></tr>
+          <tr><td><code>daysRunning</code></td><td>days between those two</td><td><code>days_running</code></td></tr>
+          <tr><td><code>advertiser.name</code></td><td>the Facebook page that ran it</td><td><code>advertiser</code></td></tr>
+          <tr><td><code>content.title</code> + <code>body</code></td><td>the ad's text</td><td><code>copy</code></td></tr>
+          <tr><td><code>landingPageUrl</code>, <code>…Domain</code></td><td>where a click goes</td><td><code>landing_url</code>, <code>landing_domain</code></td></tr>
+          <tr><td><code>metrics.reach</code></td><td>people who saw it</td><td><code>reach</code></td></tr>
+          <tr><td><code>metrics.duplicates</code></td><td>copies of this ad TrendTrack found</td><td><code>duplicates</code></td></tr>
+          <tr><td><code>reachDelta7d</code>, <code>…30d</code></td><td>new reach in the last 7 and 30 days</td><td><code>reach_delta</code></td></tr>
+          <tr><td><code>audience.ageMin/Max</code>, <code>gender</code></td><td>who it targets</td><td><code>audience</code></td></tr>
+          <tr><td><code>media.mediaUrl</code></td><td>the image</td><td><code>media_url</code></td></tr>
+          <tr><td><code>ctaLinkDescription</code>, <code>callToAction</code>, <code>estimatedSpend</code>, <code>collationId</code>, <code>totalReach</code></td><td>the text under the button, the button label, TrendTrack's spend estimate, its group id for copies, the page's total reach</td><td class="muted">not kept</td></tr>
+        </tbody>
+      </table></div>
+    </div>
+    <p class="col muted">The mapping is <code>TrendtrackAds.hit</code> in <code>adapters/trendtrack-ads.ts:63-91</code>.</p>
+  </article>
+
+  <article class="step">
+    <h3><span class="stepno">Step 4</span>Store the ad and give it a bucket</h3>
+    <p class="col">The store saves all 351 ads as rows in the <code>ads</code> table. For each ad it does two more things:</p>
+    <ul class="col">
+      <li><strong>Competitor link.</strong> If the landing domain is the web address of a confirmed competitor, the row gets that competitor's id. <code>revibezen.us</code> is not one, so our ad has none. Only 3 of the 341 kept ads link to a confirmed competitor.</li>
+      <li><strong>Bucket.</strong> Code reads the ad's own numbers and sets <code>bucket</code> and <code>bucket_why</code>.</li>
+    </ul>
+    <div class="tablewrap"><table>
+      <thead><tr><th>Ad (same text, different pages)</th><th class="num">Days</th><th>Status</th><th class="num">7-day reach growth</th><th class="num">Copies</th><th>Bucket, and the reason code writes</th></tr></thead>
+      <tbody>
+        <tr><td>SoyJackツ → revibezen.us <span class="muted">(our ad)</span></td><td class="num">45</td><td>inactive</td><td class="num">0</td><td class="num">14</td><td><span class="pill win">winning</span> ran 45 days</td></tr>
+        <tr><td>Arvea Chez Vous → dermanuvita.com</td><td class="num">5</td><td>inactive</td><td class="num">1</td><td class="num">21</td><td><span class="pill dead">dead</span> stopped after 5 days</td></tr>
+        <tr><td>Weekend health routine → heyzeyla.us</td><td class="num">1</td><td>inactive</td><td class="num">?</td><td class="num">19</td><td><span class="pill dead">dead</span> stopped after 1 days</td></tr>
+      </tbody>
+    </table></div>
+    <p class="col">The rule, in order: 10 or more days is <em>winning</em>. Otherwise, a stopped ad is <em>dead</em>. Otherwise, a running ad with 400+ new reach in 7 days or 5+ copies is <em>winning</em>. Any other running ad is <em>testing</em>. The second row has 21 copies but stopped after 5 days, so it is dead. Copies count only while an ad still runs.</p>
+    <p class="col">In the whole run: 226 winning, 13 testing, 102 dead.</p>
+  </article>
+
+  <article class="step">
+    <h3><span class="stepno">Step 5</span>Put ads with the same text into one script</h3>
+    <p class="col">Code makes a key from each ad's text. It changes every letter to lower case and removes everything that is not a letter or a number:</p>
+<pre>"I'm pissed nobody told me about this sooner.\n\nBecause I almost…"
+   → "impissednobodytoldmeaboutthissoonerbecauseialmost…"</pre>
+    <p class="col">Ads with the same key form one <em>script</em>. Our ad's script has 75 ads. They ran from several pages (SoyJackツ, Claudio Rivera, Arvea Chez Vous and others) to three shops: revibezen.us, heyzeyla.us and dermanuvita.com. 68 are winning and 7 are dead. 351 ads made 161 scripts.</p>
+    <p class="col">The first ad of each script, in the store's order (most days first), is the one the reader sees. For this script it is <code>facebook_1553160189171683</code>, also from SoyJackツ, 45 days.</p>
+  </article>
+
+  <article class="step">
+    <h3><span class="stepno">Step 6</span>The reader agent reads the script</h3>
+    <p class="col">The reader is an LLM agent. Code sends it 8 scripts per call, and runs 3 calls at the same time. Each call gets one text, built by code (<code>agent/stages/ads/ad-reader.ts</code>). It starts with the client, then one block per ad:</p>
+<pre>The client: Mullevia Mullevia Mullein Drops, a lung-support supplement (liquid
+herbal extract) sold on Mullein Leaf. Its claims: Powered by maximum-potency
+mullein extract, … | …
+
+&lt;ad id="0684fb1aa848466c9d3df0f653b6329c"&gt;
+advertiser: SoyJackツ; lands on https://www.revibezen.us/products/lungcleansingpen18_en/up; audience all, ages 18-65
+I'm pissed nobody told me about this sooner.
+…the whole text of the ad…
+&lt;/ad&gt;
+&lt;ad id="…"&gt; …7 more ads… &lt;/ad&gt;</pre>
+    <p class="col">The id in <code>&lt;ad id=…&gt;</code> is the app's own id for the row, not TrendTrack's. One call of this kind was 90,197 characters long. The reader sees no days, reach or copies, because it does not judge how the ad is doing.</p>
+    <p class="col">The reader answers by calling a tool named <code>submit</code>, with one reading per ad. This is the reading it gave our script, as stored:</p>
+    <div class="code">
+<pre>{
+  "ring": "direct_competitor",                         <span class="n">①</span>
+  "ring_why": "Sells Balanlogy, a mullein inhaler for COPD mucus — same
+               ingredient and problem, competing delivery format …",
+  "avatar": "A COPD patient on inhalers watching FEV1 decline toward more
+             meds, who already tried mullein tea, tincture, and capsules
+             without results.",                        <span class="n">②</span>
+  "claim_type": "mechanism",                           <span class="n">③</span>
+  "awareness": "solution_aware",                       <span class="n">④</span>
+  "mechanism": "Two mucus layers with a cemented deep layer; oral mullein
+                is destroyed by stomach acid …",
+  "proof_kinds": ["testimonial", "results_timeline", "social_numbers"],
+  "offer_kinds": ["discount"],
+  "offer": "Balanlogy mullein inhaler with 50% off.",
+  "emotion_kind": "frustration",
+  "landing_kind": "product_page",
+  "copy_structure": "personal_story",
+  "risk_flags": ["'lung function is up 11%' attributed to mullein inhaler", …]  <span class="n">⑤</span>
+}</pre>
+      <ol class="notes">
+        <li><strong>Ring</strong>: how the ad relates to the client. Here: the same kind of product on the same ingredient.</li>
+        <li><strong>Avatar</strong>: who the ad speaks to, in one sentence. Stage 5 uses this when it places ads on its avatars. (COPD = chronic obstructive pulmonary disease; FEV1 = a lung-function measure.)</li>
+        <li><strong>Claim type</strong>: plain, bigger, mechanism (a reason why it works) or identity.</li>
+        <li><strong>Awareness</strong>: what the opening assumes the reader already knows. "Solution aware" means they know solutions exist, such as mullein tea.</li>
+        <li><strong>Risk flags</strong>: claims that look risky under advertising rules for health products.</li>
+      </ol>
+    </div>
+    <p class="col">Code checks the answer before it accepts it. Every ad in the batch must have exactly one reading, no reading may name an ad that was not sent, and every list value must come from the fixed lists. If a check fails, the agent gets the problems back and tries again, up to 3 times. In this run, 20 of the 21 batches passed. One batch failed because the model sent its list as text in quotes. Code now turns such text back into a list before it checks.</p>
+  </article>
+
+  <article class="step">
+    <h3><span class="stepno">Step 7</span>Copy the reading, and drop off-market ads</h3>
+    <p class="col">Code copies the reading of the first ad to all 75 ads of the script. Each of the 75 rows now has the same ring, avatar and claim, but keeps its own days, reach and bucket.</p>
+    <p class="col">When the reader marks a script <code>off_market</code>, code deletes all its ads from the run. Two kinds came up in this run. These are the reader's own <code>ring_why</code> lines:</p>
+    <ul class="col">
+      <li>"Sells Weston Animal Co Airway Support chews with mullein leaf for dogs (Yorkie tracheal collapse) …"</li>
+      <li>"Sells an herbal nicotine-free breathing stick (mullein, thyme, peppermint) to help 64-year-old smokers quit …"</li>
+    </ul>
+    <p class="col">10 ads were dropped. 341 stay: 284 direct competitor, 36 same problem, 5 same buyer, and 16 with no reading because their batch failed.</p>
+  </article>
+
+  <article class="step">
+    <h3><span class="stepno">Step 8</span>Group the scripts into angles</h3>
+    <p class="col">An angle is the core argument a group of ads makes. One agent call gets one line per script, with a short handle. For our script, code would build this line (<code>angle-grouper.ts:41-45</code>):</p>
+<pre>[s1] 75 ad(s), SoyJackツ | mechanism | mechanism: Two mucus layers with a cemented deep
+layer; … | for: A COPD patient on inhalers watching FEV1 decline … | "I'm pissed nobody told me about this sooner."</pre>
+    <p class="col">The text in quotes is the hook: the first sentence or the first line of the ad, whichever is shorter. Code cuts it, so the model never retypes it. The agent answers with angles, each a key, a name, one line, and the handles of its scripts. Code checks that every handle is in exactly one angle, then puts all 75 ads of <code>s1</code> on that angle.</p>
+    <p class="warn col">This step is rebuilt. It has not run on real ads yet. On 26 Oct the old version, one line per ad, failed here.</p>
+  </article>
+
+  <article class="step">
+    <h3><span class="stepno">Step 9</span>Fit, findings, and what later stages read</h3>
+    <ul class="col">
+      <li><strong>Fit.</strong> One agent gets each angle with its best hooks and the client's own claims, numbered. For each angle it says <em>supported</em> (and cites claims), <em>needs a new claim</em>, or <em>does not apply</em>.</li>
+      <li><strong>Count.</strong> Code counts the tables: ads and proven ads per angle, launches in the last 30 and 60 days, which labels proven ads use more than the rest.</li>
+      <li><strong>Findings.</strong> One agent gets only those tables, not the ads. It writes one headline for each of steps 2 to 5 of the ads page. Code refuses a headline with a digit in it, so every number on the page comes from code.</li>
+      <li><strong>Stage 4</strong> reads the stored ads when it judges the market's awareness and sophistication.</li>
+      <li><strong>Stage 5</strong> uses only ads from a confirmed competitor or in the direct-competitor or same-problem ring (<code>ads.ts:111-114</code>). It places them on its avatars, and counts the share of each avatar's ads in the <em>winning</em> bucket. Our ad is direct competitor and winning, so it counts.</li>
+    </ul>
+  </article>
 </section>
 
-<!-- ============ 5. TRENDTRACK ============ -->
-<section id="data">
-  <div class="eyebrow">The data</div>
-  <h2>What TrendTrack sends back</h2>
-  <p class="col">TrendTrack keeps a copy of the public Meta Ad Library (Facebook and Instagram ads) and adds its own numbers. Below is the line the scout sees for one real ad. Click a value to see what it means.</p>
-  <div class="adrow" id="adrow">[<button type="button" class="f" data-f="id">facebook_1077652420894954</button>] <button type="button" class="f" data-f="adv">Lignosus</button> → <button type="button" class="f" data-f="dom">nz.lignosus.com</button> | <button type="button" class="f" data-f="status">active</button>, <button type="button" class="f" data-f="days">530 days</button>, <button type="button" class="f" data-f="dup">108 duplicates</button>, <button type="button" class="f" data-f="reach">reach 77608</button>, <button type="button" class="f" data-f="d7">+551 reach in 7 days</button> | <button type="button" class="f" data-f="aud">audience unknown</button><br>&nbsp;&nbsp;&nbsp;"<button type="button" class="f" data-f="copy">If You’ve Had That Same Cough for Weeks… Read This. Introducing Lignosus - a natural herbal food supplement…</button>"</div>
-  <div class="fieldinfo" id="fieldinfo" aria-live="polite"><p class="muted">Click a value in the line above.</p></div>
+<section>
+  <div class="eyebrow">4 · The code, annotated</div>
+  <h2>Four places that carry the logic</h2>
 
-  <h3>What each call costs</h3>
-  <div class="tw"><table>
-    <thead><tr><th>Action</th><th>Price</th><th class="num">Usual cost</th></tr></thead>
+  <h3>The search word and the pool</h3>
+  <div class="code">
+    <pre><span class="src">server/src/agent/stages/ads/ad-pool.ts:16-36</span>
+static term(product) {
+<span class="m">  const named = new Set(product.name…split(…));</span>      <span class="n">①</span>
+<span class="m">  const shared = product.key_active…filter((word) => named.has(word));</span>
+  return shared.length > 0 ? shared.join(" ")
+                           : product.key_active.trim();  <span class="n">②</span>
+}
+
+async pull(term, countries, signal) {
+<span class="m">  for (const sortBy of AdPool.SORTS) {</span>            <span class="n">③</span>
+    for (let page = 1; … ; page++) {
+      const found = await this.ads.search({ terms: [term],
+        searchIn: "ad_copy", countries, limit, page, sortBy,
+        longForm: { minCopyChars: this.minCopyChars } });
+<span class="m">      for (const hit of found.hits) if (!pooled.has(hit.ad_id)) pooled.set(…);</span>  <span class="n">④</span>
+      if (found.hits.length &lt; limit) break;
+    } } …</pre>
+    <ol class="notes">
+      <li>Code splits the product name and the key ingredient into words, and keeps the words they share. "Mullein Leaf" and "Mullevia Mullein Drops" share "mullein".</li>
+      <li>If they share no word, code searches the ingredient as written. TrendTrack matches a phrase as a whole, so this finds fewer ads.</li>
+      <li><code>SORTS</code> is longest running, most duplicated, reach and 7-day reach growth. For each sort, code asks for 100 ads in two pages of 50.</li>
+      <li>An ad that comes back under two sorts is kept once. 400 rows held 351 different ads.</li>
+    </ol>
+  </div>
+
+  <h3>How code decides an ad is doing well</h3>
+  <div class="code">
+    <pre><span class="src">server/src/domain/ads.ts:92-106</span>
+static readonly WINNING_DAYS = 10;
+static readonly TRACTION_REACH_7D = 400;
+static readonly TRACTION_DUPLICATES = 5;
+
+static of(hit) {
+<span class="m">  if (days >= 10) return { bucket: "winning", … };</span>        <span class="n">①</span>
+<span class="m">  if (hit.status !== "active") return { bucket: "dead", … };</span> <span class="n">②</span>
+<span class="m">  if (reach >= 400 || duplicates >= 5) return { bucket: "winning", why: "early traction…" };</span> <span class="n">③</span>
+  return { bucket: "testing", … };                       <span class="n">④</span>
+}</pre>
+    <ol class="notes">
+      <li>An ad that ran 10 days or more is <em>winning</em>, whether it still runs or not.</li>
+      <li>An ad that stopped before 10 days is <em>dead</em>.</li>
+      <li>A young ad that still runs is <em>winning</em> when its reach grew by 400 or more in 7 days, or the advertiser copied it 5 or more times.</li>
+      <li>Any other young ad that still runs is <em>testing</em>. The store calls this rule for every ad when it saves it (<code>ad-table.ts:20</code>).</li>
+    </ol>
+  </div>
+
+  <h3>Read one script, copy the reading</h3>
+  <div class="code">
+    <pre><span class="src">server/src/agent/stages/ads/competitor-ad-stage.ts:68-92</span>
+<span class="m">const members = new Map(scripts.map((s) => [s[0].id, s]));</span>  <span class="n">①</span>
+const firsts = scripts.map((s) => s[0]);
+// batches of 8 firsts, 3 workers at a time
+const result = await this.reader.read(context, product, batch, ++number);
+for (const reading of result.value.ads) {
+<span class="m">  for (const ad of members.get(reading.ad_id)) {</span>       <span class="n">②</span>
+<span class="m">    if (reading.ring === "off_market") offMarket.push(ad.id);</span>  <span class="n">③</span>
+    else await context.store.ads.saveReading(ad.id, { ...reading, ad_id: ad.id });
+  } }</pre>
+    <ol class="notes">
+      <li><code>AdScripts.group</code> (<code>extract/ad-scripts.ts:6</code>) puts ads with the same text in one script. It ignores capital letters, spaces and punctuation. The first ad of each script is the one the reader sees.</li>
+      <li>Code copies each reading to every ad of that script. The model never writes the same reading twice.</li>
+      <li>An ad the reader marks <em>off_market</em> is not saved. Line 47 then deletes those ads from the run.</li>
+    </ol>
+  </div>
+
+  <h3>Angles by script handle</h3>
+  <div class="code">
+    <pre><span class="src">server/src/agent/stages/ads/angle-grouper.ts:13-27</span>
+<span class="m">const members = new Map(scripts.map((script, i) => [`s${i + 1}`, script]));</span> <span class="n">①</span>
+const result = await context.agent({ …,
+  reasoning: "low",                                     <span class="n">②</span>
+  check: (angles) => AngleGrouper.problems(angles, handles) });
+<span class="m">return … ad_ids: angle.ad_ids.flatMap((handle) => members.get(handle).map((ad) => ad.id))</span> <span class="n">③</span></pre>
+    <ol class="notes">
+      <li>Each script gets a short handle: s1, s2, s3. The agent sees one line per script, not one line per ad.</li>
+      <li>"Low" asks the model to think briefly. Before, the model wrote 25,000 to 40,000 tokens per turn here.</li>
+      <li>After the check passes, code replaces each handle with every ad of that script. The angle then holds all its ads.</li>
+    </ol>
+  </div>
+</section>
+
+<section>
+  <div class="eyebrow">5 · Why it was built this way</div>
+  <h2>The design reasons</h2>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Choice</th><th>Why</th><th>What was not taken</th></tr></thead>
     <tbody>
-      <tr><td>Search ads</td><td>1 credit per ad returned, plus about 1 per search</td><td class="num">10 ads ≈ $0.10</td></tr>
-      <tr><td>Find trending shops</td><td>4 credits per shop returned</td><td class="num">5 shops = $0.18</td></tr>
-      <tr><td>Read an ad</td><td>free</td><td class="num">$0</td></tr>
-      <tr><td>Scout's maximum (20 searches of 20 ads)</td><td>about 420 credits</td><td class="num">≈ $3.74</td></tr>
+      <tr><td>Code pulls the ads</td><td>The scout agent made 17 searches. 13 returned nothing: competitor domains with no long-form ads, and phrases. It asked for 5 of the 3,637 ads its one useful search found.</td><td>Keep the scout and tell it in the prompt to search more. A prompt rule does not stop the same mistake from happening again.</td></tr>
+      <tr><td>Read each script once</td><td>The same text often runs many times from several pages. In this run one script ran as 75 ads. 351 ads held 161 scripts.</td><td>Read all 351 ads. That costs more than twice the reader calls for the same answers.</td></tr>
+      <tr><td>Code sets the bucket</td><td>A reading is copied to every ad of its script, but each ad has its own days and reach. So the bucket must come from each ad's numbers. The 10-day line is the owner's rule.</td><td>Let the reader judge each ad's bucket. Then a copied reading would carry the wrong bucket.</td></tr>
+      <tr><td>Drop off-market ads</td><td>An ad can mention mullein and sell to someone else, such as dog-cough chews. 10 ads were dropped in this run.</td><td>Keep them in a separate group. The owner chose to drop them for now.</td></tr>
+      <tr><td>Group scripts by handle</td><td>Placing 341 ads by 32-letter id in one call failed. The model left ads out and once hit the 40,000-token limit.</td><td>Split the grouping across several calls. Then two calls could invent the same angle under two names.</td></tr>
     </tbody>
   </table></div>
-  <details class="d2"><summary>Where these prices come from <span class="lvl">How it works</span></summary><div class="body">
-    <p>TrendTrack charges in <span class="t" data-def="TrendTrack's unit of payment. One returned row costs one credit. The app values a credit at $0.0089.">credits</span>. You pay for the rows that come back, not the rows you asked for. TrendTrack reports the credits of each call in its reply, and the app writes that number to the run's costs.</p>
-    <p>The app values one credit at $0.0089. That is the plan price: $89 a month for 10,000 credits (operator, 2026-10-03). TrendTrack's documents list extra credits at $1 per 1,000.</p>
-    <p>Measured on run <code>344caa7d</code>: the older search method used 540 credits ($4.81) for 40 searches and kept 150 ads. The readers cost $0.42 in 42 calls. One reader call used 28,281 input and 9,957 output tokens, took 75 seconds and cost $0.0092.</p>
-    <details class="d3"><summary>Code words <span class="lvl">Code</span></summary><div class="body">
-      <p>The header is <code>X-Credits-Used</code>. If it is missing, code counts the rows. The setting is <code>MRA_TRENDTRACK_USD_PER_CREDIT</code>. Each call writes a <code>charges</code> row: service <code>trendtrack</code>, item <code>ads</code> or <code>shops</code>.</p>
-      <p class="ref">adapters/trendtrack-ads.ts:59 · adapters/metered.ts · config/settings.ts:99 · ../setup.md:1207 · trendtrack/credit_billing.md</p>
-    </div></details>
-  </div></details>
-  <details class="d2"><summary>Three surprises in the real data <span class="lvl">How it works</span></summary><div class="body">
-    <ol>
-      <li><strong>"Days running" is not one ad's run time.</strong> TrendTrack groups copies of the same picture and text. For a group, it counts from the oldest copy's start to today. The Lignosus ad was seen from 2025-05-07 to 2025-10-09 (155 days), but shows 530 days. 28 of the 207 stored ads show this gap. The scout's "30 days" rule and the readers' bucket both read it as one ad's time.</li>
-      <li><strong>No stored ad has an audience.</strong> Age and gender are empty on all 207, so the scout sees "audience unknown".</li>
-      <li><strong>Active ads have a last-seen date.</strong> All 90 active ads have one. TrendTrack's documents say it should be empty while an ad runs.</li>
-    </ol>
-    <p class="ref">Measured with one query over the <code>ads</code> table, run 344caa7d, 2026-10-22.</p>
-  </div></details>
+  <p class="note col"><strong>Two rules for "doing well".</strong> The bucket (10-day rule) feeds stage 5: the share of an avatar's ads that are winning. The ads page's analysis uses a stricter rule called <em>proven</em>: still running, 30 or more days, 2 or more copies (<code>extract/proven-rule.ts:9-12</code>). The two rules give different counts. They are not joined yet.</p>
 </section>
 
-<!-- ============ 6. BEFORE/AFTER ============ -->
-<section id="before">
-  <div class="eyebrow">Before and after</div>
-  <h2>Who decides which ads to keep</h2>
-  <div><div class="seg" role="group" aria-label="Choose version"><button type="button" id="vb" aria-pressed="false">Before: code sweep</button><button type="button" id="va" aria-pressed="true">Now: scout agent</button></div></div>
-  <figure>
-    <div class="svgwrap">
-    <svg class="dia" id="ba" viewBox="0 0 760 170" role="img" aria-label="Before: an agent wrote keywords and code ran fixed searches and kept ads by rule. Now: one agent chooses each search and the ads to keep, and code checks its list.">
-      <defs><marker id="ah3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="currentColor"/></marker></defs>
-      <g id="vb-g" hidden>
-        <g class="box"><rect x="20" y="55" width="150" height="60" rx="8"/><text class="t" x="95" y="80" text-anchor="middle">Keyword agent</text><text class="s" x="95" y="97" text-anchor="middle">writes search words</text></g>
-        <g class="box on"><rect x="230" y="55" width="160" height="60" rx="8"/><text class="t" x="310" y="80" text-anchor="middle">Fixed searches</text><text class="s" x="310" y="97" text-anchor="middle">every word, two orders</text></g>
-        <g class="box ext"><rect x="450" y="55" width="130" height="60" rx="8"/><text class="t" x="515" y="80" text-anchor="middle">TrendTrack</text><text class="s" x="515" y="97" text-anchor="middle">540 rows paid</text></g>
-        <g class="box"><rect x="620" y="55" width="120" height="60" rx="8"/><text class="t" x="680" y="80" text-anchor="middle">Code rule</text><text class="s" x="680" y="97" text-anchor="middle">keeps 150</text></g>
-        <g class="edge" color="var(--muted)"><path d="M170,85 H228" marker-end="url(#ah3)"/><text x="199" y="76" text-anchor="middle">words</text></g>
-        <g class="edge on" color="var(--accent)"><path d="M390,85 H448" marker-end="url(#ah3)"/><text x="419" y="76" text-anchor="middle">all</text></g>
-        <g class="edge" color="var(--muted)"><path d="M580,85 H618" marker-end="url(#ah3)"/></g>
-        <text x="380" y="150" text-anchor="middle" font-size="12" fill="currentColor">No step looks at an ad before paying for it.</text>
-      </g>
-      <g id="va-g">
-        <g class="box ext"><rect x="20" y="55" width="160" height="60" rx="8"/><text class="t" x="100" y="80" text-anchor="middle">Scout agent</text><text class="s" x="100" y="97" text-anchor="middle">one search at a time</text></g>
-        <g class="box ext"><rect x="250" y="55" width="130" height="60" rx="8"/><text class="t" x="315" y="80" text-anchor="middle">TrendTrack</text><text class="s" x="315" y="97" text-anchor="middle">≤ 20 searches</text></g>
-        <g class="box on"><rect x="450" y="55" width="140" height="60" rx="8"/><text class="t" x="520" y="80" text-anchor="middle">Submit check</text><text class="s" x="520" y="97" text-anchor="middle">seen? once? caps?</text></g>
-        <g class="box"><rect x="640" y="55" width="100" height="60" rx="8"/><text class="t" x="690" y="88" text-anchor="middle">Saved</text></g>
-        <g class="edge" color="var(--muted)"><path d="M180,75 H248" marker-end="url(#ah3)"/><text x="214" y="68" text-anchor="middle">query</text></g>
-        <g class="edge" color="var(--muted)"><path d="M250,98 H182" marker-end="url(#ah3)"/><text x="214" y="114" text-anchor="middle">ads, read</text></g>
-        <g class="edge on" color="var(--accent)"><path d="M180,62 C260,20 380,20 448,62" marker-end="url(#ah3)"/><text x="315" y="28" text-anchor="middle">kept list + rings</text></g>
-        <g class="edge" color="var(--muted)"><path d="M590,85 H638" marker-end="url(#ah3)"/></g>
-        <text x="380" y="150" text-anchor="middle" font-size="12" fill="currentColor">The agent reads results before its next search. Code checks the list.</text>
-      </g>
-    </svg>
-    </div>
-    <figcaption id="bacap">Now: the scout chooses each search after it reads the last results. Code checks the final list.</figcaption>
-  </figure>
-  <details class="d2"><summary>Why the change was made <span class="lvl">How it works</span></summary><div class="body">
-    <p>On run <code>344caa7d</code>, the sweep's one-word search terms brought in dental ads and pet ads. A word match is not relevance. The sweep also paid for 540 rows to keep 150 (workings.md, docs/gaps.md 13a).</p>
-    <p>The house rule is: the agent judges, and code checks anything that code can check. Code can prove the scout saw an ad and stayed inside the limits. Code cannot judge whether an ad speaks to your buyer. So that judgement went to the agent.</p>
-    <p><strong>The option not taken:</strong> keep the code sweep and add better keyword lists. The repo refuses lists of words in code (a "synonym table"), because each new product needs new lists.</p>
-  </div></details>
+<section>
+  <div class="eyebrow">6 · See it yourself</div>
+  <h2>Three checks you can do</h2>
+  <ol class="notes col">
+    <li>Open the run at <code>http://localhost:8080/runs/344caa7d25fe4c108ac0c7f7a936394a</code>. Under stage 3, read the summary line. It starts "351 ads pooled for "mullein" in 8 requests, 161 distinct scripts; 10 off-market ads dropped".</li>
+    <li>In a terminal, run <code>.claude/skills/mra-control/bin/mra calls 344caa7d25fe4c108ac0c7f7a936394a</code>. Look for lines named <code>ad_reader:1</code> to <code>ad_reader:21</code>. There is one per batch of 8 scripts, plus retries.</li>
+    <li>On the Long-form ads tab, open any ad card. The grey line under it is the bucket reason, written by code: for example "ran 64 days" or "stopped after 3 days".</li>
+  </ol>
 </section>
 
-<!-- ============ 7. CODE ============ -->
-<section id="code">
-  <div class="eyebrow">The code, annotated</div>
-  <h2>Five pieces of real code</h2>
-  <p class="col">You do not need to read code to use this page. These are here so that you can check the claims. Lines are trimmed with "…".</p>
-
-  <details class="d3"><summary>The stage, from start to verdict <span class="lvl">Code</span></summary><div class="body">
-    <div class="codegrid">
-      <pre>async run(input) {
-  if (!this.ads) return { status: "failed", … };        <span class="mk">1</span>
-  const competitors = (…).filter((c) =&gt; c.status === "confirmed");
-  await context.store.ads.clear(context.run.id);        <span class="mk">2</span>
-  const { result, log } = await new AdScout(…).scout(…); <span class="mk">3</span>
-  if (result.status !== "completed") {
-    return { status: result.status === "invalid"
-             ? "invalid" : "failed", … };               <span class="mk">4</span>
-  }
-  const stored = await context.store.ads.save(…,
-    report.kept.map((kept) =&gt; log.ad(kept.ad_id)!), byDomain); <span class="mk">5</span>
-  for (const ad of stored) await context.store.ads.saveRing(…);
-  const unread = await this.readAll(context, product, stored); <span class="mk">6</span>
-  if (stored.length &gt; 0 &amp;&amp; unread === stored.length)
-    return { status: "invalid", … };                    <span class="mk">7</span>
-  return { status: "completed", summary, error: "" };
-}</pre>
-      <ol class="notes">
-        <li><span class="mk">1</span>No TrendTrack key: stop, spend nothing.</li>
-        <li><span class="mk">2</span>Delete this run's old ads.</li>
-        <li><span class="mk">3</span>Run the scout agent. It returns its answer and its log.</li>
-        <li><span class="mk">4</span>No accepted answer: the stage stops here.</li>
-        <li><span class="mk">5</span>Each ad's data comes from the log, found by the id the scout gave.</li>
-        <li><span class="mk">6</span>Run the readers. Count the ads left without labels.</li>
-        <li><span class="mk">7</span>"Invalid" only if no ad got a label.</li>
-      </ol>
-    </div>
-    <p class="ref">server/src/agent/stages/ads/competitor-ad-stage.ts:27–50 (the analysis is one more call at the end: <code>this.analysis.analyze(…)</code>, line 49)</p>
-  </div></details>
-
-  <details class="d3"><summary>The four checks on the scout's list <span class="lvl">Code</span></summary><div class="body">
-    <div class="codegrid">
-      <pre>static problems(report, log, limits) {
-  const ids = report.kept.map((kept) =&gt; kept.ad_id);
-  const problems = ids.filter((id) =&gt; !log.ad(id))
-    .map((id) =&gt; `ad ${id} was not in any of your searches; …`); <span class="mk">1</span>
-  problems.push(...ids.filter((id, i) =&gt; ids.indexOf(id) !== i)
-    .map((id) =&gt; `ad ${id} is kept twice`));             <span class="mk">2</span>
-  if (ids.length &gt; limits.maxAds) problems.push(…);     <span class="mk">3</span>
-  …
-  for (const [domain, count] of perBrand)
-    if (count &gt; limits.maxAdsPerBrand) problems.push(…); <span class="mk">4</span>
-  return problems;                                      <span class="mk">5</span>
-}</pre>
-      <ol class="notes">
-        <li><span class="mk">1</span>Each kept id must be in the log of ads that searches returned.</li>
-        <li><span class="mk">2</span>No id two times.</li>
-        <li><span class="mk">3</span>At most 150 ads.</li>
-        <li><span class="mk">4</span>At most 15 ads per website.</li>
-        <li><span class="mk">5</span>An empty list means "accept". Each problem goes back to the agent with a number.</li>
-      </ol>
-    </div>
-    <p class="ref">server/src/agent/stages/ads/ad-scout.ts:54–66</p>
-  </div></details>
-
-  <details class="d3"><summary>The proven rule <span class="lvl">Code</span></summary><div class="body">
-    <div class="codegrid">
-      <pre>export class ProvenRule {
-  static readonly MIN_DAYS = 30;                       <span class="mk">1</span>
-  static readonly MIN_DUPLICATES = 2;
-
-  static isProven(ad) {
-    …
-    return ad.status === "active"                      <span class="mk">2</span>
-      &amp;&amp; (ad.days_running ?? 0) &gt;= ProvenRule.MIN_DAYS
-      &amp;&amp; (ad.duplicates ?? 0) &gt;= ProvenRule.MIN_DUPLICATES; <span class="mk">3</span>
-  }
-}</pre>
-      <ol class="notes">
-        <li><span class="mk">1</span>The two thresholds. They were checked against run 344caa7d before they were fixed.</li>
-        <li><span class="mk">2</span>The ad must still run today.</li>
-        <li><span class="mk">3</span>A missing number counts as 0. So an ad with no duplicate count is never proven.</li>
-      </ol>
-    </div>
-    <p class="ref">server/src/extract/proven-rule.ts:5–13</p>
-  </div></details>
-
-  <details class="d3"><summary>The findings check: no digits, no made-up names <span class="lvl">Code</span></summary><div class="body">
-    <div class="codegrid">
-      <pre>static problems(findings, steps, subjects, adIds) {
-  const written = findings.findings.map((f) =&gt; f.step);
-  const problems = steps.filter((step) =&gt; !written.includes(step))
-    .map((step) =&gt; `step ${step} has no finding`);      <span class="mk">1</span>
-  …
-  for (const finding of findings.findings) {
-    if (/\d/.test(finding.headline))
-      problems.push(`… headline has a digit; …`);       <span class="mk">2</span>
-    problems.push(...finding.subjects
-      .filter((subject) =&gt; !subjects.has(subject)) …); <span class="mk">3</span>
-    problems.push(...finding.ad_ids
-      .filter((id) =&gt; !adIds.includes(id)) …);         <span class="mk">4</span>
-  }
-  return problems;
-}</pre>
-      <ol class="notes">
-        <li><span class="mk">1</span>Every step asked for must have a finding.</li>
-        <li><span class="mk">2</span>Any digit (0 to 9) in the sentence: refused. The page shows the numbers that code counted.</li>
-        <li><span class="mk">3</span>Every angle, label value or brand it names must exist in the tables.</li>
-        <li><span class="mk">4</span>Every ad it cites must be an ad of this run.</li>
-      </ol>
-    </div>
-    <p class="ref">server/src/agent/stages/ads/findings-writer.ts:38–49</p>
-  </div></details>
-
-  <details class="d3"><summary>The search tool: refuse, call, pay, remember <span class="lvl">Code</span></summary><div class="body">
-    <div class="codegrid">
-      <pre>async execute(_id, params, signal) {
-  if (!AD_SORTS.includes(params.sort_by)) return { … };  <span class="mk">1</span>
-  if (self.log.searchesLeft &lt;= 0) return { … };          <span class="mk">2</span>
-  const limit = Math.min(Math.max(Math.trunc(params.limit ?? 10), 1), 20);
-  const page = await self.ads.search({ terms: [params.query], …,
-    longForm: { minCopyChars: self.minCopyChars } }, signal); <span class="mk">3</span>
-  self.log.record(page.hits);                            <span class="mk">4</span>
-  const rows = page.hits.map(SearchLongFormTool.row);    <span class="mk">5</span>
-  …
-}</pre>
-      <ol class="notes">
-        <li><span class="mk">1</span>An order TrendTrack refuses: say so, call nothing.</li>
-        <li><span class="mk">2</span>Budget spent: say so, call nothing.</li>
-        <li><span class="mk">3</span>Call TrendTrack. The wrapper around <code>ads</code> writes the cost.</li>
-        <li><span class="mk">4</span>Save every returned ad in the log, and count one search.</li>
-        <li><span class="mk">5</span>Turn each ad into the short line the scout reads.</li>
-      </ol>
-    </div>
-    <p class="ref">server/src/agent/tools/search-long-form-tool.ts:30–43</p>
-  </div></details>
-</section>
-
-<!-- ============ 8. SEE ============ -->
-<section id="see">
-  <div class="eyebrow">See it yourself</div>
-  <h2>How to watch it work</h2>
-  <div class="col">
-    <ol>
-      <li>Rerun stage 3 on a run: <code>mra rerun &lt;runId&gt; competitor_ads</code>. This spends money: up to about $3.74 of TrendTrack credits plus the model's tokens. It also reruns stages 4 and 5, which use stage 3.</li>
-      <li>Read the agent's turns: <code>mra calls &lt;runId&gt;</code>. Look for lines with <code>ad_scout</code>. Each line is one turn and shows the tool it called.</li>
-      <li>Open the run's Long-form ads page. Look at step 2: on run 344caa7d it says the ads "have not been grouped into angles", because they were kept before angles existed. The top line says 30 proven, which matches the count above.</li>
-      <li>Without spending: <code>cd server &amp;&amp; npx vitest run tests/ad-analysis.test.ts tests/ads.test.ts</code>. The stage test scripts the three analysis agents. It makes the findings writer first answer "3 brands run it." and checks that code refuses it for the digit.</li>
-    </ol>
-  </div>
-</section>
-
-<!-- ============ 9. QUIZ ============ -->
-<section id="quiz">
-  <div class="eyebrow">Check your understanding</div>
+<section>
+  <div class="eyebrow">7 · Check your understanding</div>
   <h2>Three questions</h2>
-  <div class="q">
-    <details><summary>The scout submits an ad id that it made up. What happens?</summary><div class="body"><p>Code refuses the list, because that id is not in the scout log. The agent gets the problem with a number and can try again. After 3 refusals it stops, the stage ends "invalid", and no ads are saved. The searches are still paid for.</p></div></details>
-    <details><summary>Can the scout change an ad's text or its days running?</summary><div class="body"><p>No. The scout's answer has only the id, the ring and a reason. Code takes the ad's text and numbers from the scout log, which holds what TrendTrack returned.</p></div></details>
-    <details><summary>The findings writer writes "Five brands run this angle, and 3 are competitors." What happens?</summary><div class="body"><p>Code refuses it, because the sentence has the digit 3. ("Five" is a word, so only the 3 breaks the rule.) The agent gets the problem and tries again, at most 3 times. If it never passes, stage 3 ends "invalid", but the ads, labels and angles stay saved and the page still shows every count.</p></div></details>
-  </div>
+  <details><summary>A product is called "Lung Clear Drops" and its key ingredient is "Mullein Leaf". What does stage 3 search for?</summary><div><p>The name and the ingredient share no word. So code searches the phrase "Mullein Leaf" as written. On 26 Oct that phrase matched 411 US long-form ads, where "mullein" alone matched 3,464. The pool is then smaller.</p></div></details>
+  <details><summary>The same ad text runs from three pages. How many times does the reader read it, and do the three ads get the same bucket?</summary><div><p>The reader reads it once. Code copies the reading to all three ads. The buckets can differ, because code computes each bucket from that ad's own days, status, reach and copies.</p></div></details>
+  <details><summary>An ad started 5 days ago, still runs, and has 6 copies. Which bucket is it in, and does the ads page call it proven?</summary><div><p>It is <em>winning</em>: it still runs and has 5 or more copies. The ads page does not call it proven, because proven needs 30 or more days.</p></div></details>
 </section>
 
-<!-- ============ 10. GLOSSARY ============ -->
-<section id="words">
-  <div class="eyebrow">Words used on this page</div>
+<section>
+  <div class="eyebrow">8 · Words used on this page</div>
   <h2>Glossary</h2>
-  <dl class="gloss">
-    <dt>Agent</dt><dd>An AI model that works in a loop: it asks for tools, reads the results, and ends by handing in an answer.</dd>
-    <dt>Turn</dt><dd>One pass through the AI model: it reads everything so far and replies once.</dd>
-    <dt>Tool</dt><dd>An action that the app performs for the model, for example a search. The model asks; code does it.</dd>
-    <dt>Submit</dt><dd>The one tool that ends an agent. Its input is the final answer.</dd>
-    <dt>Check</dt><dd>Code that tests a submitted answer and lists its problems. An empty list means accepted.</dd>
-    <dt>Schema</dt><dd>The exact shape an answer must have. Code rejects an answer that does not fit.</dd>
-    <dt>System prompt</dt><dd>The fixed instructions an AI model gets before its task.</dd>
-    <dt>Scout</dt><dd>The agent that searches TrendTrack and chooses which ads to keep.</dd>
-    <dt>Scout log</dt><dd>The app's record of every ad the scout's searches returned. Code checks the kept list against it.</dd>
-    <dt>Reader</dt><dd>An agent that labels a group of 8 kept ads. It has no tools.</dd>
-    <dt>Ring</dt><dd>One of four groups for a kept ad: direct competitor, same problem, same buyer, trending shop.</dd>
-    <dt>Supply ad</dt><dd>An ad that competes for your buyer: a competitor's ad, or one in the direct-competitor or same-problem ring.</dd>
-    <dt>Bucket</dt><dd>The reader's judgement: winning, testing or dead.</dd>
-    <dt>Proven</dt><dd>An ad still active after 30 days or more, with 2 or more duplicates. Code decides it. It means scaled and kept running, not known to be profitable.</dd>
-    <dt>Angle</dt><dd>The core argument an ad makes: the promise, the reason to believe it, and who it is for. One AI call groups every read ad into one angle.</dd>
-    <dt>Hook</dt><dd>The opening of an ad: its first sentence or first line, whichever is shorter. Code cuts it from the text.</dd>
-    <dt>Fit</dt><dd>Whether your own claims back an angle: supported, needs a new claim, or does not apply.</dd>
-    <dt>Finding</dt><dd>One sentence per step of the page, with no digits. The numbers beside it come from code.</dd>
-    <dt>Risk share</dt><dd>The part of an angle's proven ads that make a claim the reader flagged as risky under FTC or Meta health rules.</dd>
-    <dt>Credit</dt><dd>TrendTrack's unit of payment. One returned row costs one credit, valued at $0.0089.</dd>
-    <dt>Duplicates</dt><dd>How many copies of the same ad TrendTrack found. Advertisers copy ads that make money.</dd>
-    <dt>Reach</dt><dd>Meta's public count of how many times an ad was shown. Meta publishes it mainly for ads shown in the EU and UK.</dd>
-    <dt>Invalid / failed</dt><dd>Invalid: the agent finished, but no answer passed the checks. Failed: something broke, for example the model could not be reached.</dd>
-    <dt>pi-agent-core</dt><dd>The open-source library that runs the model-tool loop.</dd>
+  <dl>
+    <dt>Long-form static ad</dt><dd>A Meta image ad with 2,000 or more characters of text (<code>MRA_AD_MIN_COPY_CHARS</code>).</dd>
+    <dt>Pool</dt><dd>The set of ads code pulls from TrendTrack for one run: up to 100 ads under each of four sorts, each ad once.</dd>
+    <dt>Sort</dt><dd>The order TrendTrack returns ads in. Stage 3 uses four: longest running, most duplicated, reach, and reach growth in 7 days.</dd>
+    <dt>Script</dt><dd>A group of ads with the same text, after capital letters, spaces and punctuation are ignored.</dd>
+    <dt>Reading</dt><dd>What the reader agent records about one script: ring, who it speaks to (avatar), claim type, awareness, proof, offer and more.</dd>
+    <dt>Ring</dt><dd>How an ad relates to the client. Direct competitor: same product. Same problem: another product for the same need. Same buyer: another need, same person. Off-market: sells to someone else.</dd>
+    <dt>Bucket</dt><dd>Winning, testing or dead. Code sets it from the ad's days running, status, reach growth and copies.</dd>
+    <dt>Proven</dt><dd>A stricter label on the ads page: still running, 30 or more days, 2 or more copies.</dd>
+    <dt>Angle</dt><dd>The core argument a group of ads makes: the promise, the reason to believe it, and who it is for.</dd>
+    <dt>Agent</dt><dd>An LLM that works in turns and ends only by calling <code>submit</code>. Code checks the submission and can refuse it.</dd>
+    <dt>LLM</dt><dd>Large language model. Here: GLM-5.3-flash on OpenRouter, with DeepSeek as a backup.</dd>
+    <dt>Credit</dt><dd>TrendTrack's billing unit. It billed 1.5 credits per ad returned; one credit costs $0.0089.</dd>
   </dl>
 </section>
 </main>
-<div id="tip" hidden></div>
 
 <script>
-(function(){
-  // ---------- depth control ----------
-  var btns = document.querySelectorAll('.depth button');
-  function setDepth(d){
-    btns.forEach(function(b){ b.setAttribute('aria-pressed', String(b.dataset.d === String(d))); });
-    document.querySelectorAll('details.d2').forEach(function(el){ el.open = d >= 2; });
-    document.querySelectorAll('details.d3').forEach(function(el){ el.open = d >= 3; });
-    try { localStorage.setItem('depth', String(d)); } catch(e) {}
-  }
-  btns.forEach(function(b){ b.addEventListener('click', function(){ setDepth(Number(b.dataset.d)); }); });
-  try { var saved = Number(localStorage.getItem('depth')); if (saved > 1) setDepth(saved); } catch(e) {}
-
-  // ---------- term tooltips ----------
-  var tip = document.getElementById('tip');
-  function showTip(el){
-    tip.textContent = el.dataset.def; tip.hidden = false;
-    var r = el.getBoundingClientRect(), w = tip.offsetWidth, h = tip.offsetHeight;
-    var x = Math.min(Math.max(8, r.left), window.innerWidth - w - 8);
-    var y = r.bottom + 6; if (y + h > window.innerHeight - 8) y = r.top - h - 6;
-    tip.style.left = x + 'px'; tip.style.top = y + 'px';
-  }
-  document.querySelectorAll('.t').forEach(function(el){
-    el.tabIndex = 0;
-    el.addEventListener('mouseenter', function(){ showTip(el); });
-    el.addEventListener('focus', function(){ showTip(el); });
-    el.addEventListener('mouseleave', function(){ tip.hidden = true; });
-    el.addEventListener('blur', function(){ tip.hidden = true; });
-  });
-  window.addEventListener('scroll', function(){ tip.hidden = true; }, { passive: true });
-
-  // ---------- map boxes ----------
-  var info = {
-    stage: ['Stage 3 code', 'Ordinary code. It runs the steps in order: clear, scout, save, read, give a result. It makes no judgements.', 'CompetitorAdStage · agent/stages/ads/competitor-ad-stage.ts'],
-    model: ['Scout (AI model)', 'The AI model that chooses what to search and which ads to keep. It runs at OpenRouter, a service that sells access to many AI models. It is paid per token (a token is about three-quarters of a word).', 'agent ad_scout · 40 turns · model z-ai/glm-5.3-flash, with two backups'],
-    tools: ['Tools', 'Three actions the scout can ask for: search ads, read one ad in full, and find trending shops. Code runs each one and enforces the budget of 20 searches.', 'SearchLongFormTool · ReadAdTool · TrendingShopsTool'],
-    tt: ['TrendTrack', 'An outside service that copies the public Meta Ad Library and adds numbers: days running, copies, reach. Each returned ad costs one credit ($0.0089).', 'POST /v1/ads/query · POST /v1/shops/query'],
-    log: ['Scout log', 'The app’s memory of every ad the searches returned. "Read ad" reads from it. The submit check compares the kept list with it. Saved ads take their data from it.', 'ScoutLog · agent/stages/ads/scout-log.ts'],
-    check: ['Submit check', 'Code that tests the scout’s list: every ad was seen, none twice, at most 150, at most 15 per website. If a rule fails, the agent gets the problems and tries again, at most 3 times.', 'AdScout.problems · SubmitTool'],
-    db: ['Database', 'Postgres. One row per kept ad with its text and numbers, one row of labels per ad, the angles of the run and the findings.', 'tables ads, ad_extractions, ad_angles, ad_findings · AdTable, AdAnalysisTable'],
-    read: ['Readers (AI model)', 'Agents that label the kept ads, 8 per agent, 3 agents at a time. They have no tools. Five of the labels must come from fixed lists, so code can count them. Code checks that each ad got one label and that each listed value is allowed.', 'agents ad_reader:1, :2, … · AdReader'],
-    page: ['Ads page', 'The Long-form ads page in the cockpit. It leads you through six steps, each a finding over its evidence, then shows all ads under a filter bar.', 'frontend/src/run/ads/Ads.tsx'],
-    ana: ['Analysts (AI model)', 'Three AI calls, one after the other. The first puts every read ad in one angle. The second checks each angle against the claims on your product page. The third reads the counted tables and writes one sentence per step. Code checks each answer.', 'agents angle_grouper, angle_fitter, ads_findings · AdAnalysisStep'],
-    count: ['Counts (code)', 'Plain code that counts every number on the page from the ads, the angles and the findings, each time the page loads. No AI model writes a number you see.', 'AdsAnalyzer · GET /runs/:id/ads/analysis']
-  };
-  var boxinfo = document.getElementById('boxinfo');
-  document.querySelectorAll('#flow .box').forEach(function(g){
-    g.setAttribute('tabindex', '0'); g.setAttribute('role', 'button');
-    function pick(){
-      var d = info[g.dataset.k];
-      boxinfo.innerHTML = '<h3>' + d[0] + '</h3><p>' + d[1] + '</p><p class="ref">' + d[2] + '</p>';
-    }
-    g.addEventListener('click', pick);
-    g.addEventListener('keydown', function(e){ if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pick(); } });
-  });
-
-  // ---------- walkthrough ----------
-  var scenes = [
-    { t: 'Stage 3 starts', on: ['b-stage'], e: [],
-      p: 'You confirm the competitors. Stage 1 finishes. Stage 3 starts. Code deletes any ads that this run kept before.' },
-    { t: 'Code writes the brief', on: ['b-stage','b-model'], e: ['e-brief'],
-      p: 'Code sends the scout its job description and four lines: Mullevia mullein drops, its claims, the confirmed competitors, and the budget of 20 searches.',
-      x: 'The client: Mullevia … sold on …\nIts own claims: …\nConfirmed competitors: …\nBudget: 20 searches; keep at most 150 ads, at most 15 from one brand.' },
-    { t: 'The scout asks for a search', on: ['b-model','b-tools'], e: ['e-ask'],
-      p: 'The scout decides to look at a competitor first. It asks for that website’s ads, longest running first, ten of them.',
-      x: 'search_ads { query: "origindrops.com", search_in: "domain", sort_by: "longestRunning", limit: 10 }' },
-    { t: 'Code calls TrendTrack and pays', on: ['b-tools','b-tt'], e: ['e-q','e-ads'],
-      p: 'Code checks the order and the budget. It adds the long-form filters, calls TrendTrack, and writes the cost: about 11 credits, or ten cents.' },
-    { t: 'Code remembers every ad', on: ['b-tools','b-log','b-model'], e: ['e-rem','e-res'],
-      p: 'Code saves each returned ad in the scout log. Then it shows the scout one short line per ad, like this real one.',
-      x: '[facebook_1077652420894954] Lignosus → nz.lignosus.com | active, 530 days, 108 duplicates, reach 77608, +551 reach in 7 days | audience unknown' },
-    { t: 'The scout reads and searches again', on: ['b-model','b-tools','b-log'], e: ['e-ask','e-res'],
-      p: 'The scout reads the full text of ads it likes, for free. It follows the brands it finds and searches again, up to 20 searches and 40 turns.' },
-    { t: 'The scout hands in its list', on: ['b-model','b-check','b-log'], e: ['e-sub','e-chk'],
-      p: 'The scout submits the ads to keep, each with a ring and a reason. Code checks each id against the scout log, and checks the limits.' },
-    { t: 'Refused, or accepted', on: ['b-check','b-model','b-db'], e: ['e-ref','e-save'],
-      p: 'If a rule fails, the scout gets a numbered list of problems and tries again, at most three times. If the list passes, code saves the kept ads, with data taken from the log.' },
-    { t: 'Readers label the ads', on: ['b-db','b-read'], e: ['e-batch','e-lab'],
-      p: 'Code splits the ads into groups of eight. Three reader agents work at the same time. Each labels its eight ads: the buyer, the claim, the proof, the offer, the landing page, and winning, testing or dead.' },
-    { t: 'One call groups the ads into angles', on: ['b-db','b-ana'], e: ['e-ana','e-ana2'],
-      p: 'One AI call sees every read ad as one line. It puts each ad in exactly one angle: the core argument the ad makes. Code refuses an ad left out or placed twice.',
-      x: '[ad id] Lignosus | mechanism | mechanism: 4-step lung care | for: adults with chronic cough | "If You’ve Had That Same Cough for Weeks… Read This."' },
-    { t: 'One call checks each angle against your claims', on: ['b-db','b-ana'], e: ['e-ana','e-ana2'],
-      p: 'A second call reads your product page claims, numbered. For each angle it answers: you already claim this, you would need a new claim, or it is not about your product.' },
-    { t: 'Code counts, then one call writes the findings', on: ['b-ana','b-count'], e: ['e-cnt','e-ana2'],
-      p: 'Code counts each angle: its ads, its proven ads, its brands, its recent launches. A third call reads only these tables and writes one sentence per step. Code refuses a sentence with a digit in it.' },
-    { t: 'The page counts again on every load', on: ['b-db','b-count','b-page'], e: ['e-cnt','e-show'],
-      p: 'The stage ends completed. When you open the page, code counts again from the stored ads, angles and findings. Every number you see comes from that count, not from a model.' },
-    { t: 'You read six steps, then the ads', on: ['b-count','b-page'], e: ['e-show'],
-      p: 'The page leads with findings: who the market pays to reach, proven angles, what competitors launch now, what proven ads do differently, and what you can run. All ads sit below, under filters.' }
+(function () {
+  var NODES = [
+    ["Term", "code"], ["Pool", "code"], ["Store + bucket", "code"], ["Scripts", "code"], ["Read", "agent"],
+    ["Copy + drop", "code"], ["Angles", "agent"], ["Fit + findings", "agent"], ["Page + stage 5", "code"]
   ];
-  var i = 0, playing = false, timer = null;
-  var sceneEl = document.getElementById('scene'), countEl = document.getElementById('count'), dotsEl = document.getElementById('dots');
-  var playBtn = document.getElementById('play');
-  scenes.forEach(function(s, k){
-    var b = document.createElement('button'); b.type = 'button'; b.setAttribute('aria-label', 'Step ' + (k+1) + ': ' + s.t);
-    b.addEventListener('click', function(){ stop(); go(k); }); dotsEl.appendChild(b);
+  var SCENES = [
+    [0, "Find the search word", "Stage 1 has stored the product: Mullevia Mullein Drops, key ingredient Mullein Leaf. Code keeps the words the two share. The search word is mullein.", "ad-pool.ts:16-21"],
+    [1, "Pull the pool", "Code asks TrendTrack for long-form image ads in the US that mention mullein. It asks four times, once per sort, in two pages of 50. That is 8 requests, 600 credits, 5 dollars 34, and 11 seconds.", "ad-pool.ts:23-36 · charges table, agent ad_pool"],
+    [2, "Store and bucket each ad", "400 rows hold 351 different ads. The store saves each one and links it to a confirmed competitor when the landing site matches. Code sets each ad's bucket from its own numbers.", "ad-table.ts:15-34 · ads.ts:92-106"],
+    [3, "Group into scripts", "Many ads share the same text. Code groups them into 161 scripts. The biggest script ran as 75 ads from several pages.", "ad-scripts.ts:6-19"],
+    [4, "Read one ad per script", "The reader agent gets 8 scripts at a time, 3 batches at once. For each it records the ring, who the ad speaks to, the claim and the proof. 28 calls took about 3 and a half minutes.", "competitor-ad-stage.ts:68-92 · ad-reader.ts"],
+    [5, "Copy readings, drop off-market ads", "Code copies each reading to every ad of its script. It deletes the 10 ads the reader marked off-market, such as dog-cough chews. 341 ads stay: 284 direct competitor, 36 same problem, 5 same buyer, 16 unread.", "competitor-ad-stage.ts:46-47"],
+    [6, "Group scripts into angles", "One agent call sees each script once, under a handle such as s12. It puts every script in exactly one angle. Code then puts every ad of the script on that angle. This step is rebuilt and has not run on real ads yet.", "angle-grouper.ts:13-27"],
+    [7, "Check fit and write findings", "One agent judges whether the client's own claims back each angle. Code counts the tables. A last agent writes one headline per step, and code refuses any headline with a digit.", "angle-fitter.ts · findings-writer.ts"],
+    [8, "Show it and pass it on", "The ads page reads the stored ads and counts the analysis on every load. Stage 4 reads the ads for market awareness. Stage 5 places direct-competitor and same-problem ads on the avatars.", "ad-analysis-step.ts · ads.ts:111-114"]
+  ];
+  var ns = "http://www.w3.org/2000/svg", g = document.getElementById("nodes");
+  var W = 160, H = 46, xs = [20, 190, 360, 530, 700], rows = [18, 100];
+  NODES.forEach(function (n, i) {
+    var row = i < 5 ? 0 : 1, col = i < 5 ? i : 8 - i;
+    var x = xs[col], y = rows[row];
+    var el = document.createElementNS(ns, "g"); el.setAttribute("class", "node" + (n[1] === "agent" ? " agent" : ""));
+    var r = document.createElementNS(ns, "rect"); r.setAttribute("x", x); r.setAttribute("y", y); r.setAttribute("width", W); r.setAttribute("height", H); r.setAttribute("rx", 8);
+    var t = document.createElementNS(ns, "text"); t.setAttribute("class", "t"); t.setAttribute("x", x + W / 2); t.setAttribute("y", y + 28); t.setAttribute("text-anchor", "middle"); t.textContent = (i + 1) + " " + n[0];
+    el.appendChild(r); el.appendChild(t); g.appendChild(el);
+    if (i < 8) {
+      var l = document.createElementNS(ns, "path"); l.setAttribute("class", "ln"); l.setAttribute("marker-end", "url(#a3)");
+      if (i < 4) l.setAttribute("d", "M" + (x + W) + "," + (y + H / 2) + " L" + (xs[col + 1] - 4) + "," + (y + H / 2));
+      else if (i === 4) l.setAttribute("d", "M" + (x + W / 2) + "," + (y + H) + " L" + (x + W / 2) + "," + (rows[1] - 4));
+      else l.setAttribute("d", "M" + x + "," + (y + H / 2) + " L" + (xs[col - 1] + W + 4) + "," + (y + H / 2));
+      g.appendChild(l);
+    }
   });
-  function esc(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
-  function highlight(s){
-    var svg = document.getElementById('flow');
-    svg.querySelectorAll('.box,.edge').forEach(function(g){ g.classList.remove('on'); g.classList.add('dim'); });
-    s.on.concat(s.e).forEach(function(id){ var g = document.getElementById(id); if (g) { g.classList.add('on'); g.classList.remove('dim'); } });
-  }
-  function clearHighlight(){ document.querySelectorAll('#flow .box,#flow .edge').forEach(function(g){ g.classList.remove('on','dim'); }); }
-  function go(k){
-    i = Math.max(0, Math.min(scenes.length - 1, k));
-    var s = scenes[i];
-    sceneEl.innerHTML = '<h3>' + (i+1) + '. ' + esc(s.t) + '</h3><p>' + esc(s.p) + '</p>' + (s.x ? '<pre>' + esc(s.x) + '</pre>' : '');
-    countEl.textContent = (i+1) + ' / ' + scenes.length;
-    dotsEl.querySelectorAll('button').forEach(function(b, k2){ b.setAttribute('aria-current', String(k2 === i)); });
-    highlight(s);
-  }
-  function advance(){
-    if (!playing) return;
-    if (i >= scenes.length - 1) { stop(); return; }
-    go(i + 1); wait();
-  }
-  function wait(){
-    clearTimeout(timer);
-    timer = setTimeout(advance, 6500);
-  }
-  function stop(){
-    playing = false; clearTimeout(timer);
-    playBtn.textContent = 'Play';
-  }
-  playBtn.addEventListener('click', function(){
-    if (playing) { stop(); return; }
-    playing = true; playBtn.textContent = 'Pause';
-    document.getElementById('map').scrollIntoView({ behavior: 'smooth', block: 'start' });
-    wait();
-  });
-  document.getElementById('next').addEventListener('click', function(){ stop(); go(i + 1); });
-  document.getElementById('prev').addEventListener('click', function(){ stop(); go(i - 1); });
-  go(0); clearHighlight();
-
-  // ---------- ad fields ----------
-  var fields = {
-    id: ['Ad id', 'TrendTrack’s name for the ad: "facebook_" plus Meta’s own ad number. The scout copies this id into its list. Code checks it against the scout log.', 'API field id → stored as ads.trendtrack_ad_id'],
-    adv: ['Advertiser', 'The name of the Facebook page that runs the ad. It is not always the brand: a page called "COPD Support Circle" runs ads for origindrops.com.', 'advertiser.name → ads.advertiser'],
-    dom: ['Landing website', 'Where the ad sends people. Code uses it for two things: the limit of 15 ads per website, and marking an ad as a competitor’s.', 'content.landingPageDomain → ads.landing_domain'],
-    status: ['Status', 'Active or inactive. The search asks for both, so stopped ads can come back too.', 'status → ads.status'],
-    days: ['Days running', 'For a group of copies, the days from the oldest copy’s start to today. This ad was seen for 155 days, but shows 530. So it is not one ad’s run time.', 'daysRunning → ads.days_running'],
-    dup: ['Duplicates', 'How many copies of this picture and text TrendTrack found. 108 is the most in run 344caa7d. Advertisers copy ads that make money.', 'metrics.duplicates → ads.duplicates (median 2 across the 207 ads)'],
-    reach: ['Reach', 'Meta’s public count of how many times the ad was shown. Meta publishes it mainly for ads shown in the EU and UK. 7 of the 207 stored ads have none.', 'metrics.reach → ads.reach'],
-    d7: ['Reach growth, 7 days', 'Reach added in the last 7 days. A high number means the advertiser is spending more on the ad now. 80 of the 207 stored ads have none.', 'metrics.reachDelta7d → ads.reach_delta.d7'],
-    aud: ['Audience', 'The age and gender the ad targets. All 207 stored ads have none, so the scout sees "audience unknown".', 'audience.ageMin / ageMax / gender → ads.audience'],
-    copy: ['Ad text', 'The headline and the main text. The search shows the scout the first 220 characters. "Read ad" shows all of it. This one has 3,610 characters; the median of the 207 is 10,234.', 'content.title + content.body → ads.copy']
-  };
-  var fieldinfo = document.getElementById('fieldinfo');
-  document.querySelectorAll('#adrow button.f').forEach(function(b){
-    b.addEventListener('click', function(){
-      document.querySelectorAll('#adrow button.f').forEach(function(o){ o.setAttribute('aria-pressed', 'false'); });
-      b.setAttribute('aria-pressed', 'true');
-      var d = fields[b.dataset.f];
-      fieldinfo.innerHTML = '<h3>' + d[0] + '</h3><p>' + d[1] + '</p><p class="ref">' + d[2] + '</p>';
+  var cur = 0, playing = false, muted = false, timer = null;
+  var title = document.getElementById("sc-title"), body = document.getElementById("sc-body"), src = document.getElementById("sc-src"), count = document.getElementById("p-count");
+  var bBack = document.getElementById("p-back"), bNext = document.getElementById("p-next"), bPlay = document.getElementById("p-play"), bMute = document.getElementById("p-mute");
+  var canSpeak = "speechSynthesis" in window;
+  function render() {
+    var s = SCENES[cur];
+    title.innerHTML = "<span>" + (cur + 1) + "/" + SCENES.length + "</span>" + s[1];
+    body.textContent = s[2]; src.textContent = s[3];
+    count.textContent = "Step " + (cur + 1) + " of " + SCENES.length;
+    Array.prototype.forEach.call(g.querySelectorAll(".node"), function (el, i) {
+      el.classList.toggle("on", i === s[0]); el.classList.toggle("done", i < s[0]);
     });
-  });
-
-  // ---------- before / after ----------
-  var vb = document.getElementById('vb'), va = document.getElementById('va'), cap = document.getElementById('bacap');
-  function show(after){
-    document.getElementById('va-g').toggleAttribute('hidden', !after); document.getElementById('vb-g').toggleAttribute('hidden', after);
-    va.setAttribute('aria-pressed', String(after)); vb.setAttribute('aria-pressed', String(!after));
-    cap.textContent = after ? 'Now: the scout chooses each search after it reads the last results. Code checks the final list.'
-                            : 'Before: an agent wrote keywords once, code ran every search, and a code rule kept 150 of 540 paid rows.';
+    bBack.disabled = cur === 0; bNext.disabled = cur === SCENES.length - 1;
   }
-  vb.addEventListener('click', function(){ show(false); });
-  va.addEventListener('click', function(){ show(true); });
-
-  // ---------- page before / after ----------
-  var pb = document.getElementById('pb'), pa = document.getElementById('pa'), pcap = document.getElementById('pcap');
-  function showPage(after){
-    document.getElementById('pa-g').toggleAttribute('hidden', !after); document.getElementById('pb-g').toggleAttribute('hidden', after);
-    pa.setAttribute('aria-pressed', String(after)); pb.setAttribute('aria-pressed', String(!after));
-    pcap.textContent = after ? 'Now: six steps, each a finding over the table that proves it. Click any "see the ads" to open the grid already filtered.'
-                             : 'Before: the ads as cards under ring headings, winners first. Run 344caa7d put 199 of its 207 ads under one heading.';
+  function stopSpeech() { if (canSpeak) try { speechSynthesis.cancel(); } catch (e) {} }
+  function advanceLater(ms) { clearTimeout(timer); timer = setTimeout(function () { if (!playing) return; if (cur < SCENES.length - 1) { cur++; render(); speak(); } else setPlaying(false); }, ms); }
+  function speak() {
+    if (!playing) return;
+    var text = SCENES[cur][1] + ". " + SCENES[cur][2];
+    if (muted || !canSpeak) { advanceLater(Math.max(4000, text.length * 55)); return; }
+    stopSpeech();
+    var u = new SpeechSynthesisUtterance(text); u.rate = 1;
+    u.onend = function () { advanceLater(600); };
+    u.onerror = function () { advanceLater(Math.max(4000, text.length * 55)); };
+    try { speechSynthesis.speak(u); } catch (e) { advanceLater(5000); }
   }
-  pb.addEventListener('click', function(){ showPage(false); });
-  pa.addEventListener('click', function(){ showPage(true); });
+  function setPlaying(p) { playing = p; bPlay.setAttribute("aria-pressed", String(p)); bPlay.textContent = p ? "Pause" : "Play"; if (p) speak(); else { clearTimeout(timer); stopSpeech(); } }
+  bPlay.addEventListener("click", function () { if (!playing && cur === SCENES.length - 1) { cur = 0; render(); } setPlaying(!playing); });
+  bBack.addEventListener("click", function () { setPlaying(false); if (cur > 0) { cur--; render(); } });
+  bNext.addEventListener("click", function () { setPlaying(false); if (cur < SCENES.length - 1) { cur++; render(); } });
+  bMute.addEventListener("click", function () { muted = !muted; bMute.setAttribute("aria-pressed", String(muted)); bMute.textContent = muted ? "Sound off" : "Sound on"; if (muted) stopSpeech(); if (playing) { clearTimeout(timer); speak(); } });
+  if (!canSpeak) { bMute.disabled = true; bMute.textContent = "No sound in this browser"; }
+  render();
 })();
 </script>
-</body>
-</html>

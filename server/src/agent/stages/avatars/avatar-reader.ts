@@ -20,6 +20,7 @@ export class AvatarReader {
       instructions: [contextLine, MemoryView.memory(memory), `Batch ${memory.batches_read + 1}, ${batch.length} reviews:`, MemoryView.reviews(batch)].join("\n\n"),
       tools: [],
       maxTurns: AvatarReader.MAX_TURNS,
+      reasoning: "low",
       submission: { schema: MemoryUpdateSchema, describe: "Hand back how the avatar memory changes after this batch.", check: (update) => AvatarMemoryCheck.problems(memory, update, ids) },
     });
   }

@@ -2,12 +2,11 @@ import { Hono, type Context } from "hono";
 
 import type { AnalysisService } from "../agent/index.js";
 import { Scope, type ResearchStore, type Run } from "../domain/index.js";
-import { AdsAnalyzer } from "../extract/index.js";
 import { Trace } from "../trace/index.js";
 
 import type { ApiEnv } from "./api-env.js";
 
-/** What a run's evidence stages stored: review coverage and a page of reviews per target, the long-form statics with their readings and the analysis counted over them, and the avatars with their quotes. */
+/** What a run's evidence stages stored: review coverage and a page of reviews per target, the long-form statics with their readings, and the avatars with their quotes. */
 export class EvidenceRoutes {
   static readonly MAX_PAGE = 100;
 
@@ -31,14 +30,6 @@ export class EvidenceRoutes {
       }),
     );
     api.get("/runs/:runId/ads", async (c) => this.withProduct(c, async () => c.json({ ads: await this.store.ads.list(c.req.param("runId") ?? "") })));
-    api.get("/runs/:runId/ads/analysis", async (c) =>
-      this.withProduct(c, async (productId, run) => {
-        const product = await this.store.products.get(productId);
-        const [ads, angles, findings] = await Promise.all([this.store.ads.list(run.id), this.store.adAnalysis.angles(run.id), this.store.adAnalysis.findings(run.id)]);
-        const claims = (product?.claims_on_page ?? []).map((claim) => claim.text);
-        return c.json({ analysis: AdsAnalyzer.analyze(ads, angles, findings, claims, run.created_at.slice(0, 10)) });
-      }),
-    );
     api.get("/runs/:runId/market", async (c) => this.withProduct(c, async () => c.json({ market: await this.store.market.get(c.req.param("runId") ?? "") })));
     api.get("/runs/:runId/avatars", async (c) =>
       this.withProduct(c, async () => {

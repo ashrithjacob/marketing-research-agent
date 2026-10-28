@@ -104,10 +104,9 @@ export class Env {
       reviewsPerProduct: Env.number("MRA_REVIEWS_PER_PRODUCT", 500),
       reviewsPerBand: Env.number("MRA_REVIEWS_PER_BAND", 100),
       wootDelayMs: Env.number("MRA_WOOT_DELAY_MS", 2000),
-      adsPerRun: Env.number("MRA_ADS_PER_RUN", 150),
-      adSearchesPerRun: Env.number("MRA_AD_SEARCHES_PER_RUN", 20),
-      adMinCopyChars: Env.number("MRA_AD_MIN_COPY_CHARS", 2000),
-      adsPerBrand: Env.number("MRA_ADS_PER_BRAND", 15),
+      adPoolSize: Env.number("MRA_AD_POOL_SIZE", 400),
+      adMinCopyChars: Env.number("MRA_AD_MIN_COPY_CHARS", 3000),
+      adMinDaysRunning: Env.number("MRA_AD_MIN_DAYS_RUNNING", 10),
       marketHistorySearches: Env.number("MRA_MARKET_HISTORY_SEARCHES", 8),
       marketPaidCalls: Env.number("MRA_MARKET_PAID_CALLS", 2),
 

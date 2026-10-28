@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ApifyAmazonSearch, ApifyApi, ApifyKeywordVolumes, ApifyRedditSearch, ApifyRunner, PublicPage, WaybackArchive, WebSuggestions } from "../src/adapters/index.js";
 import { TrendtrackAds } from "../src/adapters/trendtrack-ads.js";
+import { TrendtrackApi } from "../src/adapters/trendtrack-api.js";
 import type { ActorLimits, ActorRun, ActorRunner } from "../src/domain/index.js";
 
 import { TestSettings } from "./fakes.js";
@@ -121,7 +122,7 @@ describe("the free sources", () => {
   it("sends TrendTrack a first-seen window for an ad history search", async () => {
     const fetch = vi.fn(async (_url: string, _init: RequestInit) => json({ data: [], pagination: { total: 0 } }));
     vi.stubGlobal("fetch", fetch);
-    await new TrendtrackAds(settings).search({ terms: ["lungclear.com"], searchIn: "domain", countries: ["US"], limit: 5, sortBy: "newest", createdAfter: "2024-01-01", createdBefore: "2025-01-01" });
+    await new TrendtrackAds(new TrendtrackApi(settings)).search({ terms: ["lungclear.com"], searchIn: "domain", countries: ["US"], limit: 5, sortBy: "newest", createdAfter: "2024-01-01", createdBefore: "2025-01-01" });
     expect(JSON.parse(String(fetch.mock.calls[0]![1].body))).toMatchObject({ status: "all", createdAfter: "2024-01-01", createdBefore: "2025-01-01" });
   });
 });

@@ -1,6 +1,8 @@
 import { z } from "zod/v4";
 
 import { AWARENESS_LEVELS } from "./ads.js";
+import type { AdMarket } from "./ad-segments.js";
+import type { AvatarSource, GapTheme, SameBuyer } from "./avatar-sets.js";
 
 const Key = z.string().regex(/^[a-z0-9][a-z0-9_]{1,40}$/).describe("A short lower_snake_case key, e.g. ex_smokers.");
 const Items = z.array(z.string().min(1).max(200)).max(12);
@@ -44,13 +46,13 @@ export interface AvatarMemory {
 
 /** What the agent does to its memory after reading one batch of reviews. Code applies it, after checking every key and review id. */
 export const MemoryUpdateSchema = z.object({
-  create: z.array(z.object({ key: Key, parent: Key.nullable().describe("A top-level avatar's key for a sub-avatar, else null."), ...ProfileFields })).default([]),
+  create: z.array(z.object({ key: Key, ...ProfileFields })).default([]),
   revise: z
     .array(z.object(ProfileFields).partial().extend({ key: Key }))
     .default([])
     .describe("Replace the named fields of an existing avatar; use it to sharpen a description or condense a list."),
-  merge: z.array(z.object({ from: Key, into: Key })).default([]).describe("Fold one avatar into another; its reviews, quotes and sub-avatars move with it."),
-  assign: z.array(z.object({ review_id: z.string().min(1), avatar: Key.nullable().describe("null when the review says nothing about who the buyer is, e.g. shipping only.") })),
+  merge: z.array(z.object({ from: Key, into: Key })).default([]).describe("Fold one avatar into another; its reviews and quotes move with it."),
+  assign: z.array(z.object({ review_id: z.string().min(1), avatar: Key.nullable().describe("null when the review shows none of the avatars in memory.") })),
   quotes: z.array(z.object({ avatar: Key, review_id: z.string().min(1) })).default([]).describe("Reviews whose words show this avatar best; they must be assigned to it."),
 });
 export type MemoryUpdate = z.infer<typeof MemoryUpdateSchema>;
@@ -86,6 +88,7 @@ export interface StoredAvatar {
   run_id: string;
   parent_id: string | null;
   key: string;
+  source: AvatarSource;
   name: string;
   description: string;
   demand_share: number;
@@ -101,11 +104,16 @@ export interface StoredAvatar {
     skepticism: number | null;
     skepticism_review_ids: string[];
     awareness_by_channel: Partial<Record<"meta_ads" | "reviews", Partial<Record<string, number>>>>;
+    gaps?: GapTheme[];
+    quote_ad_ids?: string[];
+    market?: AdMarket;
+    same_buyer?: SameBuyer;
   };
 }
 
 export interface AvatarQuote {
   avatar_id: string;
+  kind: "quote" | "gap";
   review_id: string;
   rating: number;
   body: string;
@@ -119,4 +127,5 @@ export interface AvatarRecord {
   review_ids: readonly string[];
   quote_ids: readonly string[];
   ad_ids: readonly string[];
+  gap_review_ids: readonly string[];
 }

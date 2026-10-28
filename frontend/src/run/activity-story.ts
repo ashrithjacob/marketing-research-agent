@@ -126,6 +126,7 @@ function line(event: RunEvent, titles: Record<string, string>): [Tone, string] |
     case 'agent.started': return ['read', agentStarted(p)];
     case 'agent.ended': return agentEnded(p);
     case 'agent.resumed': return ['problem', 'The AI model dropped the connection; switched to a backup model and carried on'];
+    case 'agent.model_switched': return ['problem', `An agent kept sending the same calls; moved it from ${String(p.from)} to ${String(p.to)}`];
     case 'stage.changed': return stageChanged(p, titles);
     case 'reviews.collected': return ['insight', `Collected ${p.collected} customer reviews for ${p.target} (${p.saved} new)`];
     case 'avatars.memory': return ['insight', `Buyer groups so far, after review batch ${p.batch}: ${(p.avatars as { key: string; reviews: number }[]).map((a) => `${humanize(a.key)} (${a.reviews} reviews)`).join(', ')}`];

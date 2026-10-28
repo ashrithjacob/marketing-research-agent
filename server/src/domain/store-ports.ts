@@ -1,8 +1,7 @@
 import type { ShopSignals, ShopTraction } from "./traction.js";
 import type { Account, Scope, User, UserListing } from "./accounts.js";
-import type { AdAngle, AdAngles, AdFinding, AngleFits } from "./ad-analysis.js";
-import type { AdHit } from "./ad-library.js";
-import type { AdReading, AdRing, ReadAd, StoredAd } from "./ads.js";
+import type { PageKind, PulledAd } from "./ad-pull.js";
+import type { AdReading, ReadAd, StoredAd } from "./ads.js";
 import type { AvatarMemory, AvatarQuote, AvatarRecord, StoredAvatar } from "./avatars.js";
 import type { AnalysisInput } from "./analysis-input.js";
 import type { Charge } from "./charges.js";
@@ -77,20 +76,14 @@ export interface AvatarStore {
 /** Long-form statics found for a product's analysis, and what an agent read off each. */
 export interface AdStore {
   clear(runId: string): Promise<void>;
-  save(accountId: string, runId: string, productId: string, hits: readonly AdHit[], competitorByDomain: ReadonlyMap<string, string>): Promise<StoredAd[]>;
+  save(accountId: string, runId: string, productId: string, pulled: readonly PulledAd[], competitorByDomain: ReadonlyMap<string, string>): Promise<StoredAd[]>;
   saveReading(adId: string, reading: AdReading): Promise<void>;
-  saveRing(adId: string, ring: AdRing, why: string): Promise<void>;
+  /** Tags every ad of the run run by each named advertiser page with its kind. */
+  setPageKinds(runId: string, kindByAdvertiser: ReadonlyMap<string, PageKind>): Promise<void>;
+  /** Gives each named ad the audience segment its copy was sorted into. */
+  setSegments(segmentByAd: ReadonlyMap<string, string>): Promise<void>;
   link(runId: string, competitorByDomain: ReadonlyMap<string, string>): Promise<number>;
   list(runId: string): Promise<ReadAd[]>;
-}
-
-/** The analysis of one run's ads: the angles they were grouped into, each angle's fit, and the findings written over the counts. */
-export interface AdAnalysisStore {
-  saveAngles(runId: string, angles: AdAngles["angles"]): Promise<void>;
-  saveFits(runId: string, fits: AngleFits["fits"]): Promise<void>;
-  saveFindings(runId: string, findings: readonly AdFinding[]): Promise<void>;
-  angles(runId: string): Promise<AdAngle[]>;
-  findings(runId: string): Promise<AdFinding[]>;
 }
 
 /** Product shots and logos by page url, shared by every account: they are public pages, read once. */
@@ -136,7 +129,6 @@ export interface ResearchStore {
   readonly competitors: CompetitorStore;
   readonly reviews: ReviewStore;
   readonly ads: AdStore;
-  readonly adAnalysis: AdAnalysisStore;
   readonly avatars: AvatarStore;
   readonly market: MarketStore;
   readonly visuals: BrandVisualCache;

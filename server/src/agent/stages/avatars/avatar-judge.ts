@@ -24,6 +24,7 @@ export class AvatarJudge {
       ].join("\n\n"),
       tools: [],
       maxTurns: AvatarJudge.MAX_TURNS,
+      reasoning: "low",
       submission: { schema: AvatarVerdictsSchema, describe: "Hand back one verdict per avatar.", check: (verdicts) => AvatarJudge.problems(verdicts, memory) },
     });
   }

@@ -33,17 +33,37 @@ export class SubmitTool<T> {
   tool(): AgentTool<TSchema> {
     Trace.line(import.meta.url, "SubmitTool.tool");
     const self = this;
+    const parameters = Schemas.json(this.submission.schema) as unknown as TSchema;
     return {
       name: "submit",
       label: "Submit",
       description: `${this.submission.describe} Calling this ends your work if it passes its checks.`,
-      parameters: Schemas.json(this.submission.schema) as unknown as TSchema,
+      parameters,
       executionMode: "sequential",
+      prepareArguments: (args) => SubmitTool.unpacked(args, parameters),
       async execute(_id, params) {
         Trace.line(import.meta.url, "SubmitTool.tool.execute", { refusals: self.refusals });
         return self.judge(params);
       },
     };
+  }
+
+  /** A top-level array or object field the model sent as JSON text, parsed back into what the schema asks for; anything else is left for the schema to refuse. */
+  static unpacked(args: unknown, schema: TSchema): any {
+    Trace.line(import.meta.url, "SubmitTool.unpacked");
+    if (!args || typeof args !== "object" || Array.isArray(args)) return args;
+    const properties = (schema as { properties?: Record<string, { type?: unknown }> }).properties ?? {};
+    const fields = Object.entries(args as Record<string, unknown>).map(([key, value]) => {
+      const wanted = properties[key]?.type;
+      if (typeof value !== "string" || (wanted !== "array" && wanted !== "object")) return [key, value];
+      try {
+        const parsed: unknown = JSON.parse(value);
+        return [key, (wanted === "array") === Array.isArray(parsed) && parsed !== null && typeof parsed === "object" ? parsed : value];
+      } catch {
+        return [key, value];
+      }
+    });
+    return Object.fromEntries(fields);
   }
 
   private judge(params: unknown): { content: { type: "text"; text: string }[]; details: Record<string, unknown>; terminate?: boolean } {

@@ -130,6 +130,31 @@ describe("a rerun", () => {
   });
 });
 
+describe("a rerun of one stage alone", () => {
+  it("runs only that stage, and a stage that uses it keeps the state it had, skipped included", async () => {
+    const order: string[] = [];
+    const pipeline = new Pipeline([new FakeStage("product_market", "completed", order), new FlakyStage("competitor_ads", "completed", order), new FakeStage("avatars", "completed", order)]);
+    const faux = new Faux();
+    faux.provider.setResponses(
+      new ScriptedAgents()
+        .on("Product url:", [ScriptedAgents.call("web_fetch", { url: PRODUCT_URL }), ScriptedAgents.call("web_search", { query: "x" }), ScriptedAgents.call("submit", RESOLUTION)])
+        .steps(),
+    );
+    const { settings, traces } = TestSettings.make();
+    const app = new App({ settings, traces, store: pg.store, services: new FakeWeb(PAGES, SEARCH_HITS).services(), models: faux.models, generations: new NoBilling(), visuals: new FakeVisuals(), pipeline });
+    const driver = new RunDriver(app);
+    const runId = await driver.start({ product_url: PRODUCT_URL });
+    const first = await driver.confirmAndFinish(runId, { product_url: PRODUCT_URL, competitors: [{ brand: "A", product_name: "A", url: "https://a.example/p" }] });
+    expect(first.run.stage_status.avatars.status).toBe("skipped");
+
+    expect((await driver.api(`/runs/${runId}/rerun`, { stages: ["competitor_ads"], alone: true })).status).toBe(200);
+    const done = await driver.settle(runId, ["completed", "failed", "invalid"]);
+    expect(order.map((o) => o.split(":")[0])).toEqual(["product_market", "competitor_ads", "competitor_ads"]);
+    expect(done.run.stage_status.competitor_ads).toMatchObject({ status: "completed", summary: "worked the second time" });
+    expect(done.run.stage_status.avatars).toEqual(first.run.stage_status.avatars);
+  });
+});
+
 describe("what a rerun runs", () => {
   it("is the chosen stages, every built stage downstream of them, and any stage that did not complete", () => {
     const built = ["product_market", "reviews", "competitor_ads", "avatars"] as const;

@@ -5,8 +5,8 @@ import type { Message } from "@earendil-works/pi-ai";
 
 import { MarketStage, Pipeline } from "../src/agent/index.js";
 import { AvatarJudge } from "../src/agent/stages/avatars/avatar-judge.js";
-import type { ActorLimits, ActorRun, ActorRunner, AdHit, AdLibrary, AdPage, AdQuery, ArchivedPage, MarketAssessment, PageArchive, SearchSuggestions, SuggestionSource } from "../src/domain/index.js";
-import { AvatarTally } from "../src/extract/index.js";
+import type { ActorLimits, ActorRun, ActorRunner, AdCategoryPage, AdHit, AdLibrary, AdPage, AdQuery, ArchivedPage, EvidenceItem, MarketAssessment, MarketRead, PageArchive, SearchSuggestions, SuggestionSource } from "../src/domain/index.js";
+import { AvatarTally, MarketTally } from "../src/extract/index.js";
 import { App } from "../src/http/index.js";
 
 import { Faux, FakeVisuals, FakeWeb, NoBilling, TestSettings } from "./fakes.js";
@@ -22,6 +22,10 @@ class History implements AdLibrary {
   async search(query: AdQuery): Promise<AdPage> {
     this.queries.push(query);
     return { hits: [History.hit("h1", "2023-02-01", 400, "inactive")], total: 1, credits: 2 };
+  }
+
+  async categories(): Promise<AdCategoryPage> {
+    return { categories: [], credits: 0 };
   }
 
   static hit(id: string, first: string, days: number, status: string): AdHit {
@@ -126,9 +130,8 @@ describe("stage 4", () => {
 
     const product = await pg.store.products.upsert("admin", PRODUCT_URL, "Mullein Drops", "Mullevia");
     const runId = await driver.start({ product_url: PRODUCT_URL });
-    const [ad] = await pg.store.ads.save("admin", runId, product.id, [History.hit("s1", "2025-04-01", 90, "active")], new Map());
-    await pg.store.ads.saveRing(ad!.id, "direct_competitor", "same tincture");
-    await pg.store.ads.saveReading(ad!.id, { ad_id: ad!.id, avatar: "ex-smokers", claim_type: "mechanism", awareness: "problem_aware", mechanism: "dissolves mucus", proof_types: [], offer: null, objections_handled: [], emotion: "relief", risk_flags: [], proof_kinds: ["testimonial"], offer_kinds: ["guarantee"], emotion_kind: "relief", landing_kind: "advertorial", copy_structure: "personal_story", bucket: "winning", bucket_why: "90 days" });
+    const [ad] = await pg.store.ads.save("admin", runId, product.id, [{ hit: History.hit("s1", "2025-04-01", 90, "active"), ring: "direct_competitor", found_by: "domain \"lungclear.com\"" }], new Map());
+    await pg.store.ads.saveReading(ad!.id, { ad_id: ad!.id, avatar: "ex-smokers", claim_type: "mechanism", awareness: "problem_aware", mechanism: "dissolves mucus", proof_types: [], offer: null, objections_handled: [], emotion: "relief", risk_flags: [], proof_kinds: ["testimonial"], offer_kinds: ["guarantee"], emotion_kind: "relief", landing_kind: "advertorial", copy_structure: "personal_story", value_prop: "root_cause" });
     const done = await driver.confirmAndFinish(runId, { product_url: PRODUCT_URL, competitors: RESOLUTION.competitors.slice(0, 1).map(({ why: _why, ...pick }) => pick) });
 
     expect(done.run.stage_status.sophistication).toMatchObject({ status: "completed", error: "" });
@@ -144,6 +147,19 @@ describe("stage 4", () => {
     expect(market.awareness.map((entry) => entry.channel).sort()).toEqual(["amazon_listings", "google_search", "landing_pages", "meta_ads", "reddit"]);
     const { charges } = await driver.json<{ charges: { service: string; item: string; usd: number | null; basis: string }[] }>(`/runs/${runId}/charges`);
     expect(charges.filter((c) => c.service === "apify").map((c) => [c.item, c.usd, c.basis])).toEqual([["memo23/keyword-metrics", 0.3, "billed"], ["apt_marble/amazon-search-results-scraper", 0.02, "billed"], ["coding-doctor-omar/reddit-scraper-pro", 0.01, "billed"]]);
+  });
+});
+
+describe("the market tally", () => {
+  it("keeps every piece of evidence the reasoning names, even one it gave no label, so each citation can be shown", () => {
+    const item = (id: string, kind: EvidenceItem["kind"]): [string, EvidenceItem] => [id, { id, kind, text: id, url: null, brand: null, date: null, days_running: null, active: null, volume: null }];
+    const items = new Map([item("ws-58", "snapshot"), item("al-89", "amazon_listing"), item("al-98", "amazon_listing"), item("al-9", "amazon_listing")]);
+    const read: MarketRead = {
+      claim_groups: [{ key: "lung_support", claim: "supports your lungs", claim_type: "plain", ad_ids: ["x"] }],
+      sophistication: { stage: 2, why: "Betterbrand (ws-58) sold a plain claim; the shelf went bigger (al-89, al-98, al-1).", claim_group_keys: ["lung_support"], snapshot_ids: [], confidence: "low" },
+      labels: [{ id: "al-89", awareness: "solution_aware" }],
+    };
+    expect(MarketTally.assessment("r", read, items, []).evidence.map((e) => [e.id, e.awareness])).toEqual([["al-89", "solution_aware"], ["ws-58", null], ["al-98", null]]);
   });
 });
 

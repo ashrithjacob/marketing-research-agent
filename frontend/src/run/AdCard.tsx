@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-import type { ReadAd } from '../api';
+import { adsShape, type ReadAd } from '../api';
 import BrandMark from '../BrandMark';
 
 function audienceOf(ad: ReadAd): string | null {
@@ -9,7 +9,7 @@ function audienceOf(ad: ReadAd): string | null {
   return `${who.gender && who.gender !== 'all' ? `${who.gender}, ` : ''}${who.age_min ?? '?'}–${who.age_max ?? '?'}`;
 }
 
-export default function AdCard({ ad, logo, proven = false, angle = null }: { ad: ReadAd; logo: string | null; proven?: boolean; angle?: string | null }) {
+export default function AdCard({ ad, logo }: { ad: ReadAd; logo: string | null }) {
   const [open, setOpen] = useState(false);
   const audience = audienceOf(ad);
   return (
@@ -19,15 +19,14 @@ export default function AdCard({ ad, logo, proven = false, angle = null }: { ad:
         <BrandMark name={ad.advertiser} src={logo} size={22} />
         <strong>{ad.advertiser}</strong>
         {ad.bucket && <span className={`badge bucket-${ad.bucket}`}>{ad.bucket}</span>}
-        {proven && <span className="badge bucket-winning">proven</span>}
+        {ad.page_kind && <span className={`badge page-${ad.page_kind}`}>{adsShape.pages[ad.page_kind]}</span>}
       </div>
-      {angle && <div className="small">angle: <strong>{angle}</strong></div>}
       <div className="dim small">
         {ad.landing_domain} · {ad.days_running ?? '?'} days · {ad.duplicates ?? '?'} duplicates · {ad.status}
         {audience && ` · ${audience}`}
       </div>
       {ad.bucket_why && <p className="small dim">{ad.bucket_why}</p>}
-      {ad.ring_why && <p className="small">{ad.ring_why}</p>}
+      {ad.ring && <p className="small"><strong>{adsShape.words(ad.ring)}</strong>{ad.ring_why && <> · found by {ad.ring_why}</>}</p>}
       {ad.reading && (
         <p className="small">
           <strong>{ad.reading.claim_type}</strong>, {ad.reading.awareness.replace('_', ' ')} · {ad.reading.avatar}

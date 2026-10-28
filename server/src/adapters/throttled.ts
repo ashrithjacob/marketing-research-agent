@@ -1,4 +1,4 @@
-import type { AdLibrary, AdPage, AdQuery, FetchedPage, PageFetcher, SearchPage, SearchScope, WebSearch } from "../domain/index.js";
+import type { AdCategoryPage, AdLibrary, AdPage, AdQuery, FetchedPage, PageFetcher, SearchPage, SearchScope, WebSearch } from "../domain/index.js";
 import { Trace } from "../trace/index.js";
 
 import type { ServiceQueue } from "./service-queue.js";
@@ -36,5 +36,10 @@ export class ThrottledAdLibrary implements AdLibrary {
   search(query: AdQuery, signal?: AbortSignal): Promise<AdPage> {
     Trace.line(import.meta.url, "ThrottledAdLibrary.search", { terms: query.terms });
     return this.queue.run(() => this.inner.search(query, signal), signal);
+  }
+
+  categories(search: string, signal?: AbortSignal): Promise<AdCategoryPage> {
+    Trace.line(import.meta.url, "ThrottledAdLibrary.categories", { search });
+    return this.queue.run(() => this.inner.categories(search, signal), signal);
   }
 }

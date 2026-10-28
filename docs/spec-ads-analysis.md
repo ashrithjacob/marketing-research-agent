@@ -1,5 +1,7 @@
 # Long-form ads: from a pile of cards to a guided read
 
+*Superseded 2026-10-26:* everything this spec built (angles, fit, findings, the six-step page) was removed; stage 3 now ends at the pulled, read ads, shown by category. Why is in `docs/spec.md`, decisions. Kept as the record of what was tried.
+
 *Proposed 2026-10-21. Revised 2026-10-22: the page leads the user through six
 findings instead of five tables (D5 to D8 added, D2 extended, D4 and the
 "written read later" plan superseded). Built 2026-10-22 for stage 3 (build
@@ -530,3 +532,10 @@ by the billed charges of the first run that has them.
 - Reading competitors' landing pages (see D2's `unknown`).
 - Changing how the scout finds ads, or how many it keeps.
 - Writing the ads. Step 6's cards are stage 7's input.
+
+*2026-10-26:* the scout this spec mentions is gone. Stage 3 now pulls the top
+100 ads for the market term under four sorts (`AdPool`) and reads one ad per
+distinct script; the per-brand cap of 15 no longer exists, and an ad's bucket
+is computed from its signals (`AdBuckets`, `workings.md` stage 3). Where this
+spec says "the scout's picks", read "the pool". *Later the same day:* agents pull the ads again, one per ring,
+each to a quota (`AdPull`, `RingScout`; `workings.md` stage 3).

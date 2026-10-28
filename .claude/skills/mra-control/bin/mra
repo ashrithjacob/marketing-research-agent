@@ -38,9 +38,11 @@ cmd_check() {
     note "server typecheck"
     (cd "$REPO/server" && npm run typecheck --silent) || failed=1
     note "server tests"
-    (cd "$REPO/server" && npm test --silent >/dev/null 2>&1) \
+    local tests_out
+    tests_out=$(mktemp "${TMPDIR:-/tmp}/mra-tests.XXXXXX")
+    (cd "$REPO/server" && npm test --silent >"$tests_out" 2>&1) \
       && echo "tests pass" \
-      || { (cd "$REPO/server" && npm test --silent); failed=1; }
+      || { grep -E "×|FAIL|AssertionError|Error:|Expected|Received|Tests " "$tests_out" | head -60; echo "(the failing run in full: $tests_out)"; failed=1; }
   else
     note "server unchanged — skipped (run \`mra check\` with no flag to force)"
   fi
@@ -157,10 +159,12 @@ cmd_confirm() {
 cmd_rerun() {
   need curl "mra rerun"; need jq "mra rerun"
   local id="${1:-$(cat "${TMPDIR:-/tmp}/mra-last-run" 2>/dev/null || true)}"
-  [ -n "$id" ] || die "usage: mra rerun [runId] [stage...]   (runs again the named stages and what uses them, or with none every stage that did not complete; spends money)"
+  [ -n "$id" ] || die "usage: mra rerun [runId] [--alone] [stage...]   (runs again the named stages and what uses them, or with none every stage that did not complete; --alone runs only the named stages; spends money)"
   shift || true
+  local alone=false
+  if [ "${1:-}" = "--alone" ]; then alone=true; shift; fi
   local stages; stages=$(printf '%s\n' "$@" | jq -R . | jq -sc 'map(select(. != ""))')
-  local out; out=$(api POST "/api/research/runs/$id/rerun" "{\"stages\":$stages}")
+  local out; out=$(api POST "/api/research/runs/$id/rerun" "{\"stages\":$stages,\"alone\":$alone}")
   jq -e '.run.status' >/dev/null 2>&1 <<<"$out" || die "rerun refused: $out"
   jq -r '"run \(.run.id)  status=\(.run.status)"' <<<"$out"
 }
@@ -245,10 +249,12 @@ mra — drive and inspect the research cockpit
                            product and proposes competitors, then waits.
   confirm [runId]          accept the product and competitors as resolved and
                            start the stages (the cockpit lets you edit them)
-  rerun [runId] [stage...] run again the named stages (product_market, reviews,
+  rerun [runId] [--alone] [stage...]
+                           run again the named stages (product_market, reviews,
                            competitor_ads, avatars) and every stage that uses
                            them; with none, every stage that did not complete.
-                           Other stages are kept (spends money)
+                           Other stages are kept; --alone runs only the named
+                           stages and leaves the rest as they are (spends money)
   watch [runId]            poll until the run waits for you or ends, then print
                            its stages and competitors
   calls [runId]            the LLM call log, one line per turn

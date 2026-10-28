@@ -1,25 +1,25 @@
 import type { AvatarMemory, MemoryUpdate } from "../domain/index.js";
 import { Trace } from "../trace/index.js";
 
-/** Every way an update to the avatar memory can be wrong: an unknown key, a third level, a review left out or invented, a quote from a review assigned elsewhere. */
+/** Every way an update to the avatar memory can be wrong: an unknown key, a key another avatar already holds, a review left out or invented, a quote from a review assigned elsewhere. */
 export class AvatarMemoryCheck {
-  static problems(memory: AvatarMemory, update: MemoryUpdate, batch: readonly string[]): string[] {
-    Trace.line(import.meta.url, "AvatarMemoryCheck.problems", { avatars: memory.avatars.length, batch: batch.length });
-    const parents = new Map(memory.avatars.map((avatar) => [avatar.key, avatar.parent]));
+  static problems(memory: AvatarMemory, update: MemoryUpdate, batch: readonly string[], taken: readonly string[] = []): string[] {
+    Trace.line(import.meta.url, "AvatarMemoryCheck.problems", { avatars: memory.avatars.length, batch: batch.length, taken: taken.length });
+    const keys = new Set(memory.avatars.map((avatar) => avatar.key));
     const problems: string[] = [];
     for (const created of update.create) {
-      if (parents.has(created.key)) problems.push(`create ${created.key}: that key already exists; use revise`);
-      parents.set(created.key, created.parent);
+      if (keys.has(created.key)) problems.push(`create ${created.key}: that key already exists; use revise`);
+      else if (taken.includes(created.key)) problems.push(`create ${created.key}: another avatar already has that key; choose another`);
+      keys.add(created.key);
     }
-    for (const created of update.create) problems.push(...AvatarMemoryCheck.parentage(created.key, created.parent, parents));
     const known = (key: string, where: string): void => {
-      if (!parents.has(key)) problems.push(`${where}: avatar ${key} does not exist`);
+      if (!keys.has(key)) problems.push(`${where}: avatar ${key} does not exist`);
     };
     update.revise.forEach((revised) => known(revised.key, "revise"));
     for (const merge of update.merge) {
       known(merge.from, "merge");
       known(merge.into, "merge");
-      problems.push(...AvatarMemoryCheck.mergeable(merge.from, merge.into, parents));
+      if (merge.from === merge.into) problems.push(`merge ${merge.from}: an avatar cannot merge into itself`);
     }
     problems.push(...AvatarMemoryCheck.assignments(update, batch, (key) => known(key, "assign")));
     const assignedTo = new Map<string, string | null>(memory.avatars.flatMap((avatar) => avatar.review_ids.map((id) => [id, avatar.key] as const)));
@@ -29,23 +29,6 @@ export class AvatarMemoryCheck {
       if (assignedTo.get(quote.review_id) !== quote.avatar) problems.push(`quote ${quote.review_id}: it is not assigned to ${quote.avatar}`);
     }
     return problems;
-  }
-
-  private static parentage(key: string, parent: string | null, parents: ReadonlyMap<string, string | null>): string[] {
-    Trace.line(import.meta.url, "AvatarMemoryCheck.parentage", { key, parent });
-    if (parent === null) return [];
-    if (parent === key) return [`create ${key}: an avatar cannot be its own parent`];
-    if (!parents.has(parent)) return [`create ${key}: parent ${parent} does not exist`];
-    return parents.get(parent) === null ? [] : [`create ${key}: ${parent} is itself a sub-avatar; two levels at most`];
-  }
-
-  private static mergeable(from: string, into: string, parents: ReadonlyMap<string, string | null>): string[] {
-    Trace.line(import.meta.url, "AvatarMemoryCheck.mergeable", { from, into });
-    if (from === into) return [`merge ${from}: an avatar cannot merge into itself`];
-    if (parents.get(into) === from) return [`merge ${from} into its own sub-avatar ${into}: merge the other way`];
-    const fromHasChildren = [...parents.values()].includes(from);
-    const intoIsChild = parents.has(into) && parents.get(into) !== null;
-    return fromHasChildren && intoIsChild ? [`merge ${from} into ${into}: ${from} has sub-avatars and ${into} is a sub-avatar; two levels at most`] : [];
   }
 
   private static assignments(update: MemoryUpdate, batch: readonly string[], known: (key: string) => void): string[] {

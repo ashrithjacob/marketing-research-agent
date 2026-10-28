@@ -41,7 +41,7 @@ export default function RerunPrompt({ run, stages, onDone, onError }: { run: Run
           );
         })}
       </ul>
-      <p className="small dim">Completed stages are kept and not paid for again. Rerunning spends model tokens, and for stage 3 TrendTrack credits (up to 150 ads).</p>
+      <p className="small dim">Completed stages are kept and not paid for again. Rerunning spends model tokens, and for stage 3 TrendTrack credits (up to 1,000 ads).</p>
       <button className="primary" disabled={busy} onClick={rerun}>
         {busy ? 'Starting…' : unfinished.length === 1 ? 'Rerun this stage' : `Rerun these ${unfinished.length} stages`}
       </button>

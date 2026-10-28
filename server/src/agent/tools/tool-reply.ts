@@ -22,7 +22,7 @@ export class ToolReply {
 
   static clip(text: string, chars: number): string {
     Trace.tick(import.meta.url, "ToolReply.clip");
-    const flat = text.replace(/\s+/g, " ").trim();
-    return flat.length > chars ? `${flat.slice(0, chars)}…` : flat;
+    const flat = [...text.replace(/\s+/g, " ").trim()];
+    return flat.length > chars ? `${flat.slice(0, chars).join("")}…` : flat.join("");
   }
 }

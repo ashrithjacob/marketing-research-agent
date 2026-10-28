@@ -20,6 +20,7 @@ export class AdPlacer {
       instructions: [MemoryView.memory(memory), `${ads.length} ads to place:`, MemoryView.ads(ads)].join("\n\n"),
       tools: [],
       maxTurns: AdPlacer.MAX_TURNS,
+      reasoning: "low",
       submission: { schema: AdPlacementSchema, describe: "Hand back where each ad goes.", check: (placement) => AdPlacer.problems(placement, ids, keys) },
     });
   }

@@ -1,7 +1,7 @@
 import type { ActorLimits, ActorRun, ArchivedPage, ForumPost, ForumQuery, KeywordVolume, MarketplaceListing, SuggestionSource } from "./market-sources.js";
 import type { ShopPage, ShopQuery } from "./shop-finder.js";
 import type { ShopSignals, ShopTraction } from "./traction.js";
-import type { AdPage, AdQuery } from "./ad-library.js";
+import type { AdCategoryPage, AdPage, AdQuery } from "./ad-library.js";
 import type { Generation } from "./logs.js";
 import type { BrandVisual } from "./products.js";
 import type { CollectedReview, ReviewListing, ReviewSourceName, StorefrontFacts } from "./reviews.js";
@@ -20,6 +20,8 @@ export interface WebSearch {
 /** Searches an index of Meta ads: who advertises, the copy, where each ad lands, when it ran. */
 export interface AdLibrary {
   search(query: AdQuery, signal?: AbortSignal): Promise<AdPage>;
+  /** The categories whose name or path contains `search`, to narrow a search by. */
+  categories(search: string, signal?: AbortSignal): Promise<AdCategoryPage>;
 }
 
 /** One place reviews come from. Collects up to `limit` reviews of one listing, the text as written. */

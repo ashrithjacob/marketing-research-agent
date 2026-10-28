@@ -1,33 +1,39 @@
 import { useState } from 'react';
 
-import { adsShape, type AdFilter, type AdsAnalysis, type Competitor, type ReadAd } from '../../api';
+import { adsShape, type AdFilter, type Competitor, type ReadAd } from '../../api';
 import AdCard from '../AdCard';
 
-const FILTERS = ['proven', 'bucket', 'ring', 'brand', 'angle', ...adsShape.labels];
+const FILTERS = ['page', 'bucket', 'brand', ...adsShape.labels];
 const SORTS: Record<string, (a: ReadAd, b: ReadAd) => number> = {
   'days running': (a, b) => (b.days_running ?? 0) - (a.days_running ?? 0),
   duplicates: (a, b) => (b.duplicates ?? 0) - (a.duplicates ?? 0),
   'first seen': (a, b) => (b.first_seen ?? '').localeCompare(a.first_seen ?? ''),
 };
 
-export default function AdGrid({ ads, competitors, analysis, filter, setFilter }: { ads: ReadAd[]; competitors: Competitor[]; analysis: AdsAnalysis | null; filter: AdFilter; setFilter: (filter: AdFilter) => void }) {
+export default function AdGrid({ ads, competitors, filter, setFilter }: { ads: ReadAd[]; competitors: Competitor[]; filter: AdFilter; setFilter: (filter: AdFilter) => void }) {
   const [sort, setSort] = useState('days running');
-  const shown = ads.filter((ad) => adsShape.matches(ad, filter, analysis)).sort(SORTS[sort]);
+  const shown = ads.filter((ad) => adsShape.matches(ad, filter)).sort(SORTS[sort]);
   const logo = (ad: ReadAd) => {
     const owner = competitors.find((c) => c.id === ad.competitor_id);
     return owner?.logo_url ?? owner?.image_url ?? null;
   };
-  const angleName = (key: string) => analysis?.angles.find((angle) => angle.key === key)?.name ?? key;
   const change = (key: string, value: string) => {
     const { [key]: _old, ...rest } = filter;
     setFilter(value ? { ...rest, [key]: value } : rest);
   };
   return (
     <section id="ads-all" className="panel">
-      <h2>All ads <span className="dim small">({shown.length} of {ads.length})</span></h2>
+      <h2>Pulled ads <span className="dim small">({shown.length} of {ads.length})</span></h2>
+      <div className="filters">
+        {[null, ...adsShape.rings].map((ring) => (
+          <button key={ring ?? 'all'} className={`chip${(filter.ring ?? null) === ring ? ' on' : ''}`} onClick={() => change('ring', ring ?? '')}>
+            {ring ? adsShape.words(ring) : 'all categories'} ({ring ? ads.filter((ad) => adsShape.ringOf(ad) === ring).length : ads.length})
+          </button>
+        ))}
+      </div>
       <div className="filters">
         {FILTERS.map((key) => {
-          const values = adsShape.values(ads, key, analysis);
+          const values = adsShape.values(ads, key);
           if (values.length === 0) return null;
           return (
             <label key={key} className="chip">
@@ -36,14 +42,13 @@ export default function AdGrid({ ads, competitors, analysis, filter, setFilter }
                 <option value="">any</option>
                 {values.map((value) => (
                   <option key={value} value={value}>
-                    {key === 'angle' ? angleName(value) : adsShape.words(value)} ({ads.filter((ad) => adsShape.matches(ad, { ...filter, [key]: value }, analysis)).length})
+                    {adsShape.words(value)} ({ads.filter((ad) => adsShape.matches(ad, { ...filter, [key]: value })).length})
                   </option>
                 ))}
               </select>
             </label>
           );
         })}
-        {filter.ids && <span className="chip on">{filter.ids.split(',').length} ads from a finding</span>}
         {Object.keys(filter).length > 0 && <button className="ghost small" onClick={() => setFilter({})}>Clear filters</button>}
         <label className="chip">
           sort
@@ -54,7 +59,7 @@ export default function AdGrid({ ads, competitors, analysis, filter, setFilter }
       </div>
       <ul className="cards ads">
         {shown.map((ad) => (
-          <AdCard key={ad.id} ad={ad} logo={logo(ad)} proven={analysis?.proven_ids.includes(ad.id) ?? false} angle={analysis?.angle_of[ad.id] ? angleName(analysis.angle_of[ad.id]) : null} />
+          <AdCard key={ad.id} ad={ad} logo={logo(ad)} />
         ))}
       </ul>
     </section>
